@@ -1,0 +1,16 @@
+{
+  "pages": [
+    {
+      "path": "pages/spike/spike",
+      "style": {
+        "navigationBarTitleText": "SDK 连通性 Spike"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTitleText": "easemob-uikit-uni",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F5F5"
+  }
+}

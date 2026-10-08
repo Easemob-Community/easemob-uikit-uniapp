@@ -1,0 +1,9 @@
+{
+  "name": "easemob-uikit-uni-demo",
+  "version": "0.0.1",
+  "private": true,
+  "description": "环信 UIKit uni-app 版演示工程（uni-app x 蒸汽模式）",
+  "dependencies": {
+    "easemob-websdk": "^5.1.2"
+  }
+}

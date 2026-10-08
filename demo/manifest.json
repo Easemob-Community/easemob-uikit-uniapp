@@ -1,0 +1,25 @@
+{
+  "name": "easemob-uikit-uni demo",
+  "appid": "__UNI__08EF252",
+  "description": "环信 UIKit uni-app 版演示工程",
+  "versionName": "0.0.1",
+  "versionCode": 1,
+  "uni-app-x": {
+    "vapor": true,
+    "styleIsolationVersion": "2"
+  },
+  "vueVersion": "3",
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "minified": true
+    }
+  },
+  "app": {
+    "distribute": {
+      "modules": {}
+    }
+  },
+  "web": {}
+}
