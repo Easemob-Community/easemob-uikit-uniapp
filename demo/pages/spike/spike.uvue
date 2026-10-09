@@ -3,6 +3,7 @@
     <view class="spike__header">
       <text class="spike__title">环信 SDK 连通性 Spike</text>
       <text class="spike__status">连接状态：{{ statusText }}</text>
+      <text class="spike__status">运行模式：{{ runtimeMode }}（条件编译探针）</text>
       <text class="spike__error" v-if="errorText !== ''">{{ errorText }}</text>
     </view>
 
@@ -50,6 +51,12 @@ const anchorId = ref('')
 const lastAnchor = 'spike-anchor'
 
 const isOnline = computed(() => EmKit.state.status === 'online')
+
+// 运行模式探针：编译期条件编译，产物里只保留命中的分支——页面上显示的就是编译器真实走的管线
+let runtimeMode = ref('VDOM')
+// #ifdef VUE3-VAPOR
+runtimeMode = ref('蒸汽模式（VUE3-VAPOR）')
+// #endif
 const statusText = computed(() => {
   switch (EmKit.state.status) {
     case 'connecting': return '连接中…'
