@@ -30,9 +30,10 @@ scripts/                         # 编译/发布脚本
 ```bash
 cd demo && npm install        # 安装 easemob-websdk
 cd ..
-scripts/uni.sh dev web        # H5 开发模式
 scripts/uni.sh build web      # H5 出包
-scripts/uni.sh build mp-weixin # 微信小程序出包（用微信开发者工具打开 demo/unpackage/dist/dev|build/mp-weixin）
+scripts/uni.sh build mp-weixin # 微信小程序出包（用微信开发者工具打开 demo/unpackage/dist/build/mp-weixin）
+# H5 本地验证：dev 模式暂不支持 .uts 入口，用构建产物 + 静态伺服
+cd demo/unpackage/dist/build/web && python3 -m http.server 5180
 ```
 
 > appkey 与测试 token 从环信控制台获取（仅限开发用途），**不要**把真实凭据提交进仓库。

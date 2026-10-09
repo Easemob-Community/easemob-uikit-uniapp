@@ -4,7 +4,7 @@
 
 ## 1. 项目现状（重要，先读）
 
-**本项目处于 M0/M1 之间：最小连通性用例已落地，UI 组件尚未开始。** 已有内容：`PLAN.md`（立项计划书 v0.1，唯一执行依据）、`README.md`、`uni_modules/easemob-uikit-uni/`（仅 `libs/` 最小逻辑层：EmKit 门面 + `platform.ts` 存储收口，无组件）、`demo/`（uni-app x 蒸汽工程，含 `pages/spike/spike.vue` 连通性用例页，`uni_modules` 为指向仓库根的符号链接）、`scripts/uni.sh`（HBuilderX 内置编译器的 CLI 封装，支持 web/mp-weixin）、`docs/SPIKE-SDK-CONNECTIVITY.md`（五端验证记录，H5/小程序已编译通过，收发待测试账号实测）。`tests/` 尚未创建。
+**本项目处于 M0/M1 之间：最小连通性用例已落地，UI 组件尚未开始。** 已有内容：`PLAN.md`（立项计划书 v0.1，唯一执行依据）、`README.md`、`uni_modules/easemob-uikit-uni/`（仅 `libs/` 最小逻辑层：EmKit 门面 + client/chat/store/platform 功能拆分，无组件）、`demo/`（uni-app x 蒸汽工程：入口 `main.uts`+`App.uvue`、页面 `.uvue`（script 保持纯 ts）、manifest 含 `vapor-render-target: bytecode`，含 `pages/spike/spike.uvue` 连通性用例页，`uni_modules` 为指向仓库根的符号链接）、`scripts/uni.sh`（HBuilderX 内置编译器的 CLI 封装，build 支持 web/mp-weixin；**dev web 模式不转换 .uts 入口，H5 验证用 build + 静态伺服**）、`docs/SPIKE-SDK-CONNECTIVITY.md`（五端验证记录：H5 已用 easemob-websdk 5.x 实测登录/双向收发/重连通过；小程序/真机待验）。`tests/` 尚未创建。SDK 定稿 `easemob-websdk ^5.1.2`（ChatClient + Manager 注册制）。
 
 **`PLAN.md` 是一期开发的唯一执行依据**（其原文：「任何范围/选型变更先改本文档再动手」）。做任何实现工作前先通读 `PLAN.md`；范围或技术选型需要调整时，必须先修改 `PLAN.md` 再动代码，而不是相反。第 4 节描述的 `components/`、`pages_init.json` 等仍是**目标结构**，尚未创建。
 

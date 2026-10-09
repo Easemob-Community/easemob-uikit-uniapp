@@ -1,0 +1,8 @@
+<script setup lang="uts">
+onLaunch(() => {
+  console.log('App Launch: easemob-uikit-uni demo')
+})
+</script>
+
+<style>
+</style>

@@ -6,6 +6,7 @@
   "versionCode": 1,
   "uni-app-x": {
     "vapor": true,
+    "vapor-render-target": "bytecode",
     "styleIsolationVersion": "2"
   },
   "vueVersion": "3",
