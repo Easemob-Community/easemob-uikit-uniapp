@@ -22,5 +22,41 @@
       "modules": {}
     }
   },
-  "web": {}
+  "web": {},
+  "app-android": {
+    "distribute": {
+      "modules": {},
+      "icons": {},
+      "splashScreens": {
+        "default": {}
+      }
+    }
+  },
+  "app-ios": {
+    "distribute": {
+      "modules": {},
+      "icons": {},
+      "splashScreens": {}
+    }
+  },
+  "app-harmony": {
+    "distribute": {
+      "deviceTypes": [
+        "phone"
+      ],
+      "deviceArchs": [
+        "arm64-v8a"
+      ],
+      "bundleName": "uni.app.UNI08EF252",
+      "signingConfigs": {
+        "default": {
+          "certpath": "/Users/neohuang/Library/Application Support/HBuilder X/extensions/launcher/agc-certs/1791531928119.cer",
+          "keyAlias": "debugKey",
+          "profile": "/Users/neohuang/Library/Application Support/HBuilder X/extensions/launcher/agc-certs/1791531928119.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/neohuang/Library/Application Support/HBuilder X/extensions/launcher/agc-certs/1791531928119.p12"
+        }
+      }
+    }
+  }
 }

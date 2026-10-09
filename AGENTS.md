@@ -4,9 +4,9 @@
 
 ## 1. 项目现状（重要，先读）
 
-**本项目处于 M0/M1 之间：最小连通性用例已落地，UI 组件尚未开始。** 已有内容：`PLAN.md`（立项计划书 v0.1，唯一执行依据）、`README.md`、`uni_modules/easemob-uikit-uni/`（仅 `libs/` 最小逻辑层：EmKit 门面 + client/chat/store/platform 功能拆分，无组件）、`demo/`（uni-app x 蒸汽工程：入口 `main.uts`+`App.uvue`、页面 `.uvue`（script 保持纯 ts）、manifest 含 `vapor-render-target: bytecode`，含 `pages/spike/spike.uvue` 连通性用例页，`uni_modules` 为指向仓库根的符号链接）、`scripts/uni.sh`（HBuilderX 内置编译器的 CLI 封装，build 支持 web/mp-weixin；**dev web 模式不转换 .uts 入口，H5 验证用 build + 静态伺服**）、`docs/SPIKE-SDK-CONNECTIVITY.md`（五端验证记录：H5 已用 easemob-websdk 5.x 实测登录/双向收发/重连通过；小程序/真机待验）。`tests/` 尚未创建。SDK 定稿 `easemob-websdk ^5.1.2`（ChatClient + Manager 注册制）。
+**本项目 M1（demo 最小闭环）已落地，处于 M1/M2 之间。** 已有内容：`PLAN.md`（立项计划书 v0.1，唯一执行依据）、`README.md`、`uni_modules/easemob-uikit-uni/`（`libs/`：EmKit 门面 + client/chat/store（connection/conversation/message/theme）/platform/use/locale/utils 功能拆分；`components/`：`em-avatar`、`em-conversation-page`、`em-chat-page`（文本/图片气泡、历史加载、输入栏最小版））、`demo/`（uni-app x 蒸汽工程：入口 `main.uts`+`App.uvue`、页面 `.uvue`（script 保持纯 ts）、manifest 含 `vapor-render-target: bytecode`；页面：login（appkey/userId/token + 密码换 token 开发入口）、conversation、chat 三个闭环页 + spike/style-lab 两个开发页，`uni_modules` 为指向仓库根的符号链接）、`scripts/uni.sh`（HBuilderX 内置编译器的 CLI 封装，build 支持 web/mp-weixin；**dev web 模式不转换 .uts 入口，H5 验证用 build + 静态伺服**）、`docs/SPIKE-SDK-CONNECTIVITY.md`（五端验证记录：H5 全通；微信小程序、鸿蒙真机登录/收发/重连已实测通过；Android 真机登录/收发已通，重连待验；iOS 待验）、`docs/HARMONY-REALDEVICE-RUN.md`（鸿蒙真机运行与签名配置实测沉淀：包名三方一致原则、自动/手动申请调试证书流程、常见报错处理）。`tests/` 尚未创建。SDK 定稿 `easemob-websdk ^5.1.2`（ChatClient + Manager 注册制）。M1 H5 端到端已实测（登录 → 会话列表 → 聊天收发文本）；图片发送、微信小程序与 App 端 M1 链路待实测。
 
-**`PLAN.md` 是一期开发的唯一执行依据**（其原文：「任何范围/选型变更先改本文档再动手」）。做任何实现工作前先通读 `PLAN.md`；范围或技术选型需要调整时，必须先修改 `PLAN.md` 再动代码，而不是相反。第 4 节描述的 `components/`、`pages_init.json` 等仍是**目标结构**，尚未创建。
+**`PLAN.md` 是一期开发的唯一执行依据**（其原文：「任何范围/选型变更先改本文档再动手」）。做任何实现工作前先通读 `PLAN.md`；范围或技术选型需要调整时，必须先修改 `PLAN.md` 再动代码，而不是相反。第 4 节描述的 `pages_init.json`、气泡族原子组件（`em-*-message`）等仍是**目标结构**，尚未创建。
 
 ## 2. 项目概述
 
@@ -44,7 +44,7 @@ D1/D4/D5 如需调整，必须先改 PLAN.md 第 0 节的决策表。
 | 主题 | `--em-*` CSS 变量双层 class（`.em-theme-light` / `.em-theme-dark`），App 端主题类挂组件根节点（RiceUI trick）；`useTheme().setTheme('dark'\|'light')` |
 | i18n | 中/英，文案无硬编码 |
 | 平台适配层 | `libs/platform.ts` 收口存储（`uni.setStorage`）、网络状态、媒体选择/录制，平台差异不落组件 |
-| 图标 | unicode 直显字体图标或 view+transform 绘制（uni-ui x 方案），不打包图片图标 |
+| 图标 | iconfont 字体图标（本地 ttf 组件同级目录 + `@font-face` 相对路径，RiceUI/uni-ui x 同款，五端零条件编译），`em-icon` 原子组件收口；复杂图形用 view+transform 绘制。**禁打包 svg/png 图标**。占位字体为 uni-icons `uniicons.ttf`（Apache-2.0），正式版换设计师 iconfont.cn 导出，只改 ttf + 映射表 |
 
 ## 5. 一期功能范围（PLAN.md 第 1–2 节）
 

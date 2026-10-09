@@ -25,10 +25,10 @@
 | 端 | 编译 | 登录 | 发文本 | 收文本 | 断线重连 | 备注 |
 |---|---|---|---|---|---|---|
 | H5(web) | ✅ build 通过 | ✅ | ✅ | ✅ | ✅（登出→再登录循环验证） | 双标签 hfp/pfh 双向实时收发实测通过；**dev server 模式当前不可用**（见踩坑 8），用 `build web` + 静态伺服验证 |
-| 微信小程序 | ✅ build 通过 | 待验证 | 待验证 | 待验证 | 待验证 | 产物 `demo/unpackage/dist/build/mp-weixin`，导入微信开发者工具实测；注意配置合法域名（见下） |
-| Android（蒸汽） | ✅ 真机启动正常 | 待验证 | 待验证 | 待验证 | 待验证 | 首轮黑屏（pagesMap 报错），按同事跑通配方改结构（main.uts/App.uvue/.uvue 页面/bytecode）后 HBuilderX 重跑已正常启动；SDK 收发待实测 |
+| 微信小程序 | ✅ build 通过 | ✅ | ✅ | ✅ | ✅ | 2026-10 实测登录/收发/断线重连通过；产物 `demo/unpackage/dist/build/mp-weixin`，导入微信开发者工具实测；注意配置合法域名（见下） |
+| Android（蒸汽） | ✅ 真机启动正常 | ✅ | ✅ | ✅ | 待验证 | 2026-10 真机实测登录与收发通过；首轮黑屏（pagesMap 报错），按同事跑通配方改结构（main.uts/App.uvue/.uvue 页面/bytecode）后正常 |
 | iOS | 待验证 | | | | | |
-| 鸿蒙 | 待验证 | | | | | API20+，需 DevEco 流程 |
+| 鸿蒙 | ✅ 真机签名运行已通 | ✅ | ✅ | ✅ | ✅ | 2026-10 真机实测登录/收发/断线重连通过；包名 `uni.app.UNI08EF252`（需在 manifest 鸿蒙配置显式设置，勿用模板默认 `io.dcloud.uniappx`）；签名/真机流程见 `docs/HARMONY-REALDEVICE-RUN.md` |
 
 ## 踩坑记录（全是实测）
 

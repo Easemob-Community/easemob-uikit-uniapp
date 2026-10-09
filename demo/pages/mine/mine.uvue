@@ -1,0 +1,142 @@
+<template>
+  <view class="mine">
+    <view class="mine__header">
+      <em-avatar :name="userId" :size="56" />
+      <view class="mine__profile">
+        <text class="mine__name">{{ userId }}</text>
+        <text class="mine__status">{{ statusText }}</text>
+      </view>
+    </view>
+
+    <view class="mine__group">
+      <view class="mine__cell">
+        <text class="mine__cell-label">深色模式</text>
+        <switch :checked="isDark" @change="onThemeChange" color="#009EFF" />
+      </view>
+    </view>
+
+    <view class="mine__group">
+      <view class="mine__cell" @click="onOpen('/pages/style-lab/style-lab')">
+        <text class="mine__cell-label">样式实验室</text>
+        <text class="mine__cell-arrow">›</text>
+      </view>
+      <view class="mine__cell" @click="onOpen('/pages/spike/spike')">
+        <text class="mine__cell-label">SDK 连通性 Spike</text>
+        <text class="mine__cell-arrow">›</text>
+      </view>
+    </view>
+
+    <view class="mine__footer">
+      <button class="mine__logout" @click="onLogout">退出登录</button>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { EmKit, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+
+const { themeStore, setTheme } = useTheme()
+
+const userId = computed(() => EmKit.state.userId)
+const isDark = ref(themeStore.mode === 'dark')
+
+const statusText = computed(() => {
+  switch (EmKit.state.status) {
+    case 'online': return '已连接'
+    case 'connecting': return '连接中…'
+    default: return '未连接'
+  }
+})
+
+function onThemeChange(e: any) {
+  const dark = e.detail.value as boolean
+  isDark.value = dark
+  setTheme(dark ? 'dark' : 'light')
+}
+
+function onOpen(url: string) {
+  uni.navigateTo({ url })
+}
+
+async function onLogout() {
+  try {
+    await EmKit.logout()
+  } catch (e) {}
+  uni.reLaunch({ url: '/pages/login/login' })
+}
+</script>
+
+<style>
+.mine {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #f5f5f5;
+}
+
+.mine__header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 24px 16px;
+  background-color: #ffffff;
+}
+
+.mine__profile {
+  display: flex;
+  flex-direction: column;
+  margin-left: 12px;
+}
+
+.mine__name {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.mine__status {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #999999;
+}
+
+.mine__group {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  background-color: #ffffff;
+}
+
+.mine__cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+}
+
+.mine__cell-label {
+  font-size: 15px;
+  color: #1a1a1a;
+}
+
+.mine__cell-arrow {
+  font-size: 16px;
+  color: #c9cdcf;
+}
+
+.mine__footer {
+  padding: 24px 16px;
+}
+
+.mine__logout {
+  height: 40px;
+  line-height: 40px;
+  font-size: 15px;
+  color: #ff3355;
+  background-color: #ffffff;
+  border-radius: 6px;
+}
+</style>

@@ -5,6 +5,7 @@
       <text class="spike__status">连接状态：{{ statusText }}</text>
       <text class="spike__status">运行模式：{{ runtimeMode }}（条件编译探针）</text>
       <text class="spike__error" v-if="errorText !== ''">{{ errorText }}</text>
+      <button class="spike__btn spike__btn--plain spike__btn--entry" @click="onOpenStyleLab">样式实验室 →</button>
     </view>
 
     <view class="spike__form">
@@ -79,6 +80,10 @@ function formatTime(time: number): string {
   const d = new Date(time)
   const pad = (n: number) => (n < 10 ? '0' + n : '' + n)
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+function onOpenStyleLab() {
+  uni.navigateTo({ url: '/pages/style-lab/style-lab' })
 }
 
 async function onLogin() {
@@ -202,6 +207,11 @@ async function onSend() {
   border-width: 1px;
   border-style: solid;
   border-color: #1677ff;
+}
+
+.spike__btn--entry {
+  margin-top: 8px;
+  align-self: flex-start;
 }
 
 .spike__list {

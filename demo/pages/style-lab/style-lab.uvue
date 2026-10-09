@@ -1,0 +1,279 @@
+<template>
+  <scroll-view scroll-y :class="['lab', themeClass]">
+    <view class="lab__header">
+      <text class="lab__title">样式实验室 Style Lab</text>
+      <view class="lab__actions">
+        <button class="lab__btn" @click="toggleTheme">{{ themeStore.mode === 'light' ? '切到暗色' : '切到亮色' }}</button>
+        <button class="lab__btn" @click="toggleLocale">{{ themeStore.locale === 'zh-CN' ? 'English' : '中文' }}</button>
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">文字阶梯</text>
+      <text class="lab__text lab__text--primary">text-primary · {{ t('conversation.title') }}</text>
+      <text class="lab__text lab__text--secondary">text-secondary · {{ t('status.reconnecting') }}</text>
+      <text class="lab__text lab__text--tertiary">text-tertiary · {{ t('message.status.sending') }}</text>
+      <view class="lab__inverse-box">
+        <text class="lab__text lab__text--inverse">text-inverse · {{ t('chat.send') }}</text>
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">背景与控件阶梯</text>
+      <view class="lab__swatches">
+        <view class="lab__swatch lab__swatch--base"><text class="lab__swatch-label">bg-base</text></view>
+        <view class="lab__swatch lab__swatch--secondary"><text class="lab__swatch-label">bg-secondary</text></view>
+        <view class="lab__swatch lab__swatch--tertiary"><text class="lab__swatch-label">bg-tertiary</text></view>
+        <view class="lab__swatch lab__swatch--control"><text class="lab__swatch-label">control-bg</text></view>
+        <view class="lab__swatch lab__swatch--active"><text class="lab__swatch-label">bg-active</text></view>
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">气泡与徽标色</text>
+      <view class="lab__swatches">
+        <view class="lab__swatch lab__swatch--bubble-self"><text class="lab__swatch-label lab__swatch-label--light">bubble-self</text></view>
+        <view class="lab__swatch lab__swatch--bubble-other"><text class="lab__swatch-label">bubble-other</text></view>
+        <view class="lab__swatch lab__swatch--primary"><text class="lab__swatch-label lab__swatch-label--light">primary</text></view>
+        <view class="lab__swatch lab__swatch--badge"><text class="lab__swatch-label lab__swatch-label--light">badge</text></view>
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">间距阶梯（4/8/12/16/24/32/48）</text>
+      <view class="lab__bar lab__bar--s1"></view>
+      <view class="lab__bar lab__bar--s2"></view>
+      <view class="lab__bar lab__bar--s3"></view>
+      <view class="lab__bar lab__bar--s4"></view>
+      <view class="lab__bar lab__bar--s5"></view>
+      <view class="lab__bar lab__bar--s6"></view>
+      <view class="lab__bar lab__bar--s7"></view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">字号阶梯</text>
+      <text class="lab__fs lab__fs--10">10px {{ t('message.status.read') }}</text>
+      <text class="lab__fs lab__fs--12">12px {{ t('message.action.recall') }}</text>
+      <text class="lab__fs lab__fs--14">14px {{ t('chat.placeholder') }}</text>
+      <text class="lab__fs lab__fs--16">16px {{ t('chat.title') }}</text>
+      <text class="lab__fs lab__fs--20">20px {{ t('button.confirm') }}</text>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">em-avatar</text>
+      <view class="lab__avatars">
+        <em-avatar class="lab__avatar-item" name="环信" :size="64" :badge="3" />
+        <em-avatar class="lab__avatar-item" name="Neo" :size="48" shape="square" :badge="120" />
+        <em-avatar class="lab__avatar-item" name="张小龙" :size="40" :badge-dot="true" />
+        <em-avatar class="lab__avatar-item" name="UIKit" :size="32" />
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">em-icon（占位字体 uni-icons，正式版换设计师 iconfont）</text>
+      <view class="lab__icons">
+        <view v-for="icon in iconNames" :key="icon" class="lab__icon-item">
+          <em-icon :name="icon" :size="24" />
+          <text class="lab__icon-name">{{ icon }}</text>
+        </view>
+        <view class="lab__icon-item">
+          <em-icon name="paperplane" :size="24" color="#07c160" />
+          <text class="lab__icon-name">custom color</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</template>
+
+<script setup lang="ts">
+import { useTheme, useLocale, themeStore } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
+
+const { themeClass, setTheme } = useTheme()
+const { t, setLocale } = useLocale()
+
+const iconNames: EmIconName[] = [
+  'back', 'search', 'plus', 'mic', 'image', 'camera', 'paperclip', 'paperplane',
+  'sound', 'videocam', 'checkmarkempty', 'info', 'download', 'more', 'trash', 'undo'
+]
+
+function toggleTheme() {
+  setTheme(themeStore.mode === 'light' ? 'dark' : 'light')
+}
+
+function toggleLocale() {
+  setLocale(themeStore.locale === 'zh-CN' ? 'en' : 'zh-CN')
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.lab {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--em-bg-base);
+}
+
+.lab__header {
+  display: flex;
+  flex-direction: column;
+  padding: var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-border-color);
+}
+
+.lab__title {
+  font-size: var(--em-font-size-18);
+  font-weight: var(--em-font-weight-semibold);
+  color: var(--em-text-primary);
+}
+
+.lab__actions {
+  display: flex;
+  flex-direction: row;
+  margin-top: var(--em-spacing-3);
+}
+
+.lab__btn {
+  height: 32px;
+  line-height: 32px;
+  padding-left: var(--em-spacing-4);
+  padding-right: var(--em-spacing-4);
+  margin-right: var(--em-spacing-3);
+  font-size: var(--em-font-size-14);
+  color: var(--em-text-inverse);
+  background-color: var(--em-primary-color);
+  border-radius: var(--em-radius);
+}
+
+.lab__section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-border-light);
+}
+
+.lab__section-title {
+  font-size: var(--em-font-size-13);
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-tertiary);
+  margin-bottom: var(--em-spacing-3);
+}
+
+.lab__text {
+  font-size: var(--em-font-size-14);
+  margin-bottom: var(--em-spacing-2);
+}
+
+.lab__text--primary { color: var(--em-text-primary); }
+.lab__text--secondary { color: var(--em-text-secondary); }
+.lab__text--tertiary { color: var(--em-text-tertiary); }
+.lab__text--inverse { color: var(--em-text-inverse); }
+
+.lab__inverse-box {
+  background-color: var(--em-primary-color);
+  border-radius: var(--em-radius);
+  padding: var(--em-spacing-2) var(--em-spacing-3);
+  align-self: flex-start;
+}
+
+.lab__swatches {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.lab__swatch {
+  width: 100px;
+  height: 48px;
+  border-radius: var(--em-radius);
+  margin-right: var(--em-spacing-2);
+  margin-bottom: var(--em-spacing-2);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lab__swatch--base { background-color: var(--em-bg-base); }
+.lab__swatch--secondary { background-color: var(--em-bg-secondary); }
+.lab__swatch--tertiary { background-color: var(--em-bg-tertiary); }
+.lab__swatch--control { background-color: var(--em-control-bg); }
+.lab__swatch--active { background-color: var(--em-bg-active); }
+.lab__swatch--bubble-self { background-color: var(--em-bubble-bg-self); }
+.lab__swatch--bubble-other { background-color: var(--em-bubble-bg-other); }
+.lab__swatch--primary { background-color: var(--em-primary-color); }
+.lab__swatch--badge { background-color: var(--em-badge-bg); }
+
+.lab__swatch-label {
+  font-size: var(--em-font-size-10);
+  color: var(--em-text-secondary);
+}
+
+.lab__swatch-label--light {
+  color: #ffffff;
+}
+
+.lab__bar {
+  height: 8px;
+  border-radius: var(--em-radius);
+  background-color: var(--em-primary-color);
+  margin-bottom: var(--em-spacing-2);
+}
+
+.lab__bar--s1 { width: var(--em-spacing-1); }
+.lab__bar--s2 { width: var(--em-spacing-2); }
+.lab__bar--s3 { width: var(--em-spacing-3); }
+.lab__bar--s4 { width: var(--em-spacing-4); }
+.lab__bar--s5 { width: var(--em-spacing-5); }
+.lab__bar--s6 { width: var(--em-spacing-6); }
+.lab__bar--s7 { width: var(--em-spacing-7); }
+
+.lab__fs {
+  color: var(--em-text-primary);
+  margin-bottom: var(--em-spacing-2);
+}
+
+.lab__fs--10 { font-size: var(--em-font-size-10); }
+.lab__fs--12 { font-size: var(--em-font-size-12); }
+.lab__fs--14 { font-size: var(--em-font-size-14); }
+.lab__fs--16 { font-size: var(--em-font-size-16); }
+.lab__fs--20 { font-size: var(--em-font-size-20); }
+
+.lab__avatars {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.lab__avatar-item {
+  margin-right: var(--em-spacing-4);
+}
+
+.lab__icons {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.lab__icon-item {
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--em-spacing-3);
+}
+
+.lab__icon-name {
+  font-size: var(--em-font-size-10);
+  color: var(--em-text-tertiary);
+  margin-top: var(--em-spacing-1);
+}
+</style>

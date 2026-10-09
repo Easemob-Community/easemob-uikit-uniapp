@@ -1,0 +1,224 @@
+<template>
+  <view class="login">
+    <view class="login__header">
+      <text class="login__title">环信 IM Demo</text>
+      <text class="login__subtitle">easemob-uikit-uni 演示工程</text>
+    </view>
+
+    <view class="login__form">
+      <input class="login__input" v-model="appkey" placeholder="appkey（环信控制台获取）" />
+      <input class="login__input" v-model="userId" placeholder="userId" />
+      <input class="login__input" v-model="token" placeholder="access token" />
+      <button class="login__btn" :disabled="logging" @click="onLogin">{{ logging ? '登录中…' : '登录' }}</button>
+      <text class="login__error" v-if="errorText !== ''">{{ errorText }}</text>
+    </view>
+
+    <view class="login__dev">
+      <text class="login__dev-title" @click="showDev = !showDev">开发用：密码换 token {{ showDev ? '▲' : '▼' }}</text>
+      <view v-if="showDev" class="login__dev-body">
+        <input class="login__input" v-model="password" placeholder="密码（仅开发调试用）" password />
+        <button class="login__btn login__btn--plain" :disabled="fetchingToken" @click="onFetchToken">
+          {{ fetchingToken ? '获取中…' : '获取测试 token' }}
+        </button>
+        <text class="login__dev-tip">仅限开发调试，凭据不会写入仓库</text>
+      </view>
+    </view>
+
+    <view class="login__footer">
+      <button class="login__btn login__btn--plain" @click="onOpenSpike">SDK Spike 页 →</button>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad } from '@dcloudio/uni-app'
+import { ref } from 'vue'
+import { EmKit, getStorage, setStorage } from '@/uni_modules/easemob-uikit-uni/libs'
+
+const KEY_APPKEY = 'emkit.appkey'
+const KEY_USERID = 'emkit.userId'
+const KEY_TOKEN = 'emkit.token'
+
+const appkey = ref('')
+const userId = ref('')
+const token = ref('')
+const password = ref('')
+const logging = ref(false)
+const fetchingToken = ref(false)
+const showDev = ref(false)
+const errorText = ref('')
+
+onLoad(() => {
+  appkey.value = getStorage(KEY_APPKEY)
+  userId.value = getStorage(KEY_USERID)
+  token.value = getStorage(KEY_TOKEN)
+})
+
+function errMsg(e: any): string {
+  return (e?.message ?? e?.data?.message ?? JSON.stringify(e)) as string
+}
+
+async function onLogin() {
+  errorText.value = ''
+  if (appkey.value === '' || userId.value === '' || token.value === '') {
+    errorText.value = '请填写 appkey / userId / token'
+    return
+  }
+  logging.value = true
+  try {
+    EmKit.init({ appkey: appkey.value })
+    await EmKit.login({ userId: userId.value, token: token.value })
+    setStorage(KEY_APPKEY, appkey.value)
+    setStorage(KEY_USERID, userId.value)
+    setStorage(KEY_TOKEN, token.value)
+    uni.switchTab({ url: '/pages/conversation/conversation' })
+  } catch (e: any) {
+    errorText.value = '登录失败：' + errMsg(e)
+  } finally {
+    logging.value = false
+  }
+}
+
+// 环信 REST password grant 换用户 token；仅开发用
+async function onFetchToken() {
+  errorText.value = ''
+  if (appkey.value === '' || userId.value === '' || password.value === '') {
+    errorText.value = '请先填写 appkey / userId，并输入密码'
+    return
+  }
+  const parts = appkey.value.split('#')
+  if (parts.length !== 2) {
+    errorText.value = 'appkey 格式应为 org#app'
+    return
+  }
+  fetchingToken.value = true
+  try {
+    const res = await new Promise<any>((resolve, reject) => {
+      uni.request({
+        url: `https://a1.easemob.com/${parts[0]}/${parts[1]}/token`,
+        method: 'POST',
+        data: {
+          grant_type: 'password',
+          username: userId.value,
+          password: password.value
+        },
+        success: (r) => resolve(r),
+        fail: (e) => reject(e)
+      })
+    })
+    const body = res.data as any
+    if (body?.access_token != null) {
+      token.value = body.access_token as string
+      errorText.value = ''
+    } else {
+      errorText.value = '获取 token 失败：' + JSON.stringify(body)
+    }
+  } catch (e: any) {
+    errorText.value = '获取 token 失败：' + errMsg(e)
+  } finally {
+    fetchingToken.value = false
+  }
+}
+
+function onOpenSpike() {
+  uni.navigateTo({ url: '/pages/spike/spike' })
+}
+</script>
+
+<style>
+.login {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.login__header {
+  display: flex;
+  flex-direction: column;
+  padding: 48px 16px 24px;
+}
+
+.login__title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.login__subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #999999;
+}
+
+.login__form {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  background-color: #ffffff;
+}
+
+.login__input {
+  height: 40px;
+  padding: 0 12px;
+  margin-bottom: 10px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdcdc;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #ffffff;
+}
+
+.login__btn {
+  height: 40px;
+  line-height: 40px;
+  font-size: 15px;
+  color: #ffffff;
+  background-color: #009eff;
+  border-radius: 6px;
+}
+
+.login__btn--plain {
+  color: #009eff;
+  background-color: #ffffff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #009eff;
+}
+
+.login__error {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #e64545;
+}
+
+.login__dev {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  padding: 12px 16px;
+  background-color: #ffffff;
+}
+
+.login__dev-title {
+  font-size: 13px;
+  color: #666666;
+}
+
+.login__dev-body {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+}
+
+.login__dev-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #999999;
+}
+
+.login__footer {
+  padding: 16px;
+}
+</style>

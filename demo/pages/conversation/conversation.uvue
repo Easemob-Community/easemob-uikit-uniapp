@@ -1,0 +1,131 @@
+<template>
+  <view class="page">
+    <em-conversation-page @select="onSelect" @create="onCreate" />
+    <view v-if="showNewChat" class="newchat">
+      <view class="newchat__panel">
+        <text class="newchat__title">发起单聊</text>
+        <input class="newchat__input" v-model="peerId" placeholder="输入对方 userId" />
+        <view class="newchat__row">
+          <button class="newchat__btn newchat__btn--plain" @click="showNewChat = false">取消</button>
+          <button class="newchat__btn" @click="onStartChat">开始聊天</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { ref } from 'vue'
+import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+
+const showNewChat = ref(false)
+const peerId = ref('')
+
+function ensureLogin(): boolean {
+  if (EmKit.state.status !== 'online') {
+    uni.reLaunch({ url: '/pages/login/login' })
+    return false
+  }
+  return true
+}
+
+onLoad(() => {
+  if (!ensureLogin()) return
+  EmKit.syncConversations().catch((e) => {
+    console.error('[demo] syncConversations fail:', e)
+  })
+})
+
+onShow(() => {
+  if (!ensureLogin()) return
+  EmKit.syncConversations().catch((e) => {
+    console.error('[demo] syncConversations fail:', e)
+  })
+})
+
+function onSelect(conversationId: string) {
+  uni.navigateTo({ url: `/pages/chat/chat?conversationId=${conversationId}` })
+}
+
+function onCreate() {
+  peerId.value = ''
+  showNewChat.value = true
+}
+
+function onStartChat() {
+  const id = peerId.value.trim()
+  if (id === '') return
+  showNewChat.value = false
+  uni.navigateTo({ url: `/pages/chat/chat?conversationId=${id}` })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.newchat {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.newchat__panel {
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  padding: 16px;
+  background-color: #ffffff;
+  border-radius: 12px;
+}
+
+.newchat__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.newchat__input {
+  height: 38px;
+  padding: 0 10px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdcdc;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.newchat__row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.newchat__btn {
+  height: 34px;
+  line-height: 34px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: #ffffff;
+  background-color: #009eff;
+  border-radius: 6px;
+}
+
+.newchat__btn--plain {
+  color: #666666;
+  background-color: #f5f5f5;
+  margin-right: 10px;
+}
+</style>

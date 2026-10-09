@@ -29,7 +29,7 @@
 
 | 页面 | 组件名 | 内容 |
 |---|---|---|
-| 会话列表页 | `em-conversation-page` | 头像+未读徽标、昵称、最后消息摘要、时间、草稿、`@我` 提示、置顶/免打扰标记、滑动删除、点击进入聊天 |
+| 会话列表页 | `em-conversation-page` | 头像+未读徽标、昵称、最后消息摘要、时间、草稿、`@我` 提示、置顶/免打扰标记、会话搜索（本地过滤名称/摘要）、滑动删除、点击进入聊天 |
 | 聊天页 | `em-chat-page` | 消息列表（list-view 复用）、5 种气泡、输入栏、长按菜单、群公告条位、下拉加载历史 |
 | 登录接入 | demo 内置 `pages/login` | appkey + userId + token 登录；demo 提供「测试 token 获取」入口（仅开发用） |
 
@@ -61,11 +61,11 @@
 - Avatar：内置徽标（未读数/红点），形状走主题（`avatarShape`）
 - 状态管理：裸 `reactive` store，**零运行时依赖**（不装 pinia/dayjs/lodash）
 - 平台适配层：`libs/platform.ts` 收口存储（`uni.setStorage`）、网络状态、媒体选择/录制，差异不落组件
-- 图标：unicode 直显字体图标（App 端无伪元素约束）或 view+transform 绘制（uni-ui x 方案），不打包图片图标
+- 图标：iconfont 字体图标，本地 ttf 放组件同级目录 + `@font-face` 相对路径引入（RiceUI `rice-icon` / uni-ui x `uni-icons-x` 同款方案，vapor 五端零条件编译），由 `em-icon` 原子组件收口「图标名 → unicode 码点」映射、`<text>` 渲染；复杂图形才允许 view+transform 绘制。**不打包图片图标（svg/png）**——svg 在小程序/App 端不可行（无内联 svg、image 组件 svg 渲染有平台差异）。字体来源：一期用 uni-icons 的 `uniicons.ttf`（DCloud，Apache-2.0）占位，正式版替换为设计师维护的 iconfont.cn 项目导出 ttf；替换只需改 ttf + 映射表两个文件，组件零改动
 
 ## 2. 明确不做（Out of Scope，一期）
 
-tiptap 富文本输入、消息编辑、消息翻译、合并转发、多选模式、消息搜索、语音转文字、位置消息、群已读回执详情、会话分栏、H5 适配层（Web 版那套）、浏览器通知系统、Electron/SQLite 持久化、双 SDK adapter 抽象、名片转发、群管理全套（公告编辑/禁言/转让）、Presence 在线状态（保留接口默认关闭）、表情包商店、自研图片预览手势层。
+tiptap 富文本输入、消息编辑、消息翻译、合并转发、多选模式、消息搜索（服务端漫游消息搜索；会话列表的本地过滤搜索保留）、语音转文字、位置消息、群已读回执详情、会话分栏、H5 适配层（Web 版那套）、浏览器通知系统、Electron/SQLite 持久化、双 SDK adapter 抽象、名片转发、群管理全套（公告编辑/禁言/转让）、Presence 在线状态（保留接口默认关闭）、表情包商店、自研图片预览手势层。
 
 > 完整裁剪对照见本文件附录 A。砍掉的每一项在 README「路线图」里写明状态，防止社区 issue 重复提。
 
@@ -135,11 +135,16 @@ easemob-uikit-uniapp/
 
 **M0 不过则暂停 UI 开发，回头评估 SDK 方案（含必要时封装 uts 插件）。**
 
+> 进度（2026-10-09）：H5 全通；微信小程序、鸿蒙真机登录/收发/重连实测通过；Android 真机登录/收发已通（重连待验）；iOS 未验，挂账并行补验。四端已过，SDK 方案风险解除，M1 启动。
+
 ### M1：demo 最小闭环（先于抽象）
 
+- 开工前先落地基架子：`libs/style/variables.css`（`--em-*` token 明暗两套，值平移自 Web 版 theme/index.css）+ `useNamespace/useTheme/useLocale` + 一期 locale 文案 + em-avatar 试金石组件 + demo style-lab 验证页（先验证 CSS 变量/class 主题在 App 端可行，再大规模用）
 - 登录页（appkey/userId/token + 测试 token 入口）
-- 会话列表页 + 聊天页骨架，文本/图片两种气泡先通
+- 会话列表页 + 聊天页骨架，文本/图片两种气泡先通（页面级组件直接沉淀在 `uni_modules/components/`：em-conversation-page / em-chat-page，demo 页面仅做路由包装，避免 M3 二次搬移）
 - 目标：内部扫码可体验「登录 → 看到会话 → 收发消息」
+
+> 进度（2026-10-09）：基架子（token/use\*/locale/em-avatar/style-lab）与 demo 闭环已落地。libs 扩展了会话/消息 store、图片收发、历史消息、连接就绪门；demo 新增 login（含密码换 token 开发入口）/conversation/chat 三页。H5 端到端实测通过（登录 → 会话列表未读/摘要 → 历史加载 → 发送文本 → 返回列表摘要刷新）；web/mp-weixin 双端编译通过。图片发送、微信小程序与 App 端真机链路待实测。
 
 ### M2：聊天页完整化
 
@@ -149,7 +154,7 @@ easemob-uikit-uniapp/
 
 ### M3：组件沉淀与发布
 
-- 从 demo 解耦出页面级组件 + 原子组件；pages_init.json
+- 原子组件沉淀（em-*-message 气泡族、输入栏等从页面级组件解耦）；pages_init.json 页面模板注册
 - `variables.css` token 体系定稿（值平移自 Web 版 DESIGN-TOKEN-MAPPING）
 - README（含分包接入模板：聊天页进 subpackage 的 pages.json 示例）、changelog、license
 - uni-automator 核心链路用例（登录/收发/撤回/重发）
@@ -186,7 +191,7 @@ easemob-uikit-uniapp/
 
 | Web 版能力 | 本期处置 |
 |---|---|
-| 会话列表（未读/草稿/@我/置顶/免打扰/删除） | 保留（一期核心） |
+| 会话列表（未读/草稿/@我/置顶/免打扰/删除/本地搜索过滤） | 保留（一期核心） |
 | 文本/图片/语音/视频/文件气泡 | 保留 |
 | 引用/撤回/重发/单聊已读/typing | 保留（不配开关，默认开） |
 | 自定义消息出口 | 保留（插槽） |

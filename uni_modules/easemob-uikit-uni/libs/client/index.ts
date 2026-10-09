@@ -54,4 +54,23 @@ export class EmClient {
     connectionStore.status = 'closed'
     connectionStore.userId = ''
   }
+
+  // login resolve ≠ socket 就绪：发送/拉历史前统一等 onConnected
+  waitOnline(timeout = 8000): Promise<void> {
+    if (connectionStore.status === 'online') {
+      return Promise.resolve()
+    }
+    return new Promise<void>((resolve, reject) => {
+      const start = Date.now()
+      const timer = setInterval(() => {
+        if (connectionStore.status === 'online') {
+          clearInterval(timer)
+          resolve()
+        } else if (Date.now() - start > timeout) {
+          clearInterval(timer)
+          reject(new Error('waitOnline timeout'))
+        }
+      }, 100)
+    })
+  }
 }
