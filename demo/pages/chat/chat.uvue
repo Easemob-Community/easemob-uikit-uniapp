@@ -7,12 +7,12 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const conversationId = ref('')
 
 onLoad((options) => {
-  if (EmKit.state.status !== 'online') {
+  if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
     uni.reLaunch({ url: '/pages/login/login' })
     return
   }

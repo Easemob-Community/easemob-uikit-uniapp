@@ -2,7 +2,7 @@
   <view :class="[ns.b(), themeClass]">
     <view :class="ns.e('header')">
       <text :class="ns.e('title')">{{ t('conversation.title') }}</text>
-      <view :class="ns.e('add')" @click="emit('create')">
+      <view :class="ns.e('add')" @click="onOpenCreate">
         <EmIcon name="plus" :size="16" />
       </view>
     </view>
@@ -28,6 +28,7 @@
         :key="entry.item.conversationId"
         :class="[ns.e('item'), entry.item.isPinned ? 'em-conversation-page__item--pinned' : '']"
         @click="onSelect(entry.item)"
+        @longpress="onLongPress(entry.item)"
       >
         <em-avatar :src="entry.item.avatar" :name="entry.item.name" :size="48" />
         <view :class="ns.e('body')">
@@ -52,6 +53,20 @@
         </view>
       </view>
     </scroll-view>
+
+    <em-action-sheet
+      :visible="createSheetVisible"
+      :actions="createActions"
+      @select="onCreateAction"
+      @update:visible="createSheetVisible = $event"
+    />
+    <em-action-sheet
+      :visible="itemSheetVisible"
+      :actions="itemActions"
+      :title="activeItem != null ? activeItem.name : ''"
+      @select="onItemAction"
+      @update:visible="itemSheetVisible = $event"
+    />
   </view>
 </template>
 
@@ -59,9 +74,12 @@
 import { computed, ref } from 'vue'
 import EmAvatar from '../em-avatar/em-avatar.vue'
 import EmIcon from '../em-icon/em-icon.vue'
+import EmActionSheet from '../em-action-sheet/em-action-sheet.vue'
+import { EmKit } from '../../libs'
+import { CONVERSATION_MENU_KEY } from '../../libs/constants'
 import { conversationStore } from '../../libs/store/conversation'
 import { draftStore } from '../../libs/store/draft'
-import type { EmConversationItem } from '../../libs/types'
+import type { EmActionSheetAction, EmConversationItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useTheme } from '../../libs/use/useTheme'
 import { useLocale } from '../../libs/use/useLocale'
@@ -71,7 +89,7 @@ defineOptions({ styleIsolation: 'app-and-page' })
 
 const emit = defineEmits<{
   (e: 'select', conversationId: string): void
-  (e: 'create'): void
+  (e: 'menu', key: string): void
 }>()
 
 const ns = useNamespace('conversation-page')
@@ -111,6 +129,54 @@ function badgeText(count: number): string {
 
 function onSelect(item: EmConversationItem): void {
   emit('select', item.conversationId)
+}
+
+// 右上角加号：内置 action-sheet，菜单项选择后统一以 menu 事件透出
+const createSheetVisible = ref(false)
+const itemSheetVisible = ref(false)
+const activeItem = ref<EmConversationItem | null>(null)
+
+const createActions = computed<EmActionSheetAction[]>(() => [
+  { key: CONVERSATION_MENU_KEY.NEW_CHAT, text: t('conversation.newChat'), icon: 'chat' }
+])
+
+const itemActions = computed<EmActionSheetAction[]>(() => {
+  const item = activeItem.value
+  if (item == null) return []
+  return [
+    { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: 'top' },
+    { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: 'eye-slash' },
+    { key: CONVERSATION_MENU_KEY.DELETE, text: t('conversation.delete'), icon: 'trash', danger: true }
+  ]
+})
+
+function onOpenCreate(): void {
+  createSheetVisible.value = true
+}
+
+function onCreateAction(action: EmActionSheetAction): void {
+  emit('menu', action.key)
+}
+
+function onLongPress(item: EmConversationItem): void {
+  activeItem.value = item
+  itemSheetVisible.value = true
+}
+
+async function onItemAction(action: EmActionSheetAction): Promise<void> {
+  const item = activeItem.value
+  if (item == null) return
+  try {
+    if (action.key === CONVERSATION_MENU_KEY.PIN) {
+      await EmKit.pinConversation(item.conversationId, !item.isPinned)
+    } else if (action.key === CONVERSATION_MENU_KEY.MUTE) {
+      await EmKit.setConversationMuted(item.conversationId, !item.isMuted)
+    } else if (action.key === CONVERSATION_MENU_KEY.DELETE) {
+      await EmKit.deleteConversation(item.conversationId)
+    }
+  } catch (e) {
+    uni.showToast({ title: t('error.unknown'), icon: 'none' })
+  }
 }
 </script>
 

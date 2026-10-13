@@ -1,0 +1,168 @@
+<template>
+  <em-popup :visible="visible" position="bottom" :mask-closable="false" @mask-click="onMaskClick">
+    <view :class="ns.b()">
+      <view v-if="title !== ''" :class="ns.e('header')">
+        <text :class="ns.e('title')">{{ title }}</text>
+      </view>
+      <view :class="ns.e('list')">
+        <view
+          v-for="action in actions"
+          :key="action.key"
+          :class="[ns.e('item'), action.disabled === true ? 'em-action-sheet__item--disabled' : '']"
+          @click="onSelect(action)"
+        >
+          <EmIcon
+            v-if="hasIcon(action)"
+            :name="iconNameOf(action)"
+            :size="20"
+            :class="[ns.e('icon'), action.danger === true ? 'em-action-sheet__icon--danger' : '']"
+          />
+          <text :class="[ns.e('text'), action.danger === true ? 'em-action-sheet__text--danger' : '']">{{ action.text }}</text>
+        </view>
+      </view>
+      <view v-if="showCancel" :class="ns.e('gap')"></view>
+      <view v-if="showCancel" :class="ns.e('cancel')" @click="onCancel">
+        <text :class="ns.e('cancel-text')">{{ t('button.cancel') }}</text>
+      </view>
+    </view>
+  </em-popup>
+</template>
+
+<script setup lang="ts">
+import EmPopup from '../em-popup/em-popup.vue'
+import EmIcon from '../em-icon/em-icon.vue'
+import type { EmIconName } from '../em-icon/em-icons'
+import type { EmActionSheetAction } from '../../libs/types'
+import { useNamespace } from '../../libs/use/useNamespace'
+import { useLocale } from '../../libs/use/useLocale'
+
+interface Props {
+  visible: boolean
+  actions: EmActionSheetAction[]
+  title?: string
+  showCancel?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  title: '',
+  showCancel: true
+})
+
+defineOptions({ styleIsolation: 'app-and-page' })
+
+const emit = defineEmits<{
+  (e: 'select', action: EmActionSheetAction): void
+  (e: 'cancel'): void
+  (e: 'update:visible', value: boolean): void
+}>()
+
+const ns = useNamespace('action-sheet')
+const { t } = useLocale()
+
+// 遮罩关闭路径统一收口在本组件（popup 的 maskClosable 置 false），保证只走一条 cancel 流程
+function onMaskClick(): void {
+  emit('cancel')
+  emit('update:visible', false)
+}
+
+function onCancel(): void {
+  emit('cancel')
+  emit('update:visible', false)
+}
+
+function onSelect(action: EmActionSheetAction): void {
+  if (action.disabled === true) return
+  emit('select', action)
+  emit('update:visible', false)
+}
+
+function hasIcon(action: EmActionSheetAction): boolean {
+  return action.icon != null && action.icon !== ''
+}
+
+function iconNameOf(action: EmActionSheetAction): EmIconName {
+  return (action.icon ?? 'more') as EmIconName
+}
+</script>
+
+<style>
+@import '../../libs/style/variables.css';
+
+.em-action-sheet {
+  display: flex;
+  flex-direction: column;
+}
+
+.em-action-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--em-spacing-3) var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.em-action-sheet__title {
+  font-size: var(--em-font-size-13);
+  color: var(--em-text-tertiary);
+  lines: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.em-action-sheet__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.em-action-sheet__item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.em-action-sheet__item--disabled {
+  opacity: 0.4;
+}
+
+.em-action-sheet__icon {
+  margin-right: var(--em-spacing-2);
+  color: var(--em-text-primary);
+}
+
+.em-action-sheet__icon--danger {
+  color: var(--em-danger-color);
+}
+
+.em-action-sheet__text {
+  font-size: var(--em-font-size-16);
+  color: var(--em-text-primary);
+}
+
+.em-action-sheet__text--danger {
+  color: var(--em-danger-color);
+}
+
+.em-action-sheet__gap {
+  height: 8px;
+  background-color: var(--em-bg-secondary);
+}
+
+.em-action-sheet__cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+}
+
+.em-action-sheet__cancel-text {
+  font-size: var(--em-font-size-16);
+  color: var(--em-text-primary);
+}
+</style>

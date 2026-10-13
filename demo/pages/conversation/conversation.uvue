@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <em-conversation-page @select="onSelect" @create="onCreate" />
+    <em-conversation-page @select="onSelect" @menu="onMenu" />
     <view v-if="showNewChat" class="newchat">
       <view class="newchat__panel">
         <text class="newchat__title">发起单聊</text>
@@ -17,13 +17,13 @@
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const showNewChat = ref(false)
 const peerId = ref('')
 
 function ensureLogin(): boolean {
-  if (EmKit.state.status !== 'online') {
+  if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
     uni.reLaunch({ url: '/pages/login/login' })
     return false
   }
@@ -48,9 +48,11 @@ function onSelect(conversationId: string) {
   uni.navigateTo({ url: `/pages/chat/chat?conversationId=${conversationId}` })
 }
 
-function onCreate() {
-  peerId.value = ''
-  showNewChat.value = true
+function onMenu(key: string) {
+  if (key === CONVERSATION_MENU_KEY.NEW_CHAT) {
+    peerId.value = ''
+    showNewChat.value = true
+  }
 }
 
 function onStartChat() {

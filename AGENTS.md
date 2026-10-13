@@ -4,9 +4,9 @@
 
 ## 1. 项目现状（重要，先读）
 
-**本项目 M1（demo 最小闭环）已落地，处于 M1/M2 之间。** 已有内容：`PLAN.md`（立项计划书 v0.1，唯一执行依据）、`README.md`、`uni_modules/easemob-uikit-uni/`（`libs/`：EmKit 门面 + client/chat/store（connection/conversation/message/theme）/platform/use/locale/utils 功能拆分；`components/`：`em-avatar`、`em-conversation-page`、`em-chat-page`（文本/图片气泡、历史加载、输入栏最小版））、`demo/`（uni-app x 蒸汽工程：入口 `main.uts`+`App.uvue`、页面 `.uvue`（script 保持纯 ts）、manifest 含 `vapor-render-target: bytecode`；页面：login（appkey/userId/token + 密码换 token 开发入口）、conversation、chat 三个闭环页 + spike/style-lab 两个开发页，`uni_modules` 为指向仓库根的符号链接）、`scripts/uni.sh`（HBuilderX 内置编译器的 CLI 封装，build 支持 web/mp-weixin；**dev web 模式不转换 .uts 入口，H5 验证用 build + 静态伺服**）、`docs/SPIKE-SDK-CONNECTIVITY.md`（五端验证记录：H5 全通；微信小程序、鸿蒙真机登录/收发/重连已实测通过；Android 真机登录/收发已通，重连待验；iOS 待验）、`docs/HARMONY-REALDEVICE-RUN.md`（鸿蒙真机运行与签名配置实测沉淀：包名三方一致原则、自动/手动申请调试证书流程、常见报错处理）。`tests/` 尚未创建。SDK 定稿 `easemob-websdk ^5.1.2`（ChatClient + Manager 注册制）。M1 H5 端到端已实测（登录 → 会话列表 → 聊天收发文本）；图片发送、微信小程序与 App 端 M1 链路待实测。
+**本项目 M1（demo 最小闭环）已落地，处于 M1/M2 之间。** 已有内容：`PLAN.md`（立项计划书 v0.1，唯一执行依据）、`README.md`、`uni_modules/easemob-uikit-uni/`（`libs/`：EmKit 门面 + client/chat/store（connection/conversation/message/theme）/platform/use/locale/utils 功能拆分；`components/`：`em-avatar`、`em-popup`（内部弹层基座）、`em-action-sheet`（底部动作菜单）、`em-conversation-page`、`em-chat-page`（文本/图片气泡、历史加载、输入栏最小版））、`demo/`（uni-app x 蒸汽工程：入口 `main.uts`+`App.uvue`、页面 `.uvue`（script 保持纯 ts）、manifest 含 `vapor-render-target: bytecode`；页面：login（appkey/userId/token + 密码换 token 开发入口）、conversation、chat 三个闭环页 + spike/style-lab 两个开发页，`uni_modules` 为指向仓库根的符号链接）、`scripts/uni.sh`（HBuilderX 内置编译器的 CLI 封装，build 支持 web/mp-weixin；**dev web 模式不转换 .uts 入口，H5 验证用 build + 静态伺服**）、`docs/SPIKE-SDK-CONNECTIVITY.md`（五端验证记录：H5 全通；微信小程序、鸿蒙真机登录/收发/重连已实测通过；Android 真机登录/收发已通，重连待验；iOS 待验）、`docs/HARMONY-REALDEVICE-RUN.md`（鸿蒙真机运行与签名配置实测沉淀：包名三方一致原则、自动/手动申请调试证书流程、常见报错处理）。`tests/` 尚未创建。枚举字符串已统一收口 `libs/constants/`（MESSAGE_TYPE/MESSAGE_STATUS/CONVERSATION_TYPE/MESSAGE_EXT_KEY/CONNECTION_STATUS/THEME_MODE/LOCALE + 三组菜单 action key；types 的联合类型改为从 constants 派生，对外类型名不变；SDK wire 字段兼容映射保留字面量于 chat 层边界）。SDK 定稿 `easemob-websdk ^5.1.2`（ChatClient + Manager 注册制，已注册 ChatManager/PushManager）。弹层体系已落地：`usePopup`（z-index 运行时递增分配器，基准 2000；`holdTabBar`/`releaseTabBar` 计数器——小程序/App 原生 tabBar 页面内盖不住，弹层打开时 `uni.hideTabBar`、全关后恢复，H5 走条件编译跳过）+ `em-popup`/`em-action-sheet`；会话页加号菜单与会话长按（置顶/免打扰/删除，走 EmKit.pinConversation/setConversationMuted/deleteConversation）、聊天页消息长按四菜单已补齐（复制/引用/撤回 2 分钟窗口/本地删除，撤回事件 onMessageRecalled 落 recalled 态）；引用（quote）已落地：`EmMessageItem.quote`（EmQuoteInfo 快照，含可选 type 用于引用卡类型图标），发送时挂消息 ext（`emQuote` key），接收方与历史消息经 `toMessageItem` 解析还原，输入栏上方引用条（发送成功/手动关闭/切会话清除），气泡下方引用卡（无背景竖杠样式，对齐 vue 版 quote-card；己方 row-reverse 竖杠在右，两行折叠）；失败重发已落地：failed 消息原位保留，气泡旁状态列红叹号（仅己方）点击触发 `EmKit.resendMessage`（重建消息再投递，sending/failed 回写，sending 态用 spinner-cycle 图标）。气泡族已拆分为原子组件（`em-text-message`/`em-image-message`/`em-audio-message`/`em-video-message`/`em-file-message`，头像/引用卡/状态列/meta 留在 chat-page）；语音/视频/文件消息收发已接入（`EmMessageItem` 加 duration/fileName/fileSize；发送走 `EmKit.sendAudio/sendVideo/sendFile`，媒体选择与录音/播放收口在 platform.ts：chooseVideo 全端、chooseFile 仅小程序+H5（App 空实现待补）、录音仅小程序+App（H5 抛错降级）、播放用 createInnerAudioContext 全局互斥；视频点击预览仅 H5 window.open，其它端 toast；文件点击 toast 暂不下载；会话摘要兼容 5.x `image`/`voice` 与 4.x `img`/`audio`）。M1 H5 端到端已实测（登录 → 会话列表 → 聊天收发文本）；图片发送、微信小程序与 App 端 M1 链路待实测。
 
-**`PLAN.md` 是一期开发的唯一执行依据**（其原文：「任何范围/选型变更先改本文档再动手」）。做任何实现工作前先通读 `PLAN.md`；范围或技术选型需要调整时，必须先修改 `PLAN.md` 再动代码，而不是相反。第 4 节描述的 `pages_init.json`、气泡族原子组件（`em-*-message`）等仍是**目标结构**，尚未创建。
+**`PLAN.md` 是一期开发的唯一执行依据**（其原文：「任何范围/选型变更先改本文档再动手」）。做任何实现工作前先通读 `PLAN.md`；范围或技术选型需要调整时，必须先修改 `PLAN.md` 再动代码，而不是相反。第 4 节描述的 `pages_init.json` 等仍是**目标结构**，尚未创建（气泡族原子组件已随 M2 落地五种）。
 
 ## 2. 项目概述
 
@@ -43,6 +43,8 @@ D1/D4/D5 如需调整，必须先改 PLAN.md 第 0 节的决策表。
 | 状态管理 | 裸 `reactive` store，**零运行时依赖**（不装 pinia/dayjs/lodash） |
 | 主题 | `--em-*` CSS 变量双层 class（`.em-theme-light` / `.em-theme-dark`），App 端主题类挂组件根节点（RiceUI trick）；`useTheme().setTheme('dark'\|'light')` |
 | i18n | 中/英，文案无硬编码 |
+| 枚举字符串 | 统一走 `libs/constants/`（const 对象 + 类型别名），业务代码禁硬编码字面量；**例外**：SDK wire 协议字段（5.x `image`/`voice` vs 4.x `img`/`audio` 双兼容映射、PushManager remindType 等）保留字面量，集中在 `libs/chat` 的 `toMessageItem`/`summaryOf` 边界（对齐 vue 版同名规范） |
+| 自定义事件命名 | **禁止与原生事件同名**（`longpress`/`click`/`tap` 等）：小程序里原生事件会穿组件边界冒泡，父组件 `@longpress` 会被原生事件对象二次触发并覆盖自定义 emit 的载荷（实测坑：长按消息菜单拿到 `type='longpress'` 的原生事件）。子组件透传长按用 `long-press` |
 | 平台适配层 | `libs/platform.ts` 收口存储（`uni.setStorage`）、网络状态、媒体选择/录制，平台差异不落组件 |
 | 图标 | iconfont 字体图标（本地 ttf 组件同级目录 + `@font-face` 相对路径，RiceUI/uni-ui x 同款，五端零条件编译），`em-icon` 原子组件收口；复杂图形用 view+transform 绘制。**禁打包 svg/png 图标**。占位字体为 uni-icons `uniicons.ttf`（Apache-2.0），正式版换设计师 iconfont.cn 导出，只改 ttf + 映射表 |
 
@@ -104,6 +106,7 @@ npm 包为一期可选项：组件本体以 uni_modules 为主，npm 只发纯 j
 
 ## 10. 参考资产与样本（PLAN.md 附录 B）
 
+- **视觉/交互设计权威依据（本机只读源码，做 UI 前必读对应模块）**：`/Users/neohuang/Desktop/WorkCommonUse/UIKIT/easemob-uikit-vue`——具体模块路径与「vue web CSS → ucss」翻译纪律见 skill `.agents/skills/vue-uikit-design-reference/SKILL.md`；只读引用，禁止修改该仓库
 - 设计 token 平移来源：`easemob-uikit-vue/docs/DESIGN-TOKEN-MAPPING.md`（本仓库外）
 - 组件 API 契约参照：`easemob-uikit-vue/packages/uikit-im/src`（props/emits 命名、i18n key、Avatar 徽标规范；实现不可复用，全部重写）
 - 开源参照：uni-ui x（gitcode.com/dcloud/uni-ui-x，**alpha 分支**）、RiceUI（gitee.com/riceui/rice-ui，**release_vapor 分支**）、hello-uni-app-x（官方示例 + 自动化测试例）、unibestX（工程模板）

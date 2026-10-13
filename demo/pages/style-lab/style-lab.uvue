@@ -3,8 +3,8 @@
     <view class="lab__header">
       <text class="lab__title">样式实验室 Style Lab</text>
       <view class="lab__actions">
-        <button class="lab__btn" @click="toggleTheme">{{ themeStore.mode === 'light' ? '切到暗色' : '切到亮色' }}</button>
-        <button class="lab__btn" @click="toggleLocale">{{ themeStore.locale === 'zh-CN' ? 'English' : '中文' }}</button>
+        <button class="lab__btn" @click="toggleTheme">{{ themeStore.mode === THEME_MODE.LIGHT ? '切到暗色' : '切到亮色' }}</button>
+        <button class="lab__btn" @click="toggleLocale">{{ themeStore.locale === LOCALE.ZH_CN ? 'English' : '中文' }}</button>
       </view>
     </view>
 
@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { useTheme, useLocale, themeStore } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useTheme, useLocale, themeStore, LOCALE, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
 
 const { themeClass, setTheme } = useTheme()
@@ -98,11 +98,11 @@ const iconNames: EmIconName[] = [
 ]
 
 function toggleTheme() {
-  setTheme(themeStore.mode === 'light' ? 'dark' : 'light')
+  setTheme(themeStore.mode === THEME_MODE.LIGHT ? THEME_MODE.DARK : THEME_MODE.LIGHT)
 }
 
 function toggleLocale() {
-  setLocale(themeStore.locale === 'zh-CN' ? 'en' : 'zh-CN')
+  setLocale(themeStore.locale === LOCALE.ZH_CN ? LOCALE.EN : LOCALE.ZH_CN)
 }
 </script>
 

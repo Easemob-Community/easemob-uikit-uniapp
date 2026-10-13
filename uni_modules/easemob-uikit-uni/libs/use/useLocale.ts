@@ -1,11 +1,12 @@
 import { themeStore } from '../store/theme'
+import { LOCALE } from '../constants'
 import type { EmLocaleName } from '../types'
 import zhCN from '../locale/zh-CN'
 import en from '../locale/en'
 
 const messages: Record<EmLocaleName, Record<string, string>> = {
-  'zh-CN': zhCN,
-  en
+  [LOCALE.ZH_CN]: zhCN,
+  [LOCALE.EN]: en
 }
 
 // i18n composable：t(key) 查扁平表，支持 {name} 插值；
@@ -14,7 +15,7 @@ export function useLocale() {
   function t(key: string, params?: Record<string, string | number>): string {
     const table = messages[themeStore.locale]
     let text = table[key]
-    if (text == null) text = messages['zh-CN'][key]
+    if (text == null) text = messages[LOCALE.ZH_CN][key]
     if (text == null) return key
     if (params != null) {
       Object.keys(params).forEach((name) => {

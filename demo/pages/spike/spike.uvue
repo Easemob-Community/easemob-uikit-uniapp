@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmTextMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const appkey = ref('')
@@ -51,7 +51,7 @@ const messages = ref<EmTextMessageItem[]>([])
 const anchorId = ref('')
 const lastAnchor = 'spike-anchor'
 
-const isOnline = computed(() => EmKit.state.status === 'online')
+const isOnline = computed(() => EmKit.state.status === CONNECTION_STATUS.ONLINE)
 
 // 运行模式探针：编译期条件编译，产物里只保留命中的分支——页面上显示的就是编译器真实走的管线
 let runtimeMode = ref('VDOM')
@@ -60,9 +60,9 @@ runtimeMode = ref('蒸汽模式（VUE3-VAPOR）')
 // #endif
 const statusText = computed(() => {
   switch (EmKit.state.status) {
-    case 'connecting': return '连接中…'
-    case 'online': return `已连接（${EmKit.state.userId}）`
-    case 'closed': return '已断开'
+    case CONNECTION_STATUS.CONNECTING: return '连接中…'
+    case CONNECTION_STATUS.ONLINE: return `已连接（${EmKit.state.userId}）`
+    case CONNECTION_STATUS.CLOSED: return '已断开'
     default: return '未登录'
   }
 })
