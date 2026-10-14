@@ -2,7 +2,7 @@
   <em-popup :visible="visible" position="bottom" :mask-closable="false" @mask-click="onMaskClick">
     <view :class="ns.b()">
       <view v-if="title !== ''" :class="ns.e('header')">
-        <em-text :text="title" :text-class="ns.e('title')" />
+        <em-text :text="title" :text-class="ns.e('title')" :text-style="titleTextStyle" />
       </view>
       <view :class="ns.e('list')">
         <view
@@ -17,7 +17,7 @@
             :size="20"
             :class="[ns.e('icon'), action.danger === true ? 'em-action-sheet__icon--danger' : '']"
           />
-          <em-text :text="action.text" :text-class="actionTextClass(action)" />
+          <em-text :text="action.text" :text-class="actionTextClass(action)" :text-style="actionTextStyle(action)" />
         </view>
       </view>
       <view v-if="showCancel" :class="ns.e('gap')"></view>
@@ -89,6 +89,14 @@ function actionTextClass(action: EmActionSheetAction): string {
   return action.danger === true
     ? 'em-action-sheet__text em-action-sheet__text--danger'
     : 'em-action-sheet__text'
+}
+
+// 内联兜底（小程序样式隔离下本组件 wxss 够不到 em-text 内部 text，见 em-text 注释）
+const titleTextStyle = 'font-size: var(--em-font-size-13); color: var(--em-text-tertiary);'
+function actionTextStyle(action: EmActionSheetAction): string {
+  return action.danger === true
+    ? 'font-size: var(--em-font-size-16); color: var(--em-danger-color);'
+    : 'font-size: var(--em-font-size-16); color: var(--em-text-primary);'
 }
 </script>
 

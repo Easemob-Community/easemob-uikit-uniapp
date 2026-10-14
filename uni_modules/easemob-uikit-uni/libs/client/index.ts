@@ -1,4 +1,4 @@
-import { ChatClient, ChatManager, PushManager } from 'easemob-websdk'
+import { ChatClient, ChatManager, PushManager, UserInfoManager } from 'easemob-websdk'
 import { CONNECTION_STATUS } from '../constants'
 import { connectionStore } from '../store/connection'
 import type { EmKitConfig, EmLoginOptions } from '../types'
@@ -13,7 +13,7 @@ export class EmClient {
     }
     const client = ChatClient.init({
       appKey: config.appkey,
-      managers: [ChatManager, PushManager]
+      managers: [ChatManager, PushManager, UserInfoManager]
     })
     client.addEventHandler('emkit-connection', {
       onConnected: () => {

@@ -1,9 +1,9 @@
 <template>
   <view class="mine">
     <view class="mine__header">
-      <em-avatar :name="userId" :size="56" />
+      <em-avatar :src="avatar" :name="nick" :size="56" />
       <view class="mine__profile">
-        <text class="mine__name">{{ userId }}</text>
+        <text class="mine__name">{{ nick }}</text>
         <text class="mine__status">{{ statusText }}</text>
       </view>
     </view>
@@ -34,11 +34,13 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { EmKit, useTheme, CONNECTION_STATUS, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, useTheme, avatarOf, displayNameOf, CONNECTION_STATUS, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const { themeStore, setTheme } = useTheme()
 
 const userId = computed(() => EmKit.state.userId)
+const nick = computed(() => displayNameOf(userId.value))
+const avatar = computed(() => avatarOf(userId.value))
 const isDark = ref(themeStore.mode === THEME_MODE.DARK)
 
 const statusText = computed(() => {

@@ -21,14 +21,20 @@
       <view
         v-for="m in list"
         :key="m.localId"
-        :id="msgAnchorId(m)"
-        :class="[ns.e('msg'), m.self ? 'em-chat-page__msg--self' : '', m.status === MESSAGE_STATUS.RECALLED ? 'em-chat-page__msg--recalled' : '', highlightId !== '' && highlightId === m.localId ? 'em-chat-page__msg--highlight' : '']"
       >
+        <!-- 时间分隔条：首条必显，相邻消息间隔超过 TIME_DIVIDER_INTERVAL（5 分钟）插入（对齐 vue 版 message-list divider） -->
+        <view v-if="dividerBefore[m.localId] === true" :class="ns.e('divider')">
+          <text :class="ns.e('divider-text')">{{ formatDividerTime(m.time) }}</text>
+        </view>
+        <view
+          :id="msgAnchorId(m)"
+          :class="[ns.e('msg'), m.self ? 'em-chat-page__msg--self' : '', m.status === MESSAGE_STATUS.RECALLED ? 'em-chat-page__msg--recalled' : '', highlightId !== '' && highlightId === m.localId ? 'em-chat-page__msg--highlight' : '']"
+        >
         <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
           <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
         </view>
         <template v-else>
-          <em-avatar :name="m.self ? '' : m.from" :size="36" />
+          <em-avatar :src="avatarOf(m.from)" :name="displayNameOf(m.from)" :size="36" />
           <view :class="[ns.e('content'), m.self ? 'em-chat-page__content--self' : '']">
             <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
             <view :class="ns.e('bubble-row')">
@@ -76,15 +82,13 @@
             <view v-if="m.quote != null" :class="[ns.e('quote'), m.self ? 'em-chat-page__quote--self' : '']" @click="onQuoteClick(m)">
               <view :class="[ns.e('quote-line'), m.self ? 'em-chat-page__quote-line--self' : '']"></view>
               <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="13" :class="[ns.e('quote-icon'), m.self ? 'em-chat-page__quote-icon--self' : '']" />
-              <em-text :lines="2" :text-class="quoteTextClass(m)" :class="ns.e('quote-host')">
+              <em-text :lines="2" :text-class="quoteTextClass(m)" :text-style="quoteTextStyle(m)" :class="ns.e('quote-host')">
                 <text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text>
               </em-text>
             </view>
-            <view :class="ns.e('meta')">
-              <text :class="ns.e('time')">{{ formatTimeHM(m.time) }}</text>
-            </view>
           </view>
         </template>
+        </view>
       </view>
       <view :id="bottomAnchor" :class="ns.e('anchor')"></view>
     </scroll-view>
@@ -121,15 +125,16 @@ import EmAudioMessage from '../em-audio-message/em-audio-message.vue'
 import EmVideoMessage from '../em-video-message/em-video-message.vue'
 import EmFileMessage from '../em-file-message/em-file-message.vue'
 import type { EmIconName } from '../em-icon/em-icons'
-import { MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../libs/constants'
+import { MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE, TIME_DIVIDER_INTERVAL } from '../../libs/constants'
 import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../libs'
 import type { EmActionSheetAction, EmMessageItem, EmQuoteInfo } from '../../libs/types'
 import { messageStore } from '../../libs/store/message'
 import { clearDraft, getDraft, setDraft } from '../../libs/store/draft'
+import { avatarOf, displayNameOf } from '../../libs/store/user'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useTheme } from '../../libs/use/useTheme'
 import { useLocale } from '../../libs/use/useLocale'
-import { formatTimeHM } from '../../libs/utils/time'
+import { formatDividerTime } from '../../libs/utils/time'
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
@@ -150,6 +155,29 @@ const loadingMore = ref(false)
 
 const list = computed<EmMessageItem[]>(() => messageStore.byConversation[props.conversationId] ?? [])
 const hasMore = computed(() => messageStore.hasMore[props.conversationId] === true)
+
+// 时间分隔条：首条必显，之后相邻消息间隔超过阈值（5 分钟）在其前插入（对齐 vue 版 shouldShowTimeDivider）
+const dividerBefore = computed<Record<string, boolean>>(() => {
+  const map: Record<string, boolean> = {}
+  let prev = 0
+  list.value.forEach((m) => {
+    if (m.time > 0) {
+      if (prev === 0 || m.time - prev > TIME_DIVIDER_INTERVAL) {
+        map[m.localId] = true
+      }
+      prev = m.time
+    }
+  })
+  return map
+})
+
+// 导航标题：昵称 > conversationId（资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）
+const peerDisplayName = computed(() => displayNameOf(props.conversationId))
+watch(peerDisplayName, (v) => {
+  if (v !== '') {
+    uni.setNavigationBarTitle({ title: v })
+  }
+}, { immediate: true })
 
 // 对端 typing 提示（chat 层 5s 超时自动消失）
 const peerTyping = computed(() => messageStore.peerTyping[props.conversationId] === true)
@@ -362,13 +390,20 @@ function quoteSuffix(q: EmQuoteInfo | null): string {
 }
 
 function quoteSender(m: EmMessageItem): string {
-  return m.quote?.from ?? ''
+  // 引用卡发送者：用户资料昵称优先，回落原始 userId
+  return displayNameOf(m.quote?.from ?? '')
 }
 
 function quoteTextClass(m: EmMessageItem): string {
   return m.self
     ? 'em-chat-page__quote-text em-chat-page__quote-text--self'
     : 'em-chat-page__quote-text'
+}
+
+// 内联兜底（小程序样式隔离，见 em-text 注释）；text-align 己方右对齐
+const quoteTextStyleBase = 'font-family: var(--em-font-family); font-size: var(--em-font-size-13); line-height: 18px; color: var(--em-text-secondary);'
+function quoteTextStyle(m: EmMessageItem): string {
+  return m.self ? `${quoteTextStyleBase} text-align: right;` : quoteTextStyleBase
 }
 
 // 非文本引用在文本流开头带类型图标（em-icons 现有映射里语义最近的；文本不带）
@@ -480,6 +515,19 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   display: flex;
   flex-direction: row;
   margin-bottom: var(--em-message-gap);
+}
+
+/* 时间分隔条：居中弱文案（对齐 vue 版 message-list divider） */
+.em-chat-page__divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--em-message-gap);
+}
+
+.em-chat-page__divider-text {
+  font-size: var(--em-font-size-12);
+  color: var(--em-text-tertiary);
 }
 
 .em-chat-page__msg--self {
@@ -631,15 +679,8 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   color: var(--em-bubble-text-other);
 }
 
-.em-chat-page__meta {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-top: var(--em-spacing-1);
-}
-
 /* 气泡行：气泡与状态图标的水平容器，底边对齐——状态图标永远贴着气泡末尾，
-   不被引用卡/meta 撑高（vue 版用 ResizeObserver 对齐气泡本体，ucss 下用 flex-end 等价实现）。
+   不被引用卡撑高（vue 版用 ResizeObserver 对齐气泡本体，ucss 下用 flex-end 等价实现）。
    注意：状态图标用绝对定位移出布局流——小程序里组件宿主节点参与 flex 布局且约束链解析不可靠，
    在流内占位会把气泡顶超宽（实测超出正好一个图标位被头像裁切） */
 .em-chat-page__bubble-row {
@@ -702,11 +743,6 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   100% {
     transform: rotate(360deg);
   }
-}
-
-.em-chat-page__time {
-  font-size: var(--em-font-size-10);
-  color: var(--em-text-tertiary);
 }
 
 .em-chat-page__anchor {

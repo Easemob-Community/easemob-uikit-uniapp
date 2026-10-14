@@ -1,6 +1,6 @@
 <template>
   <view :class="ns.b()">
-    <text :class="[ns.e('value'), clampClass, textClass]">{{ text }}<slot /></text>
+    <text :class="[ns.e('value'), clampClass, textClass]" :style="textStyle">{{ text }}<slot /></text>
   </view>
 </template>
 
@@ -9,21 +9,27 @@ import { computed } from 'vue'
 import { useNamespace } from '../../libs/use/useNamespace'
 
 // 文本溢出/折叠/断词收口组件：所有可能溢出的用户内容文本一律走这里。
-// 布局 class（flex/min-width/margin 等）落在组件标签上（宿主 = 根 view）；
-// 字号/颜色/字重等文字样式经 textClass 透传到内部 <text>（ucss 无继承，放组件标签上不生效）。
+// 布局 class（flex/min-width/margin 等）落在组件标签上（宿主 = 根 view）。
+// 文字样式双通道：
+// - textClass 走 class（H5/App 生效）；
+// - textStyle 走内联 style——小程序样式隔离下父组件 wxss 够不到本组件内部 text
+//  （app-and-page 编译为 apply-shared，只放行页面级样式；实测会话摘要字体颜色全失效），
+//   内联 style 不受隔离限制，跨端使用必须同时给 textStyle（var() token 引用可用）。
 interface Props {
   text?: string
   lines?: number      // 默认 1 行折叠省略；0 = 不折叠、只做长文断词
   textClass?: string
+  textStyle?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   text: '',
   lines: 1,
-  textClass: ''
+  textClass: '',
+  textStyle: ''
 })
 
-defineOptions({ styleIsolation: 'app-and-page' })
+defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const ns = useNamespace('text')
 
@@ -38,7 +44,8 @@ const clampClass = computed(() => {
 <style>
 @import '../../libs/style/variables.css';
 
-/* 宿主节点：小程序里组件宿主参与父级 flex 布局，max-width/overflow 收在这一层 */
+/* 宿主节点：virtualHost 模式无实体宿主，外部 class 经 virtualHostClass 合并到根 view，
+   max-width/overflow 收在根 view 这一层（小程序里该节点直接参与父级 flex 布局） */
 .em-text {
   max-width: 100%;
   overflow: hidden;
@@ -56,6 +63,9 @@ const clampClass = computed(() => {
   lines: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* mp-weixin 的 wxss 管线不认 lines（uvue 独占属性），缺 nowrap 时 text 自由换行，
+     父容器固定行高 + overflow:hidden 会把第二行拦腰裁切，视觉上像两行重叠（实测坑） */
+  white-space: nowrap;
 }
 
 .em-text__value--line2 {

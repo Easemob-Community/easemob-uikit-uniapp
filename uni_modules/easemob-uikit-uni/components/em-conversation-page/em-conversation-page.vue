@@ -34,11 +34,11 @@
         @click="onSelect(entry.item)"
         @longpress="onLongPress(entry.item)"
       >
-        <em-avatar :src="entry.item.avatar" :name="entry.item.name" :size="48" />
+        <em-avatar :src="entry.avatar" :name="entry.name" :size="48" />
         <view :class="ns.e('body')">
           <view :class="ns.e('top')">
             <view :class="ns.e('name-wrap')">
-              <em-text :text="entry.item.name" :text-class="ns.e('name')" :class="ns.e('name-host')" />
+              <em-text :text="entry.name" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
               <!-- 置顶/免打扰徽标：em-icons 无 pin/bell-slash 字形，置顶用 top、免打扰用 eye-slash（与长按菜单图标一致），弱化图标色 -->
               <EmIcon v-if="entry.item.isPinned" name="top" :size="12" :class="ns.e('flag')" />
               <EmIcon v-if="entry.item.isMuted" name="eye-slash" :size="12" :class="ns.e('flag')" />
@@ -48,7 +48,7 @@
           <view :class="ns.e('bottom')">
             <view :class="ns.e('message')">
               <text v-if="entry.draft != null" :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
-              <em-text :text="entry.draft != null ? entry.draft.text : entry.item.lastMessageText" :text-class="ns.e('summary')" :class="ns.e('summary-host')" />
+              <em-text :text="entry.draft != null ? entry.draft.text : entry.item.lastMessageText" :text-class="ns.e('summary')" :text-style="summaryTextStyle" :class="ns.e('summary-host')" />
             </view>
             <view v-if="entry.item.unreadCount > 0 && entry.item.isMuted" :class="ns.e('unread-dot')"></view>
             <view v-else-if="entry.item.unreadCount > 0" :class="ns.e('unread')">
@@ -68,7 +68,7 @@
     <em-action-sheet
       :visible="itemSheetVisible"
       :actions="itemActions"
-      :title="activeItem != null ? activeItem.name : ''"
+      :title="activeItem != null ? displayNameOf(activeItem.conversationId, activeItem.name) : ''"
       @select="onItemAction"
       @update:visible="itemSheetVisible = $event"
     />
@@ -84,6 +84,7 @@ import { EmKit } from '../../libs'
 import { CONVERSATION_MENU_KEY } from '../../libs/constants'
 import { conversationStore } from '../../libs/store/conversation'
 import { draftStore } from '../../libs/store/draft'
+import { avatarOf, displayNameOf } from '../../libs/store/user'
 import type { EmActionSheetAction, EmConversationItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useTheme } from '../../libs/use/useTheme'
@@ -91,6 +92,10 @@ import { useLocale } from '../../libs/use/useLocale'
 import { formatConversationTime } from '../../libs/utils/time'
 
 defineOptions({ styleIsolation: 'app-and-page' })
+
+// 文字样式内联兜底（小程序样式隔离下父组件 wxss 够不到 em-text 内部 text，须走 text-style；详见 em-text 注释）
+const nameTextStyle = 'font-family: var(--em-font-family); font-size: var(--em-font-size-15); font-weight: var(--em-font-weight-semibold); line-height: 20px; color: var(--em-text-primary);'
+const summaryTextStyle = 'font-family: var(--em-font-family); font-size: var(--em-font-size-13); line-height: 18px; color: var(--em-text-secondary);'
 
 const emit = defineEmits<{
   (e: 'select', conversationId: string): void
@@ -106,25 +111,30 @@ const keyword = ref('')
 
 interface Entry {
   item: EmConversationItem
+  name: string
+  avatar: string
   draft: { text: string, time: number } | null
   timeText: string
 }
 
+// 名称/头像回落链（对齐 vue 版 conversation-item）：用户资料 nickname/avatarUrl > SDK conversation.name/avatar > conversationId
 // 草稿优先：时间取草稿时间与最后消息时间的较大者（对齐 Web 版 displayTime 规则）
 // 搜索：本地过滤名称 / 会话 ID / 摘要（一期不做服务端漫游消息搜索）
 const items = computed<Entry[]>(() => {
   const kw = keyword.value.trim().toLowerCase()
   return conversationStore.list
-    .filter((item) => {
-      if (kw === '') return true
-      return item.name.toLowerCase().includes(kw)
-        || item.conversationId.toLowerCase().includes(kw)
-        || item.lastMessageText.toLowerCase().includes(kw)
-    })
     .map((item) => {
+      const name = displayNameOf(item.conversationId, item.name)
+      const avatar = avatarOf(item.conversationId)
       const draft = draftStore.map[item.conversationId] ?? null
       const time = draft != null && draft.time > item.lastMessageTime ? draft.time : item.lastMessageTime
-      return { item, draft, timeText: formatConversationTime(time) }
+      return { item, name, avatar: avatar !== '' ? avatar : item.avatar, draft, timeText: formatConversationTime(time) }
+    })
+    .filter((entry) => {
+      if (kw === '') return true
+      return entry.name.toLowerCase().includes(kw)
+        || entry.item.conversationId.toLowerCase().includes(kw)
+        || entry.item.lastMessageText.toLowerCase().includes(kw)
     })
 })
 
@@ -325,6 +335,7 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
 }
 
 .em-conversation-page__name {
+  font-family: var(--em-font-family);
   font-size: var(--em-font-size-15);
   font-weight: var(--em-font-weight-semibold);
   line-height: 20px;
@@ -339,6 +350,7 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
 }
 
 .em-conversation-page__time {
+  font-family: var(--em-font-family);
   font-size: var(--em-font-size-11);
   line-height: 16px;
   color: var(--em-text-tertiary);
@@ -364,6 +376,7 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
 }
 
 .em-conversation-page__draft {
+  font-family: var(--em-font-family);
   font-size: var(--em-font-size-13);
   line-height: 18px;
   color: var(--em-danger-color);
@@ -377,6 +390,7 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
 }
 
 .em-conversation-page__summary {
+  font-family: var(--em-font-family);
   font-size: var(--em-font-size-13);
   line-height: 18px;
   color: var(--em-text-secondary);

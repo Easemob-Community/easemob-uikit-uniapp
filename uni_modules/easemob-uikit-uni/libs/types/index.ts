@@ -70,6 +70,13 @@ export interface EmConversationItem {
   isMuted: boolean
 }
 
+/** 用户属性快照（昵称/头像；SDK UserInfo 的中立子集，wire 字段在 chat 边界归一） */
+export interface EmUserInfo {
+  userId: string
+  nickname: string
+  avatarUrl: string
+}
+
 export type EmThemeMode = ThemeModeValue
 
 export type EmLocaleName = LocaleValue

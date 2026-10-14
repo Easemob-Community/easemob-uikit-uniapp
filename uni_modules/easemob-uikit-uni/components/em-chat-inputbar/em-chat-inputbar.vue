@@ -4,7 +4,7 @@
     <view v-if="quote != null" :class="ns.e('quotebar')">
       <view :class="ns.e('quotebar-line')"></view>
       <EmIcon v-if="hasQuoteIcon" :name="quoteIcon" :size="13" :class="ns.e('quotebar-icon')" />
-      <em-text :text-class="ns.e('quotebar-text')" :class="ns.e('quotebar-host')">
+      <em-text :text-class="ns.e('quotebar-text')" :text-style="quotebarTextStyle" :class="ns.e('quotebar-host')">
         <text :class="ns.e('quotebar-sender')">{{ quoteFrom }}</text><text :class="ns.e('quotebar-preview')">{{ quoteSuffix }}</text>
       </em-text>
       <view :class="ns.e('quotebar-close')" @click="emit('quote-close')">
@@ -108,6 +108,9 @@ const emit = defineEmits<{
 }>()
 
 const ns = useNamespace('chat-inputbar')
+
+// 引用条文字内联兜底（小程序样式隔离，见 em-text 注释）
+const quotebarTextStyle = 'font-size: var(--em-font-size-13); color: var(--em-text-secondary);'
 const { t } = useLocale()
 
 const text = computed({

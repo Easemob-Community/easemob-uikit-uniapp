@@ -4,7 +4,7 @@
       <EmIcon :name="iconName" :size="20" :class="ns.e('icon-glyph')" />
     </view>
     <view :class="ns.e('info')">
-      <em-text :text="fileName" :text-class="nameClass" />
+      <em-text :text="fileName" :text-class="nameClass" :text-style="nameStyle" />
       <text v-if="sizeText !== ''" :class="[ns.e('size'), message.self ? 'em-file-message__size--self' : '']">{{ sizeText }}</text>
     </view>
   </view>
@@ -40,6 +40,11 @@ const fileName = computed(() => props.message.fileName !== '' ? props.message.fi
 const nameClass = computed(() => props.message.self
   ? 'em-file-message__name em-file-message__name--self'
   : 'em-file-message__name')
+
+// 内联兜底（小程序样式隔离下父组件 wxss 够不到 em-text 内部 text，见 em-text 注释）
+const nameStyle = computed(() => props.message.self
+  ? 'font-size: var(--em-font-size-15); font-weight: var(--em-font-weight-medium); color: var(--em-bubble-text-self);'
+  : 'font-size: var(--em-font-size-15); font-weight: var(--em-font-weight-medium); color: var(--em-bubble-text-other);')
 
 const sizeText = computed(() => {
   const size = props.message.fileSize

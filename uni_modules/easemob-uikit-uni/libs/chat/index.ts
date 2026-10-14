@@ -19,6 +19,7 @@ import { getMessages, messageStore } from '../store/message'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
 import type { EmConversationItem, EmKitConfig, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
 import { useLocale } from '../use/useLocale'
+import { bindUserInfo, ensureUserInfos } from './user-info'
 
 // typing 信号：发送节流间隔与接收方展示超时（对齐 vue 版 5s）
 const TYPING_THROTTLE = 5000
@@ -48,6 +49,7 @@ export class EmChat {
     this.client = client
     this.waitOnline = waitOnline
     this.readReceiptOn = config?.enableReadReceipt !== false
+    bindUserInfo(client)
     client.chatManager.addEventHandler('emkit-message', {
       onMessage: (message: Message) => {
         // SDK wire 边界：cmd 信号消息（typing 等）不落消息列表，在此拦截
@@ -58,6 +60,7 @@ export class EmChat {
         const item = this.toMessageItem(message)
         this.appendMessage(item)
         this.notify(item)
+        ensureUserInfos([item.from])
         // 在当前会话收到对方消息：即时回已读回执
         if (!item.self && item.conversationId === this.currentConversationId) {
           this.sendReadReceipts(item.conversationId).catch(() => {})
@@ -67,6 +70,7 @@ export class EmChat {
         conversationStore.list = payload.items
           .filter((c) => c.conversationType === CONVERSATION_TYPE.SINGLE_CHAT)
           .map((c) => this.toConversationItem(c))
+        ensureUserInfos(conversationStore.list.map((c) => c.conversationId))
       },
       onMessageRecalled: (payload: { conversationId: string, messageId: string }) => {
         this.markRecalled(payload.conversationId, payload.messageId)
@@ -232,6 +236,7 @@ export class EmChat {
       .map((m) => this.toMessageItem(m as Message))
       .filter((m) => !existing[m.id])
     messageStore.byConversation[conversationId] = [...older, ...list].sort((a, b) => a.time - b.time)
+    ensureUserInfos(older.map((m) => m.from))
   }
 
   async syncConversations(): Promise<void> {
@@ -247,6 +252,7 @@ export class EmChat {
       conversationStore.list = items
         .filter((c) => c.conversationType === CONVERSATION_TYPE.SINGLE_CHAT)
         .map((c) => this.toConversationItem(c))
+      ensureUserInfos(conversationStore.list.map((c) => c.conversationId))
     } finally {
       conversationStore.syncing = false
     }
@@ -259,6 +265,8 @@ export class EmChat {
     chatManager.clearConversationUnreadMessageCount({ conversationId, conversationType: CONVERSATION_TYPE.SINGLE_CHAT }).catch(() => {})
     // 进入会话即回已读回执（对齐 vue 版会话切换 sendChannelAck 的时机）
     this.sendReadReceipts(conversationId).catch(() => {})
+    // 确保对端与己方资料已缓存（气泡头像/昵称、导航标题用）
+    ensureUserInfos([conversationId, connectionStore.userId])
   }
 
   leaveConversation(): void {

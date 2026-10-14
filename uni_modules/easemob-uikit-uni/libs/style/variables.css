@@ -22,9 +22,11 @@
   --em-spacing-6: 32px;
   --em-spacing-7: 48px;
 
+  /* 字体栈（平移 vue 版 --uikit-font-family；ucss 无继承，需落在具体 text class 上消费） */
+  --em-font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans SC', sans-serif;
+
   /* 字号阶梯（静态值；vue 版的 calc(Npx × font-scale) 适老缩放一期不做） */
-  --em-font-size-10: 10px;
-  --em-font-size-11: 11px;
+  --em-font-size-10: 10px;  --em-font-size-11: 11px;
   --em-font-size-12: 12px;
   --em-font-size-13: 13px;
   --em-font-size-14: 14px;

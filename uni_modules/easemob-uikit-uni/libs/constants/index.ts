@@ -87,6 +87,9 @@ export const MESSAGE_MENU_KEY = {
 
 export type MessageMenuKeyValue = (typeof MESSAGE_MENU_KEY)[keyof typeof MESSAGE_MENU_KEY]
 
+/** 聊天页时间分隔条：相邻消息间隔超过该值插入时间条（对齐 vue 版 messageListConfig.groupInterval 默认 5 分钟） */
+export const TIME_DIVIDER_INTERVAL = 5 * 60 * 1000
+
 /** 输入栏「+」媒体面板 action key */
 export const MEDIA_PANEL_KEY = {
   ALBUM: 'album',

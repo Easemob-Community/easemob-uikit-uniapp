@@ -1,8 +1,10 @@
 import { EmClient } from './client'
 import { EmChat } from './chat'
+import { ensureUserInfos } from './chat/user-info'
 import { connectionStore } from './store/connection'
 import { conversationStore } from './store/conversation'
 import { messageStore } from './store/message'
+import { userStore } from './store/user'
 import type {
   EmKitConfig,
   EmLoginOptions,
@@ -17,6 +19,7 @@ class EmKitImpl {
   readonly state = connectionStore
   readonly conversations = conversationStore
   readonly messages = messageStore
+  readonly users = userStore
 
   private client = new EmClient()
   private chat = new EmChat()
@@ -26,8 +29,10 @@ class EmKitImpl {
     this.chat.bind(client, () => this.client.waitOnline(), config)
   }
 
-  login(options: EmLoginOptions): Promise<void> {
-    return this.client.login(options)
+  async login(options: EmLoginOptions): Promise<void> {
+    await this.client.login(options)
+    // 登录成功即拉取自己的昵称/头像（会话页、聊天页己方气泡、demo mine 页回显）
+    ensureUserInfos([options.userId])
   }
 
   logout(): Promise<void> {
@@ -110,6 +115,11 @@ class EmKitImpl {
     this.chat.onMessage(handler)
   }
 
+  // 按需确保一批用户的昵称/头像已缓存（微任务合批，单次请求）
+  ensureUserInfos(userIds: string[]): void {
+    ensureUserInfos(userIds)
+  }
+
   /** @deprecated 兼容 M0 spike 页 */
   onTextMessage(handler: EmMessageHandler): void {
     this.chat.onTextMessage(handler)
@@ -128,3 +138,5 @@ export { useLocale } from './use/useLocale'
 export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
 export { usePopup, nextZIndex } from './use/usePopup'
 export { themeStore } from './store/theme'
+export { userStore, displayNameOf, avatarOf, mergeUserInfo } from './store/user'
+export { ensureUserInfos } from './chat/user-info'
