@@ -1,0 +1,34 @@
+<template>
+  <view class="page">
+    <em-chat-info-page v-if="conversationId !== ''" :conversation-id="conversationId" @deleted="onDeleted" />
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad } from '@dcloudio/uni-app'
+import { ref } from 'vue'
+import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
+
+const conversationId = ref('')
+
+onLoad((options) => {
+  if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
+    uni.reLaunch({ url: '/pages/login/login' })
+    return
+  }
+  conversationId.value = (options?.['conversationId'] ?? '') as string
+})
+
+// 删除会话后退回会话列表（聊天详情 ← 聊天页 ← 会话列表，delta 2）
+function onDeleted() {
+  uni.navigateBack({ delta: 2 })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+</style>

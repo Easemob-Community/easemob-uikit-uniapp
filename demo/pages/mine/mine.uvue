@@ -24,6 +24,10 @@
         <text class="mine__cell-label">SDK 连通性 Spike</text>
         <text class="mine__cell-arrow">›</text>
       </view>
+      <view class="mine__cell" @click="onExportLogs">
+        <text class="mine__cell-label">导出调试日志</text>
+        <text class="mine__cell-arrow">›</text>
+      </view>
     </view>
 
     <view class="mine__footer">
@@ -59,6 +63,19 @@ function onThemeChange(e: any) {
 
 function onOpen(url: string) {
   uni.navigateTo({ url })
+}
+
+async function onExportLogs() {
+  const result = await EmKit.exportLogs()
+  let content = ''
+  if (result === 'download') {
+    content = '日志文件已开始下载，请到浏览器下载目录查看'
+  } else if (result === 'clipboard') {
+    content = '写文件失败，日志全文已复制到剪贴板，粘贴到任意文本编辑器查看'
+  } else {
+    content = `日志已写入用户数据目录：\n${result}\n\n全文已同时复制到剪贴板，可直接粘贴导出`
+  }
+  uni.showModal({ title: '导出调试日志', content, showCancel: false })
 }
 
 async function onLogout() {

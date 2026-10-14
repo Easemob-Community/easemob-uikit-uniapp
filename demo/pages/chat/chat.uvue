@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <em-chat-page v-if="conversationId !== ''" :conversation-id="conversationId" />
+    <em-chat-page v-if="conversationId !== ''" :conversation-id="conversationId" @open-info="onOpenInfo" />
   </view>
 </template>
 
@@ -18,10 +18,12 @@ onLoad((options) => {
   }
   const id = (options?.['conversationId'] ?? '') as string
   conversationId.value = id
-  if (id !== '') {
-    uni.setNavigationBarTitle({ title: id })
-  }
 })
+
+// 聊天详情入口（em-chat-page 自绘 header 右上角 more 按钮）
+function onOpenInfo(id: string) {
+  uni.navigateTo({ url: `/pages/chat-info/chat-info?conversationId=${id}` })
+}
 </script>
 
 <style>

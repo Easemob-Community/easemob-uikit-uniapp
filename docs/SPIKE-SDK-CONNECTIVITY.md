@@ -16,7 +16,7 @@
 | HBuilderX | 5.26.2026091802（≥5.21 ✓） |
 | HBuilder V | 1.129.0-alpha（已安装） |
 | Node.js | v22.22.0 |
-| easemob-websdk | 5.1.2（demo 依赖，uni_modules peer 声明 ^5.1.2） |
+| easemob-websdk | 5.1.3（demo 依赖精确锁定 5.1.3，uni_modules peer 声明 5.1.3；spike 实测时点为 5.1.2） |
 | 微信开发者工具 / DevEco Studio / Android Studio / Xcode | 已安装 |
 | CLI 编译路径 | HBuilderX 内置 `plugins/uniapp-cli-vite`，封装为 `scripts/uni.sh <dev\|build> <web\|mp-weixin>` |
 
@@ -30,6 +30,17 @@
 | iOS | 待验证 | | | | | |
 | 鸿蒙 | ✅ 真机签名运行已通 | ✅ | ✅ | ✅ | ✅ | 2026-10 真机实测登录/收发/断线重连通过；包名 `uni.app.UNI08EF252`（需在 manifest 鸿蒙配置显式设置，勿用模板默认 `io.dcloud.uniappx`）；签名/真机流程见 `docs/HARMONY-REALDEVICE-RUN.md` |
 
+## 联系人（ContactManager）验证（M2.5）
+
+> 用例：demo 联系人 tab（`pages/contact/contact`）+ 新请求页（`pages/contact-requests/contact-requests`）。
+> 接入方式：`ChatClient.init({ enableSyncData: ['conversation','contact'], managers: [..., ContactManager] })`（contact 同步必须显式选择，见踩坑 11），登录后 `contactManager.getContacts()` 读内存快照（好友同步由 SDK 后台自动做），UI 刷新走 `contactManager.addEventHandler` 的 roster 事件驱动。
+
+| 端 | 编译 | getContacts 快照 | addContact 发申请 | 收申请/接受/拒绝 | 删除好友 | 备注 |
+|---|---|---|---|---|---|---|
+| H5(web) | ✅ build 通过 | ✅（登录后快照读取正常，空列表渲染空态） | ✅（pfh → hfp 申请发送 resolve；重复发送幂等 resolve；自添加被 demo 守卫拦截） | 待双账号实测（对端需在线操作） | 待实测（需先有好友关系） | 2026-10-14 实测；搜索过滤/空态/新请求页渲染/添加 modal 均通过 |
+| 微信小程序 | ✅ build 通过（组件 wxss 正常产出） | 待真机/工具实测 | | | | |
+| Android / iOS / 鸿蒙 | 待验证 | | | | | |
+
 ## 踩坑记录（全是实测）
 
 1. **4.x 根构建在 uni-app 运行时不可用**：`easemob-websdk@4.24.3` 默认入口在 uni-app web 运行时报 `a2.onOpen is not a function`（环境嗅探走错分支）。4.x 必须用 `easemob-websdk/uniApp/Easemob-chat` 子路径构建（实测可登录可收发）；**5.x 根入口直接可用，优先 5.x**。
@@ -42,6 +53,7 @@
 8. **CLI dev server 不转换 .uts 入口**：`scripts/uni.sh dev web` 对 main.uts 原样输出导致白页；`build web` 正常。H5 验证一律用 `build web` + 静态伺服（如 `python3 -m http.server`）。dev 模式待排查（可能只有 HBuilderX GUI 的 dev 管线支持 .uts 入口）。
 9. **登录 resolve ≠ 立即可发**：5.x login resolve 后立刻 sendMessage 遇到过一次 `WebSocket is not connected`，隔一会儿重发即成功。M1 设计发消息排队/连接就绪等待机制。
 10. 4.x 的 websdk 内含 `eval`（构建告警）；5.x（5.1.2）已无 eval 告警，仅剩一条无害的 Rollup 注释位置告警。
+11. **联系人自动同步需显式选择（enableSyncData，小程序空白根因）**：`ChatClient.init` 的 `enableSyncData` **SDK 默认仅 `['conversation']`**（源码 `normalizeSyncDataTypes(n.enableSyncData ?? ['conversation'])`），不显式传 `'contact'` 则登录后好友同步根本不启动、`onSyncDataFinished(dataType:'contact')` 永远不会触发，`getContacts()` 只能读到本地缓存残留——H5「有时能显示」是 localStorage 缓存的假象，小程序端即「永远空」。修复：`libs/client/index.ts` 显式传 `enableSyncData: ['conversation','contact']`（**不能含 `'group'`**：SDK 校验 group 同步依赖 GroupManager，未注册直接抛错，二期开群时再补；contact 同步依赖 UserInfoManager 的 userInfo:read 能力，已注册）。配套：消费 `payload.status`，`failed` 时不用不完整快照回填、只告警等下轮同步（对齐 vue 版 D124）。 roster 事件驱动 + 同步完成后重读快照的自愈机制（`emkit-contact-sync` handler）保留，作为快照兜底仍必要。
 
 ## 存储差异清单
 

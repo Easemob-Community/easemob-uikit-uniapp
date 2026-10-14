@@ -67,6 +67,17 @@ export const LOCALE = {
 
 export type LocaleValue = (typeof LOCALE)[keyof typeof LOCALE]
 
+/** uikit 内置 logger 级别（silent 全关） */
+export const LOG_LEVEL = {
+  DEBUG: 'debug',
+  INFO: 'info',
+  WARN: 'warn',
+  ERROR: 'error',
+  SILENT: 'silent'
+} as const
+
+export type LogLevelValue = (typeof LOG_LEVEL)[keyof typeof LOG_LEVEL]
+
 /** 会话页菜单 action key（加号面板 + 会话长按） */
 export const CONVERSATION_MENU_KEY = {
   NEW_CHAT: 'new-chat',
@@ -100,3 +111,25 @@ export const MEDIA_PANEL_KEY = {
 } as const
 
 export type MediaPanelKeyValue = (typeof MEDIA_PANEL_KEY)[keyof typeof MEDIA_PANEL_KEY]
+
+/** 联系人页菜单 action key（条目长按） */
+export const CONTACT_MENU_KEY = {
+  DELETE: 'delete'
+} as const
+
+export type ContactMenuKeyValue = (typeof CONTACT_MENU_KEY)[keyof typeof CONTACT_MENU_KEY]
+
+/** 好友申请状态 */
+export const CONTACT_INVITE_STATUS = {
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined'
+} as const
+
+export type ContactInviteStatusValue = (typeof CONTACT_INVITE_STATUS)[keyof typeof CONTACT_INVITE_STATUS]
+
+/** 联系人字母分组序列（A-Z + #，对齐 vue 版 DEFAULT_ALPHABET_KEYS） */
+export const ALPHABET_KEYS = [
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '#'
+] as const

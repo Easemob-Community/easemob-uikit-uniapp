@@ -21,7 +21,8 @@ export function mergeUserInfo(info: EmUserInfo): void {
   }
 }
 
-// 展示名回落链（对齐 vue 版 useUserInfo，一期无联系人备注）：nickname > fallback（conversation.name 等）> userId
+// 展示名回落链（对齐 vue 版 useUserInfo）：nickname > fallback（conversation.name 等）> userId
+// 联系人备注不参与本回落链（避免 store 交叉依赖），联系人场景见 libs/store/contact.ts 的 contactDisplayNameOf（remark > nickname > userId）
 export function displayNameOf(userId: string, fallback = ''): string {
   if (userId === '') return ''
   const nick = userStore.map[userId]?.nickname ?? ''

@@ -26,6 +26,7 @@
   --em-font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans SC', sans-serif;
 
   /* 字号阶梯（静态值；vue 版的 calc(Npx × font-scale) 适老缩放一期不做） */
+  --em-font-size-9: 9px;
   --em-font-size-10: 10px;  --em-font-size-11: 11px;
   --em-font-size-12: 12px;
   --em-font-size-13: 13px;

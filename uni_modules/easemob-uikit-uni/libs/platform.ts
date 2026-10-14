@@ -1,11 +1,15 @@
 // 平台适配层：存储 / 网络 / 媒体差异统一收口，组件不直接碰平台 API。
 // localStorage 在 App 端 js 引擎不可用，一律走 uni.setStorage。
 
+import { createLogger } from './utils/logger'
+
+const logger = createLogger('platform')
+
 export function setStorage(key: string, value: string): void {
   try {
     uni.setStorageSync(key, value)
   } catch (e) {
-    console.error('[emkit] setStorage fail:', key, e)
+    logger.error('setStorage fail:', key, e)
   }
 }
 
@@ -141,7 +145,7 @@ export function chooseFile(): Promise<EmPickedFile | null> {
     // #endif
     // #ifdef APP
     // App 端没有跨端通用文件选择器（需 uts 插件或原生 intent），一期空实现待真机验证后补齐
-    console.warn('[emkit] chooseFile: App 端暂不支持文件选择')
+    logger.warn('chooseFile: App 端暂不支持文件选择')
     resolve(null)
     // #endif
   })
@@ -160,7 +164,7 @@ let recordDiscarding = false
 // 录音：微信/App 走 uni.getRecorderManager；H5 不支持，调用即抛错（组件层 catch 降级）
 export function startRecord(): void {
   // #ifdef WEB
-  console.warn('[emkit] startRecord: H5 不支持录音')
+  logger.warn('startRecord: H5 不支持录音')
   throw new Error('record not supported on web')
   // #endif
   // #ifndef WEB
@@ -256,4 +260,48 @@ export function stopAudio(): void {
       onEnd()
     }
   }
+}
+
+// 导出文本文件（日志下载用）：H5 走 Blob + a[download]（resolve ''）；
+// 小程序/App 写用户数据目录（resolve 文件路径）；失败 reject 由调用方兜底剪贴板
+export function exportTextFile(filename: string, content: string): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    // #ifdef WEB
+    try {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+      resolve('')
+    } catch (e) {
+      reject(e)
+    }
+    // #endif
+    // #ifndef WEB
+    try {
+      const fs = uni.getFileSystemManager()
+      const env = (uni as unknown as { env?: { USER_DATA_PATH?: string } }).env
+      const filePath = `${env?.USER_DATA_PATH ?? ''}/${filename}`
+      fs.writeFile({
+        filePath,
+        data: content,
+        encoding: 'utf8',
+        success: () => resolve(filePath),
+        fail: (e) => reject(new Error(e?.errMsg ?? 'writeFile fail'))
+      })
+    } catch (e) {
+      reject(e)
+    }
+    // #endif
+  })
+}
+
+// 剪贴板兜底（日志导出降级、复制类功能共用）；失败静默
+export function copyText(text: string): void {
+  try {
+    uni.setClipboardData({ data: text })
+  } catch (e) {}
 }

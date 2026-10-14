@@ -1,6 +1,8 @@
 import type {
   ConnectionStatusValue,
+  ContactInviteStatusValue,
   LocaleValue,
+  LogLevelValue,
   MessageStatusValue,
   MessageTypeValue,
   ThemeModeValue
@@ -12,6 +14,12 @@ export interface EmKitConfig {
   appkey: string
   /** 单聊已读回执开关，默认 true */
   enableReadReceipt?: boolean
+  /** uikit 内置 logger 级别，默认 'info'；'silent' 全关 */
+  logLevel?: LogLevelValue
+  /** SDK 自身 console 输出开关，默认 true（关闭后 SDK 日志仍经 onLog 转发进 uikit logger） */
+  sdkConsoleLog?: boolean
+  /** SDK 日志级别（SDK 侧枚举，仅三档），默认 'WARN' */
+  sdkLogLevel?: 'DEBUG' | 'WARN' | 'ERROR'
 }
 
 export interface EmLoginOptions {
@@ -75,6 +83,25 @@ export interface EmUserInfo {
   userId: string
   nickname: string
   avatarUrl: string
+}
+
+/** 联系人条目（SDK Contact 的中立子集，wire 字段在 chat 边界归一） */
+export interface EmContactItem {
+  userId: string
+  remark: string      // 己方给该好友的备注，空串即未设置
+  nickname: string    // 好友资料昵称快照（来自 Contact.userInfo，同时并入 userStore）
+  avatarUrl: string
+  addTs: number       // 好友关系建立时间戳
+}
+
+/** 好友申请/通知条目（内存 + uni.setStorage 持久化未处理项） */
+export interface EmContactInvite {
+  id: string          // 本地生成（from + ts），幂等合并用
+  from: string        // 申请发起方 userId
+  message: string     // 验证附言，可为空串
+  status: ContactInviteStatusValue
+  outgoing: boolean   // true = 我方发出的申请被对方拒绝的通知
+  ts: number
 }
 
 export type EmThemeMode = ThemeModeValue

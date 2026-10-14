@@ -16,10 +16,13 @@ import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE
 import { connectionStore } from '../store/connection'
 import { conversationStore } from '../store/conversation'
 import { getMessages, messageStore } from '../store/message'
+import { createLogger } from '../utils/logger'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
 import type { EmConversationItem, EmKitConfig, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
 import { useLocale } from '../use/useLocale'
 import { bindUserInfo, ensureUserInfos } from './user-info'
+
+const logger = createLogger('chat')
 
 // typing 信号：发送节流间隔与接收方展示超时（对齐 vue 版 5s）
 const TYPING_THROTTLE = 5000
@@ -67,6 +70,7 @@ export class EmChat {
         }
       },
       onConversationListUpdate: (payload) => {
+        logger.debug('onConversationListUpdate raw payload:', JSON.parse(JSON.stringify(payload)))
         conversationStore.list = payload.items
           .filter((c) => c.conversationType === CONVERSATION_TYPE.SINGLE_CHAT)
           .map((c) => this.toConversationItem(c))
@@ -246,9 +250,12 @@ export class EmChat {
       let items: ReadonlyArray<ConversationItem> = []
       try {
         items = await chatManager.refreshSessionList()
+        logger.debug('syncConversations via refreshSessionList raw items:', JSON.parse(JSON.stringify(items)))
       } catch (e) {
         items = chatManager.getConversationList()
+        logger.debug('syncConversations via getConversationList raw items:', JSON.parse(JSON.stringify(items)))
       }
+      logger.info('syncConversations done, count:', items.length)
       conversationStore.list = items
         .filter((c) => c.conversationType === CONVERSATION_TYPE.SINGLE_CHAT)
         .map((c) => this.toConversationItem(c))
@@ -342,6 +349,27 @@ export class EmChat {
     delete messageStore.byConversation[conversationId]
     delete messageStore.cursors[conversationId]
     delete messageStore.hasMore[conversationId]
+  }
+
+  // 清空聊天记录（聊天详情页）：漫游走 removeHistoryMessages 时间戳截断，本地清缓存并复位游标；
+  // 会话列表该项摘要/时间清零（会话本身保留）
+  async clearConversationMessages(conversationId: string): Promise<void> {
+    const chatManager = await this.readyChatManager()
+    await chatManager.removeHistoryMessages({
+      conversationId,
+      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      beforeTimestamp: Date.now()
+    })
+    if (messageStore.byConversation[conversationId] != null) {
+      messageStore.byConversation[conversationId] = []
+    }
+    delete messageStore.cursors[conversationId]
+    delete messageStore.hasMore[conversationId]
+    const item = conversationStore.list.find((c) => c.conversationId === conversationId)
+    if (item != null) {
+      item.lastMessageText = ''
+      item.lastMessageTime = 0
+    }
   }
 
   // 免打扰走 PushManager：设置 remindType NONE 为免打扰；
@@ -579,6 +607,14 @@ export class EmChat {
         // typing 等信令不作为会话摘要展示
         return ''
       default:
+        // refreshSessionList 的 lastMessage 存在 type='unknown' 但 body.content 有值的
+        // wire 形态（实测：文本消息摘要拿到 unknown），兜底嗅探 content 当文本展示
+        {
+          const content = (last.body as Record<string, unknown>)['content']
+          if (typeof content === 'string' && content !== '') {
+            return content
+          }
+        }
         return t('message.unsupported')
     }
   }

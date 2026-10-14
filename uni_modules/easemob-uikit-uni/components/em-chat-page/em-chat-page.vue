@@ -1,8 +1,13 @@
 <template>
   <view :class="[ns.b(), themeClass]">
-    <view v-if="peerTyping" :class="ns.e('typing')">
-      <text :class="ns.e('typing-text')">{{ t('chat.typing') }}</text>
-    </view>
+    <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar -->
+    <em-nav-bar
+      :title="peerDisplayName"
+      :subtitle="peerTyping ? t('chat.typing') : ''"
+      action-icon="more-filled"
+      @back="onBack"
+      @action="onOpenInfo"
+    />
     <scroll-view
       :class="ns.e('scroll')"
       scroll-y
@@ -125,6 +130,7 @@ import EmImageMessage from '../em-image-message/em-image-message.vue'
 import EmAudioMessage from '../em-audio-message/em-audio-message.vue'
 import EmVideoMessage from '../em-video-message/em-video-message.vue'
 import EmFileMessage from '../em-file-message/em-file-message.vue'
+import EmNavBar from '../em-nav-bar/em-nav-bar.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import { MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE, TIME_DIVIDER_INTERVAL } from '../../libs/constants'
 import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../libs'
@@ -136,6 +142,9 @@ import { useNamespace } from '../../libs/use/useNamespace'
 import { useTheme } from '../../libs/use/useTheme'
 import { useLocale } from '../../libs/use/useLocale'
 import { formatDividerTime } from '../../libs/utils/time'
+import { createLogger } from '../../libs/utils/logger'
+
+const logger = createLogger('chat-page')
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
@@ -145,9 +154,22 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const emit = defineEmits<{
+  // 聊天详情入口（路由跳转由宿主页面接线）
+  (e: 'open-info', conversationId: string): void
+}>()
+
 const ns = useNamespace('chat-page')
 const { themeClass } = useTheme()
 const { t } = useLocale()
+
+function onBack(): void {
+  uni.navigateBack({ delta: 1 })
+}
+
+function onOpenInfo(): void {
+  emit('open-info', props.conversationId)
+}
 
 const draft = ref('')
 const anchorId = ref('')
@@ -178,13 +200,8 @@ const dividerBefore = computed<Record<string, boolean>>(() => {
   return map
 })
 
-// 导航标题：昵称 > conversationId（资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）
+// header 标题：昵称 > conversationId（资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）
 const peerDisplayName = computed(() => displayNameOf(props.conversationId))
-watch(peerDisplayName, (v) => {
-  if (v !== '') {
-    uni.setNavigationBarTitle({ title: v })
-  }
-}, { immediate: true })
 
 // 对端 typing 提示（chat 层 5s 超时自动消失）
 const peerTyping = computed(() => messageStore.peerTyping[props.conversationId] === true)
@@ -272,7 +289,7 @@ onMounted(() => {
   }
   EmKit.loadHistory(props.conversationId)
     .catch((e) => {
-      console.error('[emkit] loadHistory fail:', e)
+      logger.error('loadHistory fail:', e)
     })
     .finally(() => {
       scrollToBottom()
@@ -330,7 +347,7 @@ async function onLoadMore(): Promise<void> {
       })
     }
   } catch (e) {
-    console.error('[emkit] loadHistory fail:', e)
+    logger.error('loadHistory fail:', e)
   } finally {
     loadingMore.value = false
   }
@@ -347,7 +364,7 @@ async function onSend(): Promise<void> {
     quoteInfo.value = null
     scrollToBottom()
   } catch (e) {
-    console.error('[emkit] sendText fail:', e)
+    logger.error('sendText fail:', e)
   }
 }
 
@@ -358,7 +375,7 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
     await EmKit.sendImage(props.conversationId, images[0])
     scrollToBottom()
   } catch (e) {
-    console.error('[emkit] sendImage fail:', e)
+    logger.error('sendImage fail:', e)
   }
 }
 
@@ -382,7 +399,7 @@ async function onPickVideo(): Promise<void> {
     await EmKit.sendVideo(props.conversationId, video)
     scrollToBottom()
   } catch (e) {
-    console.error('[emkit] sendVideo fail:', e)
+    logger.error('sendVideo fail:', e)
   }
 }
 
@@ -393,7 +410,7 @@ async function onPickFile(): Promise<void> {
     await EmKit.sendFile(props.conversationId, file)
     scrollToBottom()
   } catch (e) {
-    console.error('[emkit] sendFile fail:', e)
+    logger.error('sendFile fail:', e)
   }
 }
 
@@ -402,7 +419,7 @@ async function onVoiceSend(path: string, duration: number): Promise<void> {
     await EmKit.sendAudio(props.conversationId, path, duration)
     scrollToBottom()
   } catch (e) {
-    console.error('[emkit] sendAudio fail:', e)
+    logger.error('sendAudio fail:', e)
   }
 }
 
@@ -492,7 +509,7 @@ async function onResend(m: EmMessageItem): Promise<void> {
     await EmKit.resendMessage(m.conversationId, m.localId)
     scrollToBottom()
   } catch (e) {
-    console.error('[emkit] resendMessage fail:', e)
+    logger.error('resendMessage fail:', e)
   }
 }
 
@@ -757,19 +774,6 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
 
 .em-chat-page__state-icon--unread {
   color: var(--em-primary-color);
-}
-
-/* typing 提示条：列表顶部居中弱文案（vue 版在 header 副标题区，uni 一期无自绘 header，放页面顶部） */
-.em-chat-page__typing {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--em-spacing-1) 0;
-}
-
-.em-chat-page__typing-text {
-  font-size: var(--em-font-size-12);
-  color: var(--em-text-tertiary);
 }
 
 @keyframes em-chat-page-spin {

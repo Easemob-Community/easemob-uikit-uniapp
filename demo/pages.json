@@ -9,7 +9,31 @@
     {
       "path": "pages/conversation/conversation",
       "style": {
-        "navigationBarTitleText": "会话列表"
+        "navigationBarTitleText": "会话列表",
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/contact/contact",
+      "style": {
+        "navigationBarTitleText": "通讯录",
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/contact-requests/contact-requests",
+      "style": {
+        "navigationBarTitleText": "新请求",
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
       }
     },
     {
@@ -22,9 +46,17 @@
       "path": "pages/chat/chat",
       "style": {
         "navigationBarTitleText": "聊天",
+        "navigationStyle": "custom",
         "app-plus": {
-          "softinputMode": "adjustResize"
+          "softinputMode": "adjustResize",
+          "titleNView": false
         }
+      }
+    },
+    {
+      "path": "pages/chat-info/chat-info",
+      "style": {
+        "navigationBarTitleText": "聊天信息"
       }
     },
     {
@@ -55,6 +87,10 @@
       {
         "pagePath": "pages/conversation/conversation",
         "text": "会话"
+      },
+      {
+        "pagePath": "pages/contact/contact",
+        "text": "联系人"
       },
       {
         "pagePath": "pages/mine/mine",

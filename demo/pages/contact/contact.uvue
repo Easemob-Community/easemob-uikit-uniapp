@@ -1,0 +1,150 @@
+<template>
+  <view class="page">
+    <em-contact-page @select="onSelect" @open-requests="onOpenRequests" @add="onAdd" />
+    <view v-if="showAddContact" class="addcontact">
+      <view class="addcontact__panel">
+        <text class="addcontact__title">添加好友</text>
+        <input class="addcontact__input" v-model="peerId" placeholder="输入用户 ID" />
+        <input class="addcontact__input" v-model="inviteMessage" placeholder="输入验证信息（可选）" />
+        <view class="addcontact__row">
+          <button class="addcontact__btn addcontact__btn--plain" @click="showAddContact = false">取消</button>
+          <button class="addcontact__btn" @click="onSendInvite">发送申请</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { ref } from 'vue'
+import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
+
+const showAddContact = ref(false)
+const peerId = ref('')
+const inviteMessage = ref('')
+
+function ensureLogin(): boolean {
+  if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
+    uni.reLaunch({ url: '/pages/login/login' })
+    return false
+  }
+  return true
+}
+
+onLoad(() => {
+  if (!ensureLogin()) return
+  EmKit.syncContacts().catch((e) => {
+    console.error('[demo] syncContacts fail:', e)
+  })
+})
+
+onShow(() => {
+  if (!ensureLogin()) return
+  EmKit.syncContacts().catch(() => {})
+})
+
+// 预热（对齐会话页点击范式）：跳转前 fire-and-forget 进入会话与历史拉取
+function onSelect(userId: string) {
+  EmKit.enterConversation(userId).catch(() => {})
+  EmKit.loadHistory(userId).catch(() => {})
+  uni.navigateTo({ url: `/pages/chat/chat?conversationId=${userId}` })
+}
+
+function onOpenRequests() {
+  uni.navigateTo({ url: '/pages/contact-requests/contact-requests' })
+}
+
+// 添加好友为 demo 级 modal（对齐 vue 版契约：页面组件只 emit add，弹窗由业务侧实现）
+function onAdd() {
+  peerId.value = ''
+  inviteMessage.value = ''
+  showAddContact.value = true
+}
+
+function onSendInvite() {
+  const id = peerId.value.trim()
+  if (id === '') return
+  if (id === EmKit.state.userId) {
+    uni.showToast({ title: '不能添加自己为好友', icon: 'none' })
+    return
+  }
+  EmKit.addContact(id, inviteMessage.value.trim())
+    .then(() => {
+      showAddContact.value = false
+      uni.showToast({ title: '好友申请已发送', icon: 'none' })
+    })
+    .catch(() => {
+      uni.showToast({ title: '添加失败，请稍后重试', icon: 'none' })
+    })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.addcontact {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.addcontact__panel {
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  padding: 16px;
+  background-color: #ffffff;
+  border-radius: 12px;
+}
+
+.addcontact__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.addcontact__input {
+  height: 38px;
+  padding: 0 10px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdcdc;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.addcontact__row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.addcontact__btn {
+  height: 34px;
+  line-height: 34px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: #ffffff;
+  background-color: #009eff;
+  border-radius: 6px;
+}
+
+.addcontact__btn--plain {
+  color: #666666;
+  background-color: #f5f5f5;
+  margin-right: 10px;
+}
+</style>

@@ -73,6 +73,6 @@
     }
   },
   "peerDependencies": {
-    "easemob-websdk": "^5.1.2"
+    "easemob-websdk": "5.1.3"
   }
 }

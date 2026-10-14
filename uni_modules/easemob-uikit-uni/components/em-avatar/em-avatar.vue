@@ -96,6 +96,9 @@ function onImageError(): void {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  /* uni-app x 的 view 默认 overflow:hidden，会裁掉负偏移探出盒子的徽标（实测坑）；
+     图片裁圆不依赖根节点（img 自带 shape 修饰符的 border-radius），此处显式放行 */
+  overflow: visible;
 }
 
 .em-avatar--circle {

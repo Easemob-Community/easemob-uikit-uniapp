@@ -1,12 +1,12 @@
 <template>
   <view :class="[ns.b(), themeClass]">
-    <view :class="ns.e('header')">
-      <text :class="ns.e('title')">{{ t('conversation.title') }}</text>
-      <!-- 纯图标按钮（对齐 vue 版 circle/plus 22px + 4px 内边距，无描边外圈） -->
-      <view :class="ns.e('add')" @click="onOpenCreate">
-        <EmIcon name="plusempty" :size="22" :class="ns.e('add-icon')" />
-      </view>
-    </view>
+    <!-- 自绘导航栏（系统栏右上角被小程序胶囊独占，且与页内标题重复）：返回隐藏，右侧「+」发起单聊 -->
+    <em-nav-bar
+      :title="t('conversation.title')"
+      :show-back="false"
+      action-icon="plusempty"
+      @action="onOpenCreate"
+    />
 
     <view :class="ns.e('search')">
       <view :class="ns.e('search-box')">
@@ -79,6 +79,7 @@
 import { computed, ref } from 'vue'
 import EmAvatar from '../em-avatar/em-avatar.vue'
 import EmIcon from '../em-icon/em-icon.vue'
+import EmNavBar from '../em-nav-bar/em-nav-bar.vue'
 import EmActionSheet from '../em-action-sheet/em-action-sheet.vue'
 import { EmKit } from '../../libs'
 import { CONVERSATION_MENU_KEY } from '../../libs/constants'
@@ -203,40 +204,6 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
   flex-direction: column;
   flex: 1;
   background-color: var(--em-conversation-list-bg);
-}
-
-.em-conversation-page__header {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 56px;
-  padding: var(--em-spacing-3) var(--em-spacing-3) var(--em-spacing-3) var(--em-spacing-4);
-  box-sizing: border-box;
-}
-
-/* 标题：16px Medium / 22px 行高（对齐 vue 版 conversation-list__title） */
-.em-conversation-page__title {
-  font-size: var(--em-font-size-16);
-  font-weight: var(--em-font-weight-medium);
-  line-height: 22px;
-  color: var(--em-text-primary);
-}
-
-/* 菜单触发：22px 图标 + 4px 内边距 = 30×30 触发盒，纯图标无描边（对齐 vue 版 menu-trigger） */
-.em-conversation-page__add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 4px;
-  border-radius: var(--em-radius);
-  box-sizing: border-box;
-}
-
-.em-conversation-page__add-icon {
-  color: var(--em-text-primary);
 }
 
 .em-conversation-page__scroll {
