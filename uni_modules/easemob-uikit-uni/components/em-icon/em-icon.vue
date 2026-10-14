@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
   color: ''
 })
 
-defineOptions({ styleIsolation: 'app-and-page' })
+defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const emit = defineEmits<{ (e: 'click'): void }>()
 

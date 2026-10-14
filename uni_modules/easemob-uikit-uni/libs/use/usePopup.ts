@@ -12,9 +12,8 @@ export function nextZIndex(): number {
 }
 
 // 底部安全区高度；H5 上 safeAreaInsets 可能缺失，兜底 0
-export function getSafeAreaBottom(): number {
-  return uni.getWindowInfo().safeAreaInsets?.bottom ?? 0
-}
+// 定义已迁至 useSafeArea.ts（PLAN 规划位），此处 re-export 保持既有引用不断
+export { getSafeAreaBottom, getSafeAreaTop } from './useSafeArea'
 
 // 小程序/App 的原生 tabBar 渲染在页面层之上，页面内弹层（无论 z-index 多高）都盖不住，
 // 只能弹层打开时 hideTabBar、全部关闭后 showTabBar。模块级计数器防嵌套弹层中途闪回。

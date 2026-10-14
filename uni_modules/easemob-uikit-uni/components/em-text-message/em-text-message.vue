@@ -14,7 +14,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-defineOptions({ styleIsolation: 'app-and-page' })
+defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const emit = defineEmits<{
   (e: 'long-press', message: EmMessageItem): void
@@ -34,6 +34,7 @@ function onLongpress(): void {
   background-color: var(--em-bubble-bg-other);
   border-radius: var(--em-bubble-radius);
   padding: 12px 14px;
+  max-width: 100%;
 }
 
 .em-text-message--self {
@@ -44,6 +45,8 @@ function onLongpress(): void {
   font-size: var(--em-font-size-15);
   line-height: var(--em-lineheight-normal);
   color: var(--em-bubble-text-other);
+  /* 长内容换行：对齐 vue 版 overflow-wrap: break-word 的语义，ucss 下用 word-break 兜底 */
+  word-break: break-all;
 }
 
 .em-text-message__text--self {

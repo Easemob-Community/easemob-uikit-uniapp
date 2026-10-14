@@ -36,6 +36,7 @@ await client.chatManager.sendMessage(msg)
 
 ## 工程陷阱
 
+- **媒体消息 `data` 不收字符串路径**：`createImageMessage`/`createVoiceMessage`/`createVideoMessage`/`createFileMessage` 的 `data` 类型是 `CompatibleFile = File | MiniAppFile | ReactNativeFile`——H5 传 `File` 对象（`uni.chooseImage` H5 端的 `res.tempFiles` 就是 File[]），小程序/App 传 `MiniAppFile`（`{ path, name?, size? }`）。直接传路径字符串会被 zod 校验拒绝：`Validation failed: data: Invalid input`（code 110）。发送/重发所有媒体类型都要过这层转换
 - **vite 预构建缓存钉死旧版 SDK**：升级 SDK 大版本后 dev server 仍用旧包（报 `ChatClient undefined`/`reading 'init'`）。删 `unpackage/dist/cache/.vite` 与 `node_modules/.vite` 后重启
 - **login resolve ≠ 立即可发**：login 返回后立刻 sendMessage 可能赶上 socket 未就绪（`WebSocket is not connected`），稍后重发即成功。封装层应做发送队列/连接就绪等待
 - 5.x（5.1.2）已无 4.x 的 eval 告警

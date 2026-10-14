@@ -4,7 +4,7 @@
       <EmIcon :name="iconName" :size="20" :class="ns.e('icon-glyph')" />
     </view>
     <view :class="ns.e('info')">
-      <text :class="[ns.e('name'), message.self ? 'em-file-message__name--self' : '']">{{ fileName }}</text>
+      <em-text :text="fileName" :text-class="nameClass" />
       <text v-if="sizeText !== ''" :class="[ns.e('size'), message.self ? 'em-file-message__size--self' : '']">{{ sizeText }}</text>
     </view>
   </view>
@@ -13,6 +13,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
+import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import type { EmMessageItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
@@ -24,7 +25,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-defineOptions({ styleIsolation: 'app-and-page' })
+defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const emit = defineEmits<{
   (e: 'long-press', message: EmMessageItem): void
@@ -34,6 +35,11 @@ const ns = useNamespace('file-message')
 const { t } = useLocale()
 
 const fileName = computed(() => props.message.fileName !== '' ? props.message.fileName : t('message.file'))
+
+// 文字样式经 textClass 透传（宿主只参与布局；info 列已有 flex:1 + overflow:hidden 约束链）
+const nameClass = computed(() => props.message.self
+  ? 'em-file-message__name em-file-message__name--self'
+  : 'em-file-message__name')
 
 const sizeText = computed(() => {
   const size = props.message.fileSize
@@ -158,9 +164,6 @@ function onLongpress(): void {
   font-size: var(--em-font-size-15);
   font-weight: var(--em-font-weight-medium);
   color: var(--em-bubble-text-other);
-  lines: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .em-file-message__name--self {

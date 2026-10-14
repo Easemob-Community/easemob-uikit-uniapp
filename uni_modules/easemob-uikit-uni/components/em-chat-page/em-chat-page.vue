@@ -1,10 +1,15 @@
 <template>
   <view :class="[ns.b(), themeClass]">
+    <view v-if="peerTyping" :class="ns.e('typing')">
+      <text :class="ns.e('typing-text')">{{ t('chat.typing') }}</text>
+    </view>
     <scroll-view
       :class="ns.e('scroll')"
       scroll-y
       :scroll-into-view="anchorId"
-      :scroll-with-animation="false"
+      :scroll-with-animation="scrollWithAnimation"
+      :show-scrollbar="false"
+      :enhanced="true"
     >
       <view v-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
         <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
@@ -16,55 +21,64 @@
       <view
         v-for="m in list"
         :key="m.localId"
-        :class="[ns.e('msg'), m.self ? 'em-chat-page__msg--self' : '', m.status === MESSAGE_STATUS.RECALLED ? 'em-chat-page__msg--recalled' : '']"
+        :id="msgAnchorId(m)"
+        :class="[ns.e('msg'), m.self ? 'em-chat-page__msg--self' : '', m.status === MESSAGE_STATUS.RECALLED ? 'em-chat-page__msg--recalled' : '', highlightId !== '' && highlightId === m.localId ? 'em-chat-page__msg--highlight' : '']"
       >
         <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
           <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
         </view>
         <template v-else>
           <em-avatar :name="m.self ? '' : m.from" :size="36" />
-          <!-- 状态列（仅己方，对齐 vue 版 message-bubble-wrapper）：row-reverse 下落在气泡与头像之间 -->
-          <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="ns.e('state')" @click="onResend(m)">
-            <EmIcon name="info-filled" :size="14" :class="ns.e('state-icon-failed')" />
-          </view>
-          <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="ns.e('state')">
-            <EmIcon name="spinner-cycle" :size="14" :class="ns.e('state-icon-sending')" />
-          </view>
           <view :class="[ns.e('content'), m.self ? 'em-chat-page__content--self' : '']">
-            <em-text-message
-              v-if="m.type === MESSAGE_TYPE.TEXT"
-              :message="m"
-              @long-press="onLongPressMessage"
-            />
-            <em-image-message
-              v-else-if="m.type === MESSAGE_TYPE.IMAGE"
-              :message="m"
-              @preview="onPreview"
-              @long-press="onLongPressMessage"
-            />
-            <em-audio-message
-              v-else-if="m.type === MESSAGE_TYPE.AUDIO"
-              :message="m"
-              @long-press="onLongPressMessage"
-            />
-            <em-video-message
-              v-else-if="m.type === MESSAGE_TYPE.VIDEO"
-              :message="m"
-              @long-press="onLongPressMessage"
-            />
-            <em-file-message
-              v-else-if="m.type === MESSAGE_TYPE.FILE"
-              :message="m"
-              @long-press="onLongPressMessage"
-            />
-            <view v-else :class="ns.e('bubble')">
-              <text :class="ns.e('text')">{{ t('message.unsupported') }}</text>
+            <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
+            <view :class="ns.e('bubble-row')">
+              <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="ns.e('state')" @click="onResend(m)">
+                <EmIcon name="info-filled" :size="14" :class="ns.e('state-icon-failed')" />
+              </view>
+              <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="ns.e('state')">
+                <EmIcon name="spinner-cycle" :size="14" :class="ns.e('state-icon-sending')" />
+              </view>
+              <!-- 单聊已读回执：仅最新一条己方已发送消息展示（对齐 vue 版 readIconDisplay 'latest'），未读空心圆/已读对勾 -->
+              <view v-else-if="showReadState(m)" :class="ns.e('state')">
+                <EmIcon :name="readIconName(m)" :size="14" :class="[ns.e('state-icon'), isPeerRead(m) ? 'em-chat-page__state-icon--read' : 'em-chat-page__state-icon--unread']" />
+              </view>
+              <em-text-message
+                v-if="m.type === MESSAGE_TYPE.TEXT"
+                :message="m"
+                @long-press="onLongPressMessage"
+              />
+              <em-image-message
+                v-else-if="m.type === MESSAGE_TYPE.IMAGE"
+                :message="m"
+                @preview="onPreview"
+                @long-press="onLongPressMessage"
+              />
+              <em-audio-message
+                v-else-if="m.type === MESSAGE_TYPE.AUDIO"
+                :message="m"
+                @long-press="onLongPressMessage"
+              />
+              <em-video-message
+                v-else-if="m.type === MESSAGE_TYPE.VIDEO"
+                :message="m"
+                @long-press="onLongPressMessage"
+              />
+              <em-file-message
+                v-else-if="m.type === MESSAGE_TYPE.FILE"
+                :message="m"
+                @long-press="onLongPressMessage"
+              />
+              <view v-else :class="ns.e('bubble')">
+                <text :class="ns.e('text')">{{ t('message.unsupported') }}</text>
+              </view>
             </view>
-            <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧 -->
-            <view v-if="m.quote != null" :class="[ns.e('quote'), m.self ? 'em-chat-page__quote--self' : '']">
+            <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧；点击定位原消息 -->
+            <view v-if="m.quote != null" :class="[ns.e('quote'), m.self ? 'em-chat-page__quote--self' : '']" @click="onQuoteClick(m)">
               <view :class="[ns.e('quote-line'), m.self ? 'em-chat-page__quote-line--self' : '']"></view>
               <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="13" :class="[ns.e('quote-icon'), m.self ? 'em-chat-page__quote-icon--self' : '']" />
-              <text :class="[ns.e('quote-text'), m.self ? 'em-chat-page__quote-text--self' : '']"><text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text></text>
+              <em-text :lines="2" :text-class="quoteTextClass(m)" :class="ns.e('quote-host')">
+                <text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text>
+              </em-text>
             </view>
             <view :class="ns.e('meta')">
               <text :class="ns.e('time')">{{ formatTimeHM(m.time) }}</text>
@@ -75,46 +89,13 @@
       <view :id="bottomAnchor" :class="ns.e('anchor')"></view>
     </scroll-view>
 
-    <view v-if="quoteInfo != null" :class="ns.e('quotebar')">
-      <view :class="ns.e('quotebar-line')"></view>
-      <EmIcon v-if="hasQuoteBarIcon" :name="quoteBarIcon" :size="13" :class="ns.e('quotebar-icon')" />
-      <text :class="ns.e('quotebar-text')"><text :class="ns.e('quotebar-sender')">{{ quoteBarFrom }}</text><text :class="ns.e('quotebar-preview')">{{ quoteBarSuffix }}</text></text>
-      <view :class="ns.e('quotebar-close')" @click="quoteInfo = null">
-        <EmIcon name="close" :size="18" />
-      </view>
-    </view>
-
-    <view :class="ns.e('inputbar')">
-      <template v-if="voiceMode">
-        <view :class="ns.e('plus')" @click="exitVoiceMode">
-          <EmIcon name="compose" :size="20" />
-        </view>
-        <view :class="[ns.e('record'), recording ? 'em-chat-page__record--active' : '']" @click="onToggleRecord">
-          <text :class="[ns.e('record-text'), recording ? 'em-chat-page__record-text--active' : '']">{{ recording ? t('chat.voice.tapStop') : t('chat.voice.tapStart') }}</text>
-        </view>
-      </template>
-      <template v-else>
-        <input
-          :class="ns.e('input')"
-          v-model="draft"
-          :placeholder="t('chat.placeholder')"
-          confirm-type="send"
-          @confirm="onSend"
-        />
-        <view :class="ns.e('plus')" @click="onOpenMedia">
-          <EmIcon name="plus" :size="20" />
-        </view>
-        <view :class="ns.e('send')" @click="onSend">
-          <text :class="ns.e('send-text')">{{ t('chat.send') }}</text>
-        </view>
-      </template>
-    </view>
-
-    <em-action-sheet
-      :visible="mediaSheetVisible"
-      :actions="mediaActions"
-      @select="onMediaAction"
-      @update:visible="mediaSheetVisible = $event"
+    <em-chat-inputbar
+      v-model="draft"
+      :quote="quoteInfo"
+      @send="onSend"
+      @quote-close="quoteInfo = null"
+      @media-select="onMediaSelect"
+      @voice-send="onVoiceSend"
     />
 
     <em-action-sheet
@@ -132,6 +113,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import EmAvatar from '../em-avatar/em-avatar.vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import EmActionSheet from '../em-action-sheet/em-action-sheet.vue'
+import EmChatInputbar from '../em-chat-inputbar/em-chat-inputbar.vue'
+import EmText from '../em-text/em-text.vue'
 import EmTextMessage from '../em-text-message/em-text-message.vue'
 import EmImageMessage from '../em-image-message/em-image-message.vue'
 import EmAudioMessage from '../em-audio-message/em-audio-message.vue'
@@ -139,7 +122,7 @@ import EmVideoMessage from '../em-video-message/em-video-message.vue'
 import EmFileMessage from '../em-file-message/em-file-message.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import { MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../libs/constants'
-import { EmKit, chooseFile, chooseImage, chooseVideo, isRecording, previewImage, startRecord, stopRecord } from '../../libs'
+import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../libs'
 import type { EmActionSheetAction, EmMessageItem, EmQuoteInfo } from '../../libs/types'
 import { messageStore } from '../../libs/store/message'
 import { clearDraft, getDraft, setDraft } from '../../libs/store/draft'
@@ -168,10 +151,78 @@ const loadingMore = ref(false)
 const list = computed<EmMessageItem[]>(() => messageStore.byConversation[props.conversationId] ?? [])
 const hasMore = computed(() => messageStore.hasMore[props.conversationId] === true)
 
+// 对端 typing 提示（chat 层 5s 超时自动消失）
+const peerTyping = computed(() => messageStore.peerTyping[props.conversationId] === true)
+
+// 已读回执展示目标：最新一条己方已发送消息（其余己方消息不显示已读态）
+const latestSelfLocalId = computed(() => {
+  const arr = list.value
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const m = arr[i]
+    if (m.self && m.status === MESSAGE_STATUS.SENT) return m.localId
+  }
+  return ''
+})
+
+function showReadState(m: EmMessageItem): boolean {
+  return EmKit.isReadReceiptEnabled() && m.self && m.status === MESSAGE_STATUS.SENT && m.localId === latestSelfLocalId.value
+}
+
+function isPeerRead(m: EmMessageItem): boolean {
+  const readAt = messageStore.peerReadTime[props.conversationId] ?? 0
+  return m.time > 0 && readAt >= m.time
+}
+
+function readIconName(m: EmMessageItem): EmIconName {
+  return isPeerRead(m) ? 'checkmarkempty' : 'circle'
+}
+
 function scrollToBottom(): void {
+  scrollWithAnimation.value = false
   anchorId.value = ''
   setTimeout(() => {
     anchorId.value = bottomAnchor
+  }, 50)
+}
+
+// 引用定位：消息行锚点 id + 点击引用卡滚动到原消息并整行闪烁高亮（对齐 vue 版 message-row-flash）；
+// 原消息未加载（历史未拉到）或已删除时提示
+const highlightId = ref('')
+const scrollWithAnimation = ref(false)
+// 单个共享计时器，避免连续定位多次堆积；与 CSS 动画 2.8s 对齐（3000ms 清除）
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+function msgAnchorId(m: EmMessageItem): string {
+  return `em-msg-${m.localId}`
+}
+
+function onQuoteClick(m: EmMessageItem): void {
+  const q = m.quote
+  if (q == null) return
+  // quote.msgId 是发送时刻的快照 id：己方消息可能是 localId（发送前），故两个字段都比对
+  const target = list.value.find((x) => x.id === q.msgId || x.localId === q.msgId)
+  if (target == null) {
+    uni.showToast({ title: t('message.quote.notFound'), icon: 'none' })
+    return
+  }
+  const anchor = msgAnchorId(target)
+  // 先清再下一帧重设：重复定位同一消息时强制移除/重加高亮类，让 CSS 动画重新触发
+  highlightId.value = ''
+  if (highlightTimer != null) {
+    clearTimeout(highlightTimer)
+    highlightTimer = null
+  }
+  nextTick(() => {
+    highlightId.value = target.localId
+    highlightTimer = setTimeout(() => {
+      highlightId.value = ''
+      highlightTimer = null
+    }, 3000)
+  })
+  scrollWithAnimation.value = true
+  anchorId.value = ''
+  setTimeout(() => {
+    anchorId.value = anchor
   }, 50)
 }
 
@@ -194,15 +245,14 @@ onMounted(async () => {
 onUnmounted(() => {
   EmKit.leaveConversation()
   quoteInfo.value = null
-  // 离开页面时若仍在录音，静默停掉不发送
-  if (isRecording()) {
-    stopRecord().then(() => {}).catch(() => {})
-  }
 })
 
-// 草稿默认开：输入即存，清空/发送即清
+// 草稿默认开：输入即存，清空/发送即清；非空输入动作向对方发 typing 信号（chat 层 5s 节流）
 watch(draft, (v) => {
   setDraft(props.conversationId, v)
+  if (v.trim() !== '') {
+    EmKit.sendTyping(props.conversationId).catch(() => {})
+  }
 })
 
 // 切换会话清掉引用条
@@ -237,42 +287,27 @@ async function onSend(): Promise<void> {
   }
 }
 
-async function onPickImage(): Promise<void> {
+async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<void> {
   try {
-    const paths = await chooseImage(1)
-    if (paths.length === 0) return
-    await EmKit.sendImage(props.conversationId, paths[0])
+    const images = await chooseImage(1, sourceType)
+    if (images.length === 0) return
+    await EmKit.sendImage(props.conversationId, images[0])
     scrollToBottom()
   } catch (e) {
     console.error('[emkit] sendImage fail:', e)
   }
 }
 
-// 输入栏「+」媒体面板：相册/视频/文件/语音
-const mediaSheetVisible = ref(false)
-const voiceMode = ref(false)
-const recording = ref(false)
-
-const mediaActions = computed<EmActionSheetAction[]>(() => [
-  { key: MEDIA_PANEL_KEY.ALBUM, text: t('chat.media.album'), icon: 'image' },
-  { key: MEDIA_PANEL_KEY.VIDEO, text: t('chat.media.video'), icon: 'videocam' },
-  { key: MEDIA_PANEL_KEY.FILE, text: t('chat.media.file'), icon: 'paperclip' },
-  { key: MEDIA_PANEL_KEY.VOICE, text: t('chat.media.voice'), icon: 'mic' }
-])
-
-function onOpenMedia(): void {
-  mediaSheetVisible.value = true
-}
-
-async function onMediaAction(action: EmActionSheetAction): Promise<void> {
-  if (action.key === MEDIA_PANEL_KEY.ALBUM) {
+// 输入栏「+」面板选择（语音由 inputbar 内部消化，这里只有 album/camera/video/file）
+async function onMediaSelect(key: string): Promise<void> {
+  if (key === MEDIA_PANEL_KEY.ALBUM) {
     await onPickImage()
-  } else if (action.key === MEDIA_PANEL_KEY.VIDEO) {
+  } else if (key === MEDIA_PANEL_KEY.CAMERA) {
+    await onPickImage('camera')
+  } else if (key === MEDIA_PANEL_KEY.VIDEO) {
     await onPickVideo()
-  } else if (action.key === MEDIA_PANEL_KEY.FILE) {
+  } else if (key === MEDIA_PANEL_KEY.FILE) {
     await onPickFile()
-  } else if (action.key === MEDIA_PANEL_KEY.VOICE) {
-    voiceMode.value = true
   }
 }
 
@@ -280,7 +315,7 @@ async function onPickVideo(): Promise<void> {
   const video = await chooseVideo()
   if (video == null) return
   try {
-    await EmKit.sendVideo(props.conversationId, video.path, video.duration, video.width, video.height)
+    await EmKit.sendVideo(props.conversationId, video)
     scrollToBottom()
   } catch (e) {
     console.error('[emkit] sendVideo fail:', e)
@@ -298,37 +333,13 @@ async function onPickFile(): Promise<void> {
   }
 }
 
-// 语音录音：最简「点击开始/点击结束」（按住说话手势一期不做）；H5 不支持时 toast 降级
-async function onToggleRecord(): Promise<void> {
-  if (recording.value) {
-    recording.value = false
-    try {
-      const res = await stopRecord()
-      if (res.path === '' || res.duration < 1) {
-        uni.showToast({ title: t('chat.voice.tooShort'), icon: 'none' })
-        return
-      }
-      await EmKit.sendAudio(props.conversationId, res.path, res.duration)
-      scrollToBottom()
-    } catch (e) {
-      console.error('[emkit] sendAudio fail:', e)
-    }
-  } else {
-    try {
-      startRecord()
-      recording.value = true
-    } catch (e) {
-      uni.showToast({ title: t('chat.voice.unsupported'), icon: 'none' })
-    }
+async function onVoiceSend(path: string, duration: number): Promise<void> {
+  try {
+    await EmKit.sendAudio(props.conversationId, path, duration)
+    scrollToBottom()
+  } catch (e) {
+    console.error('[emkit] sendAudio fail:', e)
   }
-}
-
-function exitVoiceMode(): void {
-  if (recording.value) {
-    stopRecord().then(() => {}).catch(() => {})
-    recording.value = false
-  }
-  voiceMode.value = false
 }
 
 function onPreview(m: EmMessageItem): void {
@@ -354,26 +365,11 @@ function quoteSender(m: EmMessageItem): string {
   return m.quote?.from ?? ''
 }
 
-const quoteBarSuffix = computed(() => {
-  const q = quoteInfo.value
-  if (q == null) return ''
-  return quoteSuffix(q)
-})
-
-// 模板里直接读 quoteInfo.value.xxx 会触发空值告警，拍平成 computed 基元
-const hasQuoteBarIcon = computed(() => {
-  const type = quoteInfo.value?.type
-  return type === MESSAGE_TYPE.IMAGE || type === MESSAGE_TYPE.VIDEO || type === MESSAGE_TYPE.AUDIO || type === MESSAGE_TYPE.FILE
-})
-const quoteBarIcon = computed<EmIconName>(() => {
-  const type = quoteInfo.value?.type
-  if (type === MESSAGE_TYPE.IMAGE) return 'image'
-  if (type === MESSAGE_TYPE.VIDEO) return 'videocam'
-  if (type === MESSAGE_TYPE.AUDIO) return 'sound'
-  if (type === MESSAGE_TYPE.FILE) return 'paperclip'
-  return 'more'
-})
-const quoteBarFrom = computed(() => quoteInfo.value?.from ?? '')
+function quoteTextClass(m: EmMessageItem): string {
+  return m.self
+    ? 'em-chat-page__quote-text em-chat-page__quote-text--self'
+    : 'em-chat-page__quote-text'
+}
 
 // 非文本引用在文本流开头带类型图标（em-icons 现有映射里语义最近的；文本不带）
 function hasQuoteIcon(m: EmMessageItem): boolean {
@@ -463,6 +459,9 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   flex: 1;
   height: 0;
   padding: var(--em-message-padding) var(--em-spacing-4);
+  /* 聊天列表隐藏滚动条（对齐微信/vue 版形态）：小程序端由 show-scrollbar 属性控制，
+     H5 走 scrollbar-width，不支持的端静默忽略 */
+  scrollbar-width: none;
 }
 
 .em-chat-page__history {
@@ -491,6 +490,41 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   justify-content: center;
 }
 
+/* 引用定位高亮：整行中性灰横带满铺（对齐 vue 版 message-row-flash），
+   padding+负 margin 抵消避免布局抖动；脉冲两次→保持→淡出共 2.8s，
+   与脚本侧 3000ms 清除计时器对齐。蒸汽端若不支持 @keyframes 则退化为无高亮 */
+.em-chat-page__msg--highlight {
+  padding: 4px 8px;
+  /* 负 margin 抵消 padding 防布局抖动；注意不能用 margin 简写——会覆盖基类的
+     margin-bottom: var(--em-message-gap)，行间距塌掉产生跳动（实测踩过） */
+  margin-top: -4px;
+  margin-bottom: 12px;
+  margin-left: -8px;
+  margin-right: -8px;
+  border-radius: var(--em-radius);
+  animation: em-chat-page-row-flash 2.8s ease-in-out forwards;
+}
+
+@keyframes em-chat-page-row-flash {
+  0% {
+    background-color: transparent;
+  }
+  8%,
+  30% {
+    background-color: var(--em-bg-hover);
+  }
+  18% {
+    background-color: transparent;
+  }
+  45%,
+  70% {
+    background-color: var(--em-bg-hover);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 .em-chat-page__recalled {
   display: flex;
   flex-direction: row;
@@ -511,6 +545,7 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   flex-direction: row;
   align-items: stretch;
   margin-top: 4px;
+  max-width: 100%;
   max-width: 100%;
 }
 
@@ -542,14 +577,16 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   margin-left: var(--em-spacing-1);
 }
 
-.em-chat-page__quote-text {
+/* 引用卡的折叠由 em-text 收口；宿主节点补 flex 约束链（小程序宿主参与 flex 布局，缺了会横向溢出） */
+.em-chat-page__quote-host {
   flex: 1;
+  min-width: 0;
+}
+
+.em-chat-page__quote-text {
   font-size: var(--em-font-size-13);
   line-height: 18px;
   color: var(--em-text-secondary);
-  lines: 2;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .em-chat-page__quote-text--self {
@@ -569,62 +606,11 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   color: var(--em-text-secondary);
 }
 
-/* 引用条（对齐 vue 版 quote-bar）：无边框无底色，2px 竖杠 + 摘要单行省略 + 18×18 纯图标关闭 */
-.em-chat-page__quotebar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: var(--em-spacing-2) var(--em-spacing-4);
-}
-
-.em-chat-page__quotebar-line {
-  width: 2px;
-  align-self: stretch;
-  border-radius: 2px;
-  background-color: var(--em-quote-line-color);
-  margin-right: var(--em-spacing-2);
-  flex-shrink: 0;
-}
-
-.em-chat-page__quotebar-icon {
-  margin-right: var(--em-spacing-2);
-  flex-shrink: 0;
-}
-
-.em-chat-page__quotebar-text {
-  flex: 1;
-  font-size: var(--em-font-size-13);
-  color: var(--em-text-secondary);
-  lines: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.em-chat-page__quotebar-sender {
-  font-size: var(--em-font-size-13);
-  color: var(--em-text-secondary);
-  font-weight: var(--em-font-weight-medium);
-}
-
-.em-chat-page__quotebar-preview {
-  font-size: var(--em-font-size-13);
-  color: var(--em-text-secondary);
-}
-
-.em-chat-page__quotebar-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: var(--em-spacing-2);
-  flex-shrink: 0;
-}
-
 .em-chat-page__content {
   display: flex;
   flex-direction: column;
   max-width: 70%;
+  min-width: 0;
   margin-left: var(--em-spacing-2);
   margin-right: var(--em-spacing-2);
 }
@@ -652,16 +638,29 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   margin-top: var(--em-spacing-1);
 }
 
-/* 状态列（仅己方消息）：落在气泡与头像之间，垂直居中与气泡对齐 */
+/* 气泡行：气泡与状态图标的水平容器，底边对齐——状态图标永远贴着气泡末尾，
+   不被引用卡/meta 撑高（vue 版用 ResizeObserver 对齐气泡本体，ucss 下用 flex-end 等价实现）。
+   注意：状态图标用绝对定位移出布局流——小程序里组件宿主节点参与 flex 布局且约束链解析不可靠，
+   在流内占位会把气泡顶超宽（实测超出正好一个图标位被头像裁切） */
+.em-chat-page__bubble-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  max-width: 100%;
+  position: relative;
+}
+
+/* 状态图标（仅己方消息）：绝对定位在气泡左外侧、与气泡底边对齐；不占布局宽度 */
 .em-chat-page__state {
+  position: absolute;
+  right: 100%;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: center;
   width: 20px;
   height: 20px;
-  margin: 0 var(--em-spacing-1);
-  flex-shrink: 0;
+  margin-right: var(--em-spacing-1);
 }
 
 /* 失败红叹号（em-icons 无 circle-bang，info-filled 实心圆点是语义最近的警示形），点击触发重发 */
@@ -672,6 +671,28 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
 /* sending 转圈：蒸汽端若不支持 @keyframes 则退化为静态图标，不影响语义 */
 .em-chat-page__state-icon-sending {
   animation: em-chat-page-spin 1s linear infinite;
+}
+
+/* 已读对勾：弱化灰；未读空心圆：主题色（对齐 vue 版 status-icon--unread 口径） */
+.em-chat-page__state-icon--read {
+  color: var(--em-text-tertiary);
+}
+
+.em-chat-page__state-icon--unread {
+  color: var(--em-primary-color);
+}
+
+/* typing 提示条：列表顶部居中弱文案（vue 版在 header 副标题区，uni 一期无自绘 header，放页面顶部） */
+.em-chat-page__typing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--em-spacing-1) 0;
+}
+
+.em-chat-page__typing-text {
+  font-size: var(--em-font-size-12);
+  color: var(--em-text-tertiary);
 }
 
 @keyframes em-chat-page-spin {
@@ -690,84 +711,5 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
 
 .em-chat-page__anchor {
   height: 1px;
-}
-
-.em-chat-page__inputbar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: var(--em-spacing-2) var(--em-spacing-4);
-  background-color: var(--em-input-bg);
-  border-top-width: 1px;
-  border-top-style: solid;
-  border-top-color: var(--em-divider-color);
-}
-
-.em-chat-page__input {
-  flex: 1;
-  height: 36px;
-  padding: 0 var(--em-spacing-3);
-  font-size: var(--em-font-size-14);
-  color: var(--em-text-primary);
-  background-color: var(--em-control-bg);
-  border-radius: var(--em-input-radius);
-}
-
-.em-chat-page__plus {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin-left: var(--em-spacing-2);
-  border-radius: var(--em-input-radius);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--em-input-border-color);
-}
-
-/* 语音态：点击开始/结束录音按钮（按住说话手势一期不做） */
-.em-chat-page__record {
-  flex: 1;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: var(--em-spacing-2);
-  border-radius: var(--em-input-radius);
-  background-color: var(--em-control-bg);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--em-input-border-color);
-}
-
-.em-chat-page__record--active {
-  background-color: var(--em-bg-active);
-  border-color: var(--em-primary-color);
-}
-
-.em-chat-page__record-text {
-  font-size: var(--em-font-size-14);
-  color: var(--em-text-primary);
-}
-
-.em-chat-page__record-text--active {
-  color: var(--em-primary-color);
-}
-
-.em-chat-page__send {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  padding: 0 var(--em-spacing-4);
-  margin-left: var(--em-spacing-2);
-  border-radius: var(--em-input-radius);
-  background-color: var(--em-primary-color);
-}
-
-.em-chat-page__send-text {
-  font-size: var(--em-font-size-14);
-  color: var(--em-text-inverse);
 }
 </style>

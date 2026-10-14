@@ -10,6 +10,8 @@ export type EmConnectionStatus = ConnectionStatusValue
 
 export interface EmKitConfig {
   appkey: string
+  /** 单聊已读回执开关，默认 true */
+  enableReadReceipt?: boolean
 }
 
 export interface EmLoginOptions {

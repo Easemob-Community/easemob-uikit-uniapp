@@ -1,5 +1,6 @@
 import type {
   ChatClient,
+  CmdMessageBody,
   CompatibleFile,
   ConversationItem,
   FileMessageBody,
@@ -11,31 +12,56 @@ import type {
   VideoMessageBody,
   VoiceMessageBody
 } from 'easemob-websdk'
-import { CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../constants'
+import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../constants'
 import { connectionStore } from '../store/connection'
 import { conversationStore } from '../store/conversation'
 import { getMessages, messageStore } from '../store/message'
-import type { EmPickedFile } from '../platform'
-import type { EmConversationItem, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
+import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
+import type { EmConversationItem, EmKitConfig, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
 import { useLocale } from '../use/useLocale'
+
+// typing 信号：发送节流间隔与接收方展示超时（对齐 vue 版 5s）
+const TYPING_THROTTLE = 5000
+const TYPING_TIMEOUT = 5000
+
+// localId 兜底序号（SDK msgLocalId 为空时保证唯一）
+let localSeq = 0
+function nextLocalSeq(): number {
+  localSeq += 1
+  return localSeq
+}
 
 // 消息收发与会话同步：5.x ChatManager 封装
 export class EmChat {
   private client: ChatClient | null = null
   private waitOnline: (() => Promise<void>) | null = null
   private handlers: EmMessageHandler[] = []
+  private readReceiptOn = true
+  private currentConversationId = ''
+  private typingSentAt: Record<string, number> = {}
+  private typingTimers: Record<string, ReturnType<typeof setTimeout>> = {}
 
-  bind(client: ChatClient, waitOnline: () => Promise<void>): void {
+  bind(client: ChatClient, waitOnline: () => Promise<void>, config?: EmKitConfig): void {
     if (this.client != null) {
       return
     }
     this.client = client
     this.waitOnline = waitOnline
+    this.readReceiptOn = config?.enableReadReceipt !== false
     client.chatManager.addEventHandler('emkit-message', {
       onMessage: (message: Message) => {
+        // SDK wire 边界：cmd 信号消息（typing 等）不落消息列表，在此拦截
+        if ((message.type as string) === 'cmd') {
+          this.onCmdMessage(message)
+          return
+        }
         const item = this.toMessageItem(message)
         this.appendMessage(item)
         this.notify(item)
+        // 在当前会话收到对方消息：即时回已读回执
+        if (!item.self && item.conversationId === this.currentConversationId) {
+          this.sendReadReceipts(item.conversationId).catch(() => {})
+        }
       },
       onConversationListUpdate: (payload) => {
         conversationStore.list = payload.items
@@ -44,7 +70,20 @@ export class EmChat {
       },
       onMessageRecalled: (payload: { conversationId: string, messageId: string }) => {
         this.markRecalled(payload.conversationId, payload.messageId)
+      },
+      onMessageReadReceipts: (receipts) => {
+        receipts.forEach((r) => {
+          if (r.conversationType !== CONVERSATION_TYPE.SINGLE_CHAT) return
+          const prev = messageStore.peerReadTime[r.conversationId] ?? 0
+          if (r.timestamp > prev) {
+            messageStore.peerReadTime[r.conversationId] = r.timestamp
+          }
+        })
       }    })
+  }
+
+  get readReceiptEnabled(): boolean {
+    return this.readReceiptOn
   }
 
   onMessage(handler: EmMessageHandler): void {
@@ -86,44 +125,51 @@ export class EmChat {
     return { msgId: item.id, from: item.from, text: text.slice(0, 50), type: item.type }
   }
 
-  async sendImage(to: string, filePath: string): Promise<void> {
+  // SDK 5.x createXxxMessage 的 data 不收字符串路径：H5 要 File 对象，小程序/App 要 MiniAppFile { path, name, size }
+  private asCompatibleFile(path: string, name: string, size: number, webFile: unknown | null): CompatibleFile {
+    return (webFile != null ? webFile : { path, name, size }) as CompatibleFile
+  }
+
+  async sendImage(to: string, image: EmPickedImage): Promise<void> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createImageMessage({
       conversationId: to,
       conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
-      data: filePath
+      data: this.asCompatibleFile(image.path, image.name, image.size, image.webFile),
+      filename: image.name
     })
-    await this.deliver(message, to, '')
+    await this.deliver(message, to, '', undefined, image.path)
   }
 
   async sendAudio(to: string, filePath: string, duration: number): Promise<void> {
     const chatManager = await this.readyChatManager()
+    const name = filePath.slice(filePath.lastIndexOf('/') + 1)
     const message = chatManager.createVoiceMessage({
       conversationId: to,
       conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
-      data: filePath,
+      data: this.asCompatibleFile(filePath, name, 0, null),
       duration
     })
     await this.deliver(message, to, '', undefined, filePath)
   }
 
-  async sendVideo(to: string, filePath: string, duration: number, width: number, height: number): Promise<void> {
+  async sendVideo(to: string, video: EmPickedVideo): Promise<void> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createVideoMessage({
       conversationId: to,
       conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
-      data: filePath,
-      duration,
-      width,
-      height
+      data: this.asCompatibleFile(video.path, video.name, video.size, null),
+      duration: video.duration,
+      width: video.width,
+      height: video.height
     })
-    await this.deliver(message, to, '', undefined, filePath)
+    await this.deliver(message, to, '', undefined, video.path)
   }
 
   async sendFile(to: string, file: EmPickedFile): Promise<void> {
     const chatManager = await this.readyChatManager()
     // H5 上传需要 File 对象；小程序/App 走 { path, name, size }（MiniAppFile）
-    const data = (file.webFile != null ? file.webFile : { path: file.path, name: file.name, size: file.size }) as CompatibleFile
+    const data = this.asCompatibleFile(file.path, file.name, file.size, file.webFile)
     const message = chatManager.createFileMessage({
       conversationId: to,
       conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
@@ -151,13 +197,17 @@ export class EmChat {
     if (quote != null && item.quote == null) item.quote = quote
     this.appendMessage(item)
     this.notify(item)
+    // 状态回写必须落在 store 的响应式代理上：item 是原始对象，蒸汽（vapor）端
+    // 细粒度绑定对原始对象的 mutation 不触发更新（VDOM 端靠整树重渲染掩盖了这点），
+    // 真机上会卡在 sending 态。getMessages 经 reactive 数组读取，返回的是代理。
+    const stored = getMessages(to).find((m) => m.localId === item.localId) ?? item
     try {
       const sent = await chatManager.sendMessage(message)
-      item.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
-      item.time = sent.timestamp
-      item.status = MESSAGE_STATUS.SENT
+      stored.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
+      stored.time = sent.timestamp
+      stored.status = MESSAGE_STATUS.SENT
     } catch (e) {
-      item.status = MESSAGE_STATUS.FAILED
+      stored.status = MESSAGE_STATUS.FAILED
       throw e
     }
   }
@@ -178,6 +228,7 @@ export class EmChat {
     const existing: Record<string, boolean> = {}
     list.forEach((m) => { existing[m.id] = true })
     const older = page.items
+      .filter((m) => (m.type as string) !== 'cmd')   // wire 边界：typing 等 cmd 信号不进消息列表
       .map((m) => this.toMessageItem(m as Message))
       .filter((m) => !existing[m.id])
     messageStore.byConversation[conversationId] = [...older, ...list].sort((a, b) => a.time - b.time)
@@ -203,12 +254,68 @@ export class EmChat {
 
   async enterConversation(conversationId: string): Promise<void> {
     const chatManager = await this.readyChatManager()
+    this.currentConversationId = conversationId
     chatManager.setCurrentConversation({ conversationId, conversationType: CONVERSATION_TYPE.SINGLE_CHAT })
     chatManager.clearConversationUnreadMessageCount({ conversationId, conversationType: CONVERSATION_TYPE.SINGLE_CHAT }).catch(() => {})
+    // 进入会话即回已读回执（对齐 vue 版会话切换 sendChannelAck 的时机）
+    this.sendReadReceipts(conversationId).catch(() => {})
   }
 
   leaveConversation(): void {
+    this.currentConversationId = ''
     this.client?.chatManager.resetCurrentConversation()
+  }
+
+  // 单聊已读回执：批量回执该会话内对端消息（serverId，最多 50 条），对方经 onMessageReadReceipts 收到
+  private async sendReadReceipts(conversationId: string): Promise<void> {
+    if (!this.readReceiptOn) return
+    const chatManager = await this.readyChatManager()
+    const list = messageStore.byConversation[conversationId] ?? []
+    const ids: string[] = []
+    for (let i = list.length - 1; i >= 0 && ids.length < 50; i--) {
+      const m = list[i]
+      if (!m.self && m.id !== '') {
+        ids.unshift(m.id)
+      }
+    }
+    if (ids.length === 0) return
+    await chatManager.sendMessageReadReceipts({
+      conversationId,
+      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      messageIds: ids
+    })
+  }
+
+  // typing 信号：cmd 消息发送，chat 层节流（同一会话 5s 最多一条）；失败静默
+  async sendTyping(conversationId: string): Promise<void> {
+    const now = Date.now()
+    const last = this.typingSentAt[conversationId] ?? 0
+    if (now - last < TYPING_THROTTLE) {
+      return
+    }
+    this.typingSentAt[conversationId] = now
+    const chatManager = await this.readyChatManager()
+    const message = chatManager.createCmdMessage({
+      conversationId,
+      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      action: CMD_ACTION.TYPING_BEGIN
+    })
+    await chatManager.sendMessage(message)
+  }
+
+  private onCmdMessage(message: Message): void {
+    const body = message.body as CmdMessageBody
+    if (body.action !== CMD_ACTION.TYPING_BEGIN) return
+    if (message.from === connectionStore.userId) return
+    const conversationId = this.peerOf(message)
+    messageStore.peerTyping[conversationId] = true
+    const prev = this.typingTimers[conversationId]
+    if (prev != null) {
+      clearTimeout(prev)
+    }
+    this.typingTimers[conversationId] = setTimeout(() => {
+      messageStore.peerTyping[conversationId] = false
+    }, TYPING_TIMEOUT)
   }
 
   async pinConversation(conversationId: string, pinned: boolean): Promise<void> {
@@ -284,10 +391,11 @@ export class EmChat {
     }
     let message: Message
     if (item.type === MESSAGE_TYPE.IMAGE) {
+      const name = item.url.slice(item.url.lastIndexOf('/') + 1)
       message = chatManager.createImageMessage({
         conversationId,
         conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
-        data: item.url
+        data: this.asCompatibleFile(item.url, name, 0, null)
       })
     } else {
       const quote = item.quote
@@ -347,7 +455,9 @@ export class EmChat {
     const id = message.msgServerId !== '' ? message.msgServerId : message.msgLocalId
     const item: EmMessageItem = {
       id,
-      localId: message.msgLocalId,
+      // 历史/接收消息的 msgLocalId 可能为空：localId 是列表 :key 与滚动锚点的唯一标识，
+      // 必须兜底成唯一值，否则 key 撞车、scroll-into-view 定位错乱、高亮匹配全员命中
+      localId: message.msgLocalId !== '' ? message.msgLocalId : `em-local-${id !== '' ? id : `${message.timestamp}-${nextLocalSeq()}`}`,
       conversationId: message.conversationId !== '' ? message.conversationId : this.peerOf(message),
       type: MESSAGE_TYPE.OTHER,
       text: '',
@@ -457,6 +567,9 @@ export class EmChat {
         return t('message.file')
       case 'custom':
         return t('message.custom')
+      case 'cmd':
+        // typing 等信令不作为会话摘要展示
+        return ''
       default:
         return t('message.unsupported')
     }

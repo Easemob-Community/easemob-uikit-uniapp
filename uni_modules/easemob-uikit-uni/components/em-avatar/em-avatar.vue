@@ -41,7 +41,7 @@ const props = withDefaults(defineProps<Props>(), {
   badgeMax: 99
 })
 
-defineOptions({ styleIsolation: 'app-and-page' })
+defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const ns = useNamespace('avatar')
 

@@ -2,17 +2,21 @@
   <view :class="[ns.b(), themeClass]">
     <view :class="ns.e('header')">
       <text :class="ns.e('title')">{{ t('conversation.title') }}</text>
+      <!-- 纯图标按钮（对齐 vue 版 circle/plus 22px + 4px 内边距，无描边外圈） -->
       <view :class="ns.e('add')" @click="onOpenCreate">
-        <EmIcon name="plus" :size="16" />
+        <EmIcon name="plusempty" :size="22" :class="ns.e('add-icon')" />
       </view>
     </view>
 
     <view :class="ns.e('search')">
-      <input
-        :class="ns.e('search-input')"
-        v-model="keyword"
-        :placeholder="t('conversation.searchPlaceholder')"
-      />
+      <view :class="ns.e('search-box')">
+        <EmIcon name="search" :size="16" :class="ns.e('search-icon')" />
+        <input
+          :class="ns.e('search-input')"
+          v-model="keyword"
+          :placeholder="t('conversation.searchPlaceholder')"
+        />
+      </view>
     </view>
 
     <scroll-view :class="ns.e('scroll')" scroll-y>
@@ -34,16 +38,17 @@
         <view :class="ns.e('body')">
           <view :class="ns.e('top')">
             <view :class="ns.e('name-wrap')">
-              <text :class="ns.e('name')">{{ entry.item.name }}</text>
-              <text v-if="entry.item.isPinned" :class="ns.e('flag')">📌</text>
-              <text v-if="entry.item.isMuted" :class="ns.e('flag')">🔕</text>
+              <em-text :text="entry.item.name" :text-class="ns.e('name')" :class="ns.e('name-host')" />
+              <!-- 置顶/免打扰徽标：em-icons 无 pin/bell-slash 字形，置顶用 top、免打扰用 eye-slash（与长按菜单图标一致），弱化图标色 -->
+              <EmIcon v-if="entry.item.isPinned" name="top" :size="12" :class="ns.e('flag')" />
+              <EmIcon v-if="entry.item.isMuted" name="eye-slash" :size="12" :class="ns.e('flag')" />
             </view>
             <text :class="ns.e('time')">{{ entry.timeText }}</text>
           </view>
           <view :class="ns.e('bottom')">
             <view :class="ns.e('message')">
               <text v-if="entry.draft != null" :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
-              <text :class="ns.e('summary')">{{ entry.draft != null ? entry.draft.text : entry.item.lastMessageText }}</text>
+              <em-text :text="entry.draft != null ? entry.draft.text : entry.item.lastMessageText" :text-class="ns.e('summary')" :class="ns.e('summary-host')" />
             </view>
             <view v-if="entry.item.unreadCount > 0 && entry.item.isMuted" :class="ns.e('unread-dot')"></view>
             <view v-else-if="entry.item.unreadCount > 0" :class="ns.e('unread')">
@@ -195,25 +200,33 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: var(--em-spacing-3) var(--em-spacing-4);
+  min-height: 56px;
+  padding: var(--em-spacing-3) var(--em-spacing-3) var(--em-spacing-3) var(--em-spacing-4);
+  box-sizing: border-box;
 }
 
+/* 标题：16px Medium / 22px 行高（对齐 vue 版 conversation-list__title） */
 .em-conversation-page__title {
-  font-size: var(--em-font-size-18);
-  font-weight: var(--em-font-weight-semibold);
+  font-size: var(--em-font-size-16);
+  font-weight: var(--em-font-weight-medium);
+  line-height: 22px;
   color: var(--em-text-primary);
 }
 
+/* 菜单触发：22px 图标 + 4px 内边距 = 30×30 触发盒，纯图标无描边（对齐 vue 版 menu-trigger） */
 .em-conversation-page__add {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--em-border-color);
+  width: 30px;
+  height: 30px;
+  padding: 4px;
+  border-radius: var(--em-radius);
+  box-sizing: border-box;
+}
+
+.em-conversation-page__add-icon {
+  color: var(--em-text-primary);
 }
 
 .em-conversation-page__scroll {
@@ -221,20 +234,36 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
   height: 0;
 }
 
+/* 搜索槽：上下 8px、左右 16px（对齐 vue 版 search 槽口径） */
 .em-conversation-page__search {
   display: flex;
   flex-direction: row;
-  padding: 0 var(--em-spacing-4) var(--em-spacing-2);
+  padding: var(--em-spacing-2) var(--em-spacing-4);
+}
+
+.em-conversation-page__search-box {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 36px;
+  padding: 0 var(--em-spacing-3);
+  background-color: var(--em-control-bg);
+  border-radius: var(--em-input-radius);
+}
+
+.em-conversation-page__search-icon {
+  color: var(--em-icon-muted);
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 .em-conversation-page__search-input {
   flex: 1;
   height: 36px;
-  padding: 0 var(--em-spacing-3);
   font-size: var(--em-font-size-14);
   color: var(--em-text-primary);
-  background-color: var(--em-control-bg);
-  border-radius: var(--em-input-radius);
+  background-color: transparent;
 }
 
 .em-conversation-page__tip {
@@ -289,20 +318,24 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
   flex: 1;
 }
 
+/* 名称/摘要的折叠由 em-text 收口；宿主节点补 flex 约束链（小程序宿主参与 flex 布局） */
+.em-conversation-page__name-host {
+  flex: 1;
+  min-width: 0;
+}
+
 .em-conversation-page__name {
   font-size: var(--em-font-size-15);
   font-weight: var(--em-font-weight-semibold);
   line-height: 20px;
   color: var(--em-text-primary);
-  lines: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
+/* 置顶/免打扰图标徽标：弱化图标色（对齐 vue 版 pin-badge/mute-badge 的 --uikit-icon-muted） */
 .em-conversation-page__flag {
-  font-size: var(--em-font-size-12);
   margin-left: var(--em-spacing-1);
   flex-shrink: 0;
+  color: var(--em-icon-muted);
 }
 
 .em-conversation-page__time {
@@ -338,14 +371,15 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
   flex-shrink: 0;
 }
 
+.em-conversation-page__summary-host {
+  flex: 1;
+  min-width: 0;
+}
+
 .em-conversation-page__summary {
   font-size: var(--em-font-size-13);
   line-height: 18px;
   color: var(--em-text-secondary);
-  lines: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
 }
 
 .em-conversation-page__unread {

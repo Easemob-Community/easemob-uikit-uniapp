@@ -2,7 +2,7 @@
   <em-popup :visible="visible" position="bottom" :mask-closable="false" @mask-click="onMaskClick">
     <view :class="ns.b()">
       <view v-if="title !== ''" :class="ns.e('header')">
-        <text :class="ns.e('title')">{{ title }}</text>
+        <em-text :text="title" :text-class="ns.e('title')" />
       </view>
       <view :class="ns.e('list')">
         <view
@@ -17,7 +17,7 @@
             :size="20"
             :class="[ns.e('icon'), action.danger === true ? 'em-action-sheet__icon--danger' : '']"
           />
-          <text :class="[ns.e('text'), action.danger === true ? 'em-action-sheet__text--danger' : '']">{{ action.text }}</text>
+          <em-text :text="action.text" :text-class="actionTextClass(action)" />
         </view>
       </view>
       <view v-if="showCancel" :class="ns.e('gap')"></view>
@@ -31,6 +31,7 @@
 <script setup lang="ts">
 import EmPopup from '../em-popup/em-popup.vue'
 import EmIcon from '../em-icon/em-icon.vue'
+import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import type { EmActionSheetAction } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
@@ -83,6 +84,12 @@ function hasIcon(action: EmActionSheetAction): boolean {
 function iconNameOf(action: EmActionSheetAction): EmIconName {
   return (action.icon ?? 'more') as EmIconName
 }
+
+function actionTextClass(action: EmActionSheetAction): string {
+  return action.danger === true
+    ? 'em-action-sheet__text em-action-sheet__text--danger'
+    : 'em-action-sheet__text'
+}
 </script>
 
 <style>
@@ -106,9 +113,6 @@ function iconNameOf(action: EmActionSheetAction): EmIconName {
 .em-action-sheet__title {
   font-size: var(--em-font-size-13);
   color: var(--em-text-tertiary);
-  lines: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .em-action-sheet__list {

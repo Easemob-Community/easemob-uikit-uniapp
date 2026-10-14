@@ -37,6 +37,13 @@ export const MESSAGE_EXT_KEY = {
 
 export type MessageExtKeyValue = (typeof MESSAGE_EXT_KEY)[keyof typeof MESSAGE_EXT_KEY]
 
+/** cmd 信号消息的 action 名（UIKit 应用层协议，与 vue 版对齐以便跨端互认） */
+export const CMD_ACTION = {
+  TYPING_BEGIN: 'TypingBegin'
+} as const
+
+export type CmdActionValue = (typeof CMD_ACTION)[keyof typeof CMD_ACTION]
+
 export const CONNECTION_STATUS = {
   IDLE: 'idle',
   CONNECTING: 'connecting',
@@ -83,6 +90,7 @@ export type MessageMenuKeyValue = (typeof MESSAGE_MENU_KEY)[keyof typeof MESSAGE
 /** 输入栏「+」媒体面板 action key */
 export const MEDIA_PANEL_KEY = {
   ALBUM: 'album',
+  CAMERA: 'camera',
   VIDEO: 'video',
   FILE: 'file',
   VOICE: 'voice'

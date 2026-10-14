@@ -93,7 +93,7 @@ async function onLogin() {
     return
   }
   try {
-    EmKit.init({ appkey: appkey.value })
+    EmKit.init({ appkey: appkey.value, enableReadReceipt: true })
     if (!handlerRegistered) {
       handlerRegistered = true
       EmKit.onTextMessage((msg) => {

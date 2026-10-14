@@ -10,7 +10,7 @@ import type {
   EmMessageItem,
   EmQuoteInfo
 } from './types'
-import type { EmPickedFile } from './platform'
+import type { EmPickedFile, EmPickedImage, EmPickedVideo } from './platform'
 
 // EmKit 门面：对外唯一入口，内部按功能拆分（client / chat / store / platform）
 class EmKitImpl {
@@ -23,7 +23,7 @@ class EmKitImpl {
 
   init(config: EmKitConfig): void {
     const client = this.client.init(config)
-    this.chat.bind(client, () => this.client.waitOnline())
+    this.chat.bind(client, () => this.client.waitOnline(), config)
   }
 
   login(options: EmLoginOptions): Promise<void> {
@@ -42,16 +42,16 @@ class EmKitImpl {
     return this.chat.makeQuote(item)
   }
 
-  sendImage(to: string, filePath: string): Promise<void> {
-    return this.chat.sendImage(to, filePath)
+  sendImage(to: string, image: EmPickedImage): Promise<void> {
+    return this.chat.sendImage(to, image)
   }
 
   sendAudio(to: string, filePath: string, duration: number): Promise<void> {
     return this.chat.sendAudio(to, filePath, duration)
   }
 
-  sendVideo(to: string, filePath: string, duration: number, width: number, height: number): Promise<void> {
-    return this.chat.sendVideo(to, filePath, duration, width, height)
+  sendVideo(to: string, video: EmPickedVideo): Promise<void> {
+    return this.chat.sendVideo(to, video)
   }
 
   sendFile(to: string, file: EmPickedFile): Promise<void> {
@@ -94,6 +94,14 @@ class EmKitImpl {
     return this.chat.resendMessage(conversationId, localId)
   }
 
+  sendTyping(conversationId: string): Promise<void> {
+    return this.chat.sendTyping(conversationId)
+  }
+
+  isReadReceiptEnabled(): boolean {
+    return this.chat.readReceiptEnabled
+  }
+
   leaveConversation(): void {
     this.chat.leaveConversation()
   }
@@ -113,9 +121,10 @@ export const EmKit = new EmKitImpl()
 export * from './types'
 export * from './constants'
 export { setStorage, getStorage, removeStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio } from './platform'
-export type { EmPickedVideo, EmPickedFile, EmRecordResult } from './platform'
+export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult } from './platform'
 export { useNamespace } from './use/useNamespace'
 export { useTheme } from './use/useTheme'
 export { useLocale } from './use/useLocale'
-export { usePopup, nextZIndex, getSafeAreaBottom } from './use/usePopup'
+export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
+export { usePopup, nextZIndex } from './use/usePopup'
 export { themeStore } from './store/theme'

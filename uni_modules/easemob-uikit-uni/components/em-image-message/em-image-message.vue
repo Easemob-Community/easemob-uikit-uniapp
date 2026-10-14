@@ -20,7 +20,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-defineOptions({ styleIsolation: 'app-and-page' })
+defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const emit = defineEmits<{
   (e: 'preview', message: EmMessageItem): void
