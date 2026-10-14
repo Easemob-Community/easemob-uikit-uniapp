@@ -44,7 +44,15 @@ onShow(() => {
   })
 })
 
+// 预热（对齐 TUIKit switchConversation 模式）：跳转前 fire-and-forget 发起进入会话与历史拉取，
+// messageStore 是模块级 store，跳转动画期间数据已在路上；聊天页打开即有缓存可渲染
+function preloadConversation(conversationId: string) {
+  EmKit.enterConversation(conversationId).catch(() => {})
+  EmKit.loadHistory(conversationId).catch(() => {})
+}
+
 function onSelect(conversationId: string) {
+  preloadConversation(conversationId)
   uni.navigateTo({ url: `/pages/chat/chat?conversationId=${conversationId}` })
 }
 
@@ -59,6 +67,7 @@ function onStartChat() {
   const id = peerId.value.trim()
   if (id === '') return
   showNewChat.value = false
+  preloadConversation(id)
   uni.navigateTo({ url: `/pages/chat/chat?conversationId=${id}` })
 }
 </script>

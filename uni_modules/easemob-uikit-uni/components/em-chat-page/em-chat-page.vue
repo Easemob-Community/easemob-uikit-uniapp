@@ -6,10 +6,12 @@
     <scroll-view
       :class="ns.e('scroll')"
       scroll-y
+      :scroll-top="scrollTopVal"
       :scroll-into-view="anchorId"
       :scroll-with-animation="scrollWithAnimation"
       :show-scrollbar="false"
       :enhanced="true"
+      :style="ready ? '' : 'opacity: 0;'"
     >
       <view v-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
         <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
@@ -90,7 +92,6 @@
         </template>
         </view>
       </view>
-      <view :id="bottomAnchor" :class="ns.e('anchor')"></view>
     </scroll-view>
 
     <em-chat-inputbar
@@ -150,8 +151,14 @@ const { t } = useLocale()
 
 const draft = ref('')
 const anchorId = ref('')
-const bottomAnchor = 'em-chat-bottom'
 const loadingMore = ref(false)
+
+// 滚底用 scrollTop 数值方案（对齐 TUIKit uniapp 版）：初始预置大值首帧即底部方向；
+// 两个大值交替赋值保证必触发（scroll-into-view 同值不重触发 + 超出 clamp 到底），
+// 免 SelectorQuery 测 scrollHeight 的跨端时序风险。scroll-into-view 只留给精确锚点（引用定位/历史保位）
+const scrollTopVal = ref(999999)
+// 首帧隐藏：消息区先透明，首次滚底定位后下一帧再显示，遮蔽「顶部首帧 → 跳底」视觉残留；500ms 兜底防白屏
+const ready = ref(false)
 
 const list = computed<EmMessageItem[]>(() => messageStore.byConversation[props.conversationId] ?? [])
 const hasMore = computed(() => messageStore.hasMore[props.conversationId] === true)
@@ -207,10 +214,7 @@ function readIconName(m: EmMessageItem): EmIconName {
 
 function scrollToBottom(): void {
   scrollWithAnimation.value = false
-  anchorId.value = ''
-  setTimeout(() => {
-    anchorId.value = bottomAnchor
-  }, 50)
+  scrollTopVal.value = scrollTopVal.value >= 1000000 ? 999999 : 1000000
 }
 
 // 引用定位：消息行锚点 id + 点击引用卡滚动到原消息并整行闪烁高亮（对齐 vue 版 message-row-flash）；
@@ -254,15 +258,33 @@ function onQuoteClick(m: EmMessageItem): void {
   }, 50)
 }
 
-onMounted(async () => {
+onMounted(() => {
   draft.value = getDraft(props.conversationId)?.text ?? ''
-  await EmKit.enterConversation(props.conversationId)
-  try {
-    await EmKit.loadHistory(props.conversationId)
-  } catch (e) {
-    console.error('[emkit] loadHistory fail:', e)
+  // 进入会话与拉历史并行、不阻塞渲染（对齐 TUIKit：会话页点击时已预热拉取，store 有缓存立即渲染）；
+  // 串行 await 是进入停顿的主因，这里只做 fire-and-forget + 完成后滚底
+  EmKit.enterConversation(props.conversationId).catch(() => {})
+  // 热启动（预热/二次进入命中缓存）：已有消息立即滚底并显示，不等历史请求回包
+  if (list.value.length > 0) {
+    scrollToBottom()
+    nextTick(() => {
+      ready.value = true
+    })
   }
-  scrollToBottom()
+  EmKit.loadHistory(props.conversationId)
+    .catch((e) => {
+      console.error('[emkit] loadHistory fail:', e)
+    })
+    .finally(() => {
+      scrollToBottom()
+      // 定位指令发出后的下一帧解除首帧隐藏
+      nextTick(() => {
+        ready.value = true
+      })
+    })
+  // 异常路径兜底：500ms 后强制显示，防白屏
+  setTimeout(() => {
+    ready.value = true
+  }, 500)
   EmKit.onMessage((msg) => {
     if (msg.conversationId === props.conversationId) {
       scrollToBottom()
@@ -291,8 +313,22 @@ watch(() => props.conversationId, () => {
 async function onLoadMore(): Promise<void> {
   if (loadingMore.value) return
   loadingMore.value = true
+  // 锚点保位（对齐 TUIKit uniapp 版）：prepend 前记录当前首条消息，加载后 scroll-into-view 回位，
+  // 500ms 后清空锚点——消除加载历史时视口被顶动的跳动
+  const first = list.value.length > 0 ? list.value[0] : null
   try {
     await EmKit.loadHistory(props.conversationId)
+    if (first != null) {
+      const anchor = msgAnchorId(first)
+      scrollWithAnimation.value = false
+      anchorId.value = ''
+      nextTick(() => {
+        anchorId.value = anchor
+        setTimeout(() => {
+          anchorId.value = ''
+        }, 500)
+      })
+    }
   } catch (e) {
     console.error('[emkit] loadHistory fail:', e)
   } finally {
@@ -745,7 +781,4 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   }
 }
 
-.em-chat-page__anchor {
-  height: 1px;
-}
 </style>
