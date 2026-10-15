@@ -32,7 +32,9 @@ export type ConversationTypeValue = (typeof CONVERSATION_TYPE)[keyof typeof CONV
 
 /** 消息 ext 自定义 key */
 export const MESSAGE_EXT_KEY = {
-  QUOTE: 'emQuote'
+  QUOTE: 'emQuote',
+  // @提及列表（userId 数组）：与 vue 版同 key，跨 UIKit 互认
+  MENTION: 'em_at_list'
 } as const
 
 export type MessageExtKeyValue = (typeof MESSAGE_EXT_KEY)[keyof typeof MESSAGE_EXT_KEY]
@@ -140,6 +142,24 @@ export const CONTACT_INVITE_STATUS = {
 } as const
 
 export type ContactInviteStatusValue = (typeof CONTACT_INVITE_STATUS)[keyof typeof CONTACT_INVITE_STATUS]
+
+/** 群成员角色（对齐 websdk GroupRole 与 vue 版 GROUP_MEMBER_ROLE） */
+export const GROUP_MEMBER_ROLE = {
+  OWNER: 'owner',
+  ADMIN: 'admin',
+  MEMBER: 'member'
+} as const
+
+export type GroupMemberRoleValue = (typeof GROUP_MEMBER_ROLE)[keyof typeof GROUP_MEMBER_ROLE]
+
+/** 群成员宫格首屏格数（聊天详情页成员九宫格，含加/减操作格前的成员展示上限） */
+export const GROUP_MEMBER_GRID_COUNT = 9
+
+/** 群成员游标分页每页条数 */
+export const GROUP_MEMBER_PAGE_SIZE = 20
+
+/** 群公告最大长度（对齐 vue 版 GROUP_INFO_LIMIT 语义，数值以 M2.9 计划为准） */
+export const GROUP_ANNOUNCEMENT_MAX_LENGTH = 600
 
 /** 联系人字母分组序列（A-Z + #，对齐 vue 版 DEFAULT_ALPHABET_KEYS） */
 export const ALPHABET_KEYS = [

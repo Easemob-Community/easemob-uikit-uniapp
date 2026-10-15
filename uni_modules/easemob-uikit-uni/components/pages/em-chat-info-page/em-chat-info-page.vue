@@ -36,6 +36,7 @@ import { computed, onMounted, ref } from 'vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmButton from '../../em-button/em-button.vue'
 import { EmKit } from '../../../libs'
+import { CONVERSATION_TYPE } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle } from '../../../libs/store/config'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
@@ -61,6 +62,8 @@ const { themeClass } = useTheme()
 const { t } = useLocale()
 
 const conv = computed(() => conversationStore.items.find((c) => c.conversationId === props.conversationId) ?? null)
+// 会话类型以会话 store 为准（群会话由群数据层建联后即为 groupChat）；未同步到时兜底单聊（现状等价）
+const chatType = computed(() => conv.value?.chatType ?? CONVERSATION_TYPE.SINGLE_CHAT)
 const displayName = computed(() => displayNameOf(props.conversationId, conv.value?.name ?? ''))
 const avatar = computed(() => {
   const a = avatarOf(props.conversationId)
@@ -82,7 +85,7 @@ async function onMuteChange(e: any): Promise<void> {
   const prev = muted.value
   muted.value = v
   try {
-    await EmKit.setConversationMuted(props.conversationId, v)
+    await EmKit.setConversationMuted(props.conversationId, chatType.value, v)
   } catch (err) {
     muted.value = prev
     uni.showToast({ title: t('error.unknown'), icon: 'none' })
@@ -94,7 +97,7 @@ async function onPinChange(e: any): Promise<void> {
   const prev = pinned.value
   pinned.value = v
   try {
-    await EmKit.pinConversation(props.conversationId, v)
+    await EmKit.pinConversation(props.conversationId, chatType.value, v)
   } catch (err) {
     pinned.value = prev
     uni.showToast({ title: t('error.unknown'), icon: 'none' })
@@ -107,7 +110,7 @@ function onClearHistory(): void {
     content: t('chat.info.clearHistoryConfirm'),
     success: (res) => {
       if (!res.confirm) return
-      EmKit.clearConversationMessages(props.conversationId)
+      EmKit.clearConversationMessages(props.conversationId, chatType.value)
         .then(() => {
           uni.showToast({ title: t('chat.info.clearHistory'), icon: 'success' })
         })
@@ -124,7 +127,7 @@ function onDelete(): void {
     content: t('conversation.deleteConfirm'),
     success: (res) => {
       if (!res.confirm) return
-      EmKit.deleteConversation(props.conversationId)
+      EmKit.deleteConversation(props.conversationId, chatType.value)
         .then(() => {
           emit('deleted', props.conversationId)
         })

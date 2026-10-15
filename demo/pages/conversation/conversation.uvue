@@ -17,7 +17,7 @@
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const showNewChat = ref(false)
 const peerId = ref('')
@@ -46,9 +46,10 @@ onShow(() => {
 
 // 预热（对齐 TUIKit switchConversation 模式）：跳转前 fire-and-forget 发起进入会话与历史拉取，
 // messageStore 是模块级 store，跳转动画期间数据已在路上；聊天页打开即有缓存可渲染
+// TODO(M2.9 Phase 2)：路由携带 chatType，群会话传 GROUP_CHAT
 function preloadConversation(conversationId: string) {
-  EmKit.enterConversation(conversationId).catch(() => {})
-  EmKit.loadHistory(conversationId).catch(() => {})
+  EmKit.enterConversation(conversationId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
+  EmKit.loadHistory(conversationId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
 }
 
 function onSelect(conversationId: string) {

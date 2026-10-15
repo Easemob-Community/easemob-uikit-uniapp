@@ -2,6 +2,8 @@ import type {
   ConnectionStatusValue,
   ContactInviteStatusValue,
   ConversationMenuKeyValue,
+  ConversationTypeValue,
+  GroupMemberRoleValue,
   LocaleValue,
   LogLevelValue,
   MessageMenuKeyValue,
@@ -11,6 +13,9 @@ import type {
 } from '../constants'
 
 export type EmConnectionStatus = ConnectionStatusValue
+
+/** 会话类型（单聊/群聊），联合类型自 CONVERSATION_TYPE 常量派生 */
+export type EmChatType = ConversationTypeValue
 
 /** 输入栏功能集（resolved 形态，全量布尔；EmKitConfig.inputFeatures 为其可选子集） */
 export interface EmInputFeatures {
@@ -111,6 +116,7 @@ export interface EmMessageItem {
   id: string
   localId: string
   conversationId: string
+  chatType: EmChatType
   type: EmMessageType
   text: string
   url: string
@@ -137,6 +143,7 @@ export type EmMessageHandler = (msg: EmMessageItem) => void
 
 export interface EmConversationItem {
   conversationId: string
+  chatType: EmChatType
   name: string
   avatar: string
   unreadCount: number
@@ -173,6 +180,57 @@ export interface EmContactInvite {
 }
 
 export type EmThemeMode = ThemeModeValue
+
+/** 群组条目（SDK GroupDetail/JoinedGroupSummary 的中立子集，wire 字段在 chat 边界归一） */
+export interface EmGroup {
+  groupId: string
+  name: string
+  description: string
+  /** 群主 userId（成员角色权威来源：memberMap 中该用户恒为 owner） */
+  owner: string
+  memberCount: number
+  maxUsers: number
+  avatar?: string
+  public: boolean
+  /** 入群是否需要管理员审批（wire joinApprovalRequired） */
+  approval: boolean
+  allowInvites: boolean
+  inviteNeedConfirm: boolean
+  /** 全员禁言（wire muteAllMembers） */
+  mute: boolean
+  disabled: boolean
+}
+
+/** 群成员条目（SDK GroupMemberEntry 的中立子集） */
+export interface EmGroupMember {
+  userId: string
+  role: GroupMemberRoleValue
+  /** 入群时间戳，缺失为 0（排序时排同角色末尾） */
+  joinedAt: number
+  nick?: string
+  avatar?: string
+}
+
+/** 创建群组参数（群 domain createGroup 入参，wire 映射在 domain 边界完成） */
+export interface CreateGroupParams {
+  name: string
+  description?: string
+  /** 初始成员 userId 列表（不含创建者） */
+  members?: string[]
+  public?: boolean
+  /** 入群是否需要管理员审批（映射 wire joinApprovalRequired） */
+  approval?: boolean
+  allowInvites?: boolean
+  inviteNeedConfirm?: boolean
+  maxMembers?: number
+}
+
+/** @提及联系人（输入栏 mention 候选与发送前 filterActiveMentions 的条目形态） */
+export interface MentionContact {
+  userId: string
+  name: string
+  avatar?: string
+}
 
 export type EmLocaleName = LocaleValue
 

@@ -59,6 +59,7 @@ function runOnce() {
     'ChatClient',
     'ChatManager',
     'ContactManager',
+    'GroupManager',
     'UserInfoManager',
     'PushManager',
     'setConsoleLogEnabled',

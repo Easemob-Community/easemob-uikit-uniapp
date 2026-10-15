@@ -52,12 +52,12 @@ export class EmClient {
       sdk.setConsoleLogEnabled(config.sdkConsoleLog !== false)
       const client = sdk.ChatClient.init({
         appKey: config.appkey,
-        // 登录后自动同步会话 + 联系人（SDK 默认只同步 conversation，contact 需显式选择——
-        // 未选时 getContacts() 只能读到本地缓存残留，小程序端即「永远空」的根因；
+        // 登录后自动同步会话 + 联系人 + 群（SDK 默认只同步 conversation，contact/group 需显式选择——
+        // 未选时 getContacts()/getJoinedGroupList() 只能读到本地缓存残留，小程序端即「永远空」的根因；
         // 对齐 vue 版 uikit-im 场景默认 ['conversation','contact','group']）。
-        // 不含 'group'：SDK 校验 group 同步依赖 GroupManager，未注册会直接抛错，二期开群时再补
-        enableSyncData: ['conversation', 'contact'],
-        managers: [sdk.ChatManager, sdk.PushManager, sdk.UserInfoManager, sdk.ContactManager]
+        // enableSyncData 与 managers 必须成对：含 'group' 而未注册 GroupManager 会直接抛错
+        enableSyncData: ['conversation', 'contact', 'group'],
+        managers: [sdk.ChatManager, sdk.PushManager, sdk.UserInfoManager, sdk.ContactManager, sdk.GroupManager]
       })
       // SDK 结构化日志（已脱敏）统一转发进 uikit logger：sdkConsoleLog 关闭后此通道仍在，
       // 业务侧只需盯 `emkit:` 前缀一条日志 funnel

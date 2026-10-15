@@ -3,8 +3,11 @@
 // 会话域（列表同步/置顶/免打扰/删除/清空 + wire 映射）在 ./conversation（EmConversationDomain）；
 // 本文件只做两件事：组合两个域模块、bind() 里接线 SDK ChatManager 事件并按域分发。
 // SDK wire 协议字段的兼容映射保留在各域文件的边界处（规范允许的例外）。
+// 消息/会话方法全部显式携带 chatType（M2.9 群基础，breaking）；
+// 群数据域在 ./group（EmGroupDomain），由 libs/index.ts 的 EmKitImpl 直接组合。
 import type { ChatClient, Message } from 'easemob-websdk'
 import { CONVERSATION_TYPE } from '../constants'
+import type { ConversationTypeValue } from '../constants'
 import { conversationStore } from '../store/conversation'
 import { createLogger } from '../utils/logger'
 import type { EmKitConfig, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
@@ -42,17 +45,15 @@ export class EmChat {
         this.messages.appendMessage(item)
         this.messages.notify(item)
         ensureUserInfos([item.from])
-        // 在当前会话收到对方消息：即时回已读回执
+        // 在当前会话收到对方消息：即时回已读回执（群聊在 sendReadReceipts 内部短路）
         if (!item.self && item.conversationId === this.conversations.currentConversationId) {
-          this.messages.sendReadReceipts(item.conversationId).catch(() => {})
+          this.messages.sendReadReceipts(item.conversationId, item.chatType).catch(() => {})
         }
       },
       onConversationListUpdate: (payload) => {
         logger.debug('onConversationListUpdate raw payload:', JSON.parse(JSON.stringify(payload)))
-        conversationStore.items = payload.items
-          .filter((c) => c.conversationType === CONVERSATION_TYPE.SINGLE_CHAT)
-          .map((c) => this.conversations.toConversationItem(c))
-        ensureUserInfos(conversationStore.items.map((c) => c.conversationId))
+        conversationStore.items = payload.items.map((c) => this.conversations.toConversationItem(c))
+        ensureUserInfos(conversationStore.items.filter((c) => c.chatType === CONVERSATION_TYPE.SINGLE_CHAT).map((c) => c.conversationId))
       },
       onMessageRecalled: (payload) => {
         this.messages.markRecalled(payload.conversationId, payload.messageId)
@@ -74,75 +75,90 @@ export class EmChat {
     return this.messages.onMessage(handler)
   }
 
-  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
-    return this.messages.sendText(to, text, quote)
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
+    return this.messages.sendText(to, chatType, text, quote)
   }
 
   makeQuote(item: EmMessageItem): EmQuoteInfo {
     return this.messages.makeQuote(item)
   }
 
-  async sendImage(to: string, image: EmPickedImage): Promise<EmMessageItem> {
-    return this.messages.sendImage(to, image)
+  async sendImage(to: string, chatType: ConversationTypeValue, image: EmPickedImage): Promise<EmMessageItem> {
+    return this.messages.sendImage(to, chatType, image)
   }
 
-  async sendAudio(to: string, filePath: string, duration: number): Promise<EmMessageItem> {
-    return this.messages.sendAudio(to, filePath, duration)
+  async sendAudio(to: string, chatType: ConversationTypeValue, filePath: string, duration: number): Promise<EmMessageItem> {
+    return this.messages.sendAudio(to, chatType, filePath, duration)
   }
 
-  async sendVideo(to: string, video: EmPickedVideo): Promise<EmMessageItem> {
-    return this.messages.sendVideo(to, video)
+  async sendVideo(to: string, chatType: ConversationTypeValue, video: EmPickedVideo): Promise<EmMessageItem> {
+    return this.messages.sendVideo(to, chatType, video)
   }
 
-  async sendFile(to: string, file: EmPickedFile): Promise<EmMessageItem> {
-    return this.messages.sendFile(to, file)
+  async sendFile(to: string, chatType: ConversationTypeValue, file: EmPickedFile): Promise<EmMessageItem> {
+    return this.messages.sendFile(to, chatType, file)
   }
 
-  async loadHistory(conversationId: string, pageSize = 20): Promise<void> {
-    return this.messages.loadHistory(conversationId, pageSize)
+  async loadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize = 20): Promise<void> {
+    return this.messages.loadHistory(conversationId, chatType, pageSize)
   }
 
   async syncConversations(): Promise<void> {
     return this.conversations.syncConversations()
   }
 
-  async enterConversation(conversationId: string): Promise<void> {
-    return this.conversations.enterConversation(conversationId)
+  async enterConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
+    return this.conversations.enterConversation(conversationId, chatType)
   }
 
   leaveConversation(): void {
     this.conversations.leaveConversation()
   }
 
-  async pinConversation(conversationId: string, pinned: boolean): Promise<void> {
-    return this.conversations.pinConversation(conversationId, pinned)
+  async pinConversation(conversationId: string, chatType: ConversationTypeValue, pinned: boolean): Promise<void> {
+    return this.conversations.pinConversation(conversationId, chatType, pinned)
   }
 
-  async deleteConversation(conversationId: string): Promise<void> {
-    return this.conversations.deleteConversation(conversationId)
+  async deleteConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
+    return this.conversations.deleteConversation(conversationId, chatType)
   }
 
-  async clearConversationMessages(conversationId: string): Promise<void> {
-    return this.conversations.clearConversationMessages(conversationId)
+  async clearConversationMessages(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
+    return this.conversations.clearConversationMessages(conversationId, chatType)
   }
 
-  async setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
-    return this.conversations.setConversationMuted(conversationId, muted)
+  async setConversationMuted(conversationId: string, chatType: ConversationTypeValue, muted: boolean): Promise<void> {
+    return this.conversations.setConversationMuted(conversationId, chatType, muted)
   }
 
-  async recallMessage(conversationId: string, messageId: string): Promise<void> {
-    return this.messages.recallMessage(conversationId, messageId)
+  // 本地构造会话插列表（发起会话用，不调 SDK，对齐 vue 版 new-chat-modal 语义）
+  addConversation(conversationId: string, chatType: ConversationTypeValue): void {
+    this.conversations.addConversation(conversationId, chatType)
+  }
+
+  // 群域事件钩子：被移出群/群解散时本地删会话清消息（不调 SDK）
+  removeConversationLocal(conversationId: string): void {
+    this.conversations.removeConversationLocal(conversationId)
+  }
+
+  // 群域事件钩子：群名变更同步会话名
+  updateConversationName(conversationId: string, name: string): void {
+    this.conversations.updateConversationName(conversationId, name)
+  }
+
+  async recallMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
+    return this.messages.recallMessage(conversationId, chatType, messageId)
   }
 
   deleteLocalMessage(conversationId: string, localId: string): void {
     this.messages.deleteLocalMessage(conversationId, localId)
   }
 
-  async resendMessage(conversationId: string, localId: string): Promise<void> {
-    return this.messages.resendMessage(conversationId, localId)
+  async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {
+    return this.messages.resendMessage(conversationId, chatType, localId)
   }
 
-  async sendTyping(conversationId: string): Promise<void> {
-    return this.messages.sendTyping(conversationId)
+  async sendTyping(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
+    return this.messages.sendTyping(conversationId, chatType)
   }
 }

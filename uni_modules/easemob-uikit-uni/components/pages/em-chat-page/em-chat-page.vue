@@ -149,7 +149,7 @@ import EmVideoMessage from '../../em-video-message/em-video-message.vue'
 import EmFileMessage from '../../em-file-message/em-file-message.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
-import { MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
+import { CONVERSATION_TYPE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
 import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
 import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmQuoteInfo } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
@@ -361,7 +361,7 @@ onMounted(() => {
   }
   // 进入会话与拉历史并行、不阻塞渲染（对齐 TUIKit：会话页点击时已预热拉取，store 有缓存立即渲染）；
   // 串行 await 是进入停顿的主因，这里只做 fire-and-forget + 完成后滚底
-  EmKit.enterConversation(props.conversationId).catch(() => {})
+  EmKit.enterConversation(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
   // 热启动（预热/二次进入命中缓存）：已有消息立即滚底并显示，不等历史请求回包
   if (list.value.length > 0) {
     scrollToBottom()
@@ -369,7 +369,7 @@ onMounted(() => {
       ready.value = true
     })
   }
-  EmKit.loadHistory(props.conversationId)
+  EmKit.loadHistory(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT)
     .catch((e) => {
       logger.error('loadHistory fail:', e)
     })
@@ -410,7 +410,7 @@ watch(draft, (v) => {
     setDraft(props.conversationId, v)
   }
   if (config.enableTyping && v.trim() !== '') {
-    EmKit.sendTyping(props.conversationId).catch(() => {})
+    EmKit.sendTyping(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
   }
 })
 
@@ -426,7 +426,7 @@ async function onLoadMore(): Promise<void> {
   // 延时清空锚点——消除加载历史时视口被顶动的跳动
   const first = list.value.length > 0 ? list.value[0] : null
   try {
-    await EmKit.loadHistory(props.conversationId)
+    await EmKit.loadHistory(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT)
     if (first != null) {
       const anchor = msgAnchorId(first)
       scrollWithAnimation.value = false
@@ -450,7 +450,7 @@ async function onSend(): Promise<void> {
   if (text === '') return
   const quote = quoteInfo.value != null ? quoteInfo.value : undefined
   try {
-    const item = await EmKit.sendText(props.conversationId, text, quote)
+    const item = await EmKit.sendText(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, text, quote)
     draft.value = ''
     // 发送成功才清引用条，失败保留供重发
     quoteInfo.value = null
@@ -465,7 +465,7 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
   try {
     const images = await chooseImage(1, sourceType)
     if (images.length === 0) return
-    const item = await EmKit.sendImage(props.conversationId, images[0])
+    const item = await EmKit.sendImage(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, images[0])
     scrollToBottom()
     emit('send', item)
   } catch (e) {
@@ -490,7 +490,7 @@ async function onPickVideo(): Promise<void> {
   const video = await chooseVideo()
   if (video == null) return
   try {
-    const item = await EmKit.sendVideo(props.conversationId, video)
+    const item = await EmKit.sendVideo(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, video)
     scrollToBottom()
     emit('send', item)
   } catch (e) {
@@ -502,7 +502,7 @@ async function onPickFile(): Promise<void> {
   const file = await chooseFile()
   if (file == null) return
   try {
-    const item = await EmKit.sendFile(props.conversationId, file)
+    const item = await EmKit.sendFile(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, file)
     scrollToBottom()
     emit('send', item)
   } catch (e) {
@@ -512,7 +512,7 @@ async function onPickFile(): Promise<void> {
 
 async function onVoiceSend(path: string, duration: number): Promise<void> {
   try {
-    const item = await EmKit.sendAudio(props.conversationId, path, duration)
+    const item = await EmKit.sendAudio(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, path, duration)
     scrollToBottom()
     emit('send', item)
   } catch (e) {
@@ -596,7 +596,7 @@ function onLongPressMessage(m: EmMessageItem): void {
 async function onResend(m: EmMessageItem): Promise<void> {
   if (m.status !== MESSAGE_STATUS.FAILED) return
   try {
-    await EmKit.resendMessage(m.conversationId, m.localId)
+    await EmKit.resendMessage(m.conversationId, m.chatType, m.localId)
     scrollToBottom()
   } catch (e) {
     logger.error('resendMessage fail:', e)
@@ -612,7 +612,7 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
     quoteInfo.value = EmKit.makeQuote(m)
   } else if (action.key === MESSAGE_MENU_KEY.RECALL) {
     try {
-      await EmKit.recallMessage(m.conversationId, m.id)
+      await EmKit.recallMessage(m.conversationId, m.chatType, m.id)
       emit('recall', m)
     } catch (e) {
       uni.showToast({ title: t('message.recall.failed'), icon: 'none' })

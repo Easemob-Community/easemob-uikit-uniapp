@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const appkey = ref('')
@@ -152,7 +152,7 @@ async function onSend() {
   }
   const text = draft.value
   try {
-    await EmKit.sendText(peer.value, text)
+    await EmKit.sendText(peer.value, CONVERSATION_TYPE.SINGLE_CHAT, text)
     draft.value = ''
     scrollToBottom()
   } catch (e: any) {

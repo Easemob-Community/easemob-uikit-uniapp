@@ -1,16 +1,22 @@
 import { EmClient } from './client'
 import { EmChat } from './chat'
 import { EmContact } from './chat/contact'
+import { EmGroupDomain } from './chat/group'
 import { ensureUserInfos } from './chat/user-info'
 import { connectionStore } from './store/connection'
 import { contactStore } from './store/contact'
 import { conversationStore } from './store/conversation'
+import { groupStore } from './store/group'
 import { messageStore } from './store/message'
 import { userStore } from './store/user'
 import { copyText, exportTextFile } from './platform'
 import { clearLogBuffer, createLogger, getLogText } from './utils/logger'
+import type { ConversationTypeValue } from './constants'
 import type {
+  CreateGroupParams,
   EmContactInvite,
+  EmGroup,
+  EmGroupMember,
   EmKitConfig,
   EmLoginOptions,
   EmMessageHandler,
@@ -28,10 +34,12 @@ class EmKitImpl {
   readonly messages = messageStore
   readonly users = userStore
   readonly contacts = contactStore
+  readonly groups = groupStore
 
   private client = new EmClient()
   private chat = new EmChat()
   private contact = new EmContact()
+  private group = new EmGroupDomain()
 
   init(config: EmKitConfig): void {
     this.client.init(config)
@@ -43,6 +51,10 @@ class EmKitImpl {
       .then((client) => {
         this.chat.bind(client, () => this.client.waitOnline(), config)
         this.contact.bind(client, () => this.client.waitOnline())
+        this.group.bind(client, () => this.client.waitOnline(), {
+          removeConversationLocal: (conversationId) => this.chat.removeConversationLocal(conversationId),
+          updateConversationName: (conversationId, name) => this.chat.updateConversationName(conversationId, name)
+        })
       })
       .catch((e) => kitLogger.warn('kit bind skipped:', e))
   }
@@ -59,44 +71,46 @@ class EmKitImpl {
     ensureUserInfos([options.userId])
     // 好友快照读内存（SDK 后台同步），失败不阻塞登录链路
     this.contact.syncContacts().catch(() => {})
+    // 群快照读内存（SDK 后台同步），失败不阻塞登录链路
+    this.group.getJoinedGroups().catch(() => {})
   }
 
   logout(): Promise<void> {
     return this.client.logout()
   }
 
-  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
     await this.client.whenReady()
-    return this.chat.sendText(to, text, quote)
+    return this.chat.sendText(to, chatType, text, quote)
   }
 
   makeQuote(item: EmMessageItem): EmQuoteInfo {
     return this.chat.makeQuote(item)
   }
 
-  async sendImage(to: string, image: EmPickedImage): Promise<EmMessageItem> {
+  async sendImage(to: string, chatType: ConversationTypeValue, image: EmPickedImage): Promise<EmMessageItem> {
     await this.client.whenReady()
-    return this.chat.sendImage(to, image)
+    return this.chat.sendImage(to, chatType, image)
   }
 
-  async sendAudio(to: string, filePath: string, duration: number): Promise<EmMessageItem> {
+  async sendAudio(to: string, chatType: ConversationTypeValue, filePath: string, duration: number): Promise<EmMessageItem> {
     await this.client.whenReady()
-    return this.chat.sendAudio(to, filePath, duration)
+    return this.chat.sendAudio(to, chatType, filePath, duration)
   }
 
-  async sendVideo(to: string, video: EmPickedVideo): Promise<EmMessageItem> {
+  async sendVideo(to: string, chatType: ConversationTypeValue, video: EmPickedVideo): Promise<EmMessageItem> {
     await this.client.whenReady()
-    return this.chat.sendVideo(to, video)
+    return this.chat.sendVideo(to, chatType, video)
   }
 
-  async sendFile(to: string, file: EmPickedFile): Promise<EmMessageItem> {
+  async sendFile(to: string, chatType: ConversationTypeValue, file: EmPickedFile): Promise<EmMessageItem> {
     await this.client.whenReady()
-    return this.chat.sendFile(to, file)
+    return this.chat.sendFile(to, chatType, file)
   }
 
-  async loadHistory(conversationId: string, pageSize?: number): Promise<void> {
+  async loadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize?: number): Promise<void> {
     await this.client.whenReady()
-    return this.chat.loadHistory(conversationId, pageSize)
+    return this.chat.loadHistory(conversationId, chatType, pageSize)
   }
 
   async syncConversations(): Promise<void> {
@@ -104,48 +118,53 @@ class EmKitImpl {
     return this.chat.syncConversations()
   }
 
-  async enterConversation(conversationId: string): Promise<void> {
+  async enterConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     await this.client.whenReady()
-    return this.chat.enterConversation(conversationId)
+    return this.chat.enterConversation(conversationId, chatType)
   }
 
-  async pinConversation(conversationId: string, pinned: boolean): Promise<void> {
+  async pinConversation(conversationId: string, chatType: ConversationTypeValue, pinned: boolean): Promise<void> {
     await this.client.whenReady()
-    return this.chat.pinConversation(conversationId, pinned)
+    return this.chat.pinConversation(conversationId, chatType, pinned)
   }
 
-  async deleteConversation(conversationId: string): Promise<void> {
+  async deleteConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     await this.client.whenReady()
-    return this.chat.deleteConversation(conversationId)
+    return this.chat.deleteConversation(conversationId, chatType)
   }
 
-  async clearConversationMessages(conversationId: string): Promise<void> {
+  async clearConversationMessages(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     await this.client.whenReady()
-    return this.chat.clearConversationMessages(conversationId)
+    return this.chat.clearConversationMessages(conversationId, chatType)
   }
 
-  async setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+  async setConversationMuted(conversationId: string, chatType: ConversationTypeValue, muted: boolean): Promise<void> {
     await this.client.whenReady()
-    return this.chat.setConversationMuted(conversationId, muted)
+    return this.chat.setConversationMuted(conversationId, chatType, muted)
   }
 
-  async recallMessage(conversationId: string, messageId: string): Promise<void> {
+  // 本地构造会话插列表（发起会话用，不调 SDK 建会话 API，对齐 vue 版 new-chat-modal 语义）
+  addConversation(conversationId: string, chatType: ConversationTypeValue): void {
+    this.chat.addConversation(conversationId, chatType)
+  }
+
+  async recallMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
     await this.client.whenReady()
-    return this.chat.recallMessage(conversationId, messageId)
+    return this.chat.recallMessage(conversationId, chatType, messageId)
   }
 
   deleteLocalMessage(conversationId: string, localId: string): void {
     this.chat.deleteLocalMessage(conversationId, localId)
   }
 
-  async resendMessage(conversationId: string, localId: string): Promise<void> {
+  async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {
     await this.client.whenReady()
-    return this.chat.resendMessage(conversationId, localId)
+    return this.chat.resendMessage(conversationId, chatType, localId)
   }
 
-  async sendTyping(conversationId: string): Promise<void> {
+  async sendTyping(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     await this.client.whenReady()
-    return this.chat.sendTyping(conversationId)
+    return this.chat.sendTyping(conversationId, chatType)
   }
 
   isReadReceiptEnabled(): boolean {
@@ -195,6 +214,96 @@ class EmKitImpl {
     return this.contact.declineContactInvite(invite)
   }
 
+  // ===== 群数据层（M2.9 Phase 1） =====
+
+  // 已加入群快照整量回写（SDK 后台同步，读本地快照）
+  async getJoinedGroups(): Promise<EmGroup[]> {
+    await this.client.whenReady()
+    return this.group.getJoinedGroups()
+  }
+
+  // 进群预热（对齐 enterConversation 的 fire-and-forget 用法）：拉群详情 + 成员首屏，失败静默
+  async enterGroup(groupId: string): Promise<void> {
+    await this.client.whenReady()
+    this.group.getGroupInfo(groupId).catch(() => {})
+    this.group.getGroupMemberList(groupId).catch(() => {})
+  }
+
+  async getGroupInfo(groupId: string): Promise<EmGroup> {
+    await this.client.whenReady()
+    return this.group.getGroupInfo(groupId)
+  }
+
+  async getGroupMemberList(groupId: string, cursor?: string, pageSize?: number): Promise<{ items: EmGroupMember[], cursor: string, hasMore: boolean }> {
+    await this.client.whenReady()
+    return this.group.getGroupMemberList(groupId, cursor, pageSize)
+  }
+
+  async getGroupAnnouncement(groupId: string): Promise<string> {
+    await this.client.whenReady()
+    return this.group.getGroupAnnouncement(groupId)
+  }
+
+  async createGroup(params: CreateGroupParams): Promise<string> {
+    await this.client.whenReady()
+    return this.group.createGroup(params)
+  }
+
+  async inviteUsersToGroup(groupId: string, userIds: string[]): Promise<void> {
+    await this.client.whenReady()
+    return this.group.inviteUsersToGroup(groupId, userIds)
+  }
+
+  async leaveGroup(groupId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.leaveGroup(groupId)
+  }
+
+  async destroyGroup(groupId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.destroyGroup(groupId)
+  }
+
+  async changeGroupOwner(groupId: string, userId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.changeGroupOwner(groupId, userId)
+  }
+
+  async updateGroupInfo(groupId: string, partial: { name?: string, description?: string, avatar?: string }): Promise<void> {
+    await this.client.whenReady()
+    return this.group.updateGroupInfo(groupId, partial)
+  }
+
+  async updateGroupAnnouncement(groupId: string, content: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.updateGroupAnnouncement(groupId, content)
+  }
+
+  async removeGroupMembers(groupId: string, userIds: string[]): Promise<void> {
+    await this.client.whenReady()
+    return this.group.removeGroupMembers(groupId, userIds)
+  }
+
+  async addGroupAdmin(groupId: string, userId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.addGroupAdmin(groupId, userId)
+  }
+
+  async removeGroupAdmin(groupId: string, userId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.removeGroupAdmin(groupId, userId)
+  }
+
+  async muteAllGroupMembers(groupId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.muteAllGroupMembers(groupId)
+  }
+
+  async unmuteAllGroupMembers(groupId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.group.unmuteAllGroupMembers(groupId)
+  }
+
   // 导出调试日志全文（环形缓冲，含被 level 过滤掉的 debug 行）：
   // H5 触发浏览器下载返回 'download'；小程序/App 写用户数据目录返回文件路径
   // （并 best-effort 复制全文到剪贴板）；写文件失败兜底剪贴板返回 'clipboard'
@@ -237,9 +346,12 @@ export { useConfig, setConfig } from './store/config'
 export { themeStore } from './store/theme'
 export { userStore, displayNameOf, avatarOf, mergeUserInfo } from './store/user'
 export { contactStore, contactDisplayNameOf, pendingInviteCount } from './store/contact'
+export { groupStore, groupDisplayNameOf, sortGroupMembers } from './store/group'
 export { ensureUserInfos } from './chat/user-info'
 export { setPinyinAdapter, groupContacts, matchContact, resolveAlphabetKeyByOffsetY } from './utils/pinyin'
 export type { EmPinyinResult, EmContactGroup } from './utils/pinyin'
+export { filterActiveMentions, parseMentions } from './utils/mention'
+export type { EmMentionSegment } from './utils/mention'
 export { ensureSdkModule, setSdkLoader, setSdkModule } from './client/sdk'
 export type { EmSdkModule } from './client/sdk'
 export { createLogger, setLogLevel, getLogLevel, getLogText, clearLogBuffer, getLogBufferSize } from './utils/logger'

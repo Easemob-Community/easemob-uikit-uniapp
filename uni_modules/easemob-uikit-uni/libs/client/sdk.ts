@@ -15,6 +15,7 @@ export type EmSdkModule = Pick<
   | 'ChatClient'
   | 'ChatManager'
   | 'ContactManager'
+  | 'GroupManager'
   | 'PushManager'
   | 'UserInfoManager'
   | 'setConsoleLogEnabled'
@@ -46,6 +47,7 @@ const REQUIRED_EXPORTS = [
   'ChatClient',
   'ChatManager',
   'ContactManager',
+  'GroupManager',
   'PushManager',
   'UserInfoManager',
   'setConsoleLogEnabled',

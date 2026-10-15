@@ -13,6 +13,7 @@ import type {
   VoiceMessageBody
 } from 'easemob-websdk'
 import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../constants'
+import type { ConversationTypeValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { uiConfig } from '../store/config'
 import { getMessages, messageStore } from '../store/message'
@@ -26,6 +27,16 @@ let localSeq = 0
 function nextLocalSeq(): number {
   localSeq += 1
   return localSeq
+}
+
+// SDK wire 会话类型 → 中立 chatType 的唯一映射点（wire 字面量规范允许的边界例外）：
+// 5.x 为 'singleChat'/'groupChat'/'chatRoom'，4.x 遗风 'single'/'group'/'room' 与
+// 更老的 'chat'/'groupchat' 双兼容；未识别值兜底单聊（历史单聊数据缺字段场景）
+export function mapWireChatType(wire: string): ConversationTypeValue {
+  if (wire === 'groupChat' || wire === 'group' || wire === 'groupchat') {
+    return CONVERSATION_TYPE.GROUP_CHAT
+  }
+  return CONVERSATION_TYPE.SINGLE_CHAT
 }
 
 /** chat 门面注入的共享上下文：SDK client 与等待上线的 Promise 工厂 */
@@ -67,11 +78,11 @@ export class EmMessageDomain {
     return this.ctx.client.chatManager
   }
 
-  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createTextMessage({
       conversationId: to,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       content: text,
       // 引用挂在消息 ext 上（emQuote 自定义 key），接收方/历史消息解析还原
       ext: quote != null ? { [MESSAGE_EXT_KEY.QUOTE]: { msgId: quote.msgId, from: quote.from, text: quote.text, type: quote.type } } : undefined
@@ -102,34 +113,34 @@ export class EmMessageDomain {
     return (webFile != null ? webFile : { path, name, size }) as CompatibleFile
   }
 
-  async sendImage(to: string, image: EmPickedImage): Promise<EmMessageItem> {
+  async sendImage(to: string, chatType: ConversationTypeValue, image: EmPickedImage): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createImageMessage({
       conversationId: to,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       data: this.asCompatibleFile(image.path, image.name, image.size, image.webFile),
       filename: image.name
     })
     return this.deliver(message, to, '', undefined, image.path)
   }
 
-  async sendAudio(to: string, filePath: string, duration: number): Promise<EmMessageItem> {
+  async sendAudio(to: string, chatType: ConversationTypeValue, filePath: string, duration: number): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const name = filePath.slice(filePath.lastIndexOf('/') + 1)
     const message = chatManager.createVoiceMessage({
       conversationId: to,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       data: this.asCompatibleFile(filePath, name, 0, null),
       duration
     })
     return this.deliver(message, to, '', undefined, filePath)
   }
 
-  async sendVideo(to: string, video: EmPickedVideo): Promise<EmMessageItem> {
+  async sendVideo(to: string, chatType: ConversationTypeValue, video: EmPickedVideo): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createVideoMessage({
       conversationId: to,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       data: this.asCompatibleFile(video.path, video.name, video.size, null),
       duration: video.duration,
       width: video.width,
@@ -138,13 +149,13 @@ export class EmMessageDomain {
     return this.deliver(message, to, '', undefined, video.path)
   }
 
-  async sendFile(to: string, file: EmPickedFile): Promise<EmMessageItem> {
+  async sendFile(to: string, chatType: ConversationTypeValue, file: EmPickedFile): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     // H5 上传需要 File 对象；小程序/App 走 { path, name, size }（MiniAppFile）
     const data = this.asCompatibleFile(file.path, file.name, file.size, file.webFile)
     const message = chatManager.createFileMessage({
       conversationId: to,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       data,
       filename: file.name,
       fileSize: file.size
@@ -186,12 +197,12 @@ export class EmMessageDomain {
     return stored
   }
 
-  async loadHistory(conversationId: string, pageSize = 20): Promise<void> {
+  async loadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize = 20): Promise<void> {
     const chatManager = await this.readyChatManager()
     const cursor = messageStore.cursorByConversationId[conversationId] ?? ''
     const page = await chatManager.getHistoryMessages({
       conversationId,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       cursor,
       pageSize,
       searchDirection: 'up'
@@ -209,9 +220,11 @@ export class EmMessageDomain {
     ensureUserInfos(older.map((m) => m.from))
   }
 
-  // 单聊已读回执：批量回执该会话内对端消息（serverId，最多 50 条），对方经 onMessageReadReceipts 收到
-  async sendReadReceipts(conversationId: string): Promise<void> {
+  // 单聊已读回执：批量回执该会话内对端消息（serverId，最多 50 条），对方经 onMessageReadReceipts 收到；
+  // 群聊已读回执（groupAck）不在一期范围，群聊调用直接短路
+  async sendReadReceipts(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     if (!this.readReceiptOn) return
+    if (chatType !== CONVERSATION_TYPE.SINGLE_CHAT) return
     const chatManager = await this.readyChatManager()
     const list = messageStore.messagesByConversationId[conversationId] ?? []
     const ids: string[] = []
@@ -224,7 +237,7 @@ export class EmMessageDomain {
     if (ids.length === 0) return
     await chatManager.sendMessageReadReceipts({
       conversationId,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       messageIds: ids
     })
   }
@@ -239,7 +252,7 @@ export class EmMessageDomain {
   }
 
   // typing 信号：cmd 消息发送，本域节流（同一会话 uiConfig.typingThrottle 内最多一条）；失败静默
-  async sendTyping(conversationId: string): Promise<void> {
+  async sendTyping(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     if (!uiConfig.enableTyping) return
     const now = Date.now()
     const last = this.typingSentAt[conversationId] ?? 0
@@ -250,7 +263,7 @@ export class EmMessageDomain {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createCmdMessage({
       conversationId,
-      conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+      conversationType: chatType,
       action: CMD_ACTION.TYPING_BEGIN
     })
     await chatManager.sendMessage(message)
@@ -273,9 +286,9 @@ export class EmMessageDomain {
     }, uiConfig.typingTimeout)
   }
 
-  async recallMessage(conversationId: string, messageId: string): Promise<void> {
+  async recallMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
     const chatManager = await this.readyChatManager()
-    await chatManager.recallMessage({ conversationId, conversationType: CONVERSATION_TYPE.SINGLE_CHAT, messageId })
+    await chatManager.recallMessage({ conversationId, conversationType: chatType, messageId })
     this.markRecalled(conversationId, messageId)
   }
 
@@ -302,7 +315,7 @@ export class EmMessageDomain {
   // 失败重发：原 Message 对象不入 store，用 item 上留存的内容重建消息再投递；
   // item 原位复用（只改状态/回填 serverId 与 time），列表位置与 quote 快照不动。
   // 注意：图片重发依赖 item.url 里的本地临时路径，跨会话过期后重发会再次失败
-  async resendMessage(conversationId: string, localId: string): Promise<void> {
+  async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {
     const chatManager = await this.readyChatManager()
     const list = messageStore.messagesByConversationId[conversationId]
     const item = list != null ? list.find((m) => m.localId === localId) : undefined
@@ -317,14 +330,14 @@ export class EmMessageDomain {
       const name = item.url.slice(item.url.lastIndexOf('/') + 1)
       message = chatManager.createImageMessage({
         conversationId,
-        conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+        conversationType: chatType,
         data: this.asCompatibleFile(item.url, name, 0, null)
       })
     } else {
       const quote = item.quote
       message = chatManager.createTextMessage({
         conversationId,
-        conversationType: CONVERSATION_TYPE.SINGLE_CHAT,
+        conversationType: chatType,
         content: item.text,
         ext: quote != null ? { [MESSAGE_EXT_KEY.QUOTE]: { msgId: quote.msgId, from: quote.from, text: quote.text, type: quote.type } } : undefined
       })
@@ -357,6 +370,7 @@ export class EmMessageDomain {
       // 必须兜底成唯一值，否则 key 撞车、scroll-into-view 定位错乱、高亮匹配全员命中
       localId: message.msgLocalId !== '' ? message.msgLocalId : `em-local-${id !== '' ? id : `${message.timestamp}-${nextLocalSeq()}`}`,
       conversationId: message.conversationId !== '' ? message.conversationId : this.peerOf(message),
+      chatType: mapWireChatType(message.conversationType as string),
       type: MESSAGE_TYPE.OTHER,
       text: '',
       url: '',

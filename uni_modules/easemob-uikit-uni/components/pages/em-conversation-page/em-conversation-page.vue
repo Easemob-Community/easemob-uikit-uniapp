@@ -187,11 +187,11 @@ async function onItemAction(action: EmActionSheetAction): Promise<void> {
   if (item == null) return
   try {
     if (action.key === CONVERSATION_MENU_KEY.PIN) {
-      await EmKit.pinConversation(item.conversationId, !item.isPinned)
+      await EmKit.pinConversation(item.conversationId, item.chatType, !item.isPinned)
     } else if (action.key === CONVERSATION_MENU_KEY.MUTE) {
-      await EmKit.setConversationMuted(item.conversationId, !item.isMuted)
+      await EmKit.setConversationMuted(item.conversationId, item.chatType, !item.isMuted)
     } else if (action.key === CONVERSATION_MENU_KEY.DELETE) {
-      await EmKit.deleteConversation(item.conversationId)
+      await EmKit.deleteConversation(item.conversationId, item.chatType)
     }
   } catch (e) {
     uni.showToast({ title: t('error.unknown'), icon: 'none' })
