@@ -75,17 +75,18 @@ export class EmContact {
         this.refresh()
         this.mergeProfile(p.from, p.userInfo)
       },
-      // 被对方删除：刷新快照并清掉与其相关的申请记录
+      // 被对方删除：刷新快照并清掉与其相关的 contact kind 申请记录（群邀请与好友关系无关，保留）
       onContactDeleted: (p: ContactRosterEventPayload) => {
         logger.debug('onContactDeleted raw payload:', JSON.parse(JSON.stringify(p)))
         this.refresh()
         removeInviteByFrom(p.from)
       },
-      // 我方申请被接受（发起方收）：刷新快照；若本地有其 pending 申请则置 accepted
+      // 我方申请被接受（发起方收）：刷新快照；若本地有其 pending 好友申请则置 accepted
+      //（kind 过滤必须：同一用户的 pending 群邀请不能被好友事件误置）
       onContactAgreed: (p: ContactRosterEventPayload) => {
         logger.debug('onContactAgreed raw payload:', JSON.parse(JSON.stringify(p)))
         this.refresh()
-        const pending = contactStore.invites.find((i) => i.from === p.from && i.status === CONTACT_INVITE_STATUS.PENDING)
+        const pending = contactStore.invites.find((i) => i.kind === CONTACT_INVITE_KIND.CONTACT && i.from === p.from && i.status === CONTACT_INVITE_STATUS.PENDING)
         if (pending != null) {
           updateInviteStatus(pending.id, CONTACT_INVITE_STATUS.ACCEPTED)
         }
