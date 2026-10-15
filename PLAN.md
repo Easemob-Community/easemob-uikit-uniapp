@@ -14,7 +14,7 @@
 | D2 | 目标平台 | Android / iOS / 鸿蒙（蒸汽原生渲染）+ H5 + 微信小程序（后两者当前走 VDOM 管线编译，属正常） | 一期五端，对齐 RiceUI 已验证矩阵 |
 | D3 | Vue 版本 | 仅 Vue3 组合式 API；**不支持 Vue2**（uni-app x 无 Vue2，Vue2 已 EOL） | 蒸汽模式强制组合式 |
 | D4 | 一期范围 | **最小闭环**：登录接入 + 会话列表页 + 聊天页（文本/图片/语音/视频/文件 5 种气泡、长按四菜单）+ demo 工程 | 社区路径是「扫码体验 → 导入 → 5 分钟跑通」，demo 闭环先于一切抽象 |
-| D5 | 二期候选 | 群基础（建群/群信息/成员列表）、单条转发、联系人详情页/黑名单 | 一期发版后按社区反馈排期（通讯录核心链路已提前至 M2.5，见里程碑节） |
+| D5 | 二期候选 | 单条转发、联系人详情页/黑名单 | 一期发版后按社区反馈排期（通讯录核心链路已提前至 M2.5、群基础已提前至 M2.9，见里程碑节） |
 | D6 | 分发策略 | **MIT 免费开源**：GitHub 主仓 + DCloud 插件市场免费发布 | 定位是获客漏斗，非收入项 |
 | D7 | 命名 | 仓库 `easemob-uikit-uniapp`；插件 id / uni_modules 目录 `easemob-uikit-uni`；组件前缀 **`em-`**；CSS 变量前缀 `--em-*` | 延续 Web 版 Em 心智 |
 | D8 | 系统地板 | HBuilderX / HBuilder V 5.21+；Android 6+ / iOS 15+ / 鸿蒙 API20+ / 现代浏览器 / 微信小程序基础库（随 uni-app x 要求） | 蒸汽模式硬性要求 |
@@ -161,6 +161,7 @@ easemob-uikit-uniapp/
 - 拼音决策：**零运行时依赖不动摇**——`libs/utils/pinyin.ts` 提供 `setPinyinAdapter` 可选注入口（对齐 vue 版 use-pinyin 设计），未注入时非 A-Z 首字符全部落 `#` 组、搜索仅原文匹配（与 vue 版默认降级行为一致）；不打包拼音库
 - 明确不做（留二期）：黑名单全套、群组入口/群列表、联系人详情页（备注编辑 UI/拉黑）、选人穿梭框、presence 在线点、PC 专属交互（键盘导航/右键/ScrollToTop）、触底分页（SDK 本地全量无分页）、添加好友完整 UI（demo 级 modal 即可）
 - 已知降级：组头 sticky 在蒸汽 App 端若不生效则随列表滚动；索引条高亮以索引条交互驱动为主，滚动反向驱动视 SelectorQuery 实测再补
+- M2.9 补注（2026-10-15）：本里程碑「群组入口/群列表」由 M2.9 承接落地；`em-contact-page` 好友主页形态在 M2.9 重构为「入口页 + 次级列表页」（breaking，见 M2.9 节）
 
 ### M2.6：组件配置体系整改（易用性专项，2026-10-15 定稿）
 
@@ -188,6 +189,12 @@ easemob-uikit-uniapp/
 - 明确不做：UIKit 组件代码本身拆分包（一期只解决 SDK 体积）；独立分包；动态 `import()`（uni-app x 不支持，用官方 require 回调写法）。
 - 产出：`docs/SPIKE-SDK-SUBPACKAGE.md`（编译器行为验证记录）。
 
+### M2.9：群基础（自 M4 提前，2026-10-15 立项）
+
+- **范围**：群数据层（GroupManager 注册 + `enableSyncData` 增 `'group'` + `libs/chat/group.ts` + `libs/store/group.ts` + 群事件「更新 store + 系统通知」双写）；chatType 全链路贯通（消息/会话域方法显式 `chatType` 参数，`EmMessageItem`/`EmConversationItem` 增字段，breaking）；群会话列表（含 `@我` 徽标）；聊天页群形态（群名+人数/成员昵称行/群公告条）；@ 提及全链路（`em-mention-picker` 半屏组件 + ext `em_at_list` 与 vue 版同 key，追加式插入为上限）；群列表页 `em-group-page`；统一选人组件 `em-select-contact`（发起会话/建群/邀请三处复用）；发起会话（选人 → 本地 addConversation，对齐 vue 语义）；联系人页重构为「入口页 + 次级列表页」（新 `em-contact-nav` + `em-contact-list-page`，好友主页形态 breaking）；群详情/管理（`em-chat-info-page` 群分支：成员宫格/公告编辑/管理员/转让/退群解散/全员禁言读字段禁输入）；触底加载统一组件 `em-load-more`（群成员列表游标翻页为实际消费点，按钮式翻页优先）。
+- **明确不做**：黑名单/白名单管理页（联系人页入口预留）、群共享文件、公开群入群申请审批、群名片、群已读回执详情、@ 光标处插入（uni `<input>` 无 selectionStart，物理上限）、群聊消息搜索、群公告富文本、presence。
+- **门禁**：先补 GroupManager 五端 spike（重点小程序端群同步时序，追加 `docs/SPIKE-SDK-CONNECTIVITY.md`），不过则暂停 UI 开发。
+
 ### M3：组件沉淀与发布
 
 - 原子组件沉淀（em-*-message 气泡族、输入栏等从页面级组件解耦）；pages_init.json 页面模板注册
@@ -196,7 +203,7 @@ easemob-uikit-uniapp/
 - uni-automator 核心链路用例（登录/收发/撤回/重发）
 - 插件市场首发 0.1.0 + GitHub 开源 + uni-im 交流群
 
-### M4（二期，另行立项）：群基础、单条转发、联系人详情页/黑名单、文档站
+### M4（二期，另行立项）：单条转发、联系人详情页/黑名单、文档站（群基础已提前至 M2.9）
 
 ## 6. 验证门禁（每次提交前）
 
@@ -237,7 +244,8 @@ easemob-uikit-uniapp/
 | features 15 开关 | 砍到 ≤5 个 |
 | 插件机制/插槽体系 | 砍到 3 个插槽 |
 | 通讯录核心链路（字母索引列表/好友申请） | 保留（M2.5 提前落地）；联系人详情页/黑名单/选人穿梭框仍二期 |
-| 群基础 | 二期 |
+| 群基础 | M2.9 落地 |
+| 群管理 | 核心子集 M2.9 落地（公告/改名/成员/管理员/转让/退群解散/全员禁言）；黑名单/白名单/共享文件/入群申请审批/群名片/群已读回执详情仍砍 |
 | tiptap 富文本/编辑/翻译/合并转发/多选/消息搜索/语音转文字/位置消息/群已读详情/会话分栏/H5 适配层/浏览器通知/Electron 持久化/双 adapter/名片转发/群管理全套/Presence 默认开 | 砍掉（一期不做） |
 
 ## 附录 B：参考资料
