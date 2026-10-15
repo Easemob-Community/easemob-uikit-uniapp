@@ -29,6 +29,11 @@
   color: var(--em-text-tertiary);
 }
 
+/* 滚底锚点：占位的 1px 空 view，scroll-into-view 定位目标（见组件注释） */
+.em-chat-page__bottom-anchor {
+  height: 1px;
+}
+
 .em-chat-page__msg {
   display: flex;
   flex-direction: row;
@@ -57,8 +62,9 @@
 }
 
 /* 引用定位高亮：整行中性灰横带满铺（对齐 vue 版 message-row-flash），
-   padding+负 margin 抵消避免布局抖动；脉冲两次→保持→淡出共 2.8s，
-   与脚本侧 3000ms 清除计时器对齐。蒸汽端若不支持 @keyframes 则退化为无高亮 */
+   padding+负 margin 抵消避免布局抖动；脉冲时序由脚本定时器驱动（复刻 vue 版
+   2.8s 双脉冲：on 0→500ms、off 500→840ms、on 840→1960ms、off 至清除）——
+   蒸汽端不跑 CSS @keyframes，动画必须 JS 驱动；与脚本侧 3000ms 清除计时器对齐 */
 .em-chat-page--msg-highlight {
   padding: 4px 8px;
   /* 负 margin 抵消 padding 防布局抖动；注意不能用 margin 简写——会覆盖基类的
@@ -70,27 +76,7 @@
   margin-left: -8px;
   margin-right: -8px;
   border-radius: var(--em-radius);
-  animation: em-chat-page-row-flash 2.8s ease-in-out forwards;
-}
-
-@keyframes em-chat-page-row-flash {
-  0% {
-    background-color: transparent;
-  }
-  8%,
-  30% {
-    background-color: var(--em-bg-hover);
-  }
-  18% {
-    background-color: transparent;
-  }
-  45%,
-  70% {
-    background-color: var(--em-bg-hover);
-  }
-  100% {
-    background-color: transparent;
-  }
+  background-color: var(--em-bg-hover);
 }
 
 .em-chat-page__recalled {
@@ -176,7 +162,11 @@
 .em-chat-page__content {
   display: flex;
   flex-direction: column;
-  max-width: 70%;
+  /* 必须是 rpx 定宽：Android 蒸汽端对 max-width:70% 百分比链中的 text 布局/绘制双重解析
+     不一致，每行行尾约丢 1 个汉字（探针 W2/S 组实测：百分比缺字、rpx 定宽完整；
+     W1 负 margin / W3 去 margin / W4 去 word-break / W7 overflow:visible 均无效）。
+     480rpx ≈ 手机屏幕宽 70% 减头像与页边距，与旧 70% 语义基本一致（平板略窄，可接受） */
+  max-width: 480rpx;
   min-width: 0;
   margin-left: var(--em-spacing-2);
   margin-right: var(--em-spacing-2);
@@ -189,7 +179,8 @@
 /* 不支持消息的占位气泡：壳（底色/圆角/padding）叠用 .em-bubble 基类 */
 .em-chat-page__text {
   font-size: var(--em-font-size-15);
-  line-height: var(--em-lineheight-normal);
+  /* px 行高同 em-text-message（Android 蒸汽端倍数行高不可靠）；行尾缺字修复在 __content 的 rpx 定宽 */
+  line-height: 23px;
   color: var(--em-bubble-text-other);
 }
 

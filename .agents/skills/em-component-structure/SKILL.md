@@ -74,3 +74,23 @@ custom 优先级高于内置，原子组件无 `-page` 后缀不受影响。**�
 | mp-weixin 样式丢失/默认值 | 样式写进了 .vue 或忘了独立 .css 的 variables.css import；父组件 wxss 够不到子组件内部时给用户内容文本补 text-style 内联（em-text 双通道） |
 | 新气泡颜色与其他的不一致 | 没叠 `.em-bubble` 基类，自己重写壳 |
 | 徽标/引用/时间逻辑写第二份 | 先看共享资产表，有就 import |
+
+## 组件透出契约（配置体系三层之「呈现层」）
+
+全局行为开关走 `EmKitConfig`（见 em-uikit-architecture），**组件呈现一律 props + 具名插槽**，不做 provider/inject、不做 ChatConfig 单对象透传。现有透出范式（新组件照抄）：
+
+| 组件 | props / emits / 插槽 |
+|---|---|
+| `em-chat-page` | `conversationId`（必填）、`avatarShape`；emits `open-info`/`send`/`recall`/`delete`（业务事件仅通知，行为内部走 EmKit）；插槽 `#custom-message`（按 `EmMessageItem.rawType` 判别渲染自定义消息，`ext` 为业务载荷唯一通道）、`#empty`（默认 em-empty 可整体覆盖） |
+| `em-conversation-page` | `showSearch`/`emptyText`；插槽 `#empty` |
+| `em-contact-page` | `menuKeys`；emits `select`/`open-requests`/`add`（add 弹窗宿主实现） |
+| `em-chat-inputbar` | `modelValue`（草稿）、`quote`、`features`（inputFeatures 逐项开关）、`emojis`；emits `send`/`quote-close`/`media-select`/`voice-send`；**手动键盘避让内置**（adjust-position=false + margin-bottom 顶起，见 em-crossend-pitfalls #3） |
+| `em-conversation-item` | `item`/`name`/`avatar`/`timeText`/`draft` 五 props 收装配数据；emits `click` + `long-press` |
+| `em-nav-bar` | `title`/`subtitle`/`showBack`/`actionIcon`；emits `back`/`action`；插槽 `#title`/`#action`；小程序胶囊避让内置 |
+| `em-video-message`/`em-file-message` | 点击行为上移 chat-page，组件发 `preview`/`download` emit（与 em-image-message 同模式） |
+| `em-avatar` | `placeholderColors` 五色板 prop；徽标壳 `__badge` 保留、本体收口 em-badge |
+
+## 现成原子组件清单（勿重造）
+
+- `em-empty`：props `icon`(EmIconName)/`title`/`description`/`size('small'|'normal'|'large')` + `#default`；token `--em-empty-icon-color`/`--em-empty-text-color`。三页空态与聊天页 `#empty` 默认态均用它。
+- `em-skeleton`：props `variant('avatar'|'text'|'paragraph')`/`shape`/`rows`/`width`/`height`；token `--em-skeleton-line-radius: 4px`；**静态灰块**（shimmer 动画因 ucss 禁伪元素留二期）；无 `card` variant。列表加载骨架参考会话/联系人页 SKELETON_COUNT/SKELETON_LINE_WIDTHS 组合。

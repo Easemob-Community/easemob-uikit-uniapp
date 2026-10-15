@@ -12,14 +12,26 @@
   height: 0;
 }
 
-.em-conversation-page__tip {
+.em-conversation-page__skeleton {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--em-spacing-7) var(--em-spacing-4);
+  flex-direction: column;
+  padding: 8px 16px;
 }
 
-.em-conversation-page__tip-text {
-  font-size: var(--em-font-size-14);
-  color: var(--em-empty-text-color);
+.em-conversation-page__skeleton-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.em-conversation-page__skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: 12px;
+}
+
+.em-conversation-page__skeleton-line-sub {
+  margin-top: 8px;
 }

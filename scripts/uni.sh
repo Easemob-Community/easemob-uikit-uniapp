@@ -50,7 +50,20 @@ export UNI_INPUT_DIR="$ROOT/demo/"
 
 cd "$CLI_DIR"
 if [ "$MODE" = "dev" ]; then
+  if [ "$PLATFORM" = "mp-weixin" ]; then
+    # SDK 分包后处理伴随 watch：dev 全量重发会抹掉 sub-sdk/im-sdk.js，轮询 app.json 自动重跑
+    #（HBuilderX GUI 起的 dev 无此伴随，需手动 `node scripts/prepare-sdk-subpackage.mjs <dev产物目录> --watch`）
+    node "$ROOT/scripts/prepare-sdk-subpackage.mjs" "$UNI_OUTPUT_DIR" --watch &
+    WATCH_PID=$!
+    trap 'kill "$WATCH_PID" 2>/dev/null' EXIT
+  fi
   exec node node_modules/.bin/uni -p "$PLATFORM"
 else
-  exec node node_modules/.bin/uni build -p "$PLATFORM"
+  node node_modules/.bin/uni build -p "$PLATFORM"
+fi
+
+# 构建后处理：mp-weixin 产物注入 SDK 普通分包（PLAN.md M2.8，分包异步化）+ 防回归检查
+if [ "$MODE" = "build" ] && [ "$PLATFORM" = "mp-weixin" ]; then
+  node "$ROOT/scripts/prepare-sdk-subpackage.mjs" "$UNI_OUTPUT_DIR"
+  node "$ROOT/scripts/check-mp-size.mjs" "$UNI_OUTPUT_DIR"
 fi

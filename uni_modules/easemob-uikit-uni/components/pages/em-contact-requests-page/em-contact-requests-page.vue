@@ -1,12 +1,10 @@
 <template>
-  <view :class="[ns.b(), themeClass]">
+  <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
     <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）；返回动作以 back 事件透出，路由由宿主接线 -->
     <em-nav-bar :title="t('contact.newRequests')" @back="emit('back')" />
 
     <scroll-view :class="ns.e('scroll')" scroll-y>
-      <view v-if="invites.length === 0" :class="ns.e('tip')">
-        <text :class="ns.e('tip-text')">{{ t('contact.requests.empty') }}</text>
-      </view>
+      <em-empty v-if="invites.length === 0" icon="personadd" :description="t('contact.requests.empty')" />
 
       <view v-for="invite in invites" :key="invite.id" :class="ns.e('item')">
         <em-avatar :src="avatarOf(invite.from)" :name="displayNameOf(invite.from)" :size="48" />
@@ -46,10 +44,12 @@
 import { computed, ref } from 'vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmButton from '../../em-button/em-button.vue'
+import EmEmpty from '../../em-empty/em-empty.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import { EmKit } from '../../../libs'
 import { CONTACT_INVITE_STATUS } from '../../../libs/constants'
 import { contactStore } from '../../../libs/store/contact'
+import { primaryColorStyle } from '../../../libs/store/config'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { EmContactInvite } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'

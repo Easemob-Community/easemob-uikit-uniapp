@@ -22,7 +22,7 @@ onLoad((options) => {
 
 // 聊天详情入口（em-chat-page 自绘 header 右上角 more 按钮）
 function onOpenInfo(id: string) {
-  uni.navigateTo({ url: `/pages/chat-info/chat-info?conversationId=${id}` })
+  uni.navigateTo({ url: `/sub-im/pages/chat-info/chat-info?conversationId=${id}` })
 }
 </script>
 

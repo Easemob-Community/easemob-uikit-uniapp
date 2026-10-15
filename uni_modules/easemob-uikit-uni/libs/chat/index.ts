@@ -74,7 +74,7 @@ export class EmChat {
     return this.messages.onMessage(handler)
   }
 
-  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<void> {
+  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
     return this.messages.sendText(to, text, quote)
   }
 
@@ -82,19 +82,19 @@ export class EmChat {
     return this.messages.makeQuote(item)
   }
 
-  async sendImage(to: string, image: EmPickedImage): Promise<void> {
+  async sendImage(to: string, image: EmPickedImage): Promise<EmMessageItem> {
     return this.messages.sendImage(to, image)
   }
 
-  async sendAudio(to: string, filePath: string, duration: number): Promise<void> {
+  async sendAudio(to: string, filePath: string, duration: number): Promise<EmMessageItem> {
     return this.messages.sendAudio(to, filePath, duration)
   }
 
-  async sendVideo(to: string, video: EmPickedVideo): Promise<void> {
+  async sendVideo(to: string, video: EmPickedVideo): Promise<EmMessageItem> {
     return this.messages.sendVideo(to, video)
   }
 
-  async sendFile(to: string, file: EmPickedFile): Promise<void> {
+  async sendFile(to: string, file: EmPickedFile): Promise<EmMessageItem> {
     return this.messages.sendFile(to, file)
   }
 

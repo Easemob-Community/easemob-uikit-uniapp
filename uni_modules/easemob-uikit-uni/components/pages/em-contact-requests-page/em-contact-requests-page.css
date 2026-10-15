@@ -12,18 +12,6 @@
   height: 0;
 }
 
-.em-contact-requests-page__tip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--em-spacing-7) var(--em-spacing-4);
-}
-
-.em-contact-requests-page__tip-text {
-  font-size: var(--em-font-size-14);
-  color: var(--em-empty-text-color);
-}
-
 /* 申请条目：有待处理操作的条目 min-height 96px（对齐 vue 版 actionable 行高） */
 .em-contact-requests-page__item {
   display: flex;

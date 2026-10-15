@@ -24,6 +24,7 @@ export default {
 
   'chat.title': '聊天',
   'chat.empty': '选择一个会话',
+  'chat.noMessages': '暂无消息',
   'chat.placeholder': '请输入消息...',
   'chat.send': '发送',
   'chat.typing': '对方正在输入...',
@@ -60,7 +61,6 @@ export default {
   'conversation.searchPlaceholder': '搜索会话...',
   'conversation.searchEmpty': '没有找到相关会话',
   'conversation.draft': '草稿',
-  'conversation.syncing': '正在同步会话...',
   'conversation.pullRefresh': '刷新中...',
   'conversation.loadingMore': '加载中...',
   'conversation.noMoreHistory': '没有更多历史消息',

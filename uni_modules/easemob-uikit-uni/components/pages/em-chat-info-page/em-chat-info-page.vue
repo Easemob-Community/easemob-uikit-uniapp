@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), themeClass]">
+  <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
     <scroll-view :class="ns.e('scroll')" scroll-y>
       <!-- 对方信息条（对齐 vue 版成员 strip 的单聊形态：48px 头像 + 昵称 + userId） -->
       <view :class="ns.e('profile')">
@@ -37,6 +37,7 @@ import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmButton from '../../em-button/em-button.vue'
 import { EmKit } from '../../../libs'
 import { conversationStore } from '../../../libs/store/conversation'
+import { primaryColorStyle } from '../../../libs/store/config'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'

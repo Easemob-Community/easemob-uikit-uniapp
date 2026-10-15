@@ -9,9 +9,13 @@
 
 .em-text-message__text {
   font-size: var(--em-font-size-15);
-  line-height: var(--em-lineheight-normal);
+  /* 行高必须 px：15px×1.5=22.5 向上取 23（Android 蒸汽端无单位倍数行高不可靠，px 是全库验证过的安全形态，
+     倍数 token 保留语义不再消费）。自由换行即可：行尾缺字的真根因在 chat-page content 的百分比宽度链
+     （已改 rpx 定宽修复，见 em-chat-page.css __content 注释），text 层无需 lines 属性 */
+  line-height: 23px;
   color: var(--em-bubble-text-other);
-  /* 长内容换行：对齐 vue 版 overflow-wrap: break-word 的语义，ucss 下用 word-break 兜底 */
+  /* 长内容换行：对齐 vue 版 overflow-wrap: break-word 的语义，ucss 下用 word-break 兜底；
+     5.26 蒸汽端不支持该样式（5.31 才新增）静默忽略，mp/H5 生效 */
   word-break: break-all;
 }
 

@@ -28,6 +28,7 @@ const props = defineProps<Props>()
 defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const emit = defineEmits<{
+  (e: 'download', message: EmMessageItem): void
   (e: 'long-press', message: EmMessageItem): void
 }>()
 
@@ -81,9 +82,10 @@ const iconName = computed<EmIconName>(() => {
   return 'paperclip'
 })
 
-// 文件下载/打开一期不做（需要分端落地），点击仅提示
+// 点击行为纯 emit 透传：默认下载/打开逻辑由宿主（em-chat-page 的 download 监听）实现；
+// 一期下载不做，宿主默认 toast 提示
 function onClick(): void {
-  uni.showToast({ title: t('error.unsupported'), icon: 'none' })
+  emit('download', props.message)
 }
 
 function onLongpress(): void {

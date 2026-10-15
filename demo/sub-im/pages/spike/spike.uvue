@@ -5,7 +5,14 @@
       <text class="spike__status">连接状态：{{ statusText }}</text>
       <text class="spike__status">运行模式：{{ runtimeMode }}（条件编译探针）</text>
       <text class="spike__error" v-if="errorText !== ''">{{ errorText }}</text>
+      <!-- #ifdef MP-WEIXIN -->
+      <view class="spike__row spike__row--probe">
+        <button class="spike__btn spike__btn--plain" @click="onLoadSdkProbe">加载 SDK 分包探针</button>
+        <text class="spike__status spike__status--probe">{{ sdkProbeText }}</text>
+      </view>
+      <!-- #endif -->
       <button class="spike__btn spike__btn--plain spike__btn--entry" @click="onOpenStyleLab">样式实验室 →</button>
+      <button class="spike__btn spike__btn--plain spike__btn--entry" @click="onOpenTextProbe">Text 测量探针 →</button>
     </view>
 
     <view class="spike__form">
@@ -83,8 +90,30 @@ function formatTime(time: number): string {
 }
 
 function onOpenStyleLab() {
-  uni.navigateTo({ url: '/pages/style-lab/style-lab' })
+  uni.navigateTo({ url: '/sub-im/pages/style-lab/style-lab' })
 }
+
+function onOpenTextProbe() {
+  uni.navigateTo({ url: '/sub-im/pages/text-probe/text-probe' })
+}
+
+// #ifdef MP-WEIXIN
+// 微信原生跨分包异步 require（回调式三参，路径相对编译产物中本文件位置 pages/spike/spike.js）
+const sdkProbeText = ref('未加载')
+function onLoadSdkProbe() {
+  sdkProbeText.value = '分包加载中…'
+  // @ts-ignore 微信模块作用域注入的 require（非 node/全局），UIKit sdk 层同款写法见 libs/client/sdk.ts
+  require('../../../sub-sdk/im-sdk.js', (mod: unknown) => {
+    const sdk = (mod as any)?.default ?? mod
+    const names = ['ChatClient', 'ChatManager', 'ContactManager', 'UserInfoManager', 'PushManager']
+    const missing = names.filter((n) => !(sdk as any)?.[n])
+    sdkProbeText.value =
+      missing.length > 0 ? `导出缺失: ${missing.join(',')}` : `SDK 分包加载成功（${names.length} 个核心导出齐全）`
+  }, (err: any) => {
+    sdkProbeText.value = '分包加载失败：' + (err?.errMsg ?? JSON.stringify(err))
+  })
+}
+// #endif
 
 async function onLogin() {
   errorText.value = ''
@@ -188,6 +217,16 @@ async function onSend() {
   display: flex;
   flex-direction: row;
   align-items: center;
+}
+
+.spike__row--probe {
+  margin-top: 8px;
+}
+
+.spike__status--probe {
+  flex: 1;
+  margin-top: 0;
+  margin-left: 8px;
 }
 
 .spike__btn {

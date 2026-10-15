@@ -8,7 +8,7 @@ import { conversationStore } from './store/conversation'
 import { messageStore } from './store/message'
 import { userStore } from './store/user'
 import { copyText, exportTextFile } from './platform'
-import { clearLogBuffer, getLogText } from './utils/logger'
+import { clearLogBuffer, createLogger, getLogText } from './utils/logger'
 import type {
   EmContactInvite,
   EmKitConfig,
@@ -18,6 +18,8 @@ import type {
   EmQuoteInfo
 } from './types'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from './platform'
+
+const kitLogger = createLogger('kit')
 
 // EmKit 门面：对外唯一入口，内部按功能拆分（client / chat / store / platform）
 class EmKitImpl {
@@ -32,12 +34,26 @@ class EmKitImpl {
   private contact = new EmContact()
 
   init(config: EmKitConfig): void {
-    const client = this.client.init(config)
-    this.chat.bind(client, () => this.client.waitOnline(), config)
-    this.contact.bind(client, () => this.client.waitOnline())
+    this.client.init(config)
+    // bind 推迟到 client 就绪后（小程序分包场景 SDK 模块异步到达）；
+    // 就绪门在 init 内已挂上，先于业务后续调用的续体，bind 时序稳定。
+    // 初始化失败只记录：业务入口（login 等）经 whenReady 拿到原始错误
+    this.client
+      .whenReady()
+      .then((client) => {
+        this.chat.bind(client, () => this.client.waitOnline(), config)
+        this.contact.bind(client, () => this.client.waitOnline())
+      })
+      .catch((e) => kitLogger.warn('kit bind skipped:', e))
+  }
+
+  /** SDK 就绪门（宿主渲染「加载消息服务」占位态用）：resolve 于 SDK 模块加载 + ChatClient.init 完成；未 init 即 reject */
+  whenReady(): Promise<unknown> {
+    return this.client.whenReady()
   }
 
   async login(options: EmLoginOptions): Promise<void> {
+    await this.client.whenReady()
     await this.client.login(options)
     // 登录成功即拉取自己的昵称/头像（会话页、聊天页己方气泡、demo mine 页回显）
     ensureUserInfos([options.userId])
@@ -49,7 +65,8 @@ class EmKitImpl {
     return this.client.logout()
   }
 
-  sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<void> {
+  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
+    await this.client.whenReady()
     return this.chat.sendText(to, text, quote)
   }
 
@@ -57,51 +74,63 @@ class EmKitImpl {
     return this.chat.makeQuote(item)
   }
 
-  sendImage(to: string, image: EmPickedImage): Promise<void> {
+  async sendImage(to: string, image: EmPickedImage): Promise<EmMessageItem> {
+    await this.client.whenReady()
     return this.chat.sendImage(to, image)
   }
 
-  sendAudio(to: string, filePath: string, duration: number): Promise<void> {
+  async sendAudio(to: string, filePath: string, duration: number): Promise<EmMessageItem> {
+    await this.client.whenReady()
     return this.chat.sendAudio(to, filePath, duration)
   }
 
-  sendVideo(to: string, video: EmPickedVideo): Promise<void> {
+  async sendVideo(to: string, video: EmPickedVideo): Promise<EmMessageItem> {
+    await this.client.whenReady()
     return this.chat.sendVideo(to, video)
   }
 
-  sendFile(to: string, file: EmPickedFile): Promise<void> {
+  async sendFile(to: string, file: EmPickedFile): Promise<EmMessageItem> {
+    await this.client.whenReady()
     return this.chat.sendFile(to, file)
   }
 
-  loadHistory(conversationId: string, pageSize?: number): Promise<void> {
+  async loadHistory(conversationId: string, pageSize?: number): Promise<void> {
+    await this.client.whenReady()
     return this.chat.loadHistory(conversationId, pageSize)
   }
 
-  syncConversations(): Promise<void> {
+  async syncConversations(): Promise<void> {
+    await this.client.whenReady()
     return this.chat.syncConversations()
   }
 
-  enterConversation(conversationId: string): Promise<void> {
+  async enterConversation(conversationId: string): Promise<void> {
+    await this.client.whenReady()
     return this.chat.enterConversation(conversationId)
   }
 
-  pinConversation(conversationId: string, pinned: boolean): Promise<void> {
+  async pinConversation(conversationId: string, pinned: boolean): Promise<void> {
+    await this.client.whenReady()
     return this.chat.pinConversation(conversationId, pinned)
   }
 
-  deleteConversation(conversationId: string): Promise<void> {
+  async deleteConversation(conversationId: string): Promise<void> {
+    await this.client.whenReady()
     return this.chat.deleteConversation(conversationId)
   }
 
-  clearConversationMessages(conversationId: string): Promise<void> {
+  async clearConversationMessages(conversationId: string): Promise<void> {
+    await this.client.whenReady()
     return this.chat.clearConversationMessages(conversationId)
   }
 
-  setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+  async setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+    await this.client.whenReady()
     return this.chat.setConversationMuted(conversationId, muted)
   }
 
-  recallMessage(conversationId: string, messageId: string): Promise<void> {
+  async recallMessage(conversationId: string, messageId: string): Promise<void> {
+    await this.client.whenReady()
     return this.chat.recallMessage(conversationId, messageId)
   }
 
@@ -109,11 +138,13 @@ class EmKitImpl {
     this.chat.deleteLocalMessage(conversationId, localId)
   }
 
-  resendMessage(conversationId: string, localId: string): Promise<void> {
+  async resendMessage(conversationId: string, localId: string): Promise<void> {
+    await this.client.whenReady()
     return this.chat.resendMessage(conversationId, localId)
   }
 
-  sendTyping(conversationId: string): Promise<void> {
+  async sendTyping(conversationId: string): Promise<void> {
+    await this.client.whenReady()
     return this.chat.sendTyping(conversationId)
   }
 
@@ -134,27 +165,33 @@ class EmKitImpl {
     ensureUserInfos(userIds)
   }
 
-  syncContacts(): Promise<void> {
+  async syncContacts(): Promise<void> {
+    await this.client.whenReady()
     return this.contact.syncContacts()
   }
 
-  addContact(userId: string, message = ''): Promise<void> {
+  async addContact(userId: string, message = ''): Promise<void> {
+    await this.client.whenReady()
     return this.contact.addContact(userId, message)
   }
 
-  deleteContact(userId: string): Promise<void> {
+  async deleteContact(userId: string): Promise<void> {
+    await this.client.whenReady()
     return this.contact.deleteContact(userId)
   }
 
-  setContactRemark(userId: string, remark: string): Promise<void> {
+  async setContactRemark(userId: string, remark: string): Promise<void> {
+    await this.client.whenReady()
     return this.contact.setContactRemark(userId, remark)
   }
 
-  acceptContactInvite(invite: EmContactInvite): Promise<void> {
+  async acceptContactInvite(invite: EmContactInvite): Promise<void> {
+    await this.client.whenReady()
     return this.contact.acceptContactInvite(invite)
   }
 
-  declineContactInvite(invite: EmContactInvite): Promise<void> {
+  async declineContactInvite(invite: EmContactInvite): Promise<void> {
+    await this.client.whenReady()
     return this.contact.declineContactInvite(invite)
   }
 
@@ -193,14 +230,17 @@ export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseF
 export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult } from './platform'
 export { useNamespace } from './use/useNamespace'
 export { useTheme } from './use/useTheme'
-export { useLocale } from './use/useLocale'
+export { useLocale, mergeMessages } from './use/useLocale'
 export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
 export { nextZIndex } from './use/usePopup'
+export { useConfig, setConfig } from './store/config'
 export { themeStore } from './store/theme'
 export { userStore, displayNameOf, avatarOf, mergeUserInfo } from './store/user'
 export { contactStore, contactDisplayNameOf, pendingInviteCount } from './store/contact'
 export { ensureUserInfos } from './chat/user-info'
 export { setPinyinAdapter, groupContacts, matchContact, resolveAlphabetKeyByOffsetY } from './utils/pinyin'
 export type { EmPinyinResult, EmContactGroup } from './utils/pinyin'
+export { ensureSdkModule, setSdkLoader, setSdkModule } from './client/sdk'
+export type { EmSdkModule } from './client/sdk'
 export { createLogger, setLogLevel, getLogLevel, getLogText, clearLogBuffer, getLogBufferSize } from './utils/logger'
 export type { EmLogger } from './utils/logger'

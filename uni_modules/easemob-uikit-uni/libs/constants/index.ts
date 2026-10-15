@@ -110,6 +110,10 @@ export const TYPING_THROTTLE = 5 * 1000
 /** typing 信号：接收方「正在输入」展示超时（超时未续即清除），对齐 vue 版 5s */
 export const TYPING_TIMEOUT = 5 * 1000
 
+/** 输入栏底部面板（emoji/媒体）最小高度 px：对齐 vue 版 panelHeightVar 兜底 280px；
+ * 曾测得真实键盘高度高于此值时面板高度跟随键盘，键盘↔面板互切无跳变 */
+export const PANEL_MIN_HEIGHT = 280
+
 /** 输入栏「+」媒体面板 action key */
 export const MEDIA_PANEL_KEY = {
   ALBUM: 'album',
@@ -142,3 +146,14 @@ export const ALPHABET_KEYS = [
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '#'
 ] as const
+
+/** 内置 emoji 字符集：vue 版 EMOJI_ALL（uikit-core emoji-picker）前 96 个，一期单面板无 tab 分页。
+ *  config 默认值来源（uiConfig.emojiList），运行时经 EmKitConfig.emojiList / setConfig 覆盖 */
+export const DEFAULT_EMOJI_LIST: string[] = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
+  '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨',
+  '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕',
+  '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '😕', '😟', '🙁',
+  '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞',
+  '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺'
+]

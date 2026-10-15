@@ -25,7 +25,6 @@ import { computed } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import type { EmMessageItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
-import { useLocale } from '../../libs/use/useLocale'
 import { formatVideoDuration } from '../../libs/utils/time'
 
 interface Props {
@@ -37,11 +36,11 @@ const props = defineProps<Props>()
 defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
 const emit = defineEmits<{
+  (e: 'preview', message: EmMessageItem): void
   (e: 'long-press', message: EmMessageItem): void
 }>()
 
 const ns = useNamespace('video-message')
-const { t } = useLocale()
 
 // 展示尺寸按宽高比约束在 240 内；无元数据回落 16:9 占位（对齐 vue 版，避免加载后撑高列表）
 const MAX_WIDTH = 240
@@ -61,16 +60,9 @@ const sizeStyle = computed(() => {
 
 const durationText = computed(() => formatVideoDuration(props.message.duration))
 
-// 播放：H5 直接新窗口打开流地址；小程序/App 暂无全屏视频预览收口，toast 降级
+// 点击行为纯 emit 透传（与 em-image-message 对齐）：默认播放/预览逻辑由宿主（em-chat-page 的 preview 监听）实现
 function onPlay(): void {
-  const url = props.message.url
-  if (url === '') return
-  // #ifdef WEB
-  window.open(url, '_blank')
-  // #endif
-  // #ifndef WEB
-  uni.showToast({ title: t('message.preview.unsupported'), icon: 'none' })
-  // #endif
+  emit('preview', props.message)
 }
 
 function onLongpress(): void {

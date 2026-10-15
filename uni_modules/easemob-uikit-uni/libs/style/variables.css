@@ -129,6 +129,9 @@
   --em-empty-icon-color: #C9CDCF;
   --em-empty-text-color: #919BA1;
 
+  /* 骨架屏（底色复用 --em-bg-hover） */
+  --em-skeleton-line-radius: 4px;
+
   /* 徽标（未读数/红点，独立于 danger 色） */
   --em-badge-bg: #FF7070;
   --em-badge-text: #FFFFFF;
@@ -181,6 +184,8 @@
 
   --em-empty-icon-color: #464E53;
   --em-empty-text-color: #737B82;
+
+  --em-skeleton-line-radius: 4px;
 
   --em-badge-bg: #FF7070;
   --em-badge-text: #1E1E23;

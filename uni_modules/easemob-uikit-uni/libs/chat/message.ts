@@ -12,8 +12,9 @@ import type {
   VideoMessageBody,
   VoiceMessageBody
 } from 'easemob-websdk'
-import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, TYPING_THROTTLE, TYPING_TIMEOUT } from '../constants'
+import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../constants'
 import { connectionStore } from '../store/connection'
+import { uiConfig } from '../store/config'
 import { getMessages, messageStore } from '../store/message'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
 import type { EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
@@ -66,7 +67,7 @@ export class EmMessageDomain {
     return this.ctx.client.chatManager
   }
 
-  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<void> {
+  async sendText(to: string, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createTextMessage({
       conversationId: to,
@@ -75,7 +76,7 @@ export class EmMessageDomain {
       // 引用挂在消息 ext 上（emQuote 自定义 key），接收方/历史消息解析还原
       ext: quote != null ? { [MESSAGE_EXT_KEY.QUOTE]: { msgId: quote.msgId, from: quote.from, text: quote.text, type: quote.type } } : undefined
     })
-    await this.deliver(message, to, text, quote)
+    return this.deliver(message, to, text, quote)
   }
 
   // 引用快照：文本截断 50 字，非文本消息用 locale 摘要（对齐 summaryOf 的文案纪律）
@@ -101,7 +102,7 @@ export class EmMessageDomain {
     return (webFile != null ? webFile : { path, name, size }) as CompatibleFile
   }
 
-  async sendImage(to: string, image: EmPickedImage): Promise<void> {
+  async sendImage(to: string, image: EmPickedImage): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createImageMessage({
       conversationId: to,
@@ -109,10 +110,10 @@ export class EmMessageDomain {
       data: this.asCompatibleFile(image.path, image.name, image.size, image.webFile),
       filename: image.name
     })
-    await this.deliver(message, to, '', undefined, image.path)
+    return this.deliver(message, to, '', undefined, image.path)
   }
 
-  async sendAudio(to: string, filePath: string, duration: number): Promise<void> {
+  async sendAudio(to: string, filePath: string, duration: number): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const name = filePath.slice(filePath.lastIndexOf('/') + 1)
     const message = chatManager.createVoiceMessage({
@@ -121,10 +122,10 @@ export class EmMessageDomain {
       data: this.asCompatibleFile(filePath, name, 0, null),
       duration
     })
-    await this.deliver(message, to, '', undefined, filePath)
+    return this.deliver(message, to, '', undefined, filePath)
   }
 
-  async sendVideo(to: string, video: EmPickedVideo): Promise<void> {
+  async sendVideo(to: string, video: EmPickedVideo): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createVideoMessage({
       conversationId: to,
@@ -134,10 +135,10 @@ export class EmMessageDomain {
       width: video.width,
       height: video.height
     })
-    await this.deliver(message, to, '', undefined, video.path)
+    return this.deliver(message, to, '', undefined, video.path)
   }
 
-  async sendFile(to: string, file: EmPickedFile): Promise<void> {
+  async sendFile(to: string, file: EmPickedFile): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     // H5 上传需要 File 对象；小程序/App 走 { path, name, size }（MiniAppFile）
     const data = this.asCompatibleFile(file.path, file.name, file.size, file.webFile)
@@ -148,12 +149,13 @@ export class EmMessageDomain {
       filename: file.name,
       fileSize: file.size
     })
-    await this.deliver(message, to, '', undefined, file.path)
+    return this.deliver(message, to, '', undefined, file.path)
   }
 
-  // 先落本地 sending 态，sendMessage 后回写 sent/failed；失败保留供重发
+  // 先落本地 sending 态，sendMessage 后回写 sent/failed；失败保留供重发。
+  // 返回 store 代理上的消息项（发送回写后的最终态），供业务事件透出（em-chat-page 的 send emit）
   // localUrl：语音/视频/文件的本地临时路径，SDK 未回写 body.url 时兜底（本地回显/播放/重发用）
-  private async deliver(message: Message, to: string, fallbackText: string, quote?: EmQuoteInfo, localUrl = ''): Promise<void> {
+  private async deliver(message: Message, to: string, fallbackText: string, quote?: EmQuoteInfo, localUrl = ''): Promise<EmMessageItem> {
     const chatManager = this.ctx.client?.chatManager
     if (chatManager == null) {
       throw new Error('call EmKit.init() first')
@@ -181,6 +183,7 @@ export class EmMessageDomain {
       stored.status = MESSAGE_STATUS.FAILED
       throw e
     }
+    return stored
   }
 
   async loadHistory(conversationId: string, pageSize = 20): Promise<void> {
@@ -235,11 +238,12 @@ export class EmMessageDomain {
     }
   }
 
-  // typing 信号：cmd 消息发送，本域节流（同一会话 TYPING_THROTTLE 内最多一条）；失败静默
+  // typing 信号：cmd 消息发送，本域节流（同一会话 uiConfig.typingThrottle 内最多一条）；失败静默
   async sendTyping(conversationId: string): Promise<void> {
+    if (!uiConfig.enableTyping) return
     const now = Date.now()
     const last = this.typingSentAt[conversationId] ?? 0
-    if (now - last < TYPING_THROTTLE) {
+    if (now - last < uiConfig.typingThrottle) {
       return
     }
     this.typingSentAt[conversationId] = now
@@ -254,6 +258,7 @@ export class EmMessageDomain {
 
   // cmd 信号入口（门面在 SDK onMessage 事件里拦截 cmd 后转调这里）：TypingBegin 置对端 typing，超时自动清除
   onCmdMessage(message: Message): void {
+    if (!uiConfig.enableTyping) return
     const body = message.body as CmdMessageBody
     if (body.action !== CMD_ACTION.TYPING_BEGIN) return
     if (message.from === connectionStore.userId) return
@@ -265,7 +270,7 @@ export class EmMessageDomain {
     }
     this.typingTimers[conversationId] = setTimeout(() => {
       messageStore.peerTypingByConversationId[conversationId] = false
-    }, TYPING_TIMEOUT)
+    }, uiConfig.typingTimeout)
   }
 
   async recallMessage(conversationId: string, messageId: string): Promise<void> {
@@ -366,7 +371,13 @@ export class EmMessageDomain {
       quote: null,
       duration: 0,
       fileName: '',
-      fileSize: 0
+      fileSize: 0,
+      ext: {},
+      rawType: ''
+    }
+    // SDK ext 透传给宿主（自定义消息业务载荷的唯一通道；引用 emQuote 等内部 key 原样可见）
+    if (message.ext != null && typeof message.ext === 'object') {
+      item.ext = { ...(message.ext as Record<string, unknown>) }
     }
     const rawQuote = message.ext?.[MESSAGE_EXT_KEY.QUOTE]
     if (rawQuote != null && typeof rawQuote === 'object') {
@@ -415,6 +426,9 @@ export class EmMessageDomain {
       item.url = body.url ?? ''
       item.fileName = body.filename ?? ''
       item.fileSize = body.fileSize ?? body.fileLength ?? 0
+    } else {
+      // 未识别类型（自定义消息）：保留 wire type 原文，宿主经 #custom-message 插槽按 rawType 判别渲染
+      item.rawType = mtype
     }
     return item
   }

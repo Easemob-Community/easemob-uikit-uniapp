@@ -18,7 +18,7 @@
     </view>
 
     <view :class="ns.e('bar')">
-      <view :class="[ns.e('tool'), ns.m('tool-first')]" @click="onToggleVoiceMode">
+      <view v-if="features.voice" :class="[ns.e('tool'), ns.m('tool-first')]" @click="onToggleVoiceMode">
         <EmIcon :name="voiceMode ? 'compose' : 'mic'" :size="20" />
       </view>
       <view
@@ -38,13 +38,19 @@
         :focus="inputFocus"
         :placeholder="t('chat.placeholder')"
         confirm-type="send"
+        :adjust-position="false"
         @confirm="onSend"
         @focus="onInputFocus"
+        @blur="onInputBlur"
       />
-      <view :class="ns.e('tool')" @click="onToggleEmoji">
+      <view v-if="features.emoji" :class="[ns.e('tool'), !features.voice && ns.m('tool-first')]" @click="onToggleEmoji">
         <text :class="ns.e('emoji-btn')">😀</text>
       </view>
-      <view :class="[ns.e('tool'), panel === 'media' && ns.m('tool-active')]" @click="onToggleMedia">
+      <view
+        v-if="hasMediaFeatures"
+        :class="[ns.e('tool'), !features.voice && !features.emoji && ns.m('tool-first'), panel === 'media' && ns.m('tool-active')]"
+        @click="onToggleMedia"
+      >
         <EmIcon name="plus" :size="20" />
       </view>
       <view :class="ns.e('send')" @click="onSend">
@@ -80,11 +86,11 @@ import { computed, onUnmounted, ref } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
-import { EMOJI_LIST } from './emojis'
-import { MEDIA_PANEL_KEY } from '../../libs/constants'
+import { DEFAULT_EMOJI_LIST, MEDIA_PANEL_KEY, PANEL_MIN_HEIGHT } from '../../libs/constants'
 import { cancelRecord, isRecording, startRecord, stopRecord } from '../../libs/platform'
 import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
-import type { EmQuoteInfo } from '../../libs/types'
+import { useKeyboardHeight } from '../../libs/use/useKeyboardHeight'
+import type { EmInputFeatures, EmQuoteInfo } from '../../libs/types'
 import { quoteHasIcon, quoteIconNameOf, quoteSuffixOf } from '../../libs/utils/quote'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLocale } from '../../libs/use/useLocale'
@@ -92,10 +98,16 @@ import { useLocale } from '../../libs/use/useLocale'
 interface Props {
   modelValue: string
   quote: EmQuoteInfo | null
+  /** 输入栏功能集（chat-page 从 uiConfig 读出传入；原子组件不连 store），默认全开 */
+  features?: EmInputFeatures
+  /** emoji 面板字符集，默认内置 96（constants DEFAULT_EMOJI_LIST） */
+  emojis?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  quote: null
+  quote: null,
+  features: () => ({ voice: true, emoji: true, image: true, camera: true, video: true, file: true }),
+  emojis: () => DEFAULT_EMOJI_LIST
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })
@@ -143,14 +155,27 @@ function onInputFocus(): void {
   panel.value = 'none'
 }
 
+// 手动避让（对齐 hello-uni-app-x keyboard-adjust 示例）：adjust-position 关系统默认上推后，
+// 输入栏以 margin-bottom = 键盘有效高度顶到键盘上方；blur 清零兜底部分端收起不补发 0 高度事件
+function onInputBlur(): void {
+  keyboardHeight.value = 0
+}
+
+// 面板高度 = max(最近键盘高度, 280px)：真实键盘高于兜底值时面板跟随键盘（对齐 vue 版 panelHeightVar，
+// 键盘↔面板互切无跳变）；键盘未弹过则恒为 280，对应 css 中 --em-chat-panel-height 一档已被内联覆盖
+const { keyboardHeight } = useKeyboardHeight()
+
 // 面板底部安全区（对齐 vue 版 panel 的 safe-bottom padding）
 const panelStyle = computed(() => {
   const bottom = getSafeAreaBottom()
-  return bottom > 0 ? `padding-bottom: ${bottom}px;` : ''
+  const pad = bottom > 0 ? `padding-bottom: ${bottom}px;` : ''
+  return `height: ${Math.max(keyboardHeight.value, PANEL_MIN_HEIGHT)}px;${pad}`
 })
 
-// 无面板时输入栏自身贴底，需让出 Home 指示条安全区；面板打开时安全区由面板承担，避免双重间距
+// 无面板时输入栏自身贴底，需让出 Home 指示条安全区；面板打开时安全区由面板承担，避免双重间距。
+// 键盘弹起时：以键盘有效高度顶起（键盘区已覆盖安全区，不再叠加安全区 padding）
 const rootStyle = computed(() => {
+  if (keyboardHeight.value > 0) return `margin-bottom: ${keyboardHeight.value}px;`
   if (panel.value !== 'none') return ''
   const bottom = getSafeAreaBottom()
   return bottom > 0 ? `padding-bottom: ${bottom}px;` : ''
@@ -166,8 +191,6 @@ function onSend(): void {
 
 // ========== emoji 面板 ==========
 
-const emojis = EMOJI_LIST
-
 // uni 的 input 跨端拿不到光标位置（selectionStart 是 DOM 概念），一期追加到末尾
 function onEmoji(emoji: string): void {
   emit('update:modelValue', props.modelValue + emoji)
@@ -179,14 +202,23 @@ interface MediaItem {
   key: string
   text: string
   icon: EmIconName
+  feature: keyof EmInputFeatures
 }
 
-const mediaItems = computed<MediaItem[]>(() => [
-  { key: MEDIA_PANEL_KEY.ALBUM, text: t('chat.media.album'), icon: 'image' },
-  { key: MEDIA_PANEL_KEY.CAMERA, text: t('chat.media.camera'), icon: 'camera' },
-  { key: MEDIA_PANEL_KEY.VIDEO, text: t('chat.media.video'), icon: 'videocam' },
-  { key: MEDIA_PANEL_KEY.FILE, text: t('chat.media.file'), icon: 'paperclip' }
-])
+// 全部候选按 features 过滤（image/camera/video/file 逐项可关；全开时与现状一致）。
+// 候选在 computed 内显式标注 MediaItem[]：经 .filter 后字面量失去 contextual typing，icon 会被放宽成 string
+const mediaItems = computed<MediaItem[]>(() => {
+  const candidates: MediaItem[] = [
+    { key: MEDIA_PANEL_KEY.ALBUM, text: t('chat.media.album'), icon: 'image', feature: 'image' },
+    { key: MEDIA_PANEL_KEY.CAMERA, text: t('chat.media.camera'), icon: 'camera', feature: 'camera' },
+    { key: MEDIA_PANEL_KEY.VIDEO, text: t('chat.media.video'), icon: 'videocam', feature: 'video' },
+    { key: MEDIA_PANEL_KEY.FILE, text: t('chat.media.file'), icon: 'paperclip', feature: 'file' }
+  ]
+  return candidates.filter((item) => props.features[item.feature])
+})
+
+// 四个媒体项全关时「+」入口整体隐藏
+const hasMediaFeatures = computed(() => mediaItems.value.length > 0)
 
 function onToggleMedia(): void {
   panel.value = panel.value === 'media' ? 'none' : 'media'

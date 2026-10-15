@@ -16,11 +16,11 @@
     </view>
 
     <view class="mine__group">
-      <view class="mine__cell" @click="onOpen('/pages/style-lab/style-lab')">
+      <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
         <text class="mine__cell-label">样式实验室</text>
         <text class="mine__cell-arrow">›</text>
       </view>
-      <view class="mine__cell" @click="onOpen('/pages/spike/spike')">
+      <view class="mine__cell" @click="onOpen('/sub-im/pages/spike/spike')">
         <text class="mine__cell-label">SDK 连通性 Spike</text>
         <text class="mine__cell-arrow">›</text>
       </view>

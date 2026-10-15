@@ -19,7 +19,8 @@ import { computed, ref } from 'vue'
 import EmBadge from '../em-badge/em-badge.vue'
 import { useNamespace } from '../../libs/use/useNamespace'
 
-// 文字头像占位底色板（平移自 Web 版 avatar.vue）：按 name 首字符 hash 取色
+// 文字头像占位底色板（平移自 Web 版 avatar.vue）：按 name 首字符 hash 取色；
+// 可经 placeholderColors prop 覆盖（空数组回退默认板）
 const PLACEHOLDER_COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#a78bfa']
 
 interface Props {
@@ -30,6 +31,7 @@ interface Props {
   badge?: number
   badgeDot?: boolean
   badgeMax?: number
+  placeholderColors?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -52,8 +54,10 @@ const showImage = computed(() => props.src.length > 0 && !loadFailed.value)
 const displayName = computed(() => props.name.slice(0, 2))
 
 const placeholderColor = computed(() => {
-  if (props.name.length === 0) return PLACEHOLDER_COLORS[0]
-  return PLACEHOLDER_COLORS[props.name.charCodeAt(0) % PLACEHOLDER_COLORS.length]
+  // 未传或传空数组时回退默认五色板（模块常量）
+  const palette = props.placeholderColors != null && props.placeholderColors.length > 0 ? props.placeholderColors : PLACEHOLDER_COLORS
+  if (props.name.length === 0) return palette[0]
+  return palette[props.name.charCodeAt(0) % palette.length]
 })
 
 const rootClass = computed(() => [ns.b(), ns.m(props.shape)])

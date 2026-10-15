@@ -125,7 +125,7 @@ async function onFetchToken() {
 }
 
 function onOpenSpike() {
-  uni.navigateTo({ url: '/pages/spike/spike' })
+  uni.navigateTo({ url: '/sub-im/pages/spike/spike' })
 }
 </script>
 

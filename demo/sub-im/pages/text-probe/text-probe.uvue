@@ -1,0 +1,291 @@
+<template>
+  <scroll-view class="probe" scroll-y>
+    <text class="probe__hint">第 2 轮：聚焦行尾缺字。R1/S1 为上轮对照（R1=百分比链会缺字，S1=定宽正常）。请整页截图反馈。</text>
+
+    <text class="probe__group">W 组：百分比链上的候选解法（每行尾是否还缺字）</text>
+
+    <view class="probe__case">
+      <text class="probe__label">W1 链不变 + text margin-right:-16px（补偿 content 双 margin）</text>
+      <view class="probe__row">
+        <view class="probe__avatar"></view>
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble"><text class="probe__text t--comp16">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+      </view>
+      <view class="probe__row probe__row--gap">
+        <view class="probe__avatar"></view>
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble"><text class="probe__text t--comp16">{{ TEXT_LONG }}</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">W2 content max-width 改 480rpx 定宽（对照 S 组的修法搬到链上）</text>
+      <view class="probe__row">
+        <view class="probe__avatar"></view>
+        <view class="probe__content probe__content--fixed">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble"><text class="probe__text">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">W3 content 去 margin（margin 是否参与缺字）</text>
+      <view class="probe__row">
+        <view class="probe__avatar"></view>
+        <view class="probe__content probe__content--nomargin">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble"><text class="probe__text">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">W4 去 word-break:break-all（5.26 蒸汽端不支持该样式）</text>
+      <view class="probe__row">
+        <view class="probe__avatar"></view>
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble"><text class="probe__text probe__text--nobreak">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+      </view>
+      <view class="probe__row probe__row--gap">
+        <view class="probe__avatar"></view>
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble"><text class="probe__text probe__text--nobreak">{{ TEXT_LONG }}</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">W5 百分比链 + bubble padding 28（缺字是否随 padding 翻倍）</text>
+      <view class="probe__row">
+        <view class="probe__avatar"></view>
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble probe__bubble--pad28"><text class="probe__text">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">W7 text+bubble 双 overflow:visible（行尾字能否落进 padding 区可见）</text>
+      <view class="probe__row">
+        <view class="probe__avatar"></view>
+        <view class="probe__content">
+          <view class="probe__bubblerow probe__bubblerow--vis">
+            <view class="probe__bubble probe__bubble--vis"><text class="probe__text probe__text--vis">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">W8 己方消息复刻（row-reverse + align-end，生产左裁场景）</text>
+      <view class="probe__row probe__row--self">
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble probe__bubble--self"><text class="probe__text">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+        <view class="probe__avatar"></view>
+      </view>
+      <view class="probe__row probe__row--self probe__row--gap">
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble probe__bubble--self"><text class="probe__text t--comp16">{{ TEXT_LONG }}</text></view>
+          </view>
+        </view>
+        <view class="probe__avatar"></view>
+      </view>
+    </view>
+
+    <text class="probe__group">对照组（上轮基线）</text>
+
+    <view class="probe__case">
+      <text class="probe__label">R1 百分比链 自由换行（上轮：行尾缺 1 字）</text>
+      <view class="probe__row">
+        <view class="probe__avatar"></view>
+        <view class="probe__content">
+          <view class="probe__bubblerow">
+            <view class="probe__bubble"><text class="probe__text">{{ TEXT_MIXED }}</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">S1 定宽 480rpx 自由换行（上轮：完整正常）</text>
+      <view class="probe__simple"><text class="probe__text">{{ TEXT_MIXED }}</text></view>
+      <view class="probe__simple"><text class="probe__text">{{ TEXT_LONG }}</text></view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">S6 定宽 + bubble padding 28（padding 对定宽是否无影响）</text>
+      <view class="probe__simple probe__simple--pad28"><text class="probe__text">{{ TEXT_MIXED }}</text></view>
+    </view>
+
+    <view class="probe__case">
+      <text class="probe__label">短文本单行对照（应全部正常）</text>
+      <view class="probe__simple"><text class="probe__text">{{ TEXT_SHORT }}</text></view>
+    </view>
+  </scroll-view>
+</template>
+
+<script setup lang="ts">
+// 与真机被裁消息同款的混合文本（CJK + 空格 + 拉丁），bubble 宽度下稳定折 2 行
+const TEXT_MIXED = '你好，这是一条来自 Vue3 Demo 的单聊测试消息'
+// 4 行以上长文本：检验行尾缺字是否每行都发生
+const TEXT_LONG = '结构治理冒烟测试二零二六年十月十四日北京时间下午两点五十一分发送的长文本消息用来验证多行累计误差是否逐行放大'
+const TEXT_SHORT = '短消息'
+</script>
+
+<style>
+.probe {
+  padding: 12px 16px;
+  background-color: #f5f5f5;
+}
+
+.probe__hint {
+  font-size: 12px;
+  line-height: 18px;
+  color: #e64545;
+  margin-bottom: 12px;
+}
+
+.probe__group {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333333;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.probe__case {
+  margin-bottom: 16px;
+}
+
+.probe__label {
+  font-size: 12px;
+  line-height: 16px;
+  color: #1677ff;
+  margin-bottom: 4px;
+}
+
+.probe__row {
+  display: flex;
+  flex-direction: row;
+}
+
+.probe__row--gap {
+  margin-top: 8px;
+}
+
+.probe__row--self {
+  flex-direction: row-reverse;
+}
+
+.probe__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  background-color: #9b7bff;
+  flex-shrink: 0;
+}
+
+.probe__content {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+  min-width: 0;
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.probe__content--fixed {
+  max-width: 480rpx;
+}
+
+.probe__content--nomargin {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.probe__bubblerow {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  max-width: 100%;
+  position: relative;
+}
+
+.probe__bubblerow--vis {
+  overflow: visible;
+}
+
+.probe__bubble {
+  padding: 12px 14px;
+  max-width: 100%;
+  background-color: #e4e6e7;
+  border-radius: 16px;
+}
+
+.probe__bubble--pad28 {
+  padding: 12px 28px;
+}
+
+.probe__bubble--vis {
+  overflow: visible;
+}
+
+.probe__bubble--self {
+  background-color: #009eff;
+}
+
+.probe__bubble--self .probe__text {
+  color: #ffffff;
+}
+
+.probe__text {
+  font-size: 15px;
+  line-height: 23px;
+  color: #171a1c;
+  word-break: break-all;
+}
+
+.probe__text--nobreak {
+  word-break: normal;
+}
+
+.probe__text--vis {
+  overflow: visible;
+}
+
+.t--comp16 {
+  margin-right: -16px;
+}
+
+.probe__simple {
+  max-width: 480rpx;
+  padding: 12px 14px;
+  background-color: #e4e6e7;
+  border-radius: 16px;
+  margin-bottom: 8px;
+}
+
+.probe__simple--pad28 {
+  padding: 12px 28px;
+}
+</style>

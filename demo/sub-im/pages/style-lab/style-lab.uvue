@@ -82,6 +82,26 @@
         </view>
       </view>
     </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">em-empty（空状态：normal / small / large）</text>
+      <em-empty icon="list" :description="t('conversation.empty')" />
+      <em-empty icon="search" size="small" :description="t('conversation.searchEmpty')" />
+      <em-empty icon="chatbubble" size="large" :title="t('chat.title')" :description="t('chat.noMessages')" />
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">em-skeleton（骨架屏：静态灰块，shimmer 动画留二期）</text>
+      <view class="lab__skeleton-item">
+        <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
+        <view class="lab__skeleton-lines">
+          <em-skeleton width="40%" />
+          <em-skeleton class="lab__skeleton-line-sub" width="70%" />
+        </view>
+      </view>
+      <em-skeleton class="lab__skeleton-block" />
+      <em-skeleton variant="paragraph" :rows="3" />
+    </view>
   </scroll-view>
 </template>
 
@@ -275,5 +295,27 @@ function toggleLocale() {
   font-size: var(--em-font-size-10);
   color: var(--em-text-tertiary);
   margin-top: var(--em-spacing-1);
+}
+
+.lab__skeleton-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: var(--em-spacing-4);
+}
+
+.lab__skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--em-spacing-3);
+}
+
+.lab__skeleton-line-sub {
+  margin-top: var(--em-spacing-2);
+}
+
+.lab__skeleton-block {
+  margin-bottom: var(--em-spacing-4);
 }
 </style>

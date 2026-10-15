@@ -6,22 +6,28 @@
       <EmIcon name="left" :size="22" :class="ns.e('back-icon')" />
     </view>
     <view :class="[ns.e('main'), showBack ? 'em-nav-bar__main--after-back' : '']">
-      <text :class="ns.e('title')">{{ title }}</text>
+      <slot name="title">
+        <text :class="ns.e('title')">{{ title }}</text>
+      </slot>
       <text v-if="subtitle !== ''" :class="ns.e('subtitle')">{{ subtitle }}</text>
     </view>
-    <view v-if="actionIcon !== ''" :class="ns.e('action')" @click="onAction">
-      <EmIcon :name="actionIcon" :size="22" :class="ns.e('action-icon')" />
+    <view v-if="actionIcon !== '' || slots.action != null" :class="ns.e('action')" @click="onAction">
+      <slot name="action">
+        <EmIcon :name="actionIcon" :size="22" :class="ns.e('action-icon')" />
+      </slot>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import { useSlots } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { getSafeAreaTop } from '../../libs/use/useSafeArea'
 
-// 自绘导航栏原子组件：safe-top + 44px 内容行；小程序胶囊避让内置（#ifdef MP-WEIXIN 量胶囊矩形）
+// 自绘导航栏原子组件：safe-top + 44px 内容行；小程序胶囊避让内置（#ifdef MP-WEIXIN 量胶囊矩形）；
+// #title / #action 具名插槽可覆盖默认文本标题与图标按钮（有插槽内容时优先）
 defineOptions({ styleIsolation: 'app-and-page' })
 
 interface Props {
@@ -44,6 +50,7 @@ const emit = defineEmits<{
 }>()
 
 const ns = useNamespace('nav-bar')
+const slots = useSlots()
 
 // 小程序端胶囊独占右上角：预留 胶囊左边距 + 胶囊宽 + 8px 间隔；其它端常规 12px
 let capsuleRightPad = 12

@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), themeClass]">
+  <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
     <!-- 自绘导航栏（系统栏右上角被小程序胶囊独占，且与页内标题重复）：返回隐藏，右侧「+」发起单聊 -->
     <em-nav-bar
       :title="t('conversation.title')"
@@ -8,14 +8,23 @@
       @action="onOpenCreate"
     />
 
-    <em-search-bar v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
+    <em-search-bar v-if="showSearch" v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
 
     <scroll-view :class="ns.e('scroll')" scroll-y>
-      <view v-if="syncing && items.length === 0" :class="ns.e('tip')">
-        <text :class="ns.e('tip-text')">{{ t('conversation.syncing') }}</text>
+      <!-- 首次同步骨架（对齐 vue 版 conversation-list：替代转圈，6 条会话条目占位） -->
+      <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
+        <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
+          <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
+          <view :class="ns.e('skeleton-lines')">
+            <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
+            <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+          </view>
+        </view>
       </view>
-      <view v-else-if="items.length === 0" :class="ns.e('tip')">
-        <text :class="ns.e('tip-text')">{{ keyword.trim() !== '' ? t('conversation.searchEmpty') : t('conversation.empty') }}</text>
+      <view v-else-if="items.length === 0">
+        <slot name="empty">
+          <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list'" :description="emptyTipText" />
+        </slot>
       </view>
 
       <em-conversation-item
@@ -53,9 +62,12 @@ import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmConversationItem from '../../em-conversation-item/em-conversation-item.vue'
+import EmEmpty from '../../em-empty/em-empty.vue'
+import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import { EmKit } from '../../../libs'
 import { CONVERSATION_MENU_KEY } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
+import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { draftStore } from '../../../libs/store/draft'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { EmActionSheetAction, EmConversationItem as EmConversationData } from '../../../libs/types'
@@ -66,6 +78,18 @@ import { formatConversationTime } from '../../../libs/utils/time'
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
+interface Props {
+  /** 顶部搜索条显隐，默认 true */
+  showSearch?: boolean
+  /** 列表空态文案（仅空列表场景，搜索无结果仍走 searchEmpty 文案）；空串走 i18n 默认 */
+  emptyText?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  showSearch: true,
+  emptyText: ''
+})
+
 const emit = defineEmits<{
   (e: 'select', conversationId: string): void
   (e: 'menu', key: string): void
@@ -74,9 +98,20 @@ const emit = defineEmits<{
 const ns = useNamespace('conversation-page')
 const { themeClass } = useTheme()
 const { t } = useLocale()
+const { config } = useConfig()
+
+// 空态文案：搜索无结果 > emptyText prop > i18n 默认（#empty 插槽整体优先于三者，见模板）
+const emptyTipText = computed(() => {
+  if (keyword.value.trim() !== '') return t('conversation.searchEmpty')
+  return props.emptyText !== '' ? props.emptyText : t('conversation.empty')
+})
 
 const syncing = computed(() => conversationStore.syncing)
 const keyword = ref('')
+
+// 首次同步骨架：条数与行宽对齐 vue 版 conversation-list（6 条、40%/70% 两行）
+const SKELETON_COUNT = 6
+const SKELETON_LINE_WIDTHS = ['40%', '70%']
 
 interface Entry {
   item: EmConversationData
@@ -123,11 +158,15 @@ const createActions = computed<EmActionSheetAction[]>(() => [
 const itemActions = computed<EmActionSheetAction[]>(() => {
   const item = activeItem.value
   if (item == null) return []
-  return [
+  // 候选全集按 uiConfig.conversationMenuKeys 过滤排序（默认 pin/mute/delete 全量）
+  const candidates: EmActionSheetAction[] = [
     { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: 'top' },
     { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: 'eye-slash' },
     { key: CONVERSATION_MENU_KEY.DELETE, text: t('conversation.delete'), icon: 'trash', danger: true }
   ]
+  return config.conversationMenuKeys
+    .map((key) => candidates.find((a) => a.key === key))
+    .filter((a): a is EmActionSheetAction => a != null)
 })
 
 function onOpenCreate(): void {

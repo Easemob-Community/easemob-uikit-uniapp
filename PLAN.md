@@ -82,6 +82,7 @@ tiptap 富文本输入、消息编辑、消息翻译、合并转发、多选模�
 | SDK | 环信 websdk（npm 纯 js），作为 peer 依赖；小程序端验证既有小程序 SDK 线 | 连通性是 P0 spike |
 | 测试 | uni 官方自动化测试框架（一套 test.js 驱动全端）+ jest 快照（参照 uni-ui x 的 jest.config.js） | 每个 issue 修复配测试例 |
 | IDE/CI | HBuilder V 开发；CLI（`@dcloudio/uni-cli`）出包用于 CI | 锁 IDE 版本到 readme |
+| 配置体系（2026-10-15 定稿） | 三层混合：**全局 `EmKitConfig` 行为开关**（→ reactive config store，`useConfig()` 读取，`libs/store/config.ts`）+ **页面级组件呈现 props**（局部覆盖全局）+ **少量具名插槽**（自定义消息出口/empty/nav title/action） | 不做 vue 版 provider/inject 响应式重构、不做 ChatConfig 单对象大 prop 透传；原子组件不连 store（输入栏功能集走 props 传入）；`-page` 组件仍不碰路由；默认值一律与现状一致（零行为变更，纯增配置面）；formatter/@我/presence 留二期 |
 
 ## 4. 仓库结构
 
@@ -160,6 +161,32 @@ easemob-uikit-uniapp/
 - 拼音决策：**零运行时依赖不动摇**——`libs/utils/pinyin.ts` 提供 `setPinyinAdapter` 可选注入口（对齐 vue 版 use-pinyin 设计），未注入时非 A-Z 首字符全部落 `#` 组、搜索仅原文匹配（与 vue 版默认降级行为一致）；不打包拼音库
 - 明确不做（留二期）：黑名单全套、群组入口/群列表、联系人详情页（备注编辑 UI/拉黑）、选人穿梭框、presence 在线点、PC 专属交互（键盘导航/右键/ScrollToTop）、触底分页（SDK 本地全量无分页）、添加好友完整 UI（demo 级 modal 即可）
 - 已知降级：组头 sticky 在蒸汽 App 端若不生效则随列表滚动；索引条高亮以索引条交互驱动为主，滚动反向驱动视 SelectorQuery 实测再补
+
+### M2.6：组件配置体系整改（易用性专项，2026-10-15 定稿）
+
+- **配置基建**：`libs/store/config.ts` reactive `uiConfig`（默认值收口自 constants，`RECALL_TIME_LIMIT`/`TYPING_THROTTLE`/`TYPING_TIMEOUT`/`TIME_DIVIDER_INTERVAL` 降级为默认值来源）+ `useConfig()`（getter + `setConfig(partial)` 运行时合并）；`EmKitConfig` 扩展 UI 行为维度，`EmKit.init` 接线写入 config store
+- **EmKitConfig 新增可选项（默认值 = 现状，零行为变更）**：`enableDraft`/`enableTyping`/`showTime`（默认 true/true/false）、`recallTimeLimit`/`typingThrottle`/`typingTimeout`/`timeDividerInterval`（数值常量可覆盖）、`inputFeatures{voice,emoji,image,camera,video,file}`（输入栏功能集，默认全开）、`messageMenuKeys`/`conversationMenuKeys`（长按菜单项与顺序）、`emojiList`（emoji 字符集注入，默认内置 96）、`primaryColor`（品牌色，init 落 `--em-primary-color`）
+- **组件透出**：`em-chat-page` 增 `avatarShape` prop + `send`/`recall`/`delete` emits + `#custom-message`（PLAN 承诺的自定义消息出口，未识别 type 时渲染）/`#empty` 插槽；`em-conversation-page` 增 `showSearch`/`emptyText` + `#empty`；`em-contact-page` 增 `menuKeys`（长按菜单）；`em-video-message` 补 `preview` emit（与 em-image-message 对齐，默认行为不变）、`em-file-message` 补 `download` 事件；`em-nav-bar` 补 `#title`/`#action` 插槽；`em-avatar` 占位五色板提为 `placeholderColors` prop
+- **i18n 注入口**：`useLocale` 增 `mergeMessages(locale, table)`（业务方运行时注入新语言/覆盖文案；messages 表从模块私有常量改为可变 store，zh-CN/en 为初始值）
+- 消费点接线：`libs/chat/message.ts`（撤回窗口/typing/cmd 拦截）、`em-chat-page`（分隔条间隔/菜单构建）、`em-chat-inputbar`（features → 面板项增删/emoji 集/voice 显隐）
+- 明确不做（留二期）：formatter/filterFn 函数注入、`readIconDisplay` 档位、bubbleShape 全局开关、theme `auto` 跟随系统实现、群相关配置
+
+### M2.7：空状态与骨架屏组件（2026-10-15）
+
+- **新原子组件 `em-empty`**（对齐 vue 版 `EmEmpty`）：props `icon`（em-icon 字体名）/`title`/`description`/`size('small'|'normal'|'large')` + `#default` 插槽；图标 32/48/64，复用现有 `--em-empty-icon-color`/`--em-empty-text-color` token。不译 vue 的 SVG 插画档（禁打包 svg/png 纪律）
+- **新原子组件 `em-skeleton`**（对齐 vue 版 `EmSkeleton`）：props `variant('avatar'|'text'|'paragraph')`/`shape('circle'|'square'|'rounded')`/`rows`/`width`/`height`；底色 `--em-bg-hover`、圆角 `--em-radius`（行圆角补 `--em-skeleton-line-radius`）
+- **应用点**：会话页/联系人页「同步中」文案态 → 骨架列表（6/8 条，对齐 vue 宿主组合：avatar rounded + 两行 text 40%/70%、35%/65%）；三页手写 `__tip` 空态统一收编为 `em-empty`（会话页 icon 随搜索态切换 search/list）；聊天页 `#empty` 插槽补默认 `em-empty`
+- 明确不做（留二期）：shimmer 动画（ucss 禁伪元素，`::after`+keyframes 不可用，二期 mp/H5 条件编译补）、`card` variant（无消费点）、聊天页消息区骨架（vue 版消息区亦不用，进入会话已有预热优化）
+
+### M2.8：微信小程序 SDK 分包异步化（主包体积专项，2026-10-15 立项）
+
+- **背景**：demo mp-weixin 主包 1.7MB（上限 2MB），其中 websdk 5.1.3 IIFE 873KB 经 `libs/client/index.ts` 静态导入全部落主包 `common/vendor.js`；消息列表是 tabBar 页无法进分包，与社区宿主场景同构。参照《环信 IM SDK 接入微信小程序分包异步化实施指南》落地，机制按 uni-app x 等价翻译。
+- **机制（等价替换定稿）**：SDK IIFE 自包含产物经构建后处理脚本（`scripts/prepare-sdk-subpackage.mjs`，追加 `module.exports = IMSDK` + esbuild 语法降级）拷入普通分包；主包经 uni-app 官方跨分包 JS 引用原生 `require(path, cb, fail)` 回调写法异步加载（DCloud 分包异步化文档，uni-app/uni-app x 均支持）；不使用 webpack copy 插件/app.js 注入方案（本仓编译器为 HBuilderX 内置 uniapp-cli-vite）。
+- **库侧注入口（关键）**：`libs/client/sdk.ts` 条件编译双实现——`#ifndef MP-WEIXIN` 静态直通 `easemob-websdk`（现状等价，H5/App/鸿蒙零行为变更）；`#ifdef MP-WEIXIN` 模块级 SDK 持有 + `ensureSdkModule()`（Promise 缓存/失败重置/导出校验）+ `EmKitConfig.sdkLoader` 宿主注入；`EmKit.init` 的 `ChatClient.init` 改首次 ensure 时懒初始化（load→init→login 三阶段 Promise 缓存）。全库运行时（非 `import type`）SDK 导入收口 `sdk.ts` 单文件。
+- **宿主接入契约**：pages.json `subPackages`（普通分包，independent:false）+ `preloadRule` 预下载；UIKit 不负责宿主的分包配置与 SDK 文件拷贝，只在 readme 给接入指南。
+- **demo 接线**：非 tabBar 页（chat/chat-info/contact-requests/spike/style-lab）进分包；会话页 SDK 未就绪占位态（加载/失败重试，i18n key）；`scripts/check-mp-size.mjs` 体积与防回归断言（主包阈值/SDK 版本/IIFE 全局名/require 存活/语法检查）。
+- 明确不做：UIKit 组件代码本身拆分包（一期只解决 SDK 体积）；独立分包；动态 `import()`（uni-app x 不支持，用官方 require 回调写法）。
+- 产出：`docs/SPIKE-SDK-SUBPACKAGE.md`（编译器行为验证记录）。
 
 ### M3：组件沉淀与发布
 

@@ -48,11 +48,11 @@ onShow(() => {
 function onSelect(userId: string) {
   EmKit.enterConversation(userId).catch(() => {})
   EmKit.loadHistory(userId).catch(() => {})
-  uni.navigateTo({ url: `/pages/chat/chat?conversationId=${userId}` })
+  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${userId}` })
 }
 
 function onOpenRequests() {
-  uni.navigateTo({ url: '/pages/contact-requests/contact-requests' })
+  uni.navigateTo({ url: '/sub-im/pages/contact-requests/contact-requests' })
 }
 
 // 添加好友为 demo 级 modal（对齐 vue 版契约：页面组件只 emit add，弹窗由业务侧实现）

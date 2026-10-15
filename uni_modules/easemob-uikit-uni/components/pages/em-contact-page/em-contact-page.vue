@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), themeClass]">
+  <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
     <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧 personadd 添加好友 -->
     <em-nav-bar
       :title="t('contact.title')"
@@ -25,12 +25,21 @@
           <EmIcon name="right" :size="22" :class="ns.e('entry-arrow')" />
         </view>
 
-        <view v-if="syncing && groups.length === 0" :class="ns.e('tip')">
-          <text :class="ns.e('tip-text')">{{ t('conversation.syncing') }}</text>
+        <!-- 好友同步骨架（对齐 vue 版 contact-list：8 条条目占位） -->
+        <view v-if="syncing && groups.length === 0" :class="ns.e('skeleton')">
+          <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
+            <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
+            <view :class="ns.e('skeleton-lines')">
+              <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
+              <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+            </view>
+          </view>
         </view>
-        <view v-else-if="groups.length === 0" :class="ns.e('tip')">
-          <text :class="ns.e('tip-text')">{{ keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty') }}</text>
-        </view>
+        <em-empty
+          v-else-if="groups.length === 0"
+          icon="person"
+          :description="keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty')"
+        />
 
         <view v-for="group in groups" :key="group.key">
           <!-- 分组锚点 id 供索引条 scroll-into-view 定位 -->
@@ -75,13 +84,17 @@ import { computed, nextTick, ref, watch } from 'vue'
 import EmAlphabetNav from '../../em-alphabet-nav/em-alphabet-nav.vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmBadge from '../../em-badge/em-badge.vue'
+import EmEmpty from '../../em-empty/em-empty.vue'
 import EmIcon from '../../em-icon/em-icon.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
+import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import { EmKit } from '../../../libs'
 import { ALPHABET_KEYS, CONTACT_MENU_KEY } from '../../../libs/constants'
+import type { ContactMenuKeyValue } from '../../../libs/constants'
 import { contactStore, pendingInviteCount } from '../../../libs/store/contact'
+import { primaryColorStyle } from '../../../libs/store/config'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { EmActionSheetAction, EmContactItem } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
@@ -91,6 +104,15 @@ import { groupContacts, matchContact } from '../../../libs/utils/pinyin'
 import { TEXT_STYLE_NAME } from '../../../libs/style/textStyles'
 
 defineOptions({ styleIsolation: 'app-and-page' })
+
+interface Props {
+  /** 条目长按菜单项与顺序（默认仅删除好友全量）；联系人详情/拉黑仍留二期 */
+  menuKeys?: ContactMenuKeyValue[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  menuKeys: () => [CONTACT_MENU_KEY.DELETE]
+})
 
 // 名称文字内联样式收口 libs/style/textStyles.ts（小程序样式隔离，须走 text-style；详见 em-text 注释）
 const nameTextStyle = TEXT_STYLE_NAME
@@ -108,6 +130,10 @@ const { t } = useLocale()
 const syncing = computed(() => contactStore.syncing)
 const keyword = ref('')
 const pendingCount = computed(() => pendingInviteCount())
+
+// 好友同步骨架：条数与行宽对齐 vue 版 contact-list（8 条、35%/65% 两行）
+const SKELETON_COUNT = 8
+const SKELETON_LINE_WIDTHS = ['35%', '65%']
 
 // 展示名回落链（对齐 vue 版 contact-display）：remark > userStore nickname > userId；
 // 名字一次算成 nameByUserId，分组/排序/搜索三处共用同一口径，避免分组函数内反复 find
@@ -180,13 +206,18 @@ function onSelect(c: EmContactItem): void {
   emit('select', c.userId)
 }
 
-// 长按条目：action-sheet 删除好友（CONTACT_MENU_KEY 收口，danger 项）
+// 长按条目：action-sheet 菜单项按 menuKeys props 过滤排序（默认删除好友，CONTACT_MENU_KEY 收口，danger 项）
 const itemSheetVisible = ref(false)
 const activeContact = ref<EmContactItem | null>(null)
 
-const itemActions = computed<EmActionSheetAction[]>(() => [
-  { key: CONTACT_MENU_KEY.DELETE, text: t('contact.delete'), icon: 'trash', danger: true }
-])
+const itemActions = computed<EmActionSheetAction[]>(() => {
+  const candidates: EmActionSheetAction[] = [
+    { key: CONTACT_MENU_KEY.DELETE, text: t('contact.delete'), icon: 'trash', danger: true }
+  ]
+  return props.menuKeys
+    .map((key) => candidates.find((a) => a.key === key))
+    .filter((a): a is EmActionSheetAction => a != null)
+})
 
 function onLongPress(c: EmContactItem): void {
   activeContact.value = c

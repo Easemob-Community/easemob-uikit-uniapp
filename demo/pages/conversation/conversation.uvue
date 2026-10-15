@@ -53,7 +53,7 @@ function preloadConversation(conversationId: string) {
 
 function onSelect(conversationId: string) {
   preloadConversation(conversationId)
-  uni.navigateTo({ url: `/pages/chat/chat?conversationId=${conversationId}` })
+  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${conversationId}` })
 }
 
 function onMenu(key: string) {
@@ -68,7 +68,7 @@ function onStartChat() {
   if (id === '') return
   showNewChat.value = false
   preloadConversation(id)
-  uni.navigateTo({ url: `/pages/chat/chat?conversationId=${id}` })
+  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${id}` })
 }
 </script>
 

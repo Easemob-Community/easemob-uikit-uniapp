@@ -27,51 +27,84 @@
       }
     },
     {
-      "path": "pages/contact-requests/contact-requests",
-      "style": {
-        "navigationBarTitleText": "新请求",
-        "navigationStyle": "custom",
-        "app-plus": {
-          "titleNView": false
-        }
-      }
-    },
-    {
       "path": "pages/mine/mine",
       "style": {
         "navigationBarTitleText": "我的"
       }
-    },
-    {
-      "path": "pages/chat/chat",
-      "style": {
-        "navigationBarTitleText": "聊天",
-        "navigationStyle": "custom",
-        "app-plus": {
-          "softinputMode": "adjustResize",
-          "titleNView": false
-        }
-      }
-    },
-    {
-      "path": "pages/chat-info/chat-info",
-      "style": {
-        "navigationBarTitleText": "聊天信息"
-      }
-    },
-    {
-      "path": "pages/spike/spike",
-      "style": {
-        "navigationBarTitleText": "SDK 连通性 Spike"
-      }
-    },
-    {
-      "path": "pages/style-lab/style-lab",
-      "style": {
-        "navigationBarTitleText": "样式实验室"
-      }
     }
   ],
+  "subPackages": [
+    {
+      "root": "sub-im",
+      "name": "sub-im",
+      "independent": false,
+      "pages": [
+        {
+          "path": "pages/chat/chat",
+          "style": {
+            "navigationBarTitleText": "聊天",
+            "navigationStyle": "custom",
+            "app-plus": {
+              "titleNView": false
+            }
+          }
+        },
+        {
+          "path": "pages/chat-info/chat-info",
+          "style": {
+            "navigationBarTitleText": "聊天信息"
+          }
+        },
+        {
+          "path": "pages/contact-requests/contact-requests",
+          "style": {
+            "navigationBarTitleText": "新请求",
+            "navigationStyle": "custom",
+            "app-plus": {
+              "titleNView": false
+            }
+          }
+        },
+        {
+          "path": "pages/spike/spike",
+          "style": {
+            "navigationBarTitleText": "SDK 连通性 Spike"
+          }
+        },
+        {
+          "path": "pages/style-lab/style-lab",
+          "style": {
+            "navigationBarTitleText": "样式实验室"
+          }
+        },
+        {
+          "path": "pages/text-probe/text-probe",
+          "style": {
+            "navigationBarTitleText": "Text 测量探针"
+          }
+        }
+      ]
+    },
+    {
+      "root": "sub-sdk",
+      "name": "sub-sdk",
+      "independent": false,
+      "pages": [
+        {
+          "path": "pages/placeholder/placeholder",
+          "style": {
+            "navigationBarTitleText": "SDK Loader"
+          }
+        }
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/login/login": {
+      "network": "all",
+      "packages": ["sub-sdk"]
+    }
+  },
   "easycom": {
     "autoscan": true,
     "custom": {

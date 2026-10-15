@@ -24,6 +24,7 @@ export default {
 
   'chat.title': 'Chat',
   'chat.empty': 'Select a conversation',
+  'chat.noMessages': 'No messages yet',
   'chat.placeholder': 'Type a message...',
   'chat.send': 'Send',
   'chat.typing': 'Typing...',
@@ -60,7 +61,6 @@ export default {
   'conversation.searchPlaceholder': 'Search conversations...',
   'conversation.searchEmpty': 'No matching conversations',
   'conversation.draft': 'Draft',
-  'conversation.syncing': 'Syncing conversations...',
   'conversation.pullRefresh': 'Refreshing...',
   'conversation.loadingMore': 'Loading more...',
   'conversation.noMoreHistory': 'No more history messages',
