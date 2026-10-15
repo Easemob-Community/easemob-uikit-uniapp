@@ -1,0 +1,35 @@
+<template>
+  <view class="page">
+    <em-group-page @click-group="onClickGroup" @back="onBack" />
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad } from '@dcloudio/uni-app'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+
+onLoad(() => {
+  if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
+    uni.reLaunch({ url: '/pages/login/login' })
+  }
+})
+
+// 群条目点击：预热（enterConversation/loadHistory 带 groupChat）+ 跳聊天页，与会话列表点选同 handler 口径
+function onClickGroup(groupId: string) {
+  EmKit.enterConversation(groupId, CONVERSATION_TYPE.GROUP_CHAT).catch(() => {})
+  EmKit.loadHistory(groupId, CONVERSATION_TYPE.GROUP_CHAT).catch(() => {})
+  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${groupId}&chatType=${CONVERSATION_TYPE.GROUP_CHAT}` })
+}
+
+function onBack() {
+  uni.navigateBack()
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+</style>

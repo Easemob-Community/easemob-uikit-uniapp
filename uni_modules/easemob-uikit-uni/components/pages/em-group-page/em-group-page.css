@@ -1,0 +1,130 @@
+@import '../../../libs/style/variables.css';
+
+.em-group-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: var(--em-conversation-list-bg);
+}
+
+.em-group-page__scroll {
+  flex: 1;
+  height: 0;
+}
+
+.em-group-page__skeleton {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px;
+}
+
+.em-group-page__skeleton-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.em-group-page__skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: 12px;
+}
+
+.em-group-page__skeleton-line-sub {
+  margin-top: 8px;
+}
+
+/* 群条目：64px cell 行（对齐 vue 版 group-list items 口径：48 头像 + 8px 上下 padding） */
+.em-group-page__item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: var(--em-cell-height);
+  padding: 0 var(--em-spacing-4);
+}
+
+.em-group-page__name-host {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--em-spacing-3);
+}
+
+.em-group-page__name {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-15);
+  font-weight: var(--em-font-weight-semibold);
+  line-height: 20px;
+  color: var(--em-text-primary);
+}
+
+/* 人数 meta（vue 版 group-item-default meta = String(memberCount)，右端弱化灰） */
+.em-group-page__count {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  color: var(--em-text-secondary);
+  margin-left: var(--em-spacing-3);
+  flex-shrink: 0;
+}
+
+/* 建群表单（em-select-contact #panel-top 注入区）：群名输入 + 开关组，底部 1px 分隔（对齐 vue create-group-modal__form） */
+.em-group-page__form {
+  display: flex;
+  flex-direction: column;
+  padding: var(--em-spacing-3) var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+  flex-shrink: 0;
+}
+
+.em-group-page__name-input {
+  height: 40px;
+  background-color: var(--em-control-bg);
+  border-radius: var(--em-radius);
+  padding: 0 var(--em-spacing-3);
+  font-size: var(--em-font-size-15);
+  color: var(--em-text-primary);
+}
+
+.em-group-page__switch-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 44px;
+}
+
+.em-group-page__switch-label {
+  flex: 1;
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-15);
+  color: var(--em-text-primary);
+}
+
+/* 自绘开关（ucss 无 switch 内置组件样式定制能力）：48x28 轨道 + 24 白圆钮，
+   flex 两端对齐切换位置（关=flex-start / 开=flex-end 由 --on 修饰类收口） */
+.em-group-page__switch {
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: var(--em-border-color);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.em-group-page__switch--on {
+  background-color: var(--em-primary-color);
+  justify-content: flex-end;
+}
+
+.em-group-page__switch-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background-color: var(--em-bg-elevated);
+}

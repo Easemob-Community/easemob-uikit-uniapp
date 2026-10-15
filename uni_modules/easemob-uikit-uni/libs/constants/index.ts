@@ -162,6 +162,26 @@ export const GROUP_MEMBER_PAGE_SIZE = 20
 /** 群公告最大长度（对齐 vue 版 GROUP_INFO_LIMIT.ANNOUNCEMENT_MAX_LENGTH = 512，跨 UIKit 校验口径一致） */
 export const GROUP_ANNOUNCEMENT_MAX_LENGTH = 512
 
+/** 群名称最大长度（对齐 vue 版 GROUP_INFO_LIMIT.NAME_MAX_LENGTH = 255） */
+export const GROUP_NAME_MAX_LENGTH = 255
+
+/** em-select-contact 选择模式 */
+export const SELECT_CONTACT_MODE = {
+  SINGLE: 'single',
+  MULTIPLE: 'multiple'
+} as const
+
+export type SelectContactModeValue = (typeof SELECT_CONTACT_MODE)[keyof typeof SELECT_CONTACT_MODE]
+
+/** em-load-more 触底加载 footer 三态 */
+export const LOAD_MORE_STATE = {
+  LOADING: 'loading',
+  NO_MORE: 'noMore',
+  BUTTON: 'button'
+} as const
+
+export type LoadMoreStateValue = (typeof LOAD_MORE_STATE)[keyof typeof LOAD_MORE_STATE]
+
 /** 联系人字母分组序列（A-Z + #，对齐 vue 版 DEFAULT_ALPHABET_KEYS） */
 export const ALPHABET_KEYS = [
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',

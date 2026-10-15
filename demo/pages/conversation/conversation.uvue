@@ -6,10 +6,8 @@
 
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY, useLocale } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
-
-const { t } = useLocale()
 
 function ensureLogin(): boolean {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
@@ -46,10 +44,10 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue) {
 }
 
 // 「+」菜单：new-chat 已由 em-conversation-page 内置选人闭环（em-select-contact），
-// create-group 本阶段占位（建群 Phase 4）
+// create-group 跳群列表页（群列表页即建群入口，M2.9 Phase 4）
 function onMenu(key: string) {
   if (key === CONVERSATION_MENU_KEY.CREATE_GROUP) {
-    uni.showToast({ title: t('conversation.createGroupComing'), icon: 'none' })
+    uni.navigateTo({ url: '/sub-im/pages/group/group' })
   }
 }
 </script>

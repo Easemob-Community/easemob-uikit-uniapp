@@ -5,6 +5,10 @@ export default {
   'button.close': 'Close',
   'button.back': 'Back',
 
+  'common.loading': 'Loading...',
+  'common.noMore': 'No more',
+  'common.loadMore': 'Load more',
+
   'error.notConnected': 'Not connected. Check your network and try again',
   'error.network': 'Network error. Please try again later',
   'error.timeout': 'Request timed out. Please try again later',
@@ -59,7 +63,6 @@ export default {
   'conversation.menu.createGroup': 'Create Group',
   'conversation.newChatSelfError': 'Cannot start a chat with yourself',
   'conversation.atMeInMessage': '[@me]',
-  'conversation.createGroupComing': 'Group creation is coming in a later version',
   'conversation.pin': 'Pin',
   'conversation.unpin': 'Unpin',
   'conversation.mute': 'Mute Notifications',
@@ -102,6 +105,20 @@ export default {
   'contact.requests.declineFailed': 'Decline failed. Please try again later',
   'contact.requests.received': 'sent you a contact request',
   'contact.requests.declinedByPeer': 'declined your contact request',
+
+  'contact.selectMembers': 'Select Members',
+
+  'group.title': 'Groups',
+  'group.empty': 'No groups',
+  'group.noSearchResult': 'No matching groups',
+  'group.searchPlaceholder': 'Search groups...',
+  'group.createNamePlaceholder': 'Enter group name',
+  'group.createNameRequired': 'Please enter a group name',
+  'group.createPublic': 'Public Group',
+  'group.createAllowInvites': 'Allow Member Invites',
+  'group.createSelectedEmpty': 'Select contacts',
+  'group.createSuccess': 'Group created',
+  'group.createFailed': 'Failed to create group. Please try again later',
 
   'status.networkError': 'Network error, please check your network',
   'status.kickedAnotherDevice': 'Your account is signed in on another device',

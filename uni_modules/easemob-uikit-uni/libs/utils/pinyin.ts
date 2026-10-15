@@ -48,14 +48,14 @@ function sortKeyOf(name: string): string {
   return name.toLowerCase()
 }
 
-export interface EmContactGroup {
+export interface EmContactGroup<T = EmContactItem> {
   key: string
-  items: EmContactItem[]
+  items: T[]
 }
 
 // 分组：按 ALPHABET_KEYS 顺序输出，空组剔除；组内排序
-export function groupContacts(list: EmContactItem[], nameOf: (c: EmContactItem) => string): EmContactGroup[] {
-  const buckets = new Map<string, EmContactItem[]>()
+export function groupContacts<T extends { userId: string }>(list: T[], nameOf: (c: T) => string): EmContactGroup<T>[] {
+  const buckets = new Map<string, T[]>()
   list.forEach((c) => {
     const key = groupKeyOf(nameOf(c))
     const bucket = buckets.get(key)
@@ -65,7 +65,7 @@ export function groupContacts(list: EmContactItem[], nameOf: (c: EmContactItem) 
       buckets.set(key, [c])
     }
   })
-  const groups: EmContactGroup[] = []
+  const groups: EmContactGroup<T>[] = []
   ALPHABET_KEYS.forEach((key) => {
     const items = buckets.get(key)
     if (items == null || items.length === 0) return

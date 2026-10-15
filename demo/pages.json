@@ -66,6 +66,16 @@
           }
         },
         {
+          "path": "pages/group/group",
+          "style": {
+            "navigationBarTitleText": "群组",
+            "navigationStyle": "custom",
+            "app-plus": {
+              "titleNView": false
+            }
+          }
+        },
+        {
           "path": "pages/spike/spike",
           "style": {
             "navigationBarTitleText": "SDK 连通性 Spike"

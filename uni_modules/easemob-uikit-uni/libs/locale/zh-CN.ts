@@ -5,6 +5,10 @@ export default {
   'button.close': '关闭',
   'button.back': '返回',
 
+  'common.loading': '加载中...',
+  'common.noMore': '没有更多了',
+  'common.loadMore': '加载更多',
+
   'error.notConnected': '当前未连接，请检查网络后重试',
   'error.network': '网络异常，请稍后重试',
   'error.timeout': '请求超时，请稍后重试',
@@ -59,7 +63,6 @@ export default {
   'conversation.menu.createGroup': '创建群组',
   'conversation.newChatSelfError': '不能和自己创建会话',
   'conversation.atMeInMessage': '[有人@我]',
-  'conversation.createGroupComing': '建群将在后续版本提供',
   'conversation.pin': '置顶',
   'conversation.unpin': '取消置顶',
   'conversation.mute': '免打扰',
@@ -102,6 +105,20 @@ export default {
   'contact.requests.declineFailed': '拒绝失败，请稍后重试',
   'contact.requests.received': '向你发送了好友申请',
   'contact.requests.declinedByPeer': '拒绝了你的好友申请',
+
+  'contact.selectMembers': '选择成员',
+
+  'group.title': '群组',
+  'group.empty': '暂无群组',
+  'group.noSearchResult': '未找到相关群组',
+  'group.searchPlaceholder': '搜索群组...',
+  'group.createNamePlaceholder': '输入群名称',
+  'group.createNameRequired': '请输入群名称',
+  'group.createPublic': '公开群',
+  'group.createAllowInvites': '允许成员邀请',
+  'group.createSelectedEmpty': '请选择联系人',
+  'group.createSuccess': '群组已创建',
+  'group.createFailed': '创建群组失败，请稍后重试',
 
   'status.networkError': '网络异常，请检查网络情况',
   'status.kickedAnotherDevice': '当前账号已在其他设备登录',
