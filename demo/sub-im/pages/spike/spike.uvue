@@ -25,6 +25,28 @@
       </view>
     </view>
 
+    <view class="spike__group">
+      <view class="spike__row spike__group-head" @click="onToggleGroupPanel">
+        <text class="spike__group-title">群 API 实测（M2.9 Phase 0）</text>
+        <text class="spike__group-toggle">{{ groupPanelOpen ? '收起 ▲' : '展开 ▼' }}</text>
+      </view>
+      <template v-if="groupPanelOpen">
+        <view class="spike__row spike__group-btns">
+          <button class="spike__btn spike__btn--plain spike__btn--sm" :disabled="!isOnline" @click="onTestJoinedGroups">群列表</button>
+          <button class="spike__btn spike__btn--plain spike__btn--sm" :disabled="!isOnline" @click="onTestGroupInfo">首个群详情</button>
+          <button class="spike__btn spike__btn--plain spike__btn--sm" :disabled="!isOnline" @click="onTestMemberPages">成员翻页×2</button>
+          <button class="spike__btn spike__btn--plain spike__btn--sm" :disabled="!isOnline" @click="onTestAnnouncement">公告读写往返</button>
+          <button class="spike__btn spike__btn--plain spike__btn--sm" :disabled="!isOnline" @click="onTestGroupLifecycle">建群全链路自测</button>
+          <button class="spike__btn spike__btn--plain spike__btn--sm" :disabled="!isOnline" @click="onToggleGroupProbe">{{ groupProbeOn ? '事件探针：关' : '事件探针：开' }}</button>
+          <button class="spike__btn spike__btn--plain spike__btn--sm" @click="onClearGroupLogs">清空日志</button>
+        </view>
+        <scroll-view class="spike__group-log" scroll-y>
+          <text class="spike__group-log-line" v-for="(line, i) in groupLogs" :key="i">{{ line }}</text>
+          <text class="spike__group-log-line" v-if="groupLogs.length === 0">（结果输出到这里，同步进 [emkit:spike] 日志；登录时序专项随登录自动执行）</text>
+        </scroll-view>
+      </template>
+    </view>
+
     <scroll-view class="spike__list" scroll-y :scroll-into-view="anchorId">
       <view class="spike__msg" :class="{ 'spike__msg--self': m.self }" v-for="m in messages" :key="m.id">
         <text class="spike__msg-meta">{{ m.self ? '我' : m.from }} → {{ m.to }} · {{ formatTime(m.time) }}</text>
@@ -45,8 +67,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
-import type { EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE, createLogger } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmGroup, EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const appkey = ref('')
 const userId = ref('')
@@ -115,6 +137,215 @@ function onLoadSdkProbe() {
 }
 // #endif
 
+// ---------- 群 API 实测（M2.9 Phase 0） ----------
+const groupLogger = createLogger('spike')
+const groupPanelOpen = ref(false)
+const groupLogs = ref<string[]>([])
+const groupProbeOn = ref(false)
+let syncTimingArmed = false
+let loginAt = 0
+let syncImmediateCount = -1
+
+function logGroup(line: string) {
+  groupLogs.value.push(`${formatTime(Date.now())} ${line}`)
+  if (groupLogs.value.length > 300) {
+    groupLogs.value.splice(0, groupLogs.value.length - 300)
+  }
+  groupLogger.info(line)
+}
+
+function describeError(e: any): string {
+  return (e?.message ?? e?.data?.message ?? JSON.stringify(e)) as string
+}
+
+// 实测探针需要 SDK 原始事件与 payload 字段名（EmKit 不透出群事件）——经 whenReady 拿原始 client，仅 spike 用
+async function rawClient(): Promise<any> {
+  return (await EmKit.whenReady()) as any
+}
+
+async function firstJoinedGroup(): Promise<EmGroup | null> {
+  const groups = await EmKit.getJoinedGroups()
+  if (groups.length === 0) {
+    logGroup('当前无已加入群，请先执行「建群全链路自测」')
+    return null
+  }
+  return groups[0]
+}
+
+function onToggleGroupPanel() {
+  groupPanelOpen.value = !groupPanelOpen.value
+}
+
+function onClearGroupLogs() {
+  groupLogs.value = []
+}
+
+async function onTestJoinedGroups() {
+  try {
+    const groups = await EmKit.getJoinedGroups()
+    logGroup(`getJoinedGroups: 共 ${groups.length} 个群`)
+    groups.slice(0, 3).forEach((g) => {
+      logGroup(`  ${g.groupId} | ${g.name} | 成员 ${g.memberCount} | owner ${g.owner}`)
+    })
+  } catch (e: any) {
+    logGroup('getJoinedGroups 失败：' + describeError(e))
+  }
+}
+
+async function onTestGroupInfo() {
+  try {
+    const first = await firstJoinedGroup()
+    if (first == null) {
+      return
+    }
+    const g = await EmKit.getGroupInfo(first.groupId)
+    logGroup(`getGroupInfo(${g.groupId}): name=${g.name} owner=${g.owner} 成员=${g.memberCount}/${g.maxUsers} public=${g.public} approval=${g.approval} mute=${g.mute}`)
+    logGroup(`  desc=${g.description} avatar=${g.avatar ?? '（无）'}`)
+  } catch (e: any) {
+    logGroup('getGroupInfo 失败：' + describeError(e))
+  }
+}
+
+async function onTestMemberPages() {
+  try {
+    const first = await firstJoinedGroup()
+    if (first == null) {
+      return
+    }
+    const p1 = await EmKit.getGroupMemberList(first.groupId)
+    logGroup(`成员第 1 页: ${p1.items.length} 人, cursor='${p1.cursor}', hasMore=${p1.hasMore}`)
+    p1.items.slice(0, 3).forEach((m) => logGroup(`  ${m.userId} | role=${m.role} | joinedAt=${m.joinedAt}`))
+    if (p1.hasMore && p1.cursor !== '') {
+      const p2 = await EmKit.getGroupMemberList(first.groupId, p1.cursor)
+      logGroup(`成员第 2 页: ${p2.items.length} 人, cursor='${p2.cursor}', hasMore=${p2.hasMore}（cursor: '${p1.cursor}' → '${p2.cursor}'）`)
+      p2.items.slice(0, 3).forEach((m) => logGroup(`  ${m.userId} | role=${m.role}`))
+    } else {
+      logGroup('无第 2 页（hasMore=false 或 cursor 为空）——游标语义：首页即全部')
+    }
+  } catch (e: any) {
+    logGroup('getGroupMemberList 失败：' + describeError(e))
+  }
+}
+
+async function onTestAnnouncement() {
+  try {
+    const first = await firstJoinedGroup()
+    if (first == null) {
+      return
+    }
+    const before = await EmKit.getGroupAnnouncement(first.groupId)
+    logGroup(`公告读取: '${before === '' ? '（空）' : before}'`)
+    const probe = `spike 公告 ${Date.now()}`
+    await EmKit.updateGroupAnnouncement(first.groupId, probe)
+    // domain 有公告缓存，读回校验改走 SDK 原始接口确认服务端真实值
+    const client = await rawClient()
+    const back = await client.groupManager.getGroupAnnouncement({ groupId: first.groupId })
+    const server = (back?.announcement ?? '') as string
+    logGroup(`公告写入后服务端读回: '${server}'（${server === probe ? '读写往返一致 ✓' : '不一致 ✗'}）`)
+    await EmKit.updateGroupAnnouncement(first.groupId, before)
+    logGroup('已恢复原公告')
+  } catch (e: any) {
+    logGroup('公告读写往返 失败：' + describeError(e))
+  }
+}
+
+async function onTestGroupLifecycle() {
+  const name = `spike群-${Date.now()}`
+  let groupId = ''
+  try {
+    groupId = await EmKit.createGroup({ name, description: 'spike 自测群，自动清理', maxMembers: 100 })
+    logGroup(`createGroup ✓ groupId=${groupId}`)
+    const info = await EmKit.getGroupInfo(groupId)
+    logGroup(`  详情: name=${info.name} owner=${info.owner} 成员=${info.memberCount}/${info.maxUsers}`)
+    const members = await EmKit.getGroupMemberList(groupId)
+    logGroup(`  成员: ${members.items.length} 人（${members.items.map((m) => `${m.userId}/${m.role}`).join(', ')}）`)
+    const announcement = `spike 公告 ${Date.now()}`
+    await EmKit.updateGroupAnnouncement(groupId, announcement)
+    const readBack = await EmKit.getGroupAnnouncement(groupId)
+    logGroup(`  公告: 写入并读回（${readBack === announcement ? '一致 ✓' : `不一致 ✗ readBack='${readBack}'`}）`)
+  } catch (e: any) {
+    logGroup('建群全链路 失败：' + describeError(e))
+  } finally {
+    if (groupId !== '') {
+      try {
+        await EmKit.destroyGroup(groupId)
+        const rest = await EmKit.getJoinedGroups()
+        const still = rest.some((g) => g.groupId === groupId)
+        logGroup(`destroyGroup ✓ ${groupId}（列表复核: ${still ? '仍在列表 ✗' : '已移除 ✓'}）`)
+      } catch (e: any) {
+        logGroup(`destroyGroup 失败（${groupId} 需手动清理）：` + describeError(e))
+      }
+    }
+  }
+}
+
+// 群事件探针：raw manager 注册全量群事件，输出事件名序列 + payload 字段名（验证事件契约）
+const GROUP_PROBE_EVENTS = [
+  'onMembersJoined', 'onMembersExited', 'onGroupInfoChanged', 'onAnnouncementChanged',
+  'onUserRemoved', 'onGroupDestroyed', 'onInvitationReceived', 'onInvitationAccepted',
+  'onInvitationDeclined', 'onAutoAcceptInvitationFromGroup', 'onOwnerChanged',
+  'onAdminAdded', 'onAdminRemoved', 'onAllMemberMuteStateChanged'
+]
+
+async function onToggleGroupProbe() {
+  try {
+    const client = await rawClient()
+    const mgr = client.groupManager
+    if (mgr == null) {
+      logGroup('事件探针失败：GroupManager 未注册')
+      return
+    }
+    if (groupProbeOn.value) {
+      groupProbeOn.value = false
+      try {
+        mgr.removeEventHandler('spike-group-probe')
+      } catch (e) {}
+      logGroup('群事件探针已注销')
+      return
+    }
+    const handler = {} as Record<string, (payload: any) => void>
+    GROUP_PROBE_EVENTS.forEach((name) => {
+      handler[name] = (payload: any) => {
+        const keys = payload != null ? Object.keys(payload).join(',') : '(无 payload)'
+        const gid = (payload?.groupId ?? '') as string
+        logGroup(`[事件] ${name}${gid !== '' ? ' groupId=' + gid : ''} | payload 字段: ${keys}`)
+      }
+    })
+    mgr.addEventHandler('spike-group-probe', handler)
+    groupProbeOn.value = true
+    logGroup(`群事件探针已注册（${GROUP_PROBE_EVENTS.length} 个事件），执行上方操作观察事件序列`)
+  } catch (e: any) {
+    logGroup('事件探针失败：' + describeError(e))
+  }
+}
+
+// 小程序同步时序专项（复刻 contact 缓存慢排查套路）：登录前挂 onSyncDataFinished 一次性武装，
+// 登录后立即读快照记 t0，group 同步完成回调里复测记 t1，两次对比输出
+async function armGroupSyncTiming() {
+  if (syncTimingArmed) {
+    return
+  }
+  syncTimingArmed = true
+  const client = await rawClient()
+  client.addEventHandler('spike-group-sync-timing', {
+    onSyncDataFinished: (payload: any) => {
+      if (payload?.dataType !== 'group') {
+        return
+      }
+      const cost = Date.now() - loginAt
+      if (payload?.status === 'failed') {
+        logGroup(`[时序] onSyncDataFinished(group) 失败 @+${cost}ms: ${payload?.error?.stage ?? ''} ${payload?.error?.message ?? ''}`)
+        return
+      }
+      EmKit.getJoinedGroups().then((groups) => {
+        logGroup(`[时序] onSyncDataFinished(group) @+${cost}ms → 复测 getJoinedGroups: ${groups.length} 个群（登录后立即调用为 ${syncImmediateCount} 个）`)
+      }).catch((e: any) => {
+        logGroup('[时序] 同步后复测失败：' + describeError(e))
+      })
+    }
+  })
+}
+
 async function onLogin() {
   errorText.value = ''
   if (appkey.value === '' || userId.value === '' || token.value === '') {
@@ -123,6 +354,7 @@ async function onLogin() {
   }
   try {
     EmKit.init({ appkey: appkey.value, enableReadReceipt: true })
+    await armGroupSyncTiming().catch(() => {})
     if (!handlerRegistered) {
       handlerRegistered = true
       EmKit.onMessage((msg) => {
@@ -131,6 +363,15 @@ async function onLogin() {
       })
     }
     await EmKit.login({ userId: userId.value, token: token.value })
+    // 登录时序专项（M2.9 Phase 0）：sync 完成前立即读群快照记 t0，t1 由 arm 的回调复测
+    loginAt = Date.now()
+    try {
+      const immediate = await EmKit.getJoinedGroups()
+      syncImmediateCount = immediate.length
+      logGroup(`[时序] 登录后立即 getJoinedGroups: ${immediate.length} 个群（SDK 后台同步完成前可能偏少/为空）`)
+    } catch (e: any) {
+      logGroup('[时序] 登录后立即调用失败：' + describeError(e))
+    }
   } catch (e: any) {
     errorText.value = '登录失败：' + ((e?.message ?? e?.data?.message ?? JSON.stringify(e)) as string)
   }
@@ -251,6 +492,56 @@ async function onSend() {
 .spike__btn--entry {
   margin-top: 8px;
   align-self: flex-start;
+}
+
+.spike__group {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  margin-top: 8px;
+}
+
+.spike__group-head {
+  justify-content: space-between;
+}
+
+.spike__group-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.spike__group-toggle {
+  font-size: 12px;
+  color: #1677ff;
+}
+
+.spike__group-btns {
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.spike__btn--sm {
+  height: 30px;
+  line-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.spike__group-log {
+  height: 160px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+}
+
+.spike__group-log-line {
+  font-size: 12px;
+  color: #333333;
+  margin-bottom: 4px;
 }
 
 .spike__list {

@@ -41,6 +41,28 @@
 | 微信小程序 | ✅ build 通过（组件 wxss 正常产出） | 待真机/工具实测 | | | | |
 | Android / iOS / 鸿蒙 | 待验证 | | | | | |
 
+## 群 API 实测（M2.9 Phase 0）
+
+> 用例：`demo/sub-im/pages/spike/spike.uvue`「群 API 实测」面板（每项独立按钮 + 页面结果区，同步输出 `[emkit:spike]` 日志，真机可经 `EmKit.exportLogs()` 导出）。
+> 接入方式：`ChatClient.init({ enableSyncData: ['conversation','contact','group'], managers: [..., GroupManager] })`（M2.9 Phase 1 已注册 GroupManager，踩坑 11 中「不能含 `'group'`」的限制自此解除——enableSyncData 与 managers 成对即可）。
+
+代码层可验证结论（本阶段已完成）：
+
+- **API 存在性**：EmKit 门面透出 `getJoinedGroups / getGroupInfo / getGroupMemberList / getGroupAnnouncement / updateGroupAnnouncement / createGroup / destroyGroup` 等群方法（`libs/index.ts`），群域实现在 `libs/chat/group.ts`；`web` 与 `mp-weixin` 双端编译全绿（含分包防回归 11 项）。
+- **事件注册形态**：EmKit 不透出群事件订阅，spike 页经 `EmKit.whenReady()` 拿原始 client，以 `client.groupManager.addEventHandler('spike-group-probe', {...})` 注册 14 个群事件（onMembersJoined/onMembersExited/onGroupInfoChanged/onAnnouncementChanged/onUserRemoved/onGroupDestroyed/onInvitationReceived/onInvitationAccepted/onInvitationDeclined/onAutoAcceptInvitationFromGroup/onOwnerChanged/onAdminAdded/onAdminRemoved/onAllMemberMuteStateChanged），输出事件名序列 + payload 字段名。该形态编译通过，实际触发与 payload 字段待真机回填。
+- **同步时序专项**：spike 页登录链路自动执行——登录前以 `client.addEventHandler` 挂 `onSyncDataFinished` 探针，登录后立即 `getJoinedGroups()` 记 t0，group 同步完成回调里复测记 t1，两次对比输出（复刻 contact 缓存慢排查套路，重点验证小程序端）。
+- **公告读写往返**：`updateGroupAnnouncement` 后读回校验走 SDK 原始 `groupManager.getGroupAnnouncement`（domain 有公告缓存，EmKit 读回只能证缓存一致）。
+
+真机/工具实测结果（待回填）：
+
+| 端 | 编译 | 群列表/详情 | 成员游标翻页 | 公告读写往返 | 建群→全链路→解散 | 群事件序列 | 同步时序对比 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| H5(web) | ✅ build 通过 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | |
+| 微信小程序 | ✅ build 通过（11 项断言全绿） | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | |
+| Android（蒸汽） | 待验证 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | |
+| iOS | 待验证 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | |
+| 鸿蒙 | 待验证 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | 待真机回填 | |
+
 ## 踩坑记录（全是实测）
 
 1. **4.x 根构建在 uni-app 运行时不可用**：`easemob-websdk@4.24.3` 默认入口在 uni-app web 运行时报 `a2.onOpen is not a function`（环境嗅探走错分支）。4.x 必须用 `easemob-websdk/uniApp/Easemob-chat` 子路径构建（实测可登录可收发）；**5.x 根入口直接可用，优先 5.x**。
