@@ -158,8 +158,8 @@ export const GROUP_MEMBER_GRID_COUNT = 9
 /** 群成员游标分页每页条数 */
 export const GROUP_MEMBER_PAGE_SIZE = 20
 
-/** 群公告最大长度（对齐 vue 版 GROUP_INFO_LIMIT 语义，数值以 M2.9 计划为准） */
-export const GROUP_ANNOUNCEMENT_MAX_LENGTH = 600
+/** 群公告最大长度（对齐 vue 版 GROUP_INFO_LIMIT.ANNOUNCEMENT_MAX_LENGTH = 512，跨 UIKit 校验口径一致） */
+export const GROUP_ANNOUNCEMENT_MAX_LENGTH = 512
 
 /** 联系人字母分组序列（A-Z + #，对齐 vue 版 DEFAULT_ALPHABET_KEYS） */
 export const ALPHABET_KEYS = [
