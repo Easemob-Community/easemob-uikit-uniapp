@@ -36,17 +36,5 @@ function onClick(): void {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-@font-face {
-  font-family: 'em-icons';
-  src: url('./em-icons.ttf');
-}
-
-.em-icon {
-  font-family: 'em-icons';
-  color: var(--em-icon-muted);
-  line-height: 1;
-  text-align: center;
-}
+@import './em-icon.css';
 </style>

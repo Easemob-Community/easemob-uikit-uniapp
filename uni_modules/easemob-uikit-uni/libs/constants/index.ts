@@ -101,6 +101,15 @@ export type MessageMenuKeyValue = (typeof MESSAGE_MENU_KEY)[keyof typeof MESSAGE
 /** 聊天页时间分隔条：相邻消息间隔超过该值插入时间条（对齐 vue 版 messageListConfig.groupInterval 默认 5 分钟） */
 export const TIME_DIVIDER_INTERVAL = 5 * 60 * 1000
 
+/** 消息撤回时间窗口（毫秒，2 分钟；超出后长按菜单不出现撤回项，对齐 vue 版 recallTimeLimit 默认 2min） */
+export const RECALL_TIME_LIMIT = 2 * 60 * 1000
+
+/** typing 信号：发送节流间隔（同一会话内该间隔最多发一条 cmd），对齐 vue 版 5s */
+export const TYPING_THROTTLE = 5 * 1000
+
+/** typing 信号：接收方「正在输入」展示超时（超时未续即清除），对齐 vue 版 5s */
+export const TYPING_TIMEOUT = 5 * 1000
+
 /** 输入栏「+」媒体面板 action key */
 export const MEDIA_PANEL_KEY = {
   ALBUM: 'album',

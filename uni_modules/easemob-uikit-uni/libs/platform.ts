@@ -22,12 +22,6 @@ export function getStorage(key: string): string {
   }
 }
 
-export function removeStorage(key: string): void {
-  try {
-    uni.removeStorageSync(key)
-  } catch (e) {}
-}
-
 export interface EmPickedImage {
   path: string              // 本地临时路径（H5 为 blob URL，仅用于本地预览）
   name: string

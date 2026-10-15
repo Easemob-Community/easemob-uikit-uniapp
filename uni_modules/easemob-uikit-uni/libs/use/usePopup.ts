@@ -1,8 +1,6 @@
-import { ref } from 'vue'
-import type { Ref } from 'vue'
-
 // z-index 运行时递增分配器（基准 2000），模块级计数器；
 // 弹层类组件（em-popup 及上层）open 时各取一个新值，保证后开者在上
+
 const Z_INDEX_BASE = 2000
 let zIndexSeed = Z_INDEX_BASE
 
@@ -10,10 +8,6 @@ export function nextZIndex(): number {
   zIndexSeed += 1
   return zIndexSeed
 }
-
-// 底部安全区高度；H5 上 safeAreaInsets 可能缺失，兜底 0
-// 定义已迁至 useSafeArea.ts（PLAN 规划位），此处 re-export 保持既有引用不断
-export { getSafeAreaBottom, getSafeAreaTop } from './useSafeArea'
 
 // 小程序/App 的原生 tabBar 渲染在页面层之上，页面内弹层（无论 z-index 多高）都盖不住，
 // 只能弹层打开时 hideTabBar、全部关闭后 showTabBar。模块级计数器防嵌套弹层中途闪回。
@@ -36,27 +30,4 @@ export function releaseTabBar(): void {
     uni.showTabBar({ animation: false, fail: () => {} })
   }
   // #endif
-}
-
-export interface UsePopupResult {
-  visible: Ref<boolean>
-  zIndex: Ref<number>
-  open: () => void
-  close: () => void
-}
-
-export function usePopup(): UsePopupResult {
-  const visible = ref(false)
-  const zIndex = ref(Z_INDEX_BASE)
-
-  function open(): void {
-    zIndex.value = nextZIndex()
-    visible.value = true
-  }
-
-  function close(): void {
-    visible.value = false
-  }
-
-  return { visible, zIndex, open, close }
 }

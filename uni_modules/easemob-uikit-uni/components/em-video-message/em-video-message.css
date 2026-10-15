@@ -1,0 +1,72 @@
+@import '../../libs/style/variables.css';
+@import '../../libs/style/bubble.css';
+
+.em-video-message {
+  position: relative;
+  overflow: hidden;
+}
+
+.em-video-message__thumb {
+  width: 100%;
+  height: 100%;
+}
+
+.em-video-message__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--em-bg-tertiary);
+}
+
+.em-video-message__overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.em-video-message__play {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background-color: var(--em-mask-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 播放三角：纯 border 绘制（em-icons 无 play 字形，ucss 兼容的 view 画法） */
+.em-video-message__play-triangle {
+  width: 0;
+  height: 0;
+  border-top-width: 7px;
+  border-top-style: solid;
+  border-top-color: transparent;
+  border-bottom-width: 7px;
+  border-bottom-style: solid;
+  border-bottom-color: transparent;
+  border-left-width: 12px;
+  border-left-style: solid;
+  border-left-color: #ffffff;
+  margin-left: 3px;
+}
+
+.em-video-message__duration {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background-color: var(--em-mask-color);
+}
+
+.em-video-message__duration-text {
+  font-size: var(--em-font-size-11);
+  color: #ffffff;
+}

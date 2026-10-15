@@ -1,0 +1,33 @@
+@import '../../libs/style/variables.css';
+@import '../../libs/style/bubble.css';
+
+/* 壳收口 .em-bubble（含 --self 底色覆写） */
+.em-audio-message {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.em-audio-message--playing {
+  opacity: 0.85;
+}
+
+.em-audio-message__icon {
+  color: var(--em-bubble-text-other);
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.em-audio-message__icon--self {
+  color: var(--em-bubble-text-self);
+}
+
+.em-audio-message__duration {
+  font-size: var(--em-font-size-15);
+  color: var(--em-bubble-text-other);
+}
+
+.em-audio-message__duration--self {
+  color: var(--em-bubble-text-self);
+}

@@ -59,13 +59,7 @@ export interface EmMessageItem {
   fileSize: number   // 文件消息大小（字节）
 }
 
-/** @deprecated 保留兼容 spike 页，等价于 EmMessageItem */
-export type EmTextMessageItem = EmMessageItem
-
 export type EmMessageHandler = (msg: EmMessageItem) => void
-
-/** @deprecated 保留兼容 spike 页 */
-export type EmTextMessageHandler = EmMessageHandler
 
 export interface EmConversationItem {
   conversationId: string

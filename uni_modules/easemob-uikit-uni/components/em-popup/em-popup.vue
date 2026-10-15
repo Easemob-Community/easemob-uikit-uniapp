@@ -16,7 +16,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { getSafeAreaBottom, holdTabBar, nextZIndex, releaseTabBar } from '../../libs/use/usePopup'
+import { holdTabBar, nextZIndex, releaseTabBar } from '../../libs/use/usePopup'
+import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useTheme } from '../../libs/use/useTheme'
 
@@ -93,56 +94,5 @@ function onMaskClick(): void {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-.em-popup {
-  position: fixed;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.em-popup--center {
-  justify-content: center;
-  align-items: center;
-}
-
-.em-popup__overlay {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.em-popup__overlay--show {
-  opacity: 1;
-}
-
-.em-popup__panel {
-  position: relative;
-  width: 100%;
-  background-color: var(--em-bg-elevated);
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-  transform: translateY(100%);
-  transition: transform 0.25s ease;
-}
-
-.em-popup__panel--center {
-  width: auto;
-  border-radius: 12px;
-  transform: none;
-}
-
-.em-popup__panel--show {
-  transform: translateY(0);
-}
+@import './em-popup.css';
 </style>

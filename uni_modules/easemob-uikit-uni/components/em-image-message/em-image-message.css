@@ -1,0 +1,12 @@
+@import '../../libs/style/variables.css';
+@import '../../libs/style/bubble.css';
+
+/* 壳收口 .em-bubble；图片气泡 padding 为 0、内容自撑（图片即气泡） */
+.em-image-message {
+  padding: 0;
+  overflow: hidden;
+}
+
+.em-image-message__image {
+  border-radius: var(--em-bubble-radius);
+}

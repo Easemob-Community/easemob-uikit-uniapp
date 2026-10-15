@@ -92,10 +92,10 @@ easemob-uikit-uniapp/
 ├── uni_modules/
 │   └── easemob-uikit-uni/
 │       ├── components/
-│       │   ├── em-conversation-page/   # 页面级
-│       │   ├── em-chat-page/           # 页面级
-│       │   ├── em-avatar/ em-badge/ em-cell/ em-bubble/ ...  # 原子级（二期解耦沉淀）
+│       │   ├── pages/                  # 页面级（em-conversation-page/em-chat-page/em-chat-info-page/em-contact-page/em-contact-requests-page，宿主 pages.json 配 easycom custom 规则）
+│       │   ├── em-avatar/ em-badge/ em-cell/ em-bubble/ ...  # 原子级（内置 easycom 零配置；二期解耦沉淀）
 │       │   └── em-*-message/           # 气泡族
+│       │   # 每个组件目录 = 组件 .vue + 同名 .css（样式独立文件，.vue style 块仅 @import）
 │       ├── libs/
 │       │   ├── platform.ts             # 存储/网络/媒体适配层
 │       │   ├── use/                    # useNamespace/usePopup/useSafeArea...
@@ -141,7 +141,7 @@ easemob-uikit-uniapp/
 
 - 开工前先落地基架子：`libs/style/variables.css`（`--em-*` token 明暗两套，值平移自 Web 版 theme/index.css）+ `useNamespace/useTheme/useLocale` + 一期 locale 文案 + em-avatar 试金石组件 + demo style-lab 验证页（先验证 CSS 变量/class 主题在 App 端可行，再大规模用）
 - 登录页（appkey/userId/token + 测试 token 入口）
-- 会话列表页 + 聊天页骨架，文本/图片两种气泡先通（页面级组件直接沉淀在 `uni_modules/components/`：em-conversation-page / em-chat-page，demo 页面仅做路由包装，避免 M3 二次搬移）
+- 会话列表页 + 聊天页骨架，文本/图片两种气泡先通（页面级组件直接沉淀在 `uni_modules/easemob-uikit-uni/components/pages/`，demo 页面仅做路由包装，避免 M3 二次搬移）
 - 目标：内部扫码可体验「登录 → 看到会话 → 收发消息」
 
 > 进度（2026-10-09）：基架子（token/use\*/locale/em-avatar/style-lab）与 demo 闭环已落地。libs 扩展了会话/消息 store、图片收发、历史消息、连接就绪门；demo 新增 login（含密码换 token 开发入口）/conversation/chat 三页。H5 端到端实测通过（登录 → 会话列表未读/摘要 → 历史加载 → 发送文本 → 返回列表摘要刷新）；web/mp-weixin 双端编译通过。图片发送、微信小程序与 App 端真机链路待实测。

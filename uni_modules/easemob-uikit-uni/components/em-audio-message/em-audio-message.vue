@@ -1,6 +1,6 @@
 <template>
   <view
-    :class="[ns.b(), message.self ? 'em-audio-message--self' : '', playing ? 'em-audio-message--playing' : '']"
+    :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '', playing ? ns.m('playing') : '']"
     :style="bubbleStyle"
     @click="onPlay"
     @longpress="onLongpress"
@@ -76,41 +76,5 @@ onUnmounted(() => {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-.em-audio-message {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  background-color: var(--em-bubble-bg-other);
-  border-radius: var(--em-bubble-radius);
-  padding: 10px 14px;
-}
-
-.em-audio-message--self {
-  background-color: var(--em-bubble-bg-self);
-}
-
-.em-audio-message--playing {
-  opacity: 0.85;
-}
-
-.em-audio-message__icon {
-  color: var(--em-bubble-text-other);
-  margin-right: 6px;
-  flex-shrink: 0;
-}
-
-.em-audio-message__icon--self {
-  color: var(--em-bubble-text-self);
-}
-
-.em-audio-message__duration {
-  font-size: var(--em-font-size-15);
-  color: var(--em-bubble-text-other);
-}
-
-.em-audio-message__duration--self {
-  color: var(--em-bubble-text-self);
-}
+@import './em-audio-message.css';
 </style>

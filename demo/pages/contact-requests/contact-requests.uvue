@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <em-contact-requests-page />
+    <em-contact-requests-page @back="onBack" />
   </view>
 </template>
 
@@ -13,6 +13,10 @@ onLoad(() => {
     uni.reLaunch({ url: '/pages/login/login' })
   }
 })
+
+function onBack(): void {
+  uni.navigateBack({ delta: 1 })
+}
 </script>
 
 <style>

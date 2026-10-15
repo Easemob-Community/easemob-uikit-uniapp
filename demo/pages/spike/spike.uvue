@@ -39,7 +39,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
-import type { EmTextMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const appkey = ref('')
 const userId = ref('')
@@ -47,7 +47,7 @@ const token = ref('')
 const peer = ref('')
 const draft = ref('')
 const errorText = ref('')
-const messages = ref<EmTextMessageItem[]>([])
+const messages = ref<EmMessageItem[]>([])
 const anchorId = ref('')
 const lastAnchor = 'spike-anchor'
 
@@ -96,7 +96,7 @@ async function onLogin() {
     EmKit.init({ appkey: appkey.value, enableReadReceipt: true })
     if (!handlerRegistered) {
       handlerRegistered = true
-      EmKit.onTextMessage((msg) => {
+      EmKit.onMessage((msg) => {
         messages.value.push(msg)
         scrollToBottom()
       })

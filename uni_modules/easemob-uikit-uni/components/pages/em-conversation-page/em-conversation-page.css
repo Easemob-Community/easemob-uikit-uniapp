@@ -1,0 +1,25 @@
+@import '../../../libs/style/variables.css';
+
+.em-conversation-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: var(--em-conversation-list-bg);
+}
+
+.em-conversation-page__scroll {
+  flex: 1;
+  height: 0;
+}
+
+.em-conversation-page__tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--em-spacing-7) var(--em-spacing-4);
+}
+
+.em-conversation-page__tip-text {
+  font-size: var(--em-font-size-14);
+  color: var(--em-empty-text-color);
+}

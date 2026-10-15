@@ -14,11 +14,11 @@
       <view :class="ns.e('group')">
         <view :class="ns.e('cell')">
           <text :class="ns.e('cell-label')">{{ t('chat.info.conversationMute') }}</text>
-          <switch :checked="muted" @change="onMuteChange" color="#009EFF" />
+          <switch :checked="muted" @change="onMuteChange" color="var(--em-primary-color)" />
         </view>
-        <view :class="[ns.e('cell'), 'em-chat-info-page__cell--last']">
+        <view :class="[ns.e('cell'), ns.m('cell-last')]">
           <text :class="ns.e('cell-label')">{{ t('chat.info.conversationPin') }}</text>
-          <switch :checked="pinned" @change="onPinChange" color="#009EFF" />
+          <switch :checked="pinned" @change="onPinChange" color="var(--em-primary-color)" />
         </view>
       </view>
 
@@ -33,14 +33,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import EmAvatar from '../em-avatar/em-avatar.vue'
-import EmButton from '../em-button/em-button.vue'
-import { EmKit } from '../../libs'
-import { conversationStore } from '../../libs/store/conversation'
-import { avatarOf, displayNameOf } from '../../libs/store/user'
-import { useNamespace } from '../../libs/use/useNamespace'
-import { useTheme } from '../../libs/use/useTheme'
-import { useLocale } from '../../libs/use/useLocale'
+import EmAvatar from '../../em-avatar/em-avatar.vue'
+import EmButton from '../../em-button/em-button.vue'
+import { EmKit } from '../../../libs'
+import { conversationStore } from '../../../libs/store/conversation'
+import { avatarOf, displayNameOf } from '../../../libs/store/user'
+import { useNamespace } from '../../../libs/use/useNamespace'
+import { useTheme } from '../../../libs/use/useTheme'
+import { useLocale } from '../../../libs/use/useLocale'
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
@@ -59,7 +59,7 @@ const ns = useNamespace('chat-info-page')
 const { themeClass } = useTheme()
 const { t } = useLocale()
 
-const conv = computed(() => conversationStore.list.find((c) => c.conversationId === props.conversationId) ?? null)
+const conv = computed(() => conversationStore.items.find((c) => c.conversationId === props.conversationId) ?? null)
 const displayName = computed(() => displayNameOf(props.conversationId, conv.value?.name ?? ''))
 const avatar = computed(() => {
   const a = avatarOf(props.conversationId)
@@ -136,95 +136,5 @@ function onDelete(): void {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-/* 页面白底（对齐 vue 版抽屉底色）：灰底胶囊按钮需要有对比度的承载面 */
-.em-chat-info-page {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  background-color: var(--em-bg-base);
-}
-
-.em-chat-info-page__scroll {
-  flex: 1;
-  height: 0;
-}
-
-.em-chat-info-page__profile {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: var(--em-spacing-4);
-  background-color: var(--em-bg-base);
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-bottom-color: var(--em-divider-color);
-}
-
-.em-chat-info-page__profile-main {
-  display: flex;
-  flex-direction: column;
-  margin-left: var(--em-spacing-3);
-  min-width: 0;
-}
-
-.em-chat-info-page__profile-name {
-  font-family: var(--em-font-family);
-  font-size: var(--em-font-size-16);
-  font-weight: var(--em-font-weight-medium);
-  line-height: 22px;
-  color: var(--em-text-primary);
-}
-
-.em-chat-info-page__profile-id {
-  font-family: var(--em-font-family);
-  font-size: var(--em-font-size-12);
-  line-height: 18px;
-  color: var(--em-text-tertiary);
-  margin-top: 2px;
-}
-
-.em-chat-info-page__group {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--em-bg-base);
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-bottom-color: var(--em-divider-color);
-}
-
-.em-chat-info-page__cell {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  height: 52px;
-  padding: 0 var(--em-spacing-4);
-  box-sizing: border-box;
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-bottom-color: var(--em-divider-color);
-}
-
-.em-chat-info-page__cell--last {
-  border-bottom-width: 0;
-}
-
-.em-chat-info-page__cell-label {
-  font-family: var(--em-font-family);
-  font-size: var(--em-font-size-15);
-  color: var(--em-text-primary);
-}
-
-.em-chat-info-page__footer {
-  display: flex;
-  flex-direction: column;
-  padding: var(--em-spacing-3) var(--em-spacing-4);
-}
-
-/* 按钮间距落在宿主标签（em-button 为子组件，布局 class 走宿主外部类机制） */
-.em-chat-info-page__footer-btn {
-  margin-top: var(--em-spacing-2);
-}
+@import './em-chat-info-page.css';
 </style>

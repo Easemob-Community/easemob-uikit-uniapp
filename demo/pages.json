@@ -72,6 +72,12 @@
       }
     }
   ],
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^em-([a-z-]+)-page$": "@/uni_modules/easemob-uikit-uni/components/pages/em-$1-page/em-$1-page.vue"
+    }
+  },
   "globalStyle": {
     "navigationBarTitleText": "easemob-uikit-uni",
     "navigationBarBackgroundColor": "#FFFFFF",

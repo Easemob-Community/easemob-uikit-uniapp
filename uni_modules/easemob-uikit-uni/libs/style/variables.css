@@ -59,6 +59,9 @@
   --em-message-gap: 16px;
   --em-message-padding: 12px;
 
+  /* 输入栏「+」emoji/媒体面板高度（与常见键盘高度接近，对齐 vue 版 h5-input panel） */
+  --em-chat-panel-height: 240px;
+
   /* 文件消息类型图标底色（图标本体固定白色） */
   --em-file-icon-pdf: #DA3034;
   --em-file-icon-xls: #1D7044;
@@ -129,6 +132,9 @@
   /* 徽标（未读数/红点，独立于 danger 色） */
   --em-badge-bg: #FF7070;
   --em-badge-text: #FFFFFF;
+
+  /* 遮罩（弹层 overlay / 视频播放钮与时长胶囊底） */
+  --em-mask-color: rgba(0, 0, 0, 0.4);
 }
 
 /* ========== 暗色（全量颜色 token，缺一项 var() 即失效，勿只写覆盖项） ========== */
@@ -178,4 +184,7 @@
 
   --em-badge-bg: #FF7070;
   --em-badge-text: #1E1E23;
+
+  /* 暗色遮罩更深一档，压住亮色内容对比 */
+  --em-mask-color: rgba(0, 0, 0, 0.6);
 }

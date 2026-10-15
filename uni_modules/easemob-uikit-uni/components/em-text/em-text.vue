@@ -42,35 +42,5 @@ const clampClass = computed(() => {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-/* 宿主节点：virtualHost 模式无实体宿主，外部 class 经 virtualHostClass 合并到根 view，
-   max-width/overflow 收在根 view 这一层（小程序里该节点直接参与父级 flex 布局） */
-.em-text {
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.em-text__value {
-  word-break: break-all;
-}
-
-.em-text__value--wrap {
-  overflow: hidden;
-}
-
-.em-text__value--line1 {
-  lines: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* mp-weixin 的 wxss 管线不认 lines（uvue 独占属性），缺 nowrap 时 text 自由换行，
-     父容器固定行高 + overflow:hidden 会把第二行拦腰裁切，视觉上像两行重叠（实测坑） */
-  white-space: nowrap;
-}
-
-.em-text__value--line2 {
-  lines: 2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+@import './em-text.css';
 </style>

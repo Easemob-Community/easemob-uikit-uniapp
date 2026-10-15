@@ -47,7 +47,7 @@ export function ensureUserInfos(userIds: string[]): void {
   if (connectionStore.status !== CONNECTION_STATUS.ONLINE || connectionStore.userId === '') return
   userIds.forEach((id) => {
     if (id === '') return
-    if (userStore.map[id] != null || userStore.loading[id] === true || userStore.failed[id] === true) return
+    if (userStore.infoByUserId[id] != null || userStore.loadingByUserId[id] === true || userStore.failedByUserId[id] === true) return
     if (queue.indexOf(id) === -1) queue.push(id)
   })
   if (queue.length === 0 || scheduled) return
@@ -63,17 +63,17 @@ async function flush(): Promise<void> {
   if (mgr == null || queue.length === 0) return
   const ids = queue
   queue = []
-  ids.forEach((id) => { userStore.loading[id] = true })
+  ids.forEach((id) => { userStore.loadingByUserId[id] = true })
   try {
     const users = await mgr.getUserInfoByAttribute({ userIds: ids, attributes: ['nickname', 'avatarUrl'] })
     // SDK 对未设置资料的用户也返回仅含 userId 的占位：写入空快照即视为已缓存，不再重拉
     users.forEach((u) => mergeUserInfo(normalize(u)))
     ids.forEach((id) => {
-      if (userStore.map[id] == null) mergeUserInfo({ userId: id, nickname: '', avatarUrl: '' })
+      if (userStore.infoByUserId[id] == null) mergeUserInfo({ userId: id, nickname: '', avatarUrl: '' })
     })
   } catch (e) {
-    ids.forEach((id) => { userStore.failed[id] = true })
+    ids.forEach((id) => { userStore.failedByUserId[id] = true })
   } finally {
-    ids.forEach((id) => { userStore.loading[id] = false })
+    ids.forEach((id) => { userStore.loadingByUserId[id] = false })
   }
 }

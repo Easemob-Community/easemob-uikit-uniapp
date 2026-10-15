@@ -1,0 +1,76 @@
+---
+name: em-component-structure
+description: Use when creating/organizing em-* components in easemob-uikit-uni（新建组件、拆分组件、目录归类、样式写进 .vue 导致文件过长、页面组件不自动导入/easycom 失效、想给组件加 scoped 或把样式写回 SFC 时）。环信 uni UIKit 组件目录分层与样式独立文件规范（2026-10-14 结构治理定稿）。
+---
+
+# em-* 组件目录与样式结构规范（定稿）
+
+## Overview
+
+组件按**粒度分层**：页面级（`-page` 后缀）住 `components/pages/`，原子组件（avatar/badge/bubble 族等）住 `components/` 扁平层。**每个组件的样式独立为同目录同名 `.css`**，`.vue` 的 style 块只留一行 `@import`。写任何 em-* 组件、或动组件目录前必读本文。
+
+## 目录分层与 easycom
+
+| 层 | 位置 | 导入方式 |
+|---|---|---|
+| 页面级 `em-xxx-page` | `components/pages/em-xxx-page/` | 宿主 `pages.json` 配 easycom custom 规则（见下），**否则不自动导入** |
+| 原子组件 `em-xxx` | `components/em-xxx/` | 内置 uni_modules easycom 规则，零配置 |
+
+```json
+"easycom": {
+  "autoscan": true,
+  "custom": {
+    "^em-([a-z-]+)-page$": "@/uni_modules/easemob-uikit-uni/components/pages/em-$1-page/em-$1-page.vue"
+  }
+}
+```
+
+custom 优先级高于内置，原子组件无 `-page` 后缀不受影响。**新建页面级组件后必须检查宿主 pages.json 是否已有此规则**（demo 已配；插件使用者需照 readme 自行配置）。pages.json 变更不热更，改后重启编译再验证。
+
+## 样式独立文件（强制）
+
+每个组件目录 = `em-xxx.vue` + `em-xxx.css`，.vue 尾部固定：
+
+```html
+<style>
+@import './em-xxx.css';
+</style>
+```
+
+- css 文件第一行 `@import '../../libs/style/variables.css';`（`components/pages/` 下的组件多一层：`../../../libs/`）。
+- **禁止**把样式写回 .vue 的 style 块、禁止 scoped（统一 `defineOptions({ styleIsolation: 'app-and-page' })`）。
+- 样式超 ~80 行或页面/组件混合就该拆分组件，参考已有页面级组件的拆分粒度（列表项、搜索条、徽标均已独立成 atom）。
+
+## 共享样式资产（复用优先，勿复制粘贴）
+
+| 资产 | 用途 |
+|---|---|
+| `libs/style/bubble.css` | 气泡壳基类 `.em-bubble` / `.em-bubble--self`（底色/圆角），5 个 `em-*-message` 与聊天页占位气泡已接入；新气泡组件必须叠加基类，只写个性样式 |
+| `libs/style/textStyles.ts` | `TEXT_STYLE_NAME` / `TEXT_STYLE_SUBTITLE` 共享内联文本档（小程序样式隔离双通道的 text-style 值），消费点直接 import，勿再手写拷贝 |
+| `libs/utils/quote.ts` | 引用卡/引用条的类型映射与文案纯函数（参数注入 t/displayNameOf） |
+| `libs/utils/time.ts` | 时间格式化全集（会话五档/分隔条四档/视频时长 formatVideoDuration） |
+
+## 类名与契约
+
+- BEM 由 `useNamespace` 生成；**修饰类一律块级形态 `ns.m('xxx-self')`**，对应 css `.em-block--xxx-self`。元素级 `__x--y` 是治理前遗留（alphabet-nav、气泡内部尚有），新代码禁用。
+- `-page` 组件**不碰路由**：返回/跳转一律 emit（如 `back`/`open-info`/`select`），宿主 demo 页面接线。原子组件不连 store，数据 props 进、事件 emits 出。
+- 枚举/魔法数字进 `libs/constants/`（`RECALL_TIME_LIMIT`、`TYPING_THROTTLE`、`TIME_DIVIDER_INTERVAL` 等已有先例）；颜色/间距/遮罩进 `--em-*` token（`--em-mask-color`、`--em-chat-panel-height` 等），禁硬编码。
+- 图标走 em-icon（见 em-icon-strategy skill），视觉对齐 vue 版（见 vue-uikit-design-reference skill），构造/入口约定见 uniapp-x-vapor-structure skill。
+
+## 新组件自查清单
+
+1. 纯 ts（禁 uts 方言）、`.vue` 文件
+2. ucss 子集：flex-only、class 选择器、文字样式只在 `<text>`
+3. 样式独立同名 .css、style 块仅 @import、`styleIsolation: 'app-and-page'` 无 scoped
+4. 位置放对层：页面级进 `pages/`（并确认宿主 easycom 规则），原子组件扁平层
+5. 引用同包组件用相对路径显式 import（`../../em-xxx/em-xxx.vue`，页面组件在 pages/ 下多一层 `../`）
+6. props/emits 契约：不连 store、不碰路由、自定义长按事件名用 `long-press`（禁与原生同名）
+
+## 常见错误
+
+| 症状 | 原因与修法 |
+|---|---|
+| 页面组件标签不解析/报组件未注册 | 宿主 pages.json 缺 easycom custom 规则，或改了 pages.json 没重启编译 |
+| mp-weixin 样式丢失/默认值 | 样式写进了 .vue 或忘了独立 .css 的 variables.css import；父组件 wxss 够不到子组件内部时给用户内容文本补 text-style 内联（em-text 双通道） |
+| 新气泡颜色与其他的不一致 | 没叠 `.em-bubble` 基类，自己重写壳 |
+| 徽标/引用/时间逻辑写第二份 | 先看共享资产表，有就 import |

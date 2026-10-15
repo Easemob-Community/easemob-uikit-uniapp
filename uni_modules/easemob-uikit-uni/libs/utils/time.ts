@@ -24,6 +24,13 @@ export function formatTimeHM(time: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/** 视频/音频时长 m:ss（秒数取整、非负夹取，供气泡时长胶囊使用） */
+export function formatVideoDuration(duration: number): string {
+  const d = Math.max(0, Math.round(duration))
+  const min = Math.floor(d / 60)
+  return `${min}:${pad(d % 60)}`
+}
+
 export function formatConversationTime(time: number): string {
   if (time <= 0) return ''
   const { t } = useLocale()

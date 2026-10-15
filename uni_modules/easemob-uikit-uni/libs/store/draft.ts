@@ -20,11 +20,11 @@ function loadDrafts(): Record<string, DraftEntry> {
 }
 
 export const draftStore = reactive({
-  map: loadDrafts() as Record<string, DraftEntry>
+  draftByConversationId: loadDrafts() as Record<string, DraftEntry>
 })
 
 function persist(): void {
-  setStorage(STORAGE_KEY, JSON.stringify(draftStore.map))
+  setStorage(STORAGE_KEY, JSON.stringify(draftStore.draftByConversationId))
 }
 
 export function setDraft(conversationId: string, text: string): void {
@@ -32,17 +32,17 @@ export function setDraft(conversationId: string, text: string): void {
     clearDraft(conversationId)
     return
   }
-  draftStore.map[conversationId] = { text, time: Date.now() }
+  draftStore.draftByConversationId[conversationId] = { text, time: Date.now() }
   persist()
 }
 
 export function clearDraft(conversationId: string): void {
-  if (draftStore.map[conversationId] != null) {
-    delete draftStore.map[conversationId]
+  if (draftStore.draftByConversationId[conversationId] != null) {
+    delete draftStore.draftByConversationId[conversationId]
     persist()
   }
 }
 
 export function getDraft(conversationId: string): DraftEntry | null {
-  return draftStore.map[conversationId] ?? null
+  return draftStore.draftByConversationId[conversationId] ?? null
 }

@@ -125,8 +125,8 @@ class EmKitImpl {
     this.chat.leaveConversation()
   }
 
-  onMessage(handler: EmMessageHandler): void {
-    this.chat.onMessage(handler)
+  onMessage(handler: EmMessageHandler): () => void {
+    return this.chat.onMessage(handler)
   }
 
   // 按需确保一批用户的昵称/头像已缓存（微任务合批，单次请求）
@@ -156,11 +156,6 @@ class EmKitImpl {
 
   declineContactInvite(invite: EmContactInvite): Promise<void> {
     return this.contact.declineContactInvite(invite)
-  }
-
-  /** @deprecated 兼容 M0 spike 页 */
-  onTextMessage(handler: EmMessageHandler): void {
-    this.chat.onTextMessage(handler)
   }
 
   // 导出调试日志全文（环形缓冲，含被 level 过滤掉的 debug 行）：
@@ -194,13 +189,13 @@ export const EmKit = new EmKitImpl()
 
 export * from './types'
 export * from './constants'
-export { setStorage, getStorage, removeStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio } from './platform'
+export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio } from './platform'
 export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult } from './platform'
 export { useNamespace } from './use/useNamespace'
 export { useTheme } from './use/useTheme'
 export { useLocale } from './use/useLocale'
 export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
-export { usePopup, nextZIndex } from './use/usePopup'
+export { nextZIndex } from './use/usePopup'
 export { themeStore } from './store/theme'
 export { userStore, displayNameOf, avatarOf, mergeUserInfo } from './store/user'
 export { contactStore, contactDisplayNameOf, pendingInviteCount } from './store/contact'

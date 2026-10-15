@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), message.self ? 'em-file-message--self' : '']" @click="onClick" @longpress="onLongpress">
+  <view :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '']" @click="onClick" @longpress="onLongpress">
     <view :class="[ns.e('icon'), iconTypeClass]">
       <EmIcon :name="iconName" :size="20" :class="ns.e('icon-glyph')" />
     </view>
@@ -92,96 +92,5 @@ function onLongpress(): void {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-.em-file-message {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  min-width: 166px;
-  max-width: 240px;
-  padding: 10px 12px;
-  border-radius: var(--em-file-card-radius);
-  background-color: var(--em-bubble-bg-other);
-}
-
-.em-file-message--self {
-  background-color: var(--em-bubble-bg-self);
-}
-
-.em-file-message__icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--em-radius);
-  background-color: var(--em-file-icon-file);
-  margin-right: var(--em-spacing-3);
-  flex-shrink: 0;
-}
-
-.em-file-message__icon--pdf {
-  background-color: var(--em-file-icon-pdf);
-}
-
-.em-file-message__icon--xls {
-  background-color: var(--em-file-icon-xls);
-}
-
-.em-file-message__icon--doc {
-  background-color: var(--em-file-icon-doc);
-}
-
-.em-file-message__icon--ppt {
-  background-color: var(--em-file-icon-ppt);
-}
-
-.em-file-message__icon--md {
-  background-color: var(--em-file-icon-md);
-}
-
-.em-file-message__icon--img {
-  background-color: var(--em-file-icon-img);
-}
-
-.em-file-message__icon--video {
-  background-color: var(--em-file-icon-video);
-}
-
-.em-file-message__icon--audio {
-  background-color: var(--em-file-icon-audio);
-}
-
-/* 图标本体固定白色（token 注释既定口径） */
-.em-file-message__icon-glyph {
-  color: #ffffff;
-}
-
-.em-file-message__info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  overflow: hidden;
-}
-
-.em-file-message__name {
-  font-size: var(--em-font-size-15);
-  font-weight: var(--em-font-weight-medium);
-  color: var(--em-bubble-text-other);
-}
-
-.em-file-message__name--self {
-  color: var(--em-bubble-text-self);
-}
-
-.em-file-message__size {
-  font-size: var(--em-font-size-11);
-  color: var(--em-text-tertiary);
-  margin-top: 2px;
-}
-
-.em-file-message__size--self {
-  color: var(--em-bubble-text-self-secondary);
-}
+@import './em-file-message.css';
 </style>

@@ -1,0 +1,47 @@
+@import '../../libs/style/variables.css';
+
+/* 覆盖于列表区右侧：视觉宽 16px，左右各 4px 内边距把触摸热区扩到 24px
+   （对齐 vue 版 padding+content-box 热区设计） */
+.em-alphabet-nav {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 4px;
+  width: 16px;
+  padding-left: 4px;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* 单项按可用高度等比分配、封顶 20px，空间不足自动压缩（对齐 vue 版 flex:1 + max-height） */
+.em-alphabet-nav__cell {
+  flex: 1;
+  max-height: 20px;
+  min-height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--em-radius);
+}
+
+.em-alphabet-nav__cell--active {
+  background-color: var(--em-primary-color);
+}
+
+.em-alphabet-nav__cell--dim {
+  opacity: 0.45;
+}
+
+.em-alphabet-nav__text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-9);
+  font-weight: var(--em-font-weight-medium);
+  line-height: 12px;
+  color: var(--em-text-tertiary);
+}
+
+.em-alphabet-nav__text--active {
+  color: var(--em-text-inverse);
+}

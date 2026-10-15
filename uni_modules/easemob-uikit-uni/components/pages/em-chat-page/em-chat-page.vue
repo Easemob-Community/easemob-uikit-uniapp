@@ -35,14 +35,14 @@
         </view>
         <view
           :id="msgAnchorId(m)"
-          :class="[ns.e('msg'), m.self ? 'em-chat-page__msg--self' : '', m.status === MESSAGE_STATUS.RECALLED ? 'em-chat-page__msg--recalled' : '', highlightId !== '' && highlightId === m.localId ? 'em-chat-page__msg--highlight' : '']"
+          :class="[ns.e('msg'), m.self && ns.m('msg-self'), m.status === MESSAGE_STATUS.RECALLED && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && ns.m('msg-highlight')]"
         >
         <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
           <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
         </view>
         <template v-else>
           <em-avatar :src="avatarOf(m.from)" :name="displayNameOf(m.from)" :size="36" />
-          <view :class="[ns.e('content'), m.self ? 'em-chat-page__content--self' : '']">
+          <view :class="[ns.e('content'), m.self && ns.m('content-self')]">
             <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
             <view :class="ns.e('bubble-row')">
               <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="ns.e('state')" @click="onResend(m)">
@@ -53,7 +53,7 @@
               </view>
               <!-- 单聊已读回执：仅最新一条己方已发送消息展示（对齐 vue 版 readIconDisplay 'latest'），未读空心圆/已读对勾 -->
               <view v-else-if="showReadState(m)" :class="ns.e('state')">
-                <EmIcon :name="readIconName(m)" :size="14" :class="[ns.e('state-icon'), isPeerRead(m) ? 'em-chat-page__state-icon--read' : 'em-chat-page__state-icon--unread']" />
+                <EmIcon :name="readIconName(m)" :size="14" :class="[ns.e('state-icon'), ns.m(isPeerRead(m) ? 'state-icon-read' : 'state-icon-unread')]" />
               </view>
               <em-text-message
                 v-if="m.type === MESSAGE_TYPE.TEXT"
@@ -81,14 +81,14 @@
                 :message="m"
                 @long-press="onLongPressMessage"
               />
-              <view v-else :class="ns.e('bubble')">
+              <view v-else :class="[ns.e('bubble'), 'em-bubble']">
                 <text :class="ns.e('text')">{{ t('message.unsupported') }}</text>
               </view>
             </view>
             <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧；点击定位原消息 -->
-            <view v-if="m.quote != null" :class="[ns.e('quote'), m.self ? 'em-chat-page__quote--self' : '']" @click="onQuoteClick(m)">
-              <view :class="[ns.e('quote-line'), m.self ? 'em-chat-page__quote-line--self' : '']"></view>
-              <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="13" :class="[ns.e('quote-icon'), m.self ? 'em-chat-page__quote-icon--self' : '']" />
+            <view v-if="m.quote != null" :class="[ns.e('quote'), m.self && ns.m('quote-self')]" @click="onQuoteClick(m)">
+              <view :class="[ns.e('quote-line'), m.self && ns.m('quote-line-self')]"></view>
+              <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="13" :class="[ns.e('quote-icon'), m.self && ns.m('quote-icon-self')]" />
               <em-text :lines="2" :text-class="quoteTextClass(m)" :text-style="quoteTextStyle(m)" :class="ns.e('quote-host')">
                 <text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text>
               </em-text>
@@ -120,31 +120,42 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import EmAvatar from '../em-avatar/em-avatar.vue'
-import EmIcon from '../em-icon/em-icon.vue'
-import EmActionSheet from '../em-action-sheet/em-action-sheet.vue'
-import EmChatInputbar from '../em-chat-inputbar/em-chat-inputbar.vue'
-import EmText from '../em-text/em-text.vue'
-import EmTextMessage from '../em-text-message/em-text-message.vue'
-import EmImageMessage from '../em-image-message/em-image-message.vue'
-import EmAudioMessage from '../em-audio-message/em-audio-message.vue'
-import EmVideoMessage from '../em-video-message/em-video-message.vue'
-import EmFileMessage from '../em-file-message/em-file-message.vue'
-import EmNavBar from '../em-nav-bar/em-nav-bar.vue'
-import type { EmIconName } from '../em-icon/em-icons'
-import { MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE, TIME_DIVIDER_INTERVAL } from '../../libs/constants'
-import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../libs'
-import type { EmActionSheetAction, EmMessageItem, EmQuoteInfo } from '../../libs/types'
-import { messageStore } from '../../libs/store/message'
-import { clearDraft, getDraft, setDraft } from '../../libs/store/draft'
-import { avatarOf, displayNameOf } from '../../libs/store/user'
-import { useNamespace } from '../../libs/use/useNamespace'
-import { useTheme } from '../../libs/use/useTheme'
-import { useLocale } from '../../libs/use/useLocale'
-import { formatDividerTime } from '../../libs/utils/time'
-import { createLogger } from '../../libs/utils/logger'
+import EmAvatar from '../../em-avatar/em-avatar.vue'
+import EmIcon from '../../em-icon/em-icon.vue'
+import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
+import EmChatInputbar from '../../em-chat-inputbar/em-chat-inputbar.vue'
+import EmText from '../../em-text/em-text.vue'
+import EmTextMessage from '../../em-text-message/em-text-message.vue'
+import EmImageMessage from '../../em-image-message/em-image-message.vue'
+import EmAudioMessage from '../../em-audio-message/em-audio-message.vue'
+import EmVideoMessage from '../../em-video-message/em-video-message.vue'
+import EmFileMessage from '../../em-file-message/em-file-message.vue'
+import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
+import type { EmIconName } from '../../em-icon/em-icons'
+import { MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE, RECALL_TIME_LIMIT, TIME_DIVIDER_INTERVAL } from '../../../libs/constants'
+import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
+import type { EmActionSheetAction, EmMessageItem, EmQuoteInfo } from '../../../libs/types'
+import { messageStore } from '../../../libs/store/message'
+import { clearDraft, getDraft, setDraft } from '../../../libs/store/draft'
+import { avatarOf, displayNameOf } from '../../../libs/store/user'
+import { useNamespace } from '../../../libs/use/useNamespace'
+import { useTheme } from '../../../libs/use/useTheme'
+import { useLocale } from '../../../libs/use/useLocale'
+import { formatDividerTime } from '../../../libs/utils/time'
+import { quoteHasIcon, quoteIconNameOf, quoteSenderOf, quoteSuffixOf, quoteTextClassOf, quoteTextStyleOf } from '../../../libs/utils/quote'
+import { createLogger } from '../../../libs/utils/logger'
 
 const logger = createLogger('chat-page')
+
+// 滚底双大值（scrollTop 数值方案）：两值交替赋值保证必触发（同值不重触发 + 超出 clamp 到底）
+const SCROLL_BOTTOM_TOP = 999999
+const SCROLL_BOTTOM_ALT = 1000000
+// 引用定位高亮清除计时（与 CSS 动画 2.8s 对齐，留 200ms 尾量）
+const HIGHLIGHT_CLEAR_MS = 3000
+// 首帧隐藏兜底：定位指令异常未回时强制显示，防白屏
+const READY_FALLBACK_MS = 500
+// 历史 prepend 保位锚点清除延时（scroll-into-view 回位后清空，避免残留 id 影响后续定位）
+const ANCHOR_CLEAR_MS = 500
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
@@ -175,36 +186,40 @@ const draft = ref('')
 const anchorId = ref('')
 const loadingMore = ref(false)
 
+// EmKit.onMessage 注册的滚动回调取消函数：onUnmounted 必须反注册，
+// 否则反复进出聊天页 handlers 只增不减，每条消息触发 N 次回调
+let unsubscribeMessages: (() => void) | null = null
+
 // 滚底用 scrollTop 数值方案（对齐 TUIKit uniapp 版）：初始预置大值首帧即底部方向；
 // 两个大值交替赋值保证必触发（scroll-into-view 同值不重触发 + 超出 clamp 到底），
 // 免 SelectorQuery 测 scrollHeight 的跨端时序风险。scroll-into-view 只留给精确锚点（引用定位/历史保位）
-const scrollTopVal = ref(999999)
+const scrollTopVal = ref(SCROLL_BOTTOM_TOP)
 // 首帧隐藏：消息区先透明，首次滚底定位后下一帧再显示，遮蔽「顶部首帧 → 跳底」视觉残留；500ms 兜底防白屏
 const ready = ref(false)
 
-const list = computed<EmMessageItem[]>(() => messageStore.byConversation[props.conversationId] ?? [])
-const hasMore = computed(() => messageStore.hasMore[props.conversationId] === true)
+const list = computed<EmMessageItem[]>(() => messageStore.messagesByConversationId[props.conversationId] ?? [])
+const hasMore = computed(() => messageStore.hasMoreByConversationId[props.conversationId] === true)
 
 // 时间分隔条：首条必显，之后相邻消息间隔超过阈值（5 分钟）在其前插入（对齐 vue 版 shouldShowTimeDivider）
 const dividerBefore = computed<Record<string, boolean>>(() => {
-  const map: Record<string, boolean> = {}
+  const flags: Record<string, boolean> = {}
   let prev = 0
   list.value.forEach((m) => {
     if (m.time > 0) {
       if (prev === 0 || m.time - prev > TIME_DIVIDER_INTERVAL) {
-        map[m.localId] = true
+        flags[m.localId] = true
       }
       prev = m.time
     }
   })
-  return map
+  return flags
 })
 
 // header 标题：昵称 > conversationId（资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）
 const peerDisplayName = computed(() => displayNameOf(props.conversationId))
 
 // 对端 typing 提示（chat 层 5s 超时自动消失）
-const peerTyping = computed(() => messageStore.peerTyping[props.conversationId] === true)
+const peerTyping = computed(() => messageStore.peerTypingByConversationId[props.conversationId] === true)
 
 // 已读回执展示目标：最新一条己方已发送消息（其余己方消息不显示已读态）
 const latestSelfLocalId = computed(() => {
@@ -221,7 +236,7 @@ function showReadState(m: EmMessageItem): boolean {
 }
 
 function isPeerRead(m: EmMessageItem): boolean {
-  const readAt = messageStore.peerReadTime[props.conversationId] ?? 0
+  const readAt = messageStore.peerReadTimeByConversationId[props.conversationId] ?? 0
   return m.time > 0 && readAt >= m.time
 }
 
@@ -231,7 +246,7 @@ function readIconName(m: EmMessageItem): EmIconName {
 
 function scrollToBottom(): void {
   scrollWithAnimation.value = false
-  scrollTopVal.value = scrollTopVal.value >= 1000000 ? 999999 : 1000000
+  scrollTopVal.value = scrollTopVal.value >= SCROLL_BOTTOM_ALT ? SCROLL_BOTTOM_TOP : SCROLL_BOTTOM_ALT
 }
 
 // 引用定位：消息行锚点 id + 点击引用卡滚动到原消息并整行闪烁高亮（对齐 vue 版 message-row-flash）；
@@ -266,7 +281,7 @@ function onQuoteClick(m: EmMessageItem): void {
     highlightTimer = setTimeout(() => {
       highlightId.value = ''
       highlightTimer = null
-    }, 3000)
+    }, HIGHLIGHT_CLEAR_MS)
   })
   scrollWithAnimation.value = true
   anchorId.value = ''
@@ -298,11 +313,11 @@ onMounted(() => {
         ready.value = true
       })
     })
-  // 异常路径兜底：500ms 后强制显示，防白屏
+  // 异常路径兜底：强制显示，防白屏
   setTimeout(() => {
     ready.value = true
-  }, 500)
-  EmKit.onMessage((msg) => {
+  }, READY_FALLBACK_MS)
+  unsubscribeMessages = EmKit.onMessage((msg) => {
     if (msg.conversationId === props.conversationId) {
       scrollToBottom()
     }
@@ -310,6 +325,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  unsubscribeMessages?.()
+  unsubscribeMessages = null
   EmKit.leaveConversation()
   quoteInfo.value = null
 })
@@ -331,7 +348,7 @@ async function onLoadMore(): Promise<void> {
   if (loadingMore.value) return
   loadingMore.value = true
   // 锚点保位（对齐 TUIKit uniapp 版）：prepend 前记录当前首条消息，加载后 scroll-into-view 回位，
-  // 500ms 后清空锚点——消除加载历史时视口被顶动的跳动
+  // 延时清空锚点——消除加载历史时视口被顶动的跳动
   const first = list.value.length > 0 ? list.value[0] : null
   try {
     await EmKit.loadHistory(props.conversationId)
@@ -343,7 +360,7 @@ async function onLoadMore(): Promise<void> {
         anchorId.value = anchor
         setTimeout(() => {
           anchorId.value = ''
-        }, 500)
+        }, ANCHOR_CLEAR_MS)
       })
     }
   } catch (e) {
@@ -436,43 +453,13 @@ const activeMessage = ref<EmMessageItem | null>(null)
 // 引用目标快照（选择引用时生成，发送成功/手动关闭/切会话时清除）
 const quoteInfo = ref<EmQuoteInfo | null>(null)
 
-// 引用卡/引用条共用：摘要后缀（冒号按 locale 的 summary 模板拼，发送人单列以便套 medium 字重）
-function quoteSuffix(q: EmQuoteInfo | null): string {
-  if (q == null) return ''
-  return t('message.quote.summary', { from: '', text: q.text })
-}
-
-function quoteSender(m: EmMessageItem): string {
-  // 引用卡发送者：用户资料昵称优先，回落原始 userId
-  return displayNameOf(m.quote?.from ?? '')
-}
-
-function quoteTextClass(m: EmMessageItem): string {
-  return m.self
-    ? 'em-chat-page__quote-text em-chat-page__quote-text--self'
-    : 'em-chat-page__quote-text'
-}
-
-// 内联兜底（小程序样式隔离，见 em-text 注释）；text-align 己方右对齐
-const quoteTextStyleBase = 'font-family: var(--em-font-family); font-size: var(--em-font-size-13); line-height: 18px; color: var(--em-text-secondary);'
-function quoteTextStyle(m: EmMessageItem): string {
-  return m.self ? `${quoteTextStyleBase} text-align: right;` : quoteTextStyleBase
-}
-
-// 非文本引用在文本流开头带类型图标（em-icons 现有映射里语义最近的；文本不带）
-function hasQuoteIcon(m: EmMessageItem): boolean {
-  const type = m.quote?.type
-  return type === MESSAGE_TYPE.IMAGE || type === MESSAGE_TYPE.VIDEO || type === MESSAGE_TYPE.AUDIO || type === MESSAGE_TYPE.FILE
-}
-
-function quoteIconName(m: EmMessageItem): EmIconName {
-  const type = m.quote?.type
-  if (type === MESSAGE_TYPE.IMAGE) return 'image'
-  if (type === MESSAGE_TYPE.VIDEO) return 'videocam'
-  if (type === MESSAGE_TYPE.AUDIO) return 'sound'
-  if (type === MESSAGE_TYPE.FILE) return 'paperclip'
-  return 'more'
-}
+// 引用卡展示映射收口 libs/utils/quote.ts（与输入栏引用条共用纯函数；locale/用户信息/类名注入）
+const quoteSuffix = (q: EmQuoteInfo | null): string => quoteSuffixOf(q, t)
+const quoteSender = (m: EmMessageItem): string => quoteSenderOf(m.quote?.from ?? '', displayNameOf)
+const quoteTextClass = (m: EmMessageItem): string => quoteTextClassOf(m.self, ns.e('quote-text'), ns.m('quote-text-self'))
+const quoteTextStyle = (m: EmMessageItem): string => quoteTextStyleOf(m.self)
+const hasQuoteIcon = (m: EmMessageItem): boolean => quoteHasIcon(m.quote?.type)
+const quoteIconName = (m: EmMessageItem): EmIconName => quoteIconNameOf(m.quote?.type)
 
 const messageSummary = computed(() => {
   const m = activeMessage.value
@@ -490,7 +477,7 @@ const messageActions = computed<EmActionSheetAction[]>(() => {
     actions.push({ key: MESSAGE_MENU_KEY.COPY, text: t('message.action.copy'), icon: 'checkbox' })
   }
   actions.push({ key: MESSAGE_MENU_KEY.QUOTE, text: t('message.action.quote'), icon: 'chatbubble' })
-  if (m.self && m.status === MESSAGE_STATUS.SENT && Date.now() - m.time <= 120000) {
+  if (m.self && m.status === MESSAGE_STATUS.SENT && Date.now() - m.time <= RECALL_TIME_LIMIT) {
     actions.push({ key: MESSAGE_MENU_KEY.RECALL, text: t('message.action.recall'), icon: 'undo' })
   }
   actions.push({ key: MESSAGE_MENU_KEY.DELETE, text: t('message.action.delete'), icon: 'trash', danger: true })
@@ -534,255 +521,5 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-.em-chat-page {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  background-color: var(--em-chat-bg);
-}
-
-.em-chat-page__scroll {
-  flex: 1;
-  height: 0;
-  padding: var(--em-message-padding) var(--em-spacing-4);
-  /* 聊天列表隐藏滚动条（对齐微信/vue 版形态）：小程序端由 show-scrollbar 属性控制，
-     H5 走 scrollbar-width，不支持的端静默忽略 */
-  scrollbar-width: none;
-}
-
-.em-chat-page__history {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--em-spacing-2) 0;
-}
-
-.em-chat-page__history-text {
-  font-size: var(--em-font-size-12);
-  color: var(--em-text-tertiary);
-}
-
-.em-chat-page__msg {
-  display: flex;
-  flex-direction: row;
-  margin-bottom: var(--em-message-gap);
-}
-
-/* 时间分隔条：居中弱文案（对齐 vue 版 message-list divider） */
-.em-chat-page__divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--em-message-gap);
-}
-
-.em-chat-page__divider-text {
-  font-size: var(--em-font-size-12);
-  color: var(--em-text-tertiary);
-}
-
-.em-chat-page__msg--self {
-  flex-direction: row-reverse;
-}
-
-.em-chat-page__msg--recalled {
-  justify-content: center;
-}
-
-/* 引用定位高亮：整行中性灰横带满铺（对齐 vue 版 message-row-flash），
-   padding+负 margin 抵消避免布局抖动；脉冲两次→保持→淡出共 2.8s，
-   与脚本侧 3000ms 清除计时器对齐。蒸汽端若不支持 @keyframes 则退化为无高亮 */
-.em-chat-page__msg--highlight {
-  padding: 4px 8px;
-  /* 负 margin 抵消 padding 防布局抖动；注意不能用 margin 简写——会覆盖基类的
-     margin-bottom: var(--em-message-gap)，行间距塌掉产生跳动（实测踩过） */
-  margin-top: -4px;
-  margin-bottom: 12px;
-  margin-left: -8px;
-  margin-right: -8px;
-  border-radius: var(--em-radius);
-  animation: em-chat-page-row-flash 2.8s ease-in-out forwards;
-}
-
-@keyframes em-chat-page-row-flash {
-  0% {
-    background-color: transparent;
-  }
-  8%,
-  30% {
-    background-color: var(--em-bg-hover);
-  }
-  18% {
-    background-color: transparent;
-  }
-  45%,
-  70% {
-    background-color: var(--em-bg-hover);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-.em-chat-page__recalled {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: 2px var(--em-spacing-2);
-  background-color: var(--em-message-chip-bg);
-  border-radius: 999px;
-}
-
-.em-chat-page__recalled-text {
-  font-size: var(--em-font-size-12);
-  color: var(--em-text-tertiary);
-}
-
-/* 引用卡（对齐 vue 版 quote-card）：气泡外下方，无背景无边框，2px 竖杠 + 「发送人：摘要」，最多两行折叠 */
-.em-chat-page__quote {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  margin-top: 4px;
-  max-width: 100%;
-  max-width: 100%;
-}
-
-.em-chat-page__quote--self {
-  flex-direction: row-reverse;
-}
-
-.em-chat-page__quote-line {
-  width: 2px;
-  border-radius: 2px;
-  background-color: var(--em-quote-line-color);
-  margin-right: var(--em-spacing-2);
-  flex-shrink: 0;
-}
-
-.em-chat-page__quote-line--self {
-  margin-right: 0;
-  margin-left: var(--em-spacing-2);
-}
-
-.em-chat-page__quote-icon {
-  margin-right: var(--em-spacing-1);
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-
-.em-chat-page__quote-icon--self {
-  margin-right: 0;
-  margin-left: var(--em-spacing-1);
-}
-
-/* 引用卡的折叠由 em-text 收口；宿主节点补 flex 约束链（小程序宿主参与 flex 布局，缺了会横向溢出） */
-.em-chat-page__quote-host {
-  flex: 1;
-  min-width: 0;
-}
-
-.em-chat-page__quote-text {
-  font-size: var(--em-font-size-13);
-  line-height: 18px;
-  color: var(--em-text-secondary);
-}
-
-.em-chat-page__quote-text--self {
-  text-align: right;
-}
-
-.em-chat-page__quote-sender {
-  font-size: var(--em-font-size-13);
-  line-height: 18px;
-  color: var(--em-text-secondary);
-  font-weight: var(--em-font-weight-medium);
-}
-
-.em-chat-page__quote-preview {
-  font-size: var(--em-font-size-13);
-  line-height: 18px;
-  color: var(--em-text-secondary);
-}
-
-.em-chat-page__content {
-  display: flex;
-  flex-direction: column;
-  max-width: 70%;
-  min-width: 0;
-  margin-left: var(--em-spacing-2);
-  margin-right: var(--em-spacing-2);
-}
-
-.em-chat-page__content--self {
-  align-items: flex-end;
-}
-
-.em-chat-page__bubble {
-  background-color: var(--em-bubble-bg-other);
-  border-radius: var(--em-bubble-radius);
-  padding: 12px 14px;
-}
-
-.em-chat-page__text {
-  font-size: var(--em-font-size-15);
-  line-height: var(--em-lineheight-normal);
-  color: var(--em-bubble-text-other);
-}
-
-/* 气泡行：气泡与状态图标的水平容器，底边对齐——状态图标永远贴着气泡末尾，
-   不被引用卡撑高（vue 版用 ResizeObserver 对齐气泡本体，ucss 下用 flex-end 等价实现）。
-   注意：状态图标用绝对定位移出布局流——小程序里组件宿主节点参与 flex 布局且约束链解析不可靠，
-   在流内占位会把气泡顶超宽（实测超出正好一个图标位被头像裁切） */
-.em-chat-page__bubble-row {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  max-width: 100%;
-  position: relative;
-}
-
-/* 状态图标（仅己方消息）：绝对定位在气泡左外侧、与气泡底边对齐；不占布局宽度 */
-.em-chat-page__state {
-  position: absolute;
-  right: 100%;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-right: var(--em-spacing-1);
-}
-
-/* 失败红叹号（em-icons 无 circle-bang，info-filled 实心圆点是语义最近的警示形），点击触发重发 */
-.em-chat-page__state-icon-failed {
-  color: var(--em-danger-color);
-}
-
-/* sending 转圈：蒸汽端若不支持 @keyframes 则退化为静态图标，不影响语义 */
-.em-chat-page__state-icon-sending {
-  animation: em-chat-page-spin 1s linear infinite;
-}
-
-/* 已读对勾：弱化灰；未读空心圆：主题色（对齐 vue 版 status-icon--unread 口径） */
-.em-chat-page__state-icon--read {
-  color: var(--em-text-tertiary);
-}
-
-.em-chat-page__state-icon--unread {
-  color: var(--em-primary-color);
-}
-
-@keyframes em-chat-page-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
+@import './em-chat-page.css';
 </style>

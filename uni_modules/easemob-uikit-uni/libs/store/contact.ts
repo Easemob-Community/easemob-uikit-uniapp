@@ -19,7 +19,7 @@ function loadInvites(): EmContactInvite[] {
 }
 
 export const contactStore = reactive({
-  list: [] as EmContactItem[],
+  items: [] as EmContactItem[],
   invites: loadInvites() as EmContactInvite[],
   loaded: false,
   syncing: false
@@ -30,7 +30,7 @@ function persistInvites(): void {
 }
 
 export function remarkOf(userId: string): string {
-  const c = contactStore.list.find((item) => item.userId === userId)
+  const c = contactStore.items.find((item) => item.userId === userId)
   return c != null ? c.remark : ''
 }
 
@@ -78,7 +78,7 @@ export function removeInviteByFrom(from: string): void {
 }
 
 export function clearContacts(): void {
-  contactStore.list = []
+  contactStore.items = []
   contactStore.invites = []
   contactStore.loaded = false
   contactStore.syncing = false

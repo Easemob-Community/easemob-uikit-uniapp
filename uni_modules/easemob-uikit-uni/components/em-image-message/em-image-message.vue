@@ -1,5 +1,5 @@
 <template>
-  <view :class="ns.b()" @click="onPreview" @longpress="onLongpress">
+  <view :class="[ns.b(), 'em-bubble']" @click="onPreview" @longpress="onLongpress">
     <image
       :class="ns.e('image')"
       :src="message.thumbUrl !== '' ? message.thumbUrl : message.url"
@@ -51,16 +51,5 @@ function onLongpress(): void {
 </script>
 
 <style>
-@import '../../libs/style/variables.css';
-
-.em-image-message {
-  background-color: var(--em-bubble-bg-other);
-  border-radius: var(--em-bubble-radius);
-  padding: 0;
-  overflow: hidden;
-}
-
-.em-image-message__image {
-  border-radius: var(--em-bubble-radius);
-}
+@import './em-image-message.css';
 </style>

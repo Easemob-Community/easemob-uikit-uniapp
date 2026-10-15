@@ -165,7 +165,7 @@ export class EmContact {
     logger.debug('getContacts raw snapshot:', JSON.parse(JSON.stringify(raw)))
     logger.info('contact snapshot refreshed, count:', raw.length)
     const items = raw.map((c) => this.toContactItem(c))
-    contactStore.list = items
+    contactStore.items = items
     contactStore.loaded = true
   }
 

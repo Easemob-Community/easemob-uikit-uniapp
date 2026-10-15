@@ -1,0 +1,20 @@
+@import '../../libs/style/variables.css';
+@import '../../libs/style/bubble.css';
+
+/* 壳（底色/圆角）收口 libs/style/bubble.css 的 .em-bubble；此处只留文本气泡特有 padding */
+.em-text-message {
+  padding: 12px 14px;
+  max-width: 100%;
+}
+
+.em-text-message__text {
+  font-size: var(--em-font-size-15);
+  line-height: var(--em-lineheight-normal);
+  color: var(--em-bubble-text-other);
+  /* 长内容换行：对齐 vue 版 overflow-wrap: break-word 的语义，ucss 下用 word-break 兜底 */
+  word-break: break-all;
+}
+
+.em-text-message__text--self {
+  color: var(--em-bubble-text-self);
+}
