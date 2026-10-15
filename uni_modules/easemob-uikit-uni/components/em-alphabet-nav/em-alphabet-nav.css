@@ -1,25 +1,21 @@
 @import '../../libs/style/variables.css';
 
-/* 覆盖于列表区右侧：视觉宽 16px，左右各 4px 内边距把触摸热区扩到 24px
-   （对齐 vue 版 padding+content-box 热区设计） */
+/* 覆盖于列表区右侧、垂直居中：宽 28px（视觉=热区），高度由组件内联
+   style 按 字母数 × 22px 给定，容器高 = 字母块高，触摸/视觉/滑动映射一致
+   （flex 子项 max-height 封顶在编译端不生效，勿回退该写法） */
 .em-alphabet-nav {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 50%;
   right: 4px;
-  width: 16px;
-  padding-left: 4px;
-  padding-right: 4px;
+  width: 28px;
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
-/* 单项按可用高度等比分配、封顶 20px，空间不足自动压缩（对齐 vue 版 flex:1 + max-height） */
+/* 单项定高 22px（与组件内 CELL_HEIGHT 常量一致） */
 .em-alphabet-nav__cell {
-  flex: 1;
-  max-height: 20px;
-  min-height: 12px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -36,7 +32,7 @@
 
 .em-alphabet-nav__text {
   font-family: var(--em-font-family);
-  font-size: var(--em-font-size-9);
+  font-size: var(--em-font-size-10);
   font-weight: var(--em-font-weight-medium);
   line-height: 12px;
   color: var(--em-text-tertiary);

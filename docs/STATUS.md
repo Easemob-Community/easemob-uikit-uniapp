@@ -63,6 +63,13 @@
 - HBuilderX GUI 起的 dev 仍需手动 `node scripts/prepare-sdk-subpackage.mjs demo/unpackage/dist/dev/mp-weixin --watch`。
 - 验证：`build mp-weixin` 防回归 11 项全绿；CLI dev 起 watch、触发重编译后 `im-sdk.js` 仍在。
 
+## 2026-10-15 联系人索引条重构（em-alphabet-nav 去 max-height 依赖）
+
+症状：联系人页右侧 A-Z 索引条又窄又散（mp 开发者工具实测字母格被拉伸到 ~40px 铺满整屏）。根因：**uni 版照搬 vue 版「flex:1 + max-height: 20px 封顶」写法，编译端对 flex 子项的 max-height 不生效**，格子全部拉伸；叠加 16px 视觉宽 + 9px 字号本身偏窄。落地：
+- 容器改「内容定高 + 垂直居中」：`top: 50% + transform: translateY(-50%)`（em-popup 已验证惯用法），宽 16px→**28px**（视觉=热区，不再靠 padding 扩热区），高度由组件内联 style 按 `keys.length × 22px` 给定（模板新增 `CELL_HEIGHT=22` 常量 + `navStyle` computed）——容器高 = 字母块高，触摸/视觉/滑动占比映射三者天然一致。
+- 单元格去掉 flex:1/max-height/min-height，改定高 22px；字号 `--em-font-size-9`→`--em-font-size-10`；高亮仍主色底 + `--em-radius`，淡化仍 opacity 0.45；点按/滑动/事件契约零改动。
+- 验证：build web + build mp-weixin 全绿（分包防回归 11 项过，主包 495KB）；H5 产物伺服 200。**待验**：mp 开发者工具与真机肉眼复核（居中紧凑 28px 宽字母块、点按/滑动定位、高亮淡化）。
+
 ## 待验项汇总
 
 | 项 | 端 | 备注 |

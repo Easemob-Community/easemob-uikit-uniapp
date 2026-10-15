@@ -6,3 +6,4 @@ dist/
 .DS_Store
 # 本地凭据（严禁提交真实 appkey/token）
 local.credentials.*
+.superpowers/

@@ -1,8 +1,10 @@
 <template>
   <!-- 字母索引条（对齐 vue 版 contact-alphabet-nav）：始终渲染完整 A-Z + # 序列；
+       容器按 字母数 × 22px 定高并垂直居中，触摸/视觉/滑动映射一致；
        点按走单元格 touchstart 精确命中（无需几何测量），按住滑动走容器 touchmove 占比映射 -->
   <view
     :class="ns.b()"
+    :style="navStyle"
     @touchmove="onTouchMove"
     @touchend="onTouchEnd"
     @touchcancel="onTouchEnd"
@@ -19,13 +21,16 @@
 </template>
 
 <script setup lang="ts">
-import { getCurrentInstance } from 'vue'
+import { computed, getCurrentInstance } from 'vue'
 import { ALPHABET_KEYS } from '../../libs/constants'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { resolveAlphabetKeyByOffsetY } from '../../libs/utils/pinyin'
 
 // 字母索引条原子组件：点击/滑动定位分组（微信通讯录式占比映射）
 defineOptions({ styleIsolation: 'app-and-page' })
+
+// 单项定高（与 em-alphabet-nav.css 中 __cell 的 height 一致）
+const CELL_HEIGHT = 22
 
 interface Props {
   keys?: string[]        // 渲染序列，默认完整 A-Z + '#'
@@ -45,6 +50,11 @@ const emit = defineEmits<{
 }>()
 
 const ns = useNamespace('alphabet-nav')
+
+// 容器高度 = 字母数 × 单项定高：容器高即字母块高，垂直居中由 css 收口
+const navStyle = computed(() => ({
+  height: props.keys.length * CELL_HEIGHT + 'px'
+}))
 
 function isDim(key: string): boolean {
   return props.dimKeys.indexOf(key) >= 0
