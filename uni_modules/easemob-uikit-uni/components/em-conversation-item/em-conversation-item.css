@@ -97,15 +97,20 @@
   flex-shrink: 0;
 }
 
-/* 「有人@我」前缀：主题红 + 中粗（对齐 vue 版 conversation-item__at-me-prefix 的 primary + medium） */
+/* 「有人@我」前缀：主色 + 中粗（对齐 vue 版 conversation-item__at-me-prefix 的 --uikit-primary + medium） */
 .em-conversation-item__at-me {
   font-family: var(--em-font-family);
   font-size: var(--em-font-size-13);
   line-height: 18px;
   font-weight: var(--em-font-weight-medium);
-  color: var(--em-danger-color);
+  color: var(--em-primary-color);
   margin-right: 2px;
   flex-shrink: 0;
+}
+
+/* hasAtMe 名字主色高亮（对齐 vue 版 conversation-item__name.is-at-me；text-style 侧见组件内联档） */
+.em-conversation-item--name-at-me {
+  color: var(--em-primary-color);
 }
 
 .em-conversation-item__summary-host {

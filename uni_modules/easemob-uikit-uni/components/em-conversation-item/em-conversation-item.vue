@@ -8,7 +8,8 @@
     <view :class="ns.e('body')">
       <view :class="ns.e('top')">
         <view :class="ns.e('name-wrap')">
-          <em-text :text="name" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
+          <!-- hasAtMe 时名字主色高亮（对齐 vue 版 conversation-item__name.is-at-me），text-class/text-style 双通道同步切档 -->
+          <em-text :text="name" :text-class="ns.e('name') + (hasAtMe ? ' ' + ns.m('name-at-me') : '')" :text-style="hasAtMe ? nameAtMeTextStyle : nameTextStyle" :class="ns.e('name-host')" />
           <!-- 置顶/免打扰徽标：em-icons 无 pin/bell-slash 字形，置顶用 top、免打扰用 eye-slash（与长按菜单图标一致），弱化图标色 -->
           <EmIcon v-if="item.isPinned" name="top" :size="12" :class="ns.e('flag')" />
           <EmIcon v-if="item.isMuted" name="eye-slash" :size="12" :class="ns.e('flag')" />
@@ -17,7 +18,7 @@
       </view>
       <view :class="ns.e('bottom')">
         <view :class="ns.e('message')">
-          <!-- 群聊「有人@我」红色前缀（对齐 vue 版 conversation-item at-me-prefix，atMe 期间优先于草稿态） -->
+          <!-- 群聊「有人@我」主色前缀（对齐 vue 版 conversation-item__at-me-prefix：primary + medium，atMe 期间优先于草稿态） -->
           <text v-if="hasAtMe" :class="ns.e('at-me')">{{ t('conversation.atMeInMessage') }}</text>
           <text v-else-if="draft != null" :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
           <em-text :text="draft != null ? draft.text : item.lastMessageText" :text-class="ns.e('summary')" :text-style="summaryTextStyle" :class="ns.e('summary-host')" />
@@ -64,6 +65,9 @@ defineOptions({ styleIsolation: 'app-and-page' })
 
 // 名称/摘要文字内联样式收口 libs/style/textStyles.ts（小程序样式隔离，须走 text-style；详见 em-text 注释）
 const nameTextStyle = TEXT_STYLE_NAME
+// hasAtMe 名字主色高亮档（对齐 vue 版 is-at-me）：与 TEXT_STYLE_NAME 同档仅换色，双通道的 text-style 侧
+const nameAtMeTextStyle =
+  'font-family: var(--em-font-family); font-size: var(--em-font-size-15); font-weight: var(--em-font-weight-semibold); line-height: 20px; color: var(--em-primary-color); white-space: nowrap;'
 const summaryTextStyle = TEXT_STYLE_SUBTITLE
 
 const ns = useNamespace('conversation-item')
