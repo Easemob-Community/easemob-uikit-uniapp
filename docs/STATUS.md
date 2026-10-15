@@ -102,3 +102,18 @@
 - 新类型 EmGroup/EmGroupMember/CreateGroupParams/MentionContact；constants 增 GROUP_MEMBER_ROLE/`MESSAGE_EXT_KEY.MENTION='em_at_list'`/GROUP_MEMBER_GRID_COUNT=9/GROUP_MEMBER_PAGE_SIZE=20/GROUP_ANNOUNCEMENT_MAX_LENGTH=512（对齐 vue）；`libs/utils/mention.ts` 两纯函数（filterActiveMentions/parseMentions，对齐 vue）；EmKit 透出 17 个群方法 + enterGroup 预热。
 - 验证：build web ✓ / build mp-weixin 11 项全绿（主包 516KB）/ H5 伺服 200。
 - **过渡态挂账**：①群会话已进列表但 chat 页进入仍按 singleChat 调 SDK（Phase 2 路由贯通修复）；②群邀请写入 contact invites 但无 kind 维度，请求页对群邀请点同意会走好友语义（Phase 4 修）；③insertGroupNotice 空实现（Phase 5）；④SDK 链式 API 与事件 payload 字段名仅编译期验证，待 spike + 真机冒烟。
+
+## 2026-10-15 M2.9 Phase 2（会话/聊天页群化 + 发起会话）
+
+- **路由贯通**：demo `chat`/`chat-info` URL 增 `chatType`，三处贯通（conversation→chat→chat-info）；`em-chat-page`/`em-chat-info-page` 增必传 `chatType` prop（breaking）。过渡态 Important #1 已修。
+- **会话列表群化**：群名回落 `groupDisplayNameOf` > conversation.name > groupId；`@我` 徽标全链路（onMessage 群消息查 `ext.em_at_list` → `atMeByConversationId` → `hasAtMe` prop → 进会话清除；前缀主色+medium、名字 is-at-me 高亮，对齐 vue；@ 字形图标因 iconfont 无字形挂账）；长按菜单群会话可用。
+- **聊天页群形态**（三元素独立 props 默认显示，伪装模式预留位）：`showMemberCount`（群名+人数副标题，typing 仅单聊）、`senderNameMode('always'|'hidden')`（气泡昵称行，回落：群成员名片 > userStore > userId）、`showAnnouncement`（公告条：单行省略+展开弹层，读 `announcementByGroupId`）；群聊不发 typing、不显示已读回执。
+- **发起会话**：新原子组件 `em-select-contact`（single 模式：props items/show，emits select/update:show，半屏弹层+搜索+空态，不连 store）；会话页「+」菜单增 `new-chat`/`create-group`（create-group 暂 toast 占位，Phase 4 落地）；选人 → 拒绝自己 → `addConversation` 本地构造 → 跳聊天。
+- 验证：build web ✓ / build mp-weixin 11 项全绿（主包 534KB）/ H5 伺服 200（评审员独立复跑确认）。**待验**：群链路运行时端到端（需真实账号 H5+真机冒烟）。
+
+## 2026-10-15 M2.9 Phase 3（@ 提及全链路）
+
+- 新原子组件 `em-mention-picker`（契约照抄 vue：props show/contacts/keyword/title，emits update:show/select；底部半屏 + 搜索过滤 + 成员 Cell + 空态；去 PC 锚定/键盘导航；空态图标 search 代 at——字体无字形挂账）。
+- 触发：inputbar watch 草稿尾部插入 `@` → `mention-trigger`（仅群聊，chat-page `enableMention` prop 默认 true，伪装预留位）；选人 `lastIndexOf('@')` 截断后追加 `@名字 `（修复评审发现的 keyword 残留致 ext 丢失缺陷）；发送前 `filterActiveMentions` 过滤挂 `ext.em_at_list`，重发从 ext 还原。
+- 高亮：em-text-message ext 分片渲染，`--em-mention-color: #33B1FF` 明暗两块（对齐 vue 主色值），己方气泡 `--mention-self` 变体；@ 片段点击 `mention-click` 透传。
+- 已知限制：群成员昵称含空格时高亮只到首个空格（vue 同限制）；蒸汽端嵌套 text 的 click 待真机。**待验**：真实账号「@ → 选人 → ext → 高亮/徽标」端到端冒烟。
