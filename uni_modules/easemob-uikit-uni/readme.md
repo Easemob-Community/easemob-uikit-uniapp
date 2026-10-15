@@ -13,7 +13,7 @@ EmKit.init({ appkey: 'your-appkey' })
 await EmKit.login({ userId, token })
 ```
 
-页面级组件（`em-conversation-page` / `em-chat-page` / `em-chat-info-page` / `em-contact-page` / `em-contact-requests-page`）位于 `components/pages/`，需在宿主工程 `pages.json` 配置 easycom custom 规则自动导入（原子组件走内置规则，零配置）：
+页面级组件（`em-conversation-page` / `em-chat-page` / `em-chat-info-page` / `em-contact-page` / `em-contact-list-page` / `em-contact-requests-page` / `em-group-page`）位于 `components/pages/`，需在宿主工程 `pages.json` 配置 easycom custom 规则自动导入（原子组件走内置规则，零配置）：
 
 ```json
 {

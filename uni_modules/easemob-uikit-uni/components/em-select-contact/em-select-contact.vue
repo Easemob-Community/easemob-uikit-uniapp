@@ -161,7 +161,7 @@ const filtered = computed<EmSelectContactItem[]>(() => {
   )
 })
 
-// ===== multiple：分组 + 索引条（平移 em-contact-page 实现） =====
+// ===== multiple：分组 + 索引条（平移 em-contact-list-page 实现） =====
 const groups = computed(() => groupContacts(filtered.value, (c) => c.name))
 const groupKeys = computed<string[]>(() => groups.value.map((g) => g.key))
 const dimKeys = computed<string[]>(() =>
@@ -191,7 +191,7 @@ function onJump(key: string, sliding: boolean): void {
   }
 }
 
-// 索引条初始高亮第一组（同 em-contact-page 语义）
+// 索引条初始高亮第一组（同 em-contact-list-page 语义）
 watch(groupKeys, (keys) => {
   if (activeKey.value === '' && keys.length > 0) {
     activeKey.value = keys[0]

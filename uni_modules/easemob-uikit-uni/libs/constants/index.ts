@@ -144,6 +144,23 @@ export const CONTACT_INVITE_STATUS = {
 
 export type ContactInviteStatusValue = (typeof CONTACT_INVITE_STATUS)[keyof typeof CONTACT_INVITE_STATUS]
 
+/** 申请/邀请类型（好友申请 vs 群邀请，同表存储按 kind 分化处理链路） */
+export const CONTACT_INVITE_KIND = {
+  CONTACT: 'contact',
+  GROUP: 'group'
+} as const
+
+export type ContactInviteKindValue = (typeof CONTACT_INVITE_KIND)[keyof typeof CONTACT_INVITE_KIND]
+
+/** 通讯录入口页 entry key（em-contact-page/em-contact-nav 透出，宿主按 key 接线路由） */
+export const CONTACT_ENTRY_KEY = {
+  NOTICE: 'notice',
+  GROUP: 'group',
+  CONTACT: 'contact'
+} as const
+
+export type ContactEntryKeyValue = (typeof CONTACT_ENTRY_KEY)[keyof typeof CONTACT_ENTRY_KEY]
+
 /** 群成员角色（对齐 websdk GroupRole 与 vue 版 GROUP_MEMBER_ROLE） */
 export const GROUP_MEMBER_ROLE = {
   OWNER: 'owner',

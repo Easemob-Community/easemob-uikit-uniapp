@@ -45,7 +45,7 @@
   height: 100%;
 }
 
-/* multiple：列表区 relative 容器供字母索引条 absolute 覆盖（同 em-contact-page__body 口径） */
+/* multiple：列表区 relative 容器供字母索引条 absolute 覆盖（同 em-contact-list-page__body 口径） */
 .em-select-contact__body {
   flex: 1;
   height: 0;
@@ -101,7 +101,7 @@
   color: var(--em-text-tertiary);
 }
 
-/* multiple：分组头（28px 高、11px/500、弱化灰，与 em-contact-page 分组头同口径） */
+/* multiple：分组头（28px 高、11px/500、弱化灰，与 em-contact-list-page 分组头同口径） */
 .em-select-contact__group-header {
   height: 28px;
   display: flex;

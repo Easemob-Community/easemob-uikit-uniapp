@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <em-contact-page @select="onSelect" @open-requests="onOpenRequests" @add="onAdd" />
+    <em-contact-page @entry-click="onEntryClick" @add="onAdd" />
     <view v-if="showAddContact" class="addcontact">
       <view class="addcontact__panel">
         <text class="addcontact__title">添加好友</text>
@@ -18,7 +18,7 @@
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONTACT_ENTRY_KEY } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const showAddContact = ref(false)
 const peerId = ref('')
@@ -44,15 +44,20 @@ onShow(() => {
   EmKit.syncContacts().catch(() => {})
 })
 
-// 预热（对齐会话页点击范式）：跳转前 fire-and-forget 进入会话与历史拉取
-function onSelect(userId: string) {
-  EmKit.enterConversation(userId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
-  EmKit.loadHistory(userId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
-  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${userId}` })
-}
-
-function onOpenRequests() {
-  uni.navigateTo({ url: '/sub-im/pages/contact-requests/contact-requests' })
+// 入口页 entry-click 分发（对齐 vue 版 address-book 宿主接线路由语义）：
+// notice → 新请求页；group → 群列表页；contact → 好友列表页
+function onEntryClick(key: string) {
+  if (key === CONTACT_ENTRY_KEY.NOTICE) {
+    uni.navigateTo({ url: '/sub-im/pages/contact-requests/contact-requests' })
+    return
+  }
+  if (key === CONTACT_ENTRY_KEY.GROUP) {
+    uni.navigateTo({ url: '/sub-im/pages/group/group' })
+    return
+  }
+  if (key === CONTACT_ENTRY_KEY.CONTACT) {
+    uni.navigateTo({ url: '/sub-im/pages/contact-list/contact-list' })
+  }
 }
 
 // 添加好友为 demo 级 modal（对齐 vue 版契约：页面组件只 emit add，弹窗由业务侧实现）

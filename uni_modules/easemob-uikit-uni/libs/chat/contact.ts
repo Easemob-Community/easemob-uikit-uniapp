@@ -5,7 +5,7 @@ import type {
   ContactRosterEventPayload,
   UserInfo
 } from 'easemob-websdk'
-import { CONTACT_INVITE_STATUS } from '../constants'
+import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS } from '../constants'
 import {
   addInvite,
   clearContacts,
@@ -60,6 +60,7 @@ export class EmContact {
         logger.debug('onContactInvited raw payload:', JSON.parse(JSON.stringify(p)))
         addInvite({
           id: `${p.from}:${Date.now()}`,
+          kind: CONTACT_INVITE_KIND.CONTACT,
           from: p.from,
           message: typeof p.message === 'string' ? p.message : '',
           status: CONTACT_INVITE_STATUS.PENDING,
@@ -94,6 +95,7 @@ export class EmContact {
         logger.debug('onContactRefuse raw payload:', JSON.parse(JSON.stringify(p)))
         addInvite({
           id: `${p.from}:${Date.now()}`,
+          kind: CONTACT_INVITE_KIND.CONTACT,
           from: p.from,
           message: typeof p.message === 'string' ? p.message : '',
           status: CONTACT_INVITE_STATUS.DECLINED,

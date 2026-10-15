@@ -254,6 +254,17 @@ class EmKitImpl {
     return this.group.inviteUsersToGroup(groupId, userIds)
   }
 
+  // 接受/拒绝群邀请（group kind 申请；接受成功内部刷新群快照）
+  async acceptGroupInvite(invite: EmContactInvite): Promise<void> {
+    await this.client.whenReady()
+    return this.group.acceptGroupInvite(invite)
+  }
+
+  async declineGroupInvite(invite: EmContactInvite): Promise<void> {
+    await this.client.whenReady()
+    return this.group.declineGroupInvite(invite)
+  }
+
   async leaveGroup(groupId: string): Promise<void> {
     await this.client.whenReady()
     return this.group.leaveGroup(groupId)

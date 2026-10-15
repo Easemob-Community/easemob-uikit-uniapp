@@ -83,7 +83,9 @@ custom 优先级高于内置，原子组件无 `-page` 后缀不受影响。**�
 |---|---|
 | `em-chat-page` | `conversationId`/`chatType`（均必填，M2.9 起）、`avatarShape`；群形态三独立开关 `showMemberCount`/`senderNameMode('always'\|'hidden')`/`showAnnouncement` + @提及开关 `enableMention`（均默认开，仅群聊生效，伪装模式预留）；emits `open-info`/`send`/`recall`/`delete`/`mention-click(userId)`（业务事件仅通知，行为内部走 EmKit）；插槽 `#custom-message`（按 `EmMessageItem.rawType` 判别渲染自定义消息，`ext` 为业务载荷唯一通道）、`#empty`（默认 em-empty 可整体覆盖） |
 | `em-conversation-page` | `showSearch`/`emptyText`；emits `select(conversationId, chatType)`/`menu(key)`（`new-chat` 内置 em-select-contact 选人闭环，`create-group` 直接 emit 宿主占位）；插槽 `#empty` |
-| `em-contact-page` | `menuKeys`；emits `select`/`open-requests`/`add`（add 弹窗宿主实现） |
+| `em-contact-page` | 通讯录入口页（M2.9 Phase 4b 起，对齐 vue address-book home）：em-contact-nav 三入口（notice 新请求 count+hot / group 群组 / contact 好友列表），搜索只过滤入口项；emits `entry-click(key)`（宿主按 key 接线路由）/`add`（添加好友弹窗宿主实现）；好友字母列表已迁至 em-contact-list-page |
+| `em-contact-list-page` | 好友完整列表页（M2.9 Phase 4b，自 em-contact-page 平移）：`menuKeys`；emits `select(userId)`/`back`；字母分组 + 索引条 + 搜索 + 长按删除 + 骨架/空态 |
+| `em-contact-nav` | 入口项列表原子组件（对齐 vue ContactNav）：props `entries: EmContactNavEntry[]`（key/label/count?/hot?/icon）；emits `entry-click(key)`；不连 store、不碰路由 |
 | `em-group-page` | 群列表页（M2.9 Phase 4a）：emits `click-group(groupId)`/`back`；标题栏「+」内置建群弹层（em-select-contact multiple + #panel-top 群名/开关表单，群名必填 → EmKit.createGroup + addConversation）；列表底部 em-load-more 契约预留（SDK 本地全量，hasMore 恒 false） |
 | `em-select-contact` | `items`（EmSelectContactItem[]）/`show`/`selectMode('single'\|'multiple')`/`disabledIds`/`title`；emits `select(userId)`（single）/`confirm(userIds)`（multiple，不自动关窗）/`update:show`；multiple 带字母分组+索引条+自绘 checkbox+已选头像条+通栏确认，插槽 `#panel-top`（已选条与列表之间注入表单，建群用） |
 | `em-load-more` | 触底加载 footer 三态：props `state('loading'\|'noMore'\|'button')`；emits `load`（button 态点击） |

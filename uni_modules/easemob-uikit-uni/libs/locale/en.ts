@@ -105,6 +105,12 @@ export default {
   'contact.requests.declineFailed': 'Decline failed. Please try again later',
   'contact.requests.received': 'sent you a contact request',
   'contact.requests.declinedByPeer': 'declined your contact request',
+  'contact.requests.inviter': 'Inviter: {name}',
+  'contact.requests.groupAccepted': '{name} accepted your group invitation',
+  'contact.requests.groupDeclined': '{name} declined your group invitation',
+
+  'contact.entryGroup': 'Groups',
+  'contact.entryContact': 'Contacts',
 
   'contact.selectMembers': 'Select Members',
 

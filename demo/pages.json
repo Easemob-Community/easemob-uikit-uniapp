@@ -66,6 +66,16 @@
           }
         },
         {
+          "path": "pages/contact-list/contact-list",
+          "style": {
+            "navigationBarTitleText": "好友列表",
+            "navigationStyle": "custom",
+            "app-plus": {
+              "titleNView": false
+            }
+          }
+        },
+        {
           "path": "pages/group/group",
           "style": {
             "navigationBarTitleText": "群组",

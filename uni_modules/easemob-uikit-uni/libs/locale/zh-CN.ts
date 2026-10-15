@@ -105,6 +105,12 @@ export default {
   'contact.requests.declineFailed': '拒绝失败，请稍后重试',
   'contact.requests.received': '向你发送了好友申请',
   'contact.requests.declinedByPeer': '拒绝了你的好友申请',
+  'contact.requests.inviter': '邀请人：{name}',
+  'contact.requests.groupAccepted': '{name} 接受了你的群邀请',
+  'contact.requests.groupDeclined': '{name} 拒绝了你的群邀请',
+
+  'contact.entryGroup': '群组',
+  'contact.entryContact': '好友列表',
 
   'contact.selectMembers': '选择成员',
 

@@ -1,18 +1,25 @@
 import { reactive } from 'vue'
-import { CONTACT_INVITE_STATUS } from '../constants'
+import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS } from '../constants'
 import { getStorage, setStorage } from '../platform'
 import type { EmContactItem, EmContactInvite } from '../types'
 import { displayNameOf } from './user'
 
 // 联系人 store（裸 reactive，零依赖）：list 为好友快照（事件驱动刷新），
-// invites 为好友申请/通知（内存 + storage 持久化，对齐 draft 存储套路）
+// invites 为好友申请/群邀请/通知（内存 + storage 持久化，对齐 draft 存储套路）
 const INVITES_STORAGE_KEY = 'emkit.contact.invites'
 
 function loadInvites(): EmContactInvite[] {
   try {
     const raw = getStorage(INVITES_STORAGE_KEY)
     if (raw === '') return []
-    return JSON.parse(raw) as EmContactInvite[]
+    const list = JSON.parse(raw) as EmContactInvite[]
+    // 旧持久化数据无 kind 字段：兜底 contact（好友语义，结构兼容）
+    list.forEach((i) => {
+      if (i.kind == null) {
+        i.kind = CONTACT_INVITE_KIND.CONTACT
+      }
+    })
+    return list
   } catch (e) {
     return []
   }
@@ -51,10 +58,13 @@ export function addInvite(invite: EmContactInvite): void {
   const index = contactStore.invites.findIndex((i) => i.id === invite.id)
   if (index >= 0) {
     const target = contactStore.invites[index]
+    target.kind = invite.kind
     target.message = invite.message
     target.status = invite.status
     target.outgoing = invite.outgoing
     target.ts = invite.ts
+    target.groupId = invite.groupId
+    target.groupName = invite.groupName
   } else {
     contactStore.invites.unshift(invite)
   }
@@ -69,8 +79,9 @@ export function updateInviteStatus(id: string, status: EmContactInvite['status']
   }
 }
 
+// 好友被删时清理其好友申请记录（group kind 群邀请与好友关系无关，保留）
 export function removeInviteByFrom(from: string): void {
-  const next = contactStore.invites.filter((i) => i.from !== from)
+  const next = contactStore.invites.filter((i) => i.from !== from || i.kind === CONTACT_INVITE_KIND.GROUP)
   if (next.length !== contactStore.invites.length) {
     contactStore.invites = next
     persistInvites()

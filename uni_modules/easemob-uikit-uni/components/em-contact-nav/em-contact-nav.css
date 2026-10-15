@@ -1,0 +1,54 @@
+@import '../../libs/style/variables.css';
+
+.em-contact-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 入口行：64px（--em-cell-height），图标 20px / 标题 15px / 箭头 22px（vue 版 ContactNav 口径） */
+.em-contact-nav__item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: var(--em-cell-height);
+  padding: 0 var(--em-spacing-4);
+  background-color: var(--em-bg-base);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.em-contact-nav__icon {
+  color: var(--em-text-secondary);
+  flex-shrink: 0;
+}
+
+.em-contact-nav__label {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-15);
+  font-weight: var(--em-font-weight-medium);
+  line-height: 20px;
+  color: var(--em-text-primary);
+  margin-left: var(--em-spacing-3);
+}
+
+/* hot 红点宿主类：与标题间距（vue 版 title gap 8px）；药丸/圆点本体样式收口在 em-badge */
+.em-contact-nav__dot {
+  margin-left: var(--em-spacing-2);
+  flex-shrink: 0;
+}
+
+.em-contact-nav__spacer {
+  flex: 1;
+}
+
+/* 计数徽标宿主类：与箭头间距；本体样式收口在 em-badge */
+.em-contact-nav__badge {
+  margin-right: var(--em-spacing-2);
+  flex-shrink: 0;
+}
+
+.em-contact-nav__arrow {
+  color: var(--em-icon-muted);
+  flex-shrink: 0;
+}

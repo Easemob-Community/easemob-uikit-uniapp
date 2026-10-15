@@ -7,10 +7,10 @@
       <em-empty v-if="invites.length === 0" icon="personadd" :description="t('contact.requests.empty')" />
 
       <view v-for="invite in invites" :key="invite.id" :class="ns.e('item')">
-        <em-avatar :src="avatarOf(invite.from)" :name="displayNameOf(invite.from)" :size="48" />
+        <em-avatar :src="avatarSrcOf(invite)" :name="avatarNameOf(invite)" :size="48" />
         <view :class="ns.e('item-body')">
           <view :class="ns.e('item-main')">
-            <em-text :text="displayNameOf(invite.from)" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
+            <em-text :text="titleOf(invite)" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
             <em-text :text="subtitleOf(invite)" :text-class="ns.e('subtitle')" :text-style="subtitleTextStyle" :class="ns.e('subtitle-host')" />
           </view>
           <!-- pending 且收到的申请：接受/拒绝双胶囊按钮（对齐 vue 版 notice 条目操作区） -->
@@ -47,9 +47,10 @@ import EmButton from '../../em-button/em-button.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import { EmKit } from '../../../libs'
-import { CONTACT_INVITE_STATUS } from '../../../libs/constants'
+import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS } from '../../../libs/constants'
 import { contactStore } from '../../../libs/store/contact'
 import { primaryColorStyle } from '../../../libs/store/config'
+import { groupDisplayNameOf } from '../../../libs/store/group'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { EmContactInvite } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
@@ -57,8 +58,9 @@ import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
 import { TEXT_STYLE_NAME, TEXT_STYLE_SUBTITLE } from '../../../libs/style/textStyles'
 
-// 好友申请列表页（对齐 vue 版 contact-notice-list 的好友申请部分）：
-// 条目 = 48px 头像 + 名称 + 附言副标题；pending 态接受/拒绝双按钮，已处理态弱化状态文字
+// 好友申请 + 群邀请列表页（对齐 vue 版 contact-notice-list）：
+// 条目 = 48px 头像 + 名称 + 附言副标题；pending 态接受/拒绝双按钮，已处理态弱化状态文字；
+// group kind 条目主标题为群名（群名快照 > groupStore > groupId 回落链），接受/拒绝走群邀请 API
 defineOptions({ styleIsolation: 'app-and-page' })
 
 // 名称/附言文字内联样式收口 libs/style/textStyles.ts（小程序样式隔离，须走 text-style；详见 em-text 注释）
@@ -72,7 +74,44 @@ const { t } = useLocale()
 // 新申请 unshift 置顶，store 顺序即倒序时间序
 const invites = computed<EmContactInvite[]>(() => contactStore.invites)
 
+function isGroup(invite: EmContactInvite): boolean {
+  return invite.kind === CONTACT_INVITE_KIND.GROUP
+}
+
+// 群展示名回落链：邀请快照 groupName > groupStore 详情 > groupId
+function groupNameOfInvite(invite: EmContactInvite): string {
+  if (invite.groupName != null && invite.groupName !== '') return invite.groupName
+  return groupDisplayNameOf(invite.groupId ?? '')
+}
+
+function titleOf(invite: EmContactInvite): string {
+  return isGroup(invite) ? groupNameOfInvite(invite) : displayNameOf(invite.from)
+}
+
+function avatarNameOf(invite: EmContactInvite): string {
+  return titleOf(invite)
+}
+
+function avatarSrcOf(invite: EmContactInvite): string {
+  // group kind 无群头像快照来源（事件载荷不带），走名字占位；contact kind 读用户资料缓存
+  return isGroup(invite) ? '' : avatarOf(invite.from)
+}
+
 function subtitleOf(invite: EmContactInvite): string {
+  if (isGroup(invite)) {
+    if (invite.outgoing) {
+      // 我方邀请被处理的通知：from 为被邀请人
+      return invite.status === CONTACT_INVITE_STATUS.ACCEPTED
+        ? t('contact.requests.groupAccepted', { name: displayNameOf(invite.from) })
+        : t('contact.requests.groupDeclined', { name: displayNameOf(invite.from) })
+    }
+    // 收到的群邀请：邀请人 + （有附言时）附言
+    const inviter = invite.from !== '' ? t('contact.requests.inviter', { name: displayNameOf(invite.from) }) : ''
+    if (invite.message !== '') {
+      return inviter !== '' ? `${inviter} · ${invite.message}` : invite.message
+    }
+    return inviter
+  }
   if (invite.outgoing) return t('contact.requests.declinedByPeer')
   return invite.message !== '' ? invite.message : t('contact.requests.received')
 }
@@ -97,7 +136,10 @@ function isProcessing(id: string): boolean {
 function processInvite(invite: EmContactInvite, kind: 'accept' | 'decline'): void {
   if (isProcessing(invite.id)) return
   processingIds.value.push(invite.id)
-  const action = kind === 'accept' ? EmKit.acceptContactInvite(invite) : EmKit.declineContactInvite(invite)
+  // group kind 走群邀请接受/拒绝 API（接受成功内部刷新群快照），contact kind 维持好友语义
+  const action = isGroup(invite)
+    ? (kind === 'accept' ? EmKit.acceptGroupInvite(invite) : EmKit.declineGroupInvite(invite))
+    : (kind === 'accept' ? EmKit.acceptContactInvite(invite) : EmKit.declineContactInvite(invite))
   action
     .catch(() => {
       uni.showToast({ title: kind === 'accept' ? t('contact.requests.acceptFailed') : t('contact.requests.declineFailed'), icon: 'none' })

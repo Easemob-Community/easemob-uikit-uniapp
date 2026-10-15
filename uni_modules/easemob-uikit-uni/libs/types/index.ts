@@ -1,5 +1,6 @@
 import type {
   ConnectionStatusValue,
+  ContactInviteKindValue,
   ContactInviteStatusValue,
   ConversationMenuKeyValue,
   ConversationTypeValue,
@@ -169,14 +170,26 @@ export interface EmContactItem {
   addTs: number       // 好友关系建立时间戳
 }
 
-/** 好友申请/通知条目（内存 + uni.setStorage 持久化未处理项） */
+/** 好友申请/群邀请/通知条目（内存 + uni.setStorage 持久化；好友与群邀请同表，按 kind 分化处理链路） */
 export interface EmContactInvite {
-  id: string          // 本地生成（from + ts），幂等合并用
-  from: string        // 申请发起方 userId
-  message: string     // 验证附言，可为空串
+  id: string          // 本地生成（from/groupId + ts），幂等合并用
+  kind: ContactInviteKindValue  // contact=好友申请，group=群邀请（旧持久化数据无此字段，加载时兜底 contact）
+  from: string        // 申请发起方 userId（group kind：incoming=邀请人，outgoing=被邀请人）
+  message: string     // 验证/邀请附言，可为空串
   status: ContactInviteStatusValue
-  outgoing: boolean   // true = 我方发出的申请被对方拒绝的通知
+  outgoing: boolean   // true = 我方发出的申请被对方处理的通知
   ts: number
+  groupId?: string    // group kind 必填：群 id（接受/拒绝群邀请 API 入参）
+  groupName?: string  // group kind 群名快照（事件载荷可能缺省，展示走 groupStore 回落链）
+}
+
+/** 通讯录入口项（em-contact-nav props；对齐 vue 版 ContactNavEntry） */
+export interface EmContactNavEntry {
+  key: string         // 入口唯一标识（宿主按 key 接线路由，内置 key 见 CONTACT_ENTRY_KEY）
+  label: string
+  count?: number      // 计数徽标，>0 才展示
+  hot?: boolean       // 红点（仅 count>0 时生效，对齐 vue 语义）
+  icon: string        // em-icon 图标名
 }
 
 export type EmThemeMode = ThemeModeValue
