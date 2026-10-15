@@ -404,10 +404,14 @@ watch(draft, (v) => {
   }
 })
 
-// 选人：草稿尾部追加式插入（触发 @ 已在草稿尾，补 name + 空格，与 vue 一致便于 filterActiveMentions 精确匹配）；
-// 追加式是 uni input 无光标 API 的物理上限，不做光标定位 hack
+// 选人：截断到草稿最后一个 @（剥离面板打开期间已输入的 @keyword，对齐 vue 版 insertMention 的
+// 「替换已有 @keyword」语义——否则 ...@ab 选人会残留成 ...@ab张三，@ 不紧跟名字，
+// filterActiveMentions 精确匹配不到，ext.em_at_list 静默丢失）；
+// 草稿中无 @（兜底路径，理论上 trigger 已保证有）退化为尾部追加。
+// 尾部追加是 uni input 无光标 API 的物理上限，不做光标定位 hack
 function onMentionSelect(contact: MentionContact): void {
-  draft.value = `${draft.value}${contact.name} `
+  const atIdx = draft.value.lastIndexOf('@')
+  draft.value = `${atIdx >= 0 ? draft.value.slice(0, atIdx + 1) : draft.value}${contact.name} `
   if (!mentionedContacts.value.some((c) => c.userId === contact.userId)) {
     mentionedContacts.value = [...mentionedContacts.value, contact]
   }

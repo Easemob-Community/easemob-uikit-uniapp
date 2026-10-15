@@ -4,12 +4,14 @@
          @ 片段套高亮类可点击（对齐 vue 版 text-message 的 msgSegments，链接识别不在一期） -->
     <text v-if="segments.length === 0" :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">{{ message.text }}</text>
     <text v-else :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">
-      <text
-        v-for="(seg, idx) in segments"
-        :key="idx"
-        :class="seg.type === 'mention' ? [ns.e('mention'), message.self && ns.m('mention-self')] : ''"
-        @click="seg.type === 'mention' && onMentionClick(seg)"
-      >{{ seg.value }}</text>
+      <template v-for="(seg, idx) in segments" :key="idx">
+        <text
+          v-if="seg.type === 'mention'"
+          :class="[ns.e('mention'), message.self && ns.m('mention-self')]"
+          @click="onMentionClick(seg)"
+        >{{ seg.value }}</text>
+        <text v-else>{{ seg.value }}</text>
+      </template>
     </text>
   </view>
 </template>
