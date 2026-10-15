@@ -70,6 +70,10 @@
 - 单元格去掉 flex:1/max-height/min-height，改定高 22px；字号 `--em-font-size-9`→`--em-font-size-10`；高亮仍主色底 + `--em-radius`，淡化仍 opacity 0.45；点按/滑动/事件契约零改动。
 - 验证：build web + build mp-weixin 全绿（分包防回归 11 项过，主包 495KB）；H5 产物伺服 200。**待验**：mp 开发者工具与真机肉眼复核（居中紧凑 28px 宽字母块、点按/滑动定位、高亮淡化）。
 
+## 2026-10-15 多场景易用性评估归档（零代码变更）
+
+评估结论落 `docs/EVAL-MULTI-SCENARIO.md`：四场景（客服/医疗/招聘/二手交易，H5 移动端形态）共享「入口按钮 → 直进 1v1 聊天页」模型，底座（`em-chat-page` 单组件直引 + init/login/whenReady 链路）已可用。核心缺口（按复用度）：P0 = 发送侧 ext/sendCustom、`#banner` 插槽（3/4 场景要会话顶部固定位）、`title`/`showAction` 透出、系统提示消息（居中小灰条 + 本地插入 API）；P1 = 未读 API、快捷回复条、自定义菜单动作。继承聊天记录场景拆两路线：**路线 A**（共享身份账号单聊）今天零改动可用，客服/招聘/交易主荐；**路线 B**（群伪装单聊）完全阻塞于 M2.9，且 M2.9 之上需增补「伪装模式」（群形态 UI 全套隐藏开关 + 昵称行档位 + 成员事件灰条化 + open-info 宿主接管）——须在 M2.9 设计群形态时预留开关位。H5 边界：录音物理不支持（医疗/客服受影响）、chooseFile 可用。落地时按评估文档 §6 先改 PLAN.md 再动代码。
+
 ## 待验项汇总
 
 | 项 | 端 | 备注 |
@@ -90,3 +94,11 @@
 - 微信小程序（开发者工具模拟器）：登录 → 跨分包 require 加载 SDK → 收发通。
 - 鸿蒙真机：登录/收发/重连实测通过（签名配置见 `docs/HARMONY-REALDEVICE-RUN.md`）。
 - Android 真机：登录/收发通；键盘顶飞已修复（用户复测确认）。
+
+## 2026-10-15 M2.9 群基础 Phase 1（数据层 + chatType 贯通）
+
+- `libs/chat/group.ts` + `libs/store/group.ts` 落地：GroupManager 注册 + `enableSyncData` 增 `'group'`；getJoinedGroups/getGroupInfo（飞行中去重）/getGroupMemberList 游标分页/公告读写/建群/邀请/退群/解散/转让/改名/管理员/全员禁言；群事件 12 handler（成员进出/资料变更/公告/被移出/解散/邀请）「更新 store + 系统通知」双写（`insertGroupNotice` 暂空实现，Phase 5 接）。
+- chatType 显式贯通：消息/会话域 16 处方法签名增必传 `chatType`（breaking，无默认值）；`EmMessageItem`/`EmConversationItem` 增字段，`mapWireChatType` 含 4.x 兼容；会话同步不再 filter 群聊；`sendReadReceipts` 群聊短路；新增 `addConversation` 本地构造（发起会话用，不调 SDK）。
+- 新类型 EmGroup/EmGroupMember/CreateGroupParams/MentionContact；constants 增 GROUP_MEMBER_ROLE/`MESSAGE_EXT_KEY.MENTION='em_at_list'`/GROUP_MEMBER_GRID_COUNT=9/GROUP_MEMBER_PAGE_SIZE=20/GROUP_ANNOUNCEMENT_MAX_LENGTH=512（对齐 vue）；`libs/utils/mention.ts` 两纯函数（filterActiveMentions/parseMentions，对齐 vue）；EmKit 透出 17 个群方法 + enterGroup 预热。
+- 验证：build web ✓ / build mp-weixin 11 项全绿（主包 516KB）/ H5 伺服 200。
+- **过渡态挂账**：①群会话已进列表但 chat 页进入仍按 singleChat 调 SDK（Phase 2 路由贯通修复）；②群邀请写入 contact invites 但无 kind 维度，请求页对群邀请点同意会走好友语义（Phase 4 修）；③insertGroupNotice 空实现（Phase 5）；④SDK 链式 API 与事件 payload 字段名仅编译期验证，待 spike + 真机冒烟。

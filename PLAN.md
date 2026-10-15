@@ -194,6 +194,7 @@ easemob-uikit-uniapp/
 - **范围**：群数据层（GroupManager 注册 + `enableSyncData` 增 `'group'` + `libs/chat/group.ts` + `libs/store/group.ts` + 群事件「更新 store + 系统通知」双写）；chatType 全链路贯通（消息/会话域方法显式 `chatType` 参数，`EmMessageItem`/`EmConversationItem` 增字段，breaking）；群会话列表（含 `@我` 徽标）；聊天页群形态（群名+人数/成员昵称行/群公告条）；@ 提及全链路（`em-mention-picker` 半屏组件 + ext `em_at_list` 与 vue 版同 key，追加式插入为上限）；群列表页 `em-group-page`；统一选人组件 `em-select-contact`（发起会话/建群/邀请三处复用）；发起会话（选人 → 本地 addConversation，对齐 vue 语义）；联系人页重构为「入口页 + 次级列表页」（新 `em-contact-nav` + `em-contact-list-page`，好友主页形态 breaking）；群详情/管理（`em-chat-info-page` 群分支：成员宫格/公告编辑/管理员/转让/退群解散/全员禁言读字段禁输入）；触底加载统一组件 `em-load-more`（群成员列表游标翻页为实际消费点，按钮式翻页优先）。
 - **明确不做**：黑名单/白名单管理页（联系人页入口预留）、群共享文件、公开群入群申请审批、群名片、群已读回执详情、@ 光标处插入（uni `<input>` 无 selectionStart，物理上限）、群聊消息搜索、群公告富文本、presence。
 - **门禁**：先补 GroupManager 五端 spike（重点小程序端群同步时序，追加 `docs/SPIKE-SDK-CONNECTIVITY.md`），不过则暂停 UI 开发。
+- **伪装模式预留**（承 `docs/EVAL-MULTI-SCENARIO.md` §6-3）：群形态 UI（人数/公告条/昵称行档位/成员事件渲染策略）设计时预留隐藏开关位；伪装形态下 `open-info` 由宿主接管。开关本体二期随伪装场景落地，M2.9 只保证不留硬编码分支。
 
 ### M3：组件沉淀与发布
 
