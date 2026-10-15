@@ -83,6 +83,7 @@ export type LogLevelValue = (typeof LOG_LEVEL)[keyof typeof LOG_LEVEL]
 /** 会话页菜单 action key（加号面板 + 会话长按） */
 export const CONVERSATION_MENU_KEY = {
   NEW_CHAT: 'new-chat',
+  CREATE_GROUP: 'create-group',
   PIN: 'pin',
   MUTE: 'mute',
   DELETE: 'delete'

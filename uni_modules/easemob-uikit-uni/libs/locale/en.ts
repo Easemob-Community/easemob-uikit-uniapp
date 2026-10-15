@@ -41,6 +41,11 @@ export default {
   'chat.media.file': 'File',
   'chat.media.voice': 'Voice',
 
+  'chat.memberCount': '{count} members',
+  'chat.announcementBanner.title': 'Group Announcement',
+  'chat.announcementBanner.expand': 'Expand',
+  'chat.announcementBanner.collapse': 'Collapse',
+
   'chat.info.title': 'Chat Info',
   'chat.info.conversationMute': 'Mute Notifications',
   'chat.info.conversationPin': 'Pin Conversation',
@@ -50,6 +55,11 @@ export default {
 
   'conversation.title': 'Conversations',
   'conversation.newChat': 'New Chat',
+  'conversation.menu.newChat': 'New Chat',
+  'conversation.menu.createGroup': 'Create Group',
+  'conversation.newChatSelfError': 'Cannot start a chat with yourself',
+  'conversation.atMeInMessage': '[@me]',
+  'conversation.createGroupComing': 'Group creation is coming in a later version',
   'conversation.pin': 'Pin',
   'conversation.unpin': 'Unpin',
   'conversation.mute': 'Mute Notifications',

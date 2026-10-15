@@ -3,11 +3,23 @@
     <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar -->
     <em-nav-bar
       :title="peerDisplayName"
-      :subtitle="peerTyping ? t('chat.typing') : ''"
+      :subtitle="headerSubtitle"
       action-icon="more-filled"
       @back="onBack"
       @action="onOpenInfo"
     />
+
+    <!-- 群公告条（仅群聊 + showAnnouncement）：标题 + 单行省略正文，超一行给出展开按钮（全量走 em-popup 弹层） -->
+    <view v-if="showAnnouncementBanner" :class="ns.e('announcement')">
+      <EmIcon name="notification" :size="14" :class="ns.e('announcement-icon')" />
+      <view :class="ns.e('announcement-main')">
+        <text :class="ns.e('announcement-title')">{{ t('chat.announcementBanner.title') }}</text>
+        <em-text :text="announcement" :text-class="ns.e('announcement-text')" :text-style="announcementTextStyle" :class="ns.e('announcement-host')" />
+      </view>
+      <view v-if="announcementCanExpand" :class="ns.e('announcement-toggle')" @click="announcementVisible = true">
+        <EmIcon name="arrow-down" :size="14" :class="ns.e('announcement-toggle-icon')" />
+      </view>
+    </view>
     <scroll-view
       :class="ns.e('scroll')"
       scroll-y
@@ -46,8 +58,10 @@
           <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
         </view>
         <template v-else>
-          <em-avatar :src="avatarOf(m.from)" :name="displayNameOf(m.from)" :size="36" :shape="avatarShape" />
+          <em-avatar :src="avatarOf(m.from)" :name="senderNameOf(m)" :size="36" :shape="avatarShape" />
           <view :class="[ns.e('content'), m.self && ns.m('content-self')]">
+            <!-- 群聊发送者昵称行（己方不显示；senderNameMode 控制显隐，伪装模式预留 'on-change' 档） -->
+            <em-text v-if="showSenderName(m)" :text="senderNameOf(m)" :text-class="ns.e('sender-name')" :text-style="senderNameTextStyle" :class="ns.e('sender-name-host')" />
             <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
             <view :class="ns.e('bubble-row')">
               <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="ns.e('state')" @click="onResend(m)">
@@ -131,6 +145,19 @@
       @select="onMessageAction"
       @update:visible="msgSheetVisible = $event"
     />
+
+    <!-- 群公告全文弹层（单行省略态超一行时的展开出口） -->
+    <em-popup :visible="announcementVisible" position="center" @update:visible="announcementVisible = $event">
+      <view :class="ns.e('announcement-dialog')">
+        <text :class="ns.e('announcement-dialog-title')">{{ t('chat.announcementBanner.title') }}</text>
+        <scroll-view :class="ns.e('announcement-dialog-scroll')" scroll-y>
+          <text :class="ns.e('announcement-dialog-text')">{{ announcement }}</text>
+        </scroll-view>
+        <view :class="ns.e('announcement-dialog-close')" @click="announcementVisible = false">
+          <text :class="ns.e('announcement-dialog-close-text')">{{ t('button.close') }}</text>
+        </view>
+      </view>
+    </em-popup>
   </view>
 </template>
 
@@ -148,14 +175,17 @@ import EmAudioMessage from '../../em-audio-message/em-audio-message.vue'
 import EmVideoMessage from '../../em-video-message/em-video-message.vue'
 import EmFileMessage from '../../em-file-message/em-file-message.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
+import EmPopup from '../../em-popup/em-popup.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONVERSATION_TYPE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
+import type { ConversationTypeValue } from '../../../libs/constants'
 import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
-import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmQuoteInfo } from '../../../libs/types'
+import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmQuoteInfo, EmSenderNameMode } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { clearDraft, getDraft, setDraft } from '../../../libs/store/draft'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
+import { groupDisplayNameOf, groupMemberDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
@@ -179,12 +209,23 @@ defineOptions({ styleIsolation: 'app-and-page' })
 
 interface Props {
   conversationId: string
+  /** 会话类型（M2.9 起必传，breaking）：单聊/群聊行为分流（typing/已读回执单聊专属，群聊走群数据层） */
+  chatType: ConversationTypeValue
   /** 头像形状（透传 em-avatar 的 shape），默认 'circle' */
   avatarShape?: EmAvatarShape
+  /** 群聊标题区成员数副标题显隐（仅群聊生效；typing 单聊专属，两态互斥），默认 true */
+  showMemberCount?: boolean
+  /** 群聊气泡上方发送者昵称行模式（仅群聊生效），默认 'always'；伪装模式二期加 'on-change' 档 */
+  senderNameMode?: EmSenderNameMode
+  /** 群公告条显隐（仅群聊生效），默认 true */
+  showAnnouncement?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  avatarShape: 'circle'
+  avatarShape: 'circle',
+  showMemberCount: true,
+  senderNameMode: 'always',
+  showAnnouncement: true
 })
 
 const emit = defineEmits<{
@@ -246,11 +287,60 @@ const dividerBefore = computed<Record<string, boolean>>(() => {
   return flags
 })
 
-// header 标题：昵称 > conversationId（资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）
-const peerDisplayName = computed(() => displayNameOf(props.conversationId))
+// header 标题：单聊——昵称 > conversationId（资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）；
+// 群聊——群数据层 groupDisplayNameOf（拉到即回填，name > groupId）
+const isGroupChat = computed(() => props.chatType === CONVERSATION_TYPE.GROUP_CHAT)
+const peerDisplayName = computed(() =>
+  isGroupChat.value ? groupDisplayNameOf(props.conversationId) : displayNameOf(props.conversationId)
+)
 
-// 对端 typing 提示（chat 层 5s 超时自动消失）
-const peerTyping = computed(() => messageStore.peerTypingByConversationId[props.conversationId] === true)
+// header 副标题（两态互斥）：单聊——对端 typing（chat 层 5s 超时自动消失）；
+// 群聊——成员数（showMemberCount 开关，群详情拉到后回填；typing 信令单聊专属不发不收）
+const peerTyping = computed(() =>
+  !isGroupChat.value && messageStore.peerTypingByConversationId[props.conversationId] === true
+)
+const memberCount = computed(() => groupStore.infoByGroupId[props.conversationId]?.memberCount ?? 0)
+const headerSubtitle = computed(() => {
+  if (peerTyping.value) return t('chat.typing')
+  if (isGroupChat.value && props.showMemberCount && memberCount.value > 0) {
+    return t('chat.memberCount', { count: memberCount.value })
+  }
+  return ''
+})
+
+// 群聊发送者昵称行：群成员名片 > userStore 昵称 > userId（己方消息不显示；单聊不显示）
+function senderNameOf(m: EmMessageItem): string {
+  return isGroupChat.value ? groupMemberDisplayNameOf(props.conversationId, m.from) : displayNameOf(m.from)
+}
+
+const senderNameTextStyle =
+  'font-family: var(--em-font-family); font-size: var(--em-font-size-12); line-height: 18px; font-weight: var(--em-font-weight-medium); color: var(--em-text-primary); white-space: nowrap;'
+
+function showSenderName(m: EmMessageItem): boolean {
+  return isGroupChat.value && props.senderNameMode === 'always' && !m.self && m.status !== MESSAGE_STATUS.RECALLED
+}
+
+// 群公告条：数据读 announcementByGroupId（undefined=未拉取不渲染，进会话时拉取；空串=无公告不渲染）
+const announcement = computed(() => groupStore.announcementByGroupId[props.conversationId] ?? '')
+const showAnnouncementBanner = computed(() => isGroupChat.value && props.showAnnouncement && announcement.value !== '')
+const announcementVisible = ref(false)
+const announcementTextStyle =
+  'font-family: var(--em-font-family); font-size: var(--em-font-size-12); line-height: 18px; color: var(--em-text-primary); white-space: nowrap;'
+
+// 展开按钮显隐：ucss 无 DOM 测量能力，按窗口宽与字号估算是否超一行
+// （CJK 按 1 字宽、其余按 0.55 字宽近似；横幅可用宽 = 屏宽 - 页边距 - 图标/开关占位）
+const announcementCanExpand = computed(() => {
+  const text = announcement.value
+  if (text === '') return false
+  if (text.includes('\n')) return true
+  const windowWidth = uni.getWindowInfo().windowWidth
+  const available = windowWidth - 32 - 14 - 8 - 24 - 12
+  let units = 0
+  for (const ch of text) {
+    units += (ch.charCodeAt(0) > 0xff ? 1 : 0.55)
+  }
+  return units * 12 > available
+})
 
 // 已读回执展示目标：最新一条己方已发送消息（其余己方消息不显示已读态）
 const latestSelfLocalId = computed(() => {
@@ -263,7 +353,8 @@ const latestSelfLocalId = computed(() => {
 })
 
 function showReadState(m: EmMessageItem): boolean {
-  return EmKit.isReadReceiptEnabled() && m.self && m.status === MESSAGE_STATUS.SENT && m.localId === latestSelfLocalId.value
+  // 单聊已读回执专属：群聊不显示已读态图标（groupAck 不在一期）
+  return !isGroupChat.value && EmKit.isReadReceiptEnabled() && m.self && m.status === MESSAGE_STATUS.SENT && m.localId === latestSelfLocalId.value
 }
 
 function isPeerRead(m: EmMessageItem): boolean {
@@ -361,7 +452,14 @@ onMounted(() => {
   }
   // 进入会话与拉历史并行、不阻塞渲染（对齐 TUIKit：会话页点击时已预热拉取，store 有缓存立即渲染）；
   // 串行 await 是进入停顿的主因，这里只做 fire-and-forget + 完成后滚底
-  EmKit.enterConversation(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
+  EmKit.enterConversation(props.conversationId, props.chatType).catch(() => {})
+  // 群聊额外预热：群详情 + 成员首屏（昵称行/标题/成员数用），公告未拉则进会话时拉取
+  if (isGroupChat.value) {
+    EmKit.enterGroup(props.conversationId).catch(() => {})
+    if (groupStore.announcementByGroupId[props.conversationId] === undefined) {
+      EmKit.getGroupAnnouncement(props.conversationId).catch(() => {})
+    }
+  }
   // 热启动（预热/二次进入命中缓存）：已有消息立即滚底并显示，不等历史请求回包
   if (list.value.length > 0) {
     scrollToBottom()
@@ -369,7 +467,7 @@ onMounted(() => {
       ready.value = true
     })
   }
-  EmKit.loadHistory(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT)
+  EmKit.loadHistory(props.conversationId, props.chatType)
     .catch((e) => {
       logger.error('loadHistory fail:', e)
     })
@@ -404,13 +502,13 @@ onUnmounted(() => {
 })
 
 // 草稿默认开（uiConfig.enableDraft，可经 EmKitConfig/setConfig 关闭）：输入即存，清空/发送即清；
-// 非空输入动作向对方发 typing 信号（chat 层按 uiConfig.typingThrottle 节流，enableTyping 关闭时全断）
+// 非空输入动作向对方发 typing 信号（单聊专属，群聊不发 typing；chat 层按 uiConfig.typingThrottle 节流，enableTyping 关闭时全断）
 watch(draft, (v) => {
   if (config.enableDraft) {
     setDraft(props.conversationId, v)
   }
-  if (config.enableTyping && v.trim() !== '') {
-    EmKit.sendTyping(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
+  if (config.enableTyping && !isGroupChat.value && v.trim() !== '') {
+    EmKit.sendTyping(props.conversationId, props.chatType).catch(() => {})
   }
 })
 
@@ -426,7 +524,7 @@ async function onLoadMore(): Promise<void> {
   // 延时清空锚点——消除加载历史时视口被顶动的跳动
   const first = list.value.length > 0 ? list.value[0] : null
   try {
-    await EmKit.loadHistory(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT)
+    await EmKit.loadHistory(props.conversationId, props.chatType)
     if (first != null) {
       const anchor = msgAnchorId(first)
       scrollWithAnimation.value = false
@@ -450,7 +548,7 @@ async function onSend(): Promise<void> {
   if (text === '') return
   const quote = quoteInfo.value != null ? quoteInfo.value : undefined
   try {
-    const item = await EmKit.sendText(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, text, quote)
+    const item = await EmKit.sendText(props.conversationId, props.chatType, text, quote)
     draft.value = ''
     // 发送成功才清引用条，失败保留供重发
     quoteInfo.value = null
@@ -465,7 +563,7 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
   try {
     const images = await chooseImage(1, sourceType)
     if (images.length === 0) return
-    const item = await EmKit.sendImage(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, images[0])
+    const item = await EmKit.sendImage(props.conversationId, props.chatType, images[0])
     scrollToBottom()
     emit('send', item)
   } catch (e) {
@@ -490,7 +588,7 @@ async function onPickVideo(): Promise<void> {
   const video = await chooseVideo()
   if (video == null) return
   try {
-    const item = await EmKit.sendVideo(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, video)
+    const item = await EmKit.sendVideo(props.conversationId, props.chatType, video)
     scrollToBottom()
     emit('send', item)
   } catch (e) {
@@ -502,7 +600,7 @@ async function onPickFile(): Promise<void> {
   const file = await chooseFile()
   if (file == null) return
   try {
-    const item = await EmKit.sendFile(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, file)
+    const item = await EmKit.sendFile(props.conversationId, props.chatType, file)
     scrollToBottom()
     emit('send', item)
   } catch (e) {
@@ -512,7 +610,7 @@ async function onPickFile(): Promise<void> {
 
 async function onVoiceSend(path: string, duration: number): Promise<void> {
   try {
-    const item = await EmKit.sendAudio(props.conversationId, CONVERSATION_TYPE.SINGLE_CHAT, path, duration)
+    const item = await EmKit.sendAudio(props.conversationId, props.chatType, path, duration)
     scrollToBottom()
     emit('send', item)
   } catch (e) {

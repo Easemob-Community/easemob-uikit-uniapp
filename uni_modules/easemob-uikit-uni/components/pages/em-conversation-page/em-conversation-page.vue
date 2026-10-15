@@ -35,6 +35,7 @@
         :avatar="entry.avatar"
         :time-text="entry.timeText"
         :draft="entry.draft"
+        :has-at-me="entry.hasAtMe"
         @click="onSelect"
         @long-press="onLongPress"
       />
@@ -49,9 +50,17 @@
     <em-action-sheet
       :visible="itemSheetVisible"
       :actions="itemActions"
-      :title="activeItem != null ? displayNameOf(activeItem.conversationId, activeItem.name) : ''"
+      :title="activeItem != null ? sheetTitleOf(activeItem) : ''"
       @select="onItemAction"
       @update:visible="itemSheetVisible = $event"
+    />
+
+    <!-- 发起单聊选人弹层（内置闭环：选完人 addConversation 后以 select 事件透出，宿主负责跳聊天页） -->
+    <em-select-contact
+      :items="contactItems"
+      :show="selectContactVisible"
+      @update:show="selectContactVisible = $event"
+      @select="onSelectContact"
     />
   </view>
 </template>
@@ -64,13 +73,18 @@ import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmConversationItem from '../../em-conversation-item/em-conversation-item.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
+import EmSelectContact from '../../em-select-contact/em-select-contact.vue'
 import { EmKit } from '../../../libs'
-import { CONVERSATION_MENU_KEY } from '../../../libs/constants'
+import { CONVERSATION_MENU_KEY, CONVERSATION_TYPE } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { draftStore } from '../../../libs/store/draft'
+import { connectionStore } from '../../../libs/store/connection'
+import { contactDisplayNameOf, contactStore } from '../../../libs/store/contact'
+import { groupDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
-import type { EmActionSheetAction, EmConversationItem as EmConversationData } from '../../../libs/types'
+import type { ConversationTypeValue } from '../../../libs/constants'
+import type { EmActionSheetAction, EmConversationItem as EmConversationData, EmSelectContactItem } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
@@ -91,7 +105,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  (e: 'select', conversationId: string): void
+  (e: 'select', conversationId: string, chatType: ConversationTypeValue): void
   (e: 'menu', key: string): void
 }>()
 
@@ -119,20 +133,31 @@ interface Entry {
   avatar: string
   draft: { text: string, time: number } | null
   timeText: string
+  hasAtMe: boolean
 }
 
-// 名称/头像回落链（对齐 vue 版 conversation-item）：用户资料 nickname/avatarUrl > SDK conversation.name/avatar > conversationId
+// 名称回落链（对齐 vue 版 conversation-item）：
+// 单聊——用户资料 nickname/avatarUrl > SDK conversation.name/avatar > conversationId；
+// 群聊——群数据层 groupDisplayNameOf（拉到即回填，响应式）> SDK conversation.name > groupId；
+// 群头像取群 avatar，缺失走 em-avatar 文字占位（图标纪律禁 svg/png 默认群头像）。
 // 草稿优先：时间取草稿时间与最后消息时间的较大者（对齐 Web 版 displayTime 规则）
 // 搜索：本地过滤名称 / 会话 ID / 摘要（一期不做服务端漫游消息搜索）
 const items = computed<Entry[]>(() => {
   const kw = keyword.value.trim().toLowerCase()
   return conversationStore.items
     .map((item) => {
-      const name = displayNameOf(item.conversationId, item.name)
-      const avatar = avatarOf(item.conversationId)
+      const isGroup = item.chatType === CONVERSATION_TYPE.GROUP_CHAT
+      const groupName = isGroup ? groupDisplayNameOf(item.conversationId) : ''
+      const name = isGroup && groupName !== item.conversationId
+        ? groupName
+        : displayNameOf(item.conversationId, item.name)
+      const userAvatar = avatarOf(item.conversationId)
+      const groupAvatar = isGroup ? (groupStore.infoByGroupId[item.conversationId]?.avatar ?? '') : ''
+      const avatar = userAvatar !== '' ? userAvatar : (groupAvatar !== '' ? groupAvatar : item.avatar)
       const draft = draftStore.draftByConversationId[item.conversationId] ?? null
       const time = draft != null && draft.time > item.lastMessageTime ? draft.time : item.lastMessageTime
-      return { item, name, avatar: avatar !== '' ? avatar : item.avatar, draft, timeText: formatConversationTime(time) }
+      const hasAtMe = conversationStore.atMeByConversationId[item.conversationId] === true
+      return { item, name, avatar, draft, timeText: formatConversationTime(time), hasAtMe }
     })
     .filter((entry) => {
       if (kw === '') return true
@@ -143,7 +168,30 @@ const items = computed<Entry[]>(() => {
 })
 
 function onSelect(conversationId: string): void {
-  emit('select', conversationId)
+  const item = conversationStore.items.find(i => i.conversationId === conversationId)
+  emit('select', conversationId, item?.chatType ?? CONVERSATION_TYPE.SINGLE_CHAT)
+}
+
+// 发起单聊选人（em-select-contact 数据装配：联系人展示名走 remark > nickname > userId 回落链）
+const selectContactVisible = ref(false)
+
+const contactItems = computed<EmSelectContactItem[]>(() =>
+  contactStore.items.map((c) => ({
+    userId: c.userId,
+    name: contactDisplayNameOf(c.userId),
+    avatar: c.avatarUrl !== '' ? c.avatarUrl : avatarOf(c.userId)
+  }))
+)
+
+// 选人闭环（对齐 vue 版 new-chat-modal）：拒绝自己 → 本地构造会话（已存在不动）→ select 透出由宿主跳聊天页
+function onSelectContact(userId: string): void {
+  if (userId === connectionStore.userId) {
+    uni.showToast({ title: t('conversation.newChatSelfError'), icon: 'none' })
+    return
+  }
+  EmKit.addConversation(userId, CONVERSATION_TYPE.SINGLE_CHAT)
+  selectContactVisible.value = false
+  emit('select', userId, CONVERSATION_TYPE.SINGLE_CHAT)
 }
 
 // 右上角加号：内置 action-sheet，菜单项选择后统一以 menu 事件透出
@@ -152,7 +200,8 @@ const itemSheetVisible = ref(false)
 const activeItem = ref<EmConversationData | null>(null)
 
 const createActions = computed<EmActionSheetAction[]>(() => [
-  { key: CONVERSATION_MENU_KEY.NEW_CHAT, text: t('conversation.newChat'), icon: 'chat' }
+  { key: CONVERSATION_MENU_KEY.NEW_CHAT, text: t('conversation.menu.newChat'), icon: 'chat' },
+  { key: CONVERSATION_MENU_KEY.CREATE_GROUP, text: t('conversation.menu.createGroup'), icon: 'chatboxes' }
 ])
 
 const itemActions = computed<EmActionSheetAction[]>(() => {
@@ -174,12 +223,26 @@ function onOpenCreate(): void {
 }
 
 function onCreateAction(action: EmActionSheetAction): void {
+  // new-chat 内置选人闭环（em-select-contact）；create-group 本阶段直接 emit 由宿主占位（建群 Phase 4）
+  if (action.key === CONVERSATION_MENU_KEY.NEW_CHAT) {
+    selectContactVisible.value = true
+    return
+  }
   emit('menu', action.key)
 }
 
 function onLongPress(conversationId: string): void {
   activeItem.value = conversationStore.items.find(i => i.conversationId === conversationId) ?? null
   itemSheetVisible.value = true
+}
+
+// 长按菜单标题：群会话走群展示名回落链（与列表条目同名口径）
+function sheetTitleOf(item: EmConversationData): string {
+  if (item.chatType === CONVERSATION_TYPE.GROUP_CHAT) {
+    const groupName = groupDisplayNameOf(item.conversationId)
+    if (groupName !== item.conversationId) return groupName
+  }
+  return displayNameOf(item.conversationId, item.name)
 }
 
 async function onItemAction(action: EmActionSheetAction): Promise<void> {

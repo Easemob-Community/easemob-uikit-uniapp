@@ -41,6 +41,11 @@ export default {
   'chat.media.file': '文件',
   'chat.media.voice': '语音',
 
+  'chat.memberCount': '{count} 名成员',
+  'chat.announcementBanner.title': '群公告',
+  'chat.announcementBanner.expand': '展开',
+  'chat.announcementBanner.collapse': '收起',
+
   'chat.info.title': '聊天信息',
   'chat.info.conversationMute': '会话免打扰',
   'chat.info.conversationPin': '置顶会话',
@@ -50,6 +55,11 @@ export default {
 
   'conversation.title': '会话列表',
   'conversation.newChat': '发起单聊',
+  'conversation.menu.newChat': '发起单聊',
+  'conversation.menu.createGroup': '创建群组',
+  'conversation.newChatSelfError': '不能和自己创建会话',
+  'conversation.atMeInMessage': '[有人@我]',
+  'conversation.createGroupComing': '建群将在后续版本提供',
   'conversation.pin': '置顶',
   'conversation.unpin': '取消置顶',
   'conversation.mute': '免打扰',

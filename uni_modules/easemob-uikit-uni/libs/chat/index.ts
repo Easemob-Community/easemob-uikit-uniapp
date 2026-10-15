@@ -6,8 +6,9 @@
 // 消息/会话方法全部显式携带 chatType（M2.9 群基础，breaking）；
 // 群数据域在 ./group（EmGroupDomain），由 libs/index.ts 的 EmKitImpl 直接组合。
 import type { ChatClient, Message } from 'easemob-websdk'
-import { CONVERSATION_TYPE } from '../constants'
+import { CONVERSATION_TYPE, MESSAGE_EXT_KEY } from '../constants'
 import type { ConversationTypeValue } from '../constants'
+import { connectionStore } from '../store/connection'
 import { conversationStore } from '../store/conversation'
 import { createLogger } from '../utils/logger'
 import type { EmKitConfig, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
@@ -45,6 +46,14 @@ export class EmChat {
         this.messages.appendMessage(item)
         this.messages.notify(item)
         ensureUserInfos([item.from])
+        // 群聊「有人@我」检测（接收侧）：ext em_at_list 含当前 userId 且非自己发送才置位；
+        // 清除时机在 enterConversation（对齐 vue 版 conversation.hasAtMe 语义）
+        if (item.chatType === CONVERSATION_TYPE.GROUP_CHAT && !item.self) {
+          const mentionList = item.ext[MESSAGE_EXT_KEY.MENTION]
+          if (Array.isArray(mentionList) && mentionList.includes(connectionStore.userId)) {
+            conversationStore.atMeByConversationId[item.conversationId] = true
+          }
+        }
         // 在当前会话收到对方消息：即时回已读回执（群聊在 sendReadReceipts 内部短路）
         if (!item.self && item.conversationId === this.conversations.currentConversationId) {
           this.messages.sendReadReceipts(item.conversationId, item.chatType).catch(() => {})

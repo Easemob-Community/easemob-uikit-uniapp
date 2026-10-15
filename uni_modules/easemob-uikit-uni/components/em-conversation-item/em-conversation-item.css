@@ -97,6 +97,17 @@
   flex-shrink: 0;
 }
 
+/* 「有人@我」前缀：主题红 + 中粗（对齐 vue 版 conversation-item__at-me-prefix 的 primary + medium） */
+.em-conversation-item__at-me {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 18px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-danger-color);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
 .em-conversation-item__summary-host {
   flex: 1;
   min-width: 0;

@@ -17,7 +17,9 @@
       </view>
       <view :class="ns.e('bottom')">
         <view :class="ns.e('message')">
-          <text v-if="draft != null" :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
+          <!-- 群聊「有人@我」红色前缀（对齐 vue 版 conversation-item at-me-prefix，atMe 期间优先于草稿态） -->
+          <text v-if="hasAtMe" :class="ns.e('at-me')">{{ t('conversation.atMeInMessage') }}</text>
+          <text v-else-if="draft != null" :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
           <em-text :text="draft != null ? draft.text : item.lastMessageText" :text-class="ns.e('summary')" :text-style="summaryTextStyle" :class="ns.e('summary-host')" />
         </view>
         <!-- 免打扰未读降级为静默点，其余数字徽标（99+ 截断收口 em-badge） -->
@@ -46,9 +48,12 @@ interface Props {
   avatar: string                                    // 头像 URL（已合并 userStore 与 conversation.avatar）
   timeText: string                                  // 五档格式化时间（formatConversationTime，草稿时间优先在页面侧已并入）
   draft: { text: string, time: number } | null      // 草稿态；null 展示最后消息摘要
+  hasAtMe?: boolean                                 // 群聊「有人@我」未读标记（摘要红色前缀），默认 false
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  hasAtMe: false
+})
 
 const emit = defineEmits<{
   (e: 'click', conversationId: string): void

@@ -37,8 +37,10 @@ import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmButton from '../../em-button/em-button.vue'
 import { EmKit } from '../../../libs'
 import { CONVERSATION_TYPE } from '../../../libs/constants'
+import type { ConversationTypeValue } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle } from '../../../libs/store/config'
+import { groupDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
@@ -48,6 +50,8 @@ defineOptions({ styleIsolation: 'app-and-page' })
 
 interface Props {
   conversationId: string
+  /** 会话类型（M2.9 Phase 2 起必传，breaking）；本阶段仅接线保留，群分支 UI 在 Phase 5 */
+  chatType: ConversationTypeValue
 }
 
 const props = defineProps<Props>()
@@ -62,10 +66,18 @@ const { themeClass } = useTheme()
 const { t } = useLocale()
 
 const conv = computed(() => conversationStore.items.find((c) => c.conversationId === props.conversationId) ?? null)
-// 会话类型以会话 store 为准（群会话由群数据层建联后即为 groupChat）；未同步到时兜底单聊（现状等价）
-const chatType = computed(() => conv.value?.chatType ?? CONVERSATION_TYPE.SINGLE_CHAT)
-const displayName = computed(() => displayNameOf(props.conversationId, conv.value?.name ?? ''))
+// 会话类型以路由 prop 为准（与会话列表/聊天页同一来源；群分支 UI Phase 5，本阶段仅接线）
+const chatType = computed(() => props.chatType)
+const isGroupChat = computed(() => props.chatType === CONVERSATION_TYPE.GROUP_CHAT)
+const displayName = computed(() =>
+  isGroupChat.value
+    ? groupDisplayNameOf(props.conversationId)
+    : displayNameOf(props.conversationId, conv.value?.name ?? '')
+)
 const avatar = computed(() => {
+  if (isGroupChat.value) {
+    return groupStore.infoByGroupId[props.conversationId]?.avatar ?? conv.value?.avatar ?? ''
+  }
   const a = avatarOf(props.conversationId)
   return a !== '' ? a : (conv.value?.avatar ?? '')
 })
@@ -77,7 +89,9 @@ const pinned = ref(false)
 onMounted(() => {
   muted.value = conv.value?.isMuted ?? false
   pinned.value = conv.value?.isPinned ?? false
-  EmKit.ensureUserInfos([props.conversationId])
+  if (!isGroupChat.value) {
+    EmKit.ensureUserInfos([props.conversationId])
+  }
 })
 
 async function onMuteChange(e: any): Promise<void> {

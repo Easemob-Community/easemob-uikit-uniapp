@@ -1,15 +1,17 @@
 <template>
   <view class="page">
-    <em-chat-info-page v-if="conversationId !== ''" :conversation-id="conversationId" @deleted="onDeleted" />
+    <em-chat-info-page v-if="conversationId !== ''" :conversation-id="conversationId" :chat-type="chatType" @deleted="onDeleted" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const conversationId = ref('')
+const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)
 
 onLoad((options) => {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
@@ -17,6 +19,8 @@ onLoad((options) => {
     return
   }
   conversationId.value = (options?.['conversationId'] ?? '') as string
+  const type = (options?.['chatType'] ?? '') as string
+  chatType.value = type === CONVERSATION_TYPE.GROUP_CHAT ? CONVERSATION_TYPE.GROUP_CHAT : CONVERSATION_TYPE.SINGLE_CHAT
 })
 
 // 删除会话后退回会话列表（聊天详情 ← 聊天页 ← 会话列表，delta 2）

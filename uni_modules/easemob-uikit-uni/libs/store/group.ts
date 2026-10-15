@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 import { GROUP_MEMBER_ROLE } from '../constants'
 import type { GroupMemberRoleValue } from '../constants'
 import type { EmGroup, EmGroupMember } from '../types'
+import { displayNameOf } from './user'
 
 // 群数据 store（裸 reactive，零依赖）：
 // items 为已加入群快照（SDK 后台同步 + getJoinedGroupList 整量回写）；
@@ -24,6 +25,14 @@ export const groupStore = reactive({
 export function groupDisplayNameOf(groupId: string): string {
   const name = groupStore.infoByGroupId[groupId]?.name
   return name != null && name !== '' ? name : groupId
+}
+
+// 群消息发送者昵称回落链（气泡上方昵称行）：群成员名片 > userStore 昵称 > userId
+export function groupMemberDisplayNameOf(groupId: string, userId: string): string {
+  const member = groupStore.memberMapByGroupId[groupId]?.find((m) => m.userId === userId)
+  const nick = member?.nick ?? ''
+  if (nick !== '') return nick
+  return displayNameOf(userId)
 }
 
 // 已加入群整量回写：同时并入详情缓存（回写落 reactive 代理：整表替换即可）

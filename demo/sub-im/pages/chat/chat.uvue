@@ -1,28 +1,31 @@
 <template>
   <view class="page">
-    <em-chat-page v-if="conversationId !== ''" :conversation-id="conversationId" @open-info="onOpenInfo" />
+    <em-chat-page v-if="conversationId !== ''" :conversation-id="conversationId" :chat-type="chatType" @open-info="onOpenInfo" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const conversationId = ref('')
+const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)
 
 onLoad((options) => {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
     uni.reLaunch({ url: '/pages/login/login' })
     return
   }
-  const id = (options?.['conversationId'] ?? '') as string
-  conversationId.value = id
+  conversationId.value = (options?.['conversationId'] ?? '') as string
+  const type = (options?.['chatType'] ?? '') as string
+  chatType.value = type === CONVERSATION_TYPE.GROUP_CHAT ? CONVERSATION_TYPE.GROUP_CHAT : CONVERSATION_TYPE.SINGLE_CHAT
 })
 
 // 聊天详情入口（em-chat-page 自绘 header 右上角 more 按钮）
 function onOpenInfo(id: string) {
-  uni.navigateTo({ url: `/sub-im/pages/chat-info/chat-info?conversationId=${id}` })
+  uni.navigateTo({ url: `/sub-im/pages/chat-info/chat-info?conversationId=${id}&chatType=${chatType.value}` })
 }
 </script>
 

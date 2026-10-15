@@ -232,9 +232,19 @@ export interface MentionContact {
   avatar?: string
 }
 
+/** em-select-contact 选人条目（父组件装配好的展示数据：userId/展示名/avatar） */
+export interface EmSelectContactItem {
+  userId: string
+  name: string
+  avatar: string
+}
+
 export type EmLocaleName = LocaleValue
 
 export type EmAvatarShape = 'circle' | 'square'
+
+/** 群聊气泡上方发送者昵称行模式（伪装模式二期加 'on-change' 档） */
+export type EmSenderNameMode = 'always' | 'hidden'
 
 export interface EmActionSheetAction {
   key: string

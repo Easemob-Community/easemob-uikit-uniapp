@@ -63,6 +63,10 @@ export class EmConversationDomain {
     if (chatType === CONVERSATION_TYPE.SINGLE_CHAT) {
       ensureUserInfos([conversationId, connectionStore.userId])
     }
+    // 进入会话清除「有人@我」未读标记（对齐 vue 版会话选中清 atMe 的时机）
+    if (conversationStore.atMeByConversationId[conversationId] === true) {
+      delete conversationStore.atMeByConversationId[conversationId]
+    }
   }
 
   leaveConversation(): void {
@@ -89,6 +93,7 @@ export class EmConversationDomain {
   // 被删会话是当前会话时复位 currentConversationId（对齐 vue 版 deleteConversation 语义）
   removeConversationLocal(conversationId: string): void {
     conversationStore.items = conversationStore.items.filter((c) => c.conversationId !== conversationId)
+    delete conversationStore.atMeByConversationId[conversationId]
     delete messageStore.messagesByConversationId[conversationId]
     delete messageStore.cursorByConversationId[conversationId]
     delete messageStore.hasMoreByConversationId[conversationId]
