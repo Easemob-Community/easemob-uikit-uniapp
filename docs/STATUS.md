@@ -125,3 +125,12 @@
 - 新页面级组件 `em-group-page`（nav-bar + 搜索过滤 + 骨架/空态 + store 驱动；内置建群弹层：群名必填 + public/allowInvites 开关 + createGroup → addConversation + toast；底部 em-load-more 契约预留 hasMore=false）。
 - demo：`sub-im/pages/group/group.uvue` 薄包装（click-group → chat?chatType=groupChat）；会话页 create-group 菜单 → 跳群列表页；占位 key `conversation.createGroupComing` 已删。
 - 验证：build web ✓ / build mp-weixin 11 项全绿（主包 575KB）/ H5 伺服 200。**待验**：建群/群列表运行时端到端；multiple 已选条横滚 mp 真机。
+
+## 2026-10-16 M2.9 Phase 4b（联系人页入口化重构 + 群邀请 kind 分化，breaking）
+
+- `EmContactInvite` 增 `kind('contact'|'group')` + `groupId`/`groupName`；旧持久化数据 loadInvites 兜底 contact；群邀请接受/拒绝走 `acceptInvitation`/`rejectInvitation`（websdk 5.1.3 实名，与 vue 同口径）+ 状态回写 + getJoinedGroups 刷新；`removeInviteByFrom` 收窄只清 contact kind；`onContactAgreed` 补 kind 过滤（修复存量误置同人群邀请缺陷）。
+- 新原子组件 `em-contact-nav`（entries/entry-click 契约对齐 vue ContactNavEntry 子集）。
+- `em-contact-page` 重构为**入口页**（breaking）：标题 + 搜索只过滤入口项 + 三入口（新请求红点计数/群组计数/好友列表计数），emits `entry-click` + `add`；好友列表全部移出。
+- 新页面级组件 `em-contact-list-page`：好友列表零回归平移（分组/索引/搜索/menuKeys 长按删除/骨架空态），emits select/back。
+- demo：`sub-im/pages/contact-list` 注册；contact.uvue 三入口分发（notice→contact-requests、group→group、contact→contact-list）。
+- 验证：build web ✓ / build mp-weixin 11 项全绿（主包 590KB）/ H5 伺服 200。**待验**：三入口跳转、群邀请接受入群全链路、群邀请事件真机载荷字段。
