@@ -22,3 +22,15 @@
 .em-text-message__text--self {
   color: var(--em-bubble-text-self);
 }
+
+/* @提及高亮（对齐 vue 版 text-message__mention）：仅颜色+字重区分，不加下划线；
+   己方气泡内跟随气泡文字色 + 0.9 透明度（vue 版 --self 变体语义） */
+.em-text-message__mention {
+  color: var(--em-mention-color);
+  font-weight: var(--em-font-weight-medium);
+}
+
+.em-text-message--mention-self {
+  color: var(--em-bubble-text-self);
+  opacity: 0.9;
+}

@@ -29,6 +29,19 @@ function nextLocalSeq(): number {
   return localSeq
 }
 
+// 文本消息 ext 组装：引用（emQuote 自定义 key）与 @提及（em_at_list userId 数组，与 vue 版互认）；
+// 两者皆空返回 undefined（不挂 ext，保持现状行为）
+function buildTextExt(quote?: EmQuoteInfo, mentions?: string[]): Record<string, unknown> | undefined {
+  const ext: Record<string, unknown> = {}
+  if (quote != null) {
+    ext[MESSAGE_EXT_KEY.QUOTE] = { msgId: quote.msgId, from: quote.from, text: quote.text, type: quote.type }
+  }
+  if (mentions != null && mentions.length > 0) {
+    ext[MESSAGE_EXT_KEY.MENTION] = mentions
+  }
+  return Object.keys(ext).length > 0 ? ext : undefined
+}
+
 // SDK wire 会话类型 → 中立 chatType 的唯一映射点（wire 字面量规范允许的边界例外）：
 // 5.x 为 'singleChat'/'groupChat'/'chatRoom'，4.x 遗风 'single'/'group'/'room' 与
 // 更老的 'chat'/'groupchat' 双兼容；未识别值兜底单聊（历史单聊数据缺字段场景）
@@ -78,16 +91,17 @@ export class EmMessageDomain {
     return this.ctx.client.chatManager
   }
 
-  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
+  // mentions：@提及的 userId 列表（发前已用 filterActiveMentions 过滤），挂 ext.em_at_list 与 vue 版互认
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[]): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createTextMessage({
       conversationId: to,
       conversationType: chatType,
       content: text,
       // 引用挂在消息 ext 上（emQuote 自定义 key），接收方/历史消息解析还原
-      ext: quote != null ? { [MESSAGE_EXT_KEY.QUOTE]: { msgId: quote.msgId, from: quote.from, text: quote.text, type: quote.type } } : undefined
+      ext: buildTextExt(quote, mentions)
     })
-    return this.deliver(message, to, text, quote)
+    return this.deliver(message, to, text, quote, '', mentions)
   }
 
   // 引用快照：文本截断 50 字，非文本消息用 locale 摘要（对齐 summaryOf 的文案纪律）
@@ -166,7 +180,7 @@ export class EmMessageDomain {
   // 先落本地 sending 态，sendMessage 后回写 sent/failed；失败保留供重发。
   // 返回 store 代理上的消息项（发送回写后的最终态），供业务事件透出（em-chat-page 的 send emit）
   // localUrl：语音/视频/文件的本地临时路径，SDK 未回写 body.url 时兜底（本地回显/播放/重发用）
-  private async deliver(message: Message, to: string, fallbackText: string, quote?: EmQuoteInfo, localUrl = ''): Promise<EmMessageItem> {
+  private async deliver(message: Message, to: string, fallbackText: string, quote?: EmQuoteInfo, localUrl = '', mentions?: string[]): Promise<EmMessageItem> {
     const chatManager = this.ctx.client?.chatManager
     if (chatManager == null) {
       throw new Error('call EmKit.init() first')
@@ -179,6 +193,10 @@ export class EmMessageDomain {
     if (item.url === '' && localUrl !== '') item.url = localUrl
     // 兜底本地回显：createTextMessage 返回的 Message 若未带上 ext，引用也要立即可见
     if (quote != null && item.quote == null) item.quote = quote
+    // 同款兜底：@提及 ext 未随 createTextMessage 回带时补上，保证己方气泡立即高亮
+    if (mentions != null && mentions.length > 0 && item.ext[MESSAGE_EXT_KEY.MENTION] == null) {
+      item.ext[MESSAGE_EXT_KEY.MENTION] = mentions
+    }
     this.appendMessage(item)
     this.notify(item)
     // 状态回写必须落在 store 的响应式代理上：item 是原始对象，蒸汽（vapor）端
@@ -335,11 +353,14 @@ export class EmMessageDomain {
       })
     } else {
       const quote = item.quote
+      // 重发保留 @提及 ext（item.ext 在发送时已兜底写入）；其余业务 ext 不重建（发送链路唯一挂点）
+      const rawMentions = item.ext[MESSAGE_EXT_KEY.MENTION]
+      const mentions = Array.isArray(rawMentions) ? rawMentions.filter((x): x is string => typeof x === 'string') : undefined
       message = chatManager.createTextMessage({
         conversationId,
         conversationType: chatType,
         content: item.text,
-        ext: quote != null ? { [MESSAGE_EXT_KEY.QUOTE]: { msgId: quote.msgId, from: quote.from, text: quote.text, type: quote.type } } : undefined
+        ext: buildTextExt(quote != null ? quote : undefined, mentions)
       })
     }
     item.status = MESSAGE_STATUS.SENDING

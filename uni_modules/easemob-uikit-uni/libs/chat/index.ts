@@ -84,8 +84,8 @@ export class EmChat {
     return this.messages.onMessage(handler)
   }
 
-  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
-    return this.messages.sendText(to, chatType, text, quote)
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[]): Promise<EmMessageItem> {
+    return this.messages.sendText(to, chatType, text, quote, mentions)
   }
 
   makeQuote(item: EmMessageItem): EmQuoteInfo {

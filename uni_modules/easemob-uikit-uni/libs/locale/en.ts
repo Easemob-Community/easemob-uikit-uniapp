@@ -80,6 +80,10 @@ export default {
   'contact.empty': 'No contacts',
   'contact.noSearchResult': 'No matching contacts',
   'contact.searchPlaceholder': 'Search contacts...',
+
+  'mention.title': 'Select Contact',
+  'mention.searchPlaceholder': 'Search contacts...',
+  'mention.noResult': 'No contacts found',
   'contact.newRequests': 'New Requests',
   'contact.addContact': 'Add Contact',
   'contact.addContactPlaceholder': 'Enter user ID',

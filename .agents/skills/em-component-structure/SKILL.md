@@ -81,11 +81,13 @@ custom 优先级高于内置，原子组件无 `-page` 后缀不受影响。**�
 
 | 组件 | props / emits / 插槽 |
 |---|---|
-| `em-chat-page` | `conversationId`/`chatType`（均必填，M2.9 起）、`avatarShape`；群形态三独立开关 `showMemberCount`/`senderNameMode('always'\|'hidden')`/`showAnnouncement`（默认开，伪装模式预留）；emits `open-info`/`send`/`recall`/`delete`（业务事件仅通知，行为内部走 EmKit）；插槽 `#custom-message`（按 `EmMessageItem.rawType` 判别渲染自定义消息，`ext` 为业务载荷唯一通道）、`#empty`（默认 em-empty 可整体覆盖） |
+| `em-chat-page` | `conversationId`/`chatType`（均必填，M2.9 起）、`avatarShape`；群形态三独立开关 `showMemberCount`/`senderNameMode('always'\|'hidden')`/`showAnnouncement` + @提及开关 `enableMention`（均默认开，仅群聊生效，伪装模式预留）；emits `open-info`/`send`/`recall`/`delete`/`mention-click(userId)`（业务事件仅通知，行为内部走 EmKit）；插槽 `#custom-message`（按 `EmMessageItem.rawType` 判别渲染自定义消息，`ext` 为业务载荷唯一通道）、`#empty`（默认 em-empty 可整体覆盖） |
 | `em-conversation-page` | `showSearch`/`emptyText`；emits `select(conversationId, chatType)`/`menu(key)`（`new-chat` 内置 em-select-contact 选人闭环，`create-group` 直接 emit 宿主占位）；插槽 `#empty` |
 | `em-contact-page` | `menuKeys`；emits `select`/`open-requests`/`add`（add 弹窗宿主实现） |
 | `em-select-contact` | `items`（EmSelectContactItem[]）/`show`；emits `select(userId)`/`update:show`（M2.9 Phase 2 先 single 模式，字母分组/multiple Phase 4） |
-| `em-chat-inputbar` | `modelValue`（草稿）、`quote`、`features`（inputFeatures 逐项开关）、`emojis`；emits `send`/`quote-close`/`media-select`/`voice-send`；**手动键盘避让内置**（adjust-position=false + margin-bottom 顶起，见 em-crossend-pitfalls #3） |
+| `em-chat-inputbar` | `modelValue`（草稿）、`quote`、`features`（inputFeatures 逐项开关）、`emojis`；emits `send`/`quote-close`/`media-select`/`voice-send`/`mention-trigger`（草稿尾部新增 `@` 触发，尾部追加是物理上限）；**手动键盘避让内置**（adjust-position=false + margin-bottom 顶起，见 em-crossend-pitfalls #3） |
+| `em-mention-picker` | @ 提及选人弹层（M2.9 Phase 3，对齐 vue mention-picker h5 分支）：props `show`/`contacts(MentionContact[])`/`keyword`（@ 后尾部字符，watch 同步进搜索框）/`title`；emits `select(contact)`/`update:show`（选择即关）；不连 store |
+| `em-text-message` | props `message`/`mentionContacts`（@名字→userId 解析表，缺省回落原始名字）；emits `long-press`/`mention-click(userId)`；`ext.em_at_list` 非空时 parseMentions 分片高亮（`--em-mention-color`） |
 | `em-conversation-item` | `item`/`name`/`avatar`/`timeText`/`draft` 五 props 收装配数据；emits `click` + `long-press` |
 | `em-nav-bar` | `title`/`subtitle`/`showBack`/`actionIcon`；emits `back`/`action`；插槽 `#title`/`#action`；小程序胶囊避让内置 |
 | `em-video-message`/`em-file-message` | 点击行为上移 chat-page，组件发 `preview`/`download` emit（与 em-image-message 同模式） |

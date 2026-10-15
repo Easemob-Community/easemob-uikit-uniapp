@@ -79,9 +79,9 @@ class EmKitImpl {
     return this.client.logout()
   }
 
-  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo): Promise<EmMessageItem> {
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[]): Promise<EmMessageItem> {
     await this.client.whenReady()
-    return this.chat.sendText(to, chatType, text, quote)
+    return this.chat.sendText(to, chatType, text, quote, mentions)
   }
 
   makeQuote(item: EmMessageItem): EmQuoteInfo {

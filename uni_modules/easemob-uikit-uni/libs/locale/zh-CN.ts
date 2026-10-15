@@ -80,6 +80,10 @@ export default {
   'contact.empty': '暂无联系人',
   'contact.noSearchResult': '未找到相关联系人',
   'contact.searchPlaceholder': '搜索联系人...',
+
+  'mention.title': '选择联系人',
+  'mention.searchPlaceholder': '搜索联系人...',
+  'mention.noResult': '未找到联系人',
   'contact.newRequests': '新请求',
   'contact.addContact': '添加好友',
   'contact.addContactPlaceholder': '输入用户 ID',

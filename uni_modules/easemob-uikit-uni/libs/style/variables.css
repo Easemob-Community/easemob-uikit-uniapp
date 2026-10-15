@@ -83,6 +83,8 @@
   --em-warning-color: #FFAA19; /* hsl(38,100%,60%) */
   --em-danger-color: #FF3355;  /* hsl(350,100%,60%) */
   --em-info-color: #33B1FF;
+  /* @提及高亮色（对齐 vue 版 text-message mention 的 --uikit-primary-color） */
+  --em-mention-color: #33B1FF;
 
   /* 文字阶梯（强调色/彩色背景上的文字恒白） */
   --em-text-primary: #171A1C;
@@ -148,6 +150,7 @@
   --em-warning-color: #FFAB00;
   --em-danger-color: #FF3333;
   --em-info-color: #33B1FF;
+  --em-mention-color: #33B1FF;
 
   --em-text-primary: #E8EAED;
   --em-text-secondary: #9AA0A6;

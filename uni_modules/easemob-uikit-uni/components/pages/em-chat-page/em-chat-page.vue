@@ -77,7 +77,9 @@
               <em-text-message
                 v-if="m.type === MESSAGE_TYPE.TEXT"
                 :message="m"
+                :mention-contacts="mentionContacts"
                 @long-press="onLongPressMessage"
+                @mention-click="onMentionClick"
               />
               <em-image-message
                 v-else-if="m.type === MESSAGE_TYPE.IMAGE"
@@ -136,6 +138,15 @@
       @quote-close="quoteInfo = null"
       @media-select="onMediaSelect"
       @voice-send="onVoiceSend"
+      @mention-trigger="onMentionTrigger"
+    />
+
+    <!-- @提及成员选择面板（仅群聊 + enableMention 时由 mention-trigger 打开；选人后尾部追加 @{name} 空格） -->
+    <em-mention-picker
+      v-model:show="mentionVisible"
+      :contacts="mentionContacts"
+      :keyword="mentionKeyword"
+      @select="onMentionSelect"
     />
 
     <em-action-sheet
@@ -176,15 +187,18 @@ import EmVideoMessage from '../../em-video-message/em-video-message.vue'
 import EmFileMessage from '../../em-file-message/em-file-message.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmPopup from '../../em-popup/em-popup.vue'
+import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONVERSATION_TYPE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
 import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
-import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmQuoteInfo, EmSenderNameMode } from '../../../libs/types'
+import { filterActiveMentions } from '../../../libs/utils/mention'
+import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { clearDraft, getDraft, setDraft } from '../../../libs/store/draft'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
+import { connectionStore } from '../../../libs/store/connection'
 import { groupDisplayNameOf, groupMemberDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
@@ -219,13 +233,16 @@ interface Props {
   senderNameMode?: EmSenderNameMode
   /** 群公告条显隐（仅群聊生效），默认 true */
   showAnnouncement?: boolean
+  /** @提及链路开关（仅群聊生效；伪装模式预留位），默认 true */
+  enableMention?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   avatarShape: 'circle',
   showMemberCount: true,
   senderNameMode: 'always',
-  showAnnouncement: true
+  showAnnouncement: true,
+  enableMention: true
 })
 
 const emit = defineEmits<{
@@ -235,6 +252,8 @@ const emit = defineEmits<{
   (e: 'send', message: EmMessageItem): void
   (e: 'recall', message: EmMessageItem): void
   (e: 'delete', message: EmMessageItem): void
+  // 气泡 @ 片段点击原样透传（宿主可接管跳转成员资料等，默认无行为）
+  (e: 'mention-click', userId: string): void
 }>()
 
 const ns = useNamespace('chat-page')
@@ -341,6 +360,63 @@ const announcementCanExpand = computed(() => {
   }
   return units * 12 > available
 })
+
+// ========== @提及链路（仅群聊 + enableMention；单聊全门控，isGroupChat 为唯一分流点） ==========
+
+const mentionVisible = ref(false)
+// 本轮草稿中经面板选中的被 @ 成员（与草稿文本解耦维护：用户删掉某个 @名字 不会同步清理，
+// 发送前用 filterActiveMentions 精确过滤，防失效 @ 进入 ext.em_at_list）
+const mentionedContacts = ref<MentionContact[]>([])
+
+// 面板候选：群成员排除自己，展示名走 groupMemberDisplayNameOf 同链（群名片 > userStore 昵称 > userId）；
+// 同时供 em-text-message 的 @名字→userId 点击解析（props 透传，原子组件不连 store）
+const mentionContacts = computed<MentionContact[]>(() => {
+  if (!isGroupChat.value) return []
+  const members = groupStore.memberMapByGroupId[props.conversationId] ?? []
+  return members
+    .filter((m) => m.userId !== connectionStore.userId)
+    .map((m) => ({ userId: m.userId, name: groupMemberDisplayNameOf(props.conversationId, m.userId), avatar: m.avatar }))
+})
+
+// @ 触发（inputbar 检测草稿尾部新增 @）：确保群成员已拉（memberMapByGroupId 无则拉首屏）再开面板
+function onMentionTrigger(): void {
+  if (!isGroupChat.value || !props.enableMention) return
+  if (groupStore.memberMapByGroupId[props.conversationId] == null) {
+    EmKit.getGroupMemberList(props.conversationId).catch(() => {})
+  }
+  mentionVisible.value = true
+}
+
+// 面板搜索词：面板打开期间取草稿最后一个 @ 之后的尾部（尾部追加模型，uni input 无光标 API）
+const mentionKeyword = computed(() => {
+  if (!mentionVisible.value) return ''
+  const atIdx = draft.value.lastIndexOf('@')
+  if (atIdx < 0) return ''
+  return draft.value.slice(atIdx + 1)
+})
+
+// 草稿里的触发 @ 被删掉、或 @ 后已输入空格（提及输入结束）时自动收面板
+watch(draft, (v) => {
+  if (!mentionVisible.value) return
+  const atIdx = v.lastIndexOf('@')
+  if (atIdx < 0 || v.slice(atIdx + 1).includes(' ')) {
+    mentionVisible.value = false
+  }
+})
+
+// 选人：草稿尾部追加式插入（触发 @ 已在草稿尾，补 name + 空格，与 vue 一致便于 filterActiveMentions 精确匹配）；
+// 追加式是 uni input 无光标 API 的物理上限，不做光标定位 hack
+function onMentionSelect(contact: MentionContact): void {
+  draft.value = `${draft.value}${contact.name} `
+  if (!mentionedContacts.value.some((c) => c.userId === contact.userId)) {
+    mentionedContacts.value = [...mentionedContacts.value, contact]
+  }
+}
+
+// 气泡 @ 片段点击原样透传（宿主可接管，默认无行为）
+function onMentionClick(userId: string): void {
+  emit('mention-click', userId)
+}
 
 // 已读回执展示目标：最新一条己方已发送消息（其余己方消息不显示已读态）
 const latestSelfLocalId = computed(() => {
@@ -494,6 +570,8 @@ onUnmounted(() => {
   unsubscribeMessages = null
   EmKit.leaveConversation()
   quoteInfo.value = null
+  mentionVisible.value = false
+  mentionedContacts.value = []
   clearPulseTimers()
   if (highlightTimer != null) {
     clearTimeout(highlightTimer)
@@ -512,9 +590,11 @@ watch(draft, (v) => {
   }
 })
 
-// 切换会话清掉引用条
+// 切换会话清掉引用条与 mention state
 watch(() => props.conversationId, () => {
   quoteInfo.value = null
+  mentionVisible.value = false
+  mentionedContacts.value = []
 })
 
 async function onLoadMore(): Promise<void> {
@@ -547,11 +627,17 @@ async function onSend(): Promise<void> {
   const text = draft.value.trim()
   if (text === '') return
   const quote = quoteInfo.value != null ? quoteInfo.value : undefined
+  // 发送前过滤已失效的 @（用户删掉了某个 @名字 则不挂）；非空才挂 ext.em_at_list（单聊恒空）
+  const mentionIds = isGroupChat.value
+    ? filterActiveMentions(text, mentionedContacts.value).map((c) => c.userId)
+    : []
   try {
-    const item = await EmKit.sendText(props.conversationId, props.chatType, text, quote)
+    const item = await EmKit.sendText(props.conversationId, props.chatType, text, quote, mentionIds.length > 0 ? mentionIds : undefined)
     draft.value = ''
-    // 发送成功才清引用条，失败保留供重发
+    // 发送成功才清引用条与 mention state，失败保留供重发
     quoteInfo.value = null
+    mentionedContacts.value = []
+    mentionVisible.value = false
     scrollToBottom()
     emit('send', item)
   } catch (e) {

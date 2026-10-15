@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
@@ -118,6 +118,9 @@ const emit = defineEmits<{
   (e: 'quote-close'): void
   (e: 'media-select', key: string): void
   (e: 'voice-send', path: string, duration: number): void
+  // 草稿尾部新增 @ 字符时触发（uni input 无光标 API，只支持尾部追加触发，与 emoji 同款限制）；
+  // 纯增量事件，是否响应（群聊 @ 提及）由父组件门控
+  (e: 'mention-trigger'): void
 }>()
 
 const ns = useNamespace('chat-inputbar')
@@ -129,6 +132,13 @@ const { t } = useLocale()
 const text = computed({
   get: () => props.modelValue,
   set: (v: string) => emit('update:modelValue', v)
+})
+
+// @ 触发检测：草稿变长且新值以 @ 结尾（尾部追加形态，含粘贴结尾为 @ 的情况；删除到 @ 结尾不触发）
+watch(() => props.modelValue, (v, old) => {
+  if (v.length > (old ?? '').length && v.endsWith('@')) {
+    emit('mention-trigger')
+  }
 })
 
 // ========== 引用条显示 ==========
