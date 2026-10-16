@@ -119,7 +119,7 @@ function memberAvatar(m: EmGroupMember): string {
 }
 
 const gridNameTextStyle =
-  'font-family: var(--em-font-family); font-size: var(--em-font-size-11); line-height: 16px; color: var(--em-text-primary); white-space: nowrap; text-align: center;'
+  'font-family: var(--em-font-family); font-size: var(--em-font-size-11); line-height: 16px; color: var(--em-text-primary); white-space: nowrap; text-align: center; margin-top: 4px;'
 
 // ========== 群名称 ==========
 
