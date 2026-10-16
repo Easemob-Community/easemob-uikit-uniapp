@@ -87,6 +87,11 @@
 | Android 重连回归（SPIKE 记录）；iOS 端整体待验 | App | |
 | 聊天页进页偶尔「二次置底闪动」（补偿拉取触发的列表二次变化 × 两次 scrollToBottom 时序；已搁置，优化方向见上方 2026-10-15 滚底条目） | App | 功能正常，观感优化项 |
 | 组头 sticky 蒸汽端实测 | App | 不生效则随列表滚动 |
+| 群链路端到端（真实账号：登录 → 建群/群列表 → 群聊收发 → 公告条/@我徽标/成员昵称行） | H5/mp/App | M2.9 各 Phase 共同挂账 |
+| 双角色群管理（owner/admin 成员操作矩阵、邀请入群全流程、公告编辑/改名/转让/退群解散/全员禁言禁输入） | H5/mp/真机 | |
+| @ 提及全链路（@→选人→ext→高亮/徽标；蒸汽端嵌套 text 的 mention click） | H5/真机 | |
+| 群系统通知上屏（建群/成员进出/改名/公告/转让）+ notice 长按菜单禁用 | H5/mp | |
+| 蒸汽真机群形态视觉：成员管理覆盖层 fixed 定位与弹层叠放、角色角标、宫格五列、multiple 已选条横滚 | App 三真机 | |
 
 ## 已验证基线（历史 SPIKE）
 
@@ -142,3 +147,11 @@
 - 全员禁言：群聊 + `group.mute` + 非 owner/admin → inputbar 禁用（placeholder「全员禁言中」+ guardDisabled 拦截发送/面板/语音 + toast）；mute 事件实时回写响应式生效；owner/admin 豁免。
 - 伪装预留：宫格/群名/公告三区块独立 props（showMemberGrid/showGroupName/showAnnouncement，默认显示）。
 - 单聊分支零回归。验证：build web ✓ / build mp-weixin 11 项全绿（主包 621KB）/ H5 伺服 200。**待验**：群分支端到端（双角色真实账号）、宫格五列蒸汽真机视觉。
+
+## 2026-10-16 M2.9 Phase 5b（成员管理 + 邀请接真 + 群系统通知）与 Phase 6 收尾
+
+- **成员管理视图** `em-group-members-view`（chat-info 页内全屏覆盖层，z-index 1000 低于弹层基准 2000）：角色排序列表（owner 蓝/admin 橙角标）+ 搜索 + 按钮式游标翻页（em-load-more button 态，domain 回写 store 游标/hasMore）+ 成员操作 action-sheet（权限矩阵对齐 vue 裁剪：任意角色私聊 / owner 设撤管理员·转让·移出 / admin 移出；转让/移出 uni.showModal 二次确认）；首屏 `getGroupMemberList` 兜底。
+- **邀请入群接真**：chat-info 根级挂 `em-select-contact`（multiple，disabledIds=在群成员）→ `inviteUsersToGroup` → 成功 toast + 重拉首屏兜底（事件计数增量）；`invite`/`open-members` 保留纯通知 emit，demo 零接线。成员私聊新增 `chat-member` emit，demo 接线 addConversation 跳单聊。
+- **群系统通知**：`MESSAGE_TYPE.NOTICE='notice'` 一等本地类型（id 恒空串跳过去重/回执、localId 唯一、不发服务端、loadHistory 合并保留）；`insertGroupNotice` 落六类消费点——建群（em-group-page 成功链路）/成员加入（含多成员「等 N 人」）/成员退出/群名变更（仅实际变化时）/公告变更/转让群主；管理员变更/全员禁言/被移出/解散不插（后两者随清会话即擦除，语义裁剪）。聊天页 NOTICE 居中灰条 chip 渲染（复用撤回条形态，560rpx 定宽规避蒸汽端 % max-width 坑），长按菜单对 notice 禁用。
+- **Phase 6 评审 minor 扫尾**：conversation-item props 注释「红色前缀」→主色；死 i18n key `chat.announcementBanner.expand/collapse` 删除；spike 页 `loginAt===0` 守卫（同步先于 login resolve 不输出垃圾耗时）；成员操作「移出群聊」去 danger（vue 设计稿警示色从严，红色区仅退群/解散）；透出契约表补 `hasAtMe`。i18n 全量核查：zh/en key 集一致（199 个），模板无硬编码中文。
+- 验证：build web ✓ / build mp-weixin 11 项全绿（**主包 642KB** ≤ 1.5MB，分包 1234KB）/ H5 伺服 200。**待验**：群链路端到端与双角色群管理真实账号冒烟（汇总表新增五行）。

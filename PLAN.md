@@ -196,6 +196,8 @@ easemob-uikit-uniapp/
 - **门禁**：先补 GroupManager 五端 spike（重点小程序端群同步时序，追加 `docs/SPIKE-SDK-CONNECTIVITY.md`），不过则暂停 UI 开发。
 - **伪装模式预留**（承 `docs/EVAL-MULTI-SCENARIO.md` §6-3）：群形态 UI（人数/公告条/昵称行档位/成员事件渲染策略）设计时预留隐藏开关位；伪装形态下 `open-info` 由宿主接管。开关本体二期随伪装场景落地，M2.9 只保证不留硬编码分支。
 
+> 进度（2026-10-16）：Phase 0-5 全部落地——群数据层与 chatType 贯通（Phase 1）、会话/聊天页群化与发起会话（Phase 2）、@ 提及全链路（Phase 3）、群列表页/建群/选人 multiple（Phase 4a）、联系人页入口化 + 群邀请 kind 分化（Phase 4b）、chat-info 群分支与全员禁言（Phase 5a）、成员管理/邀请接真/群系统通知（Phase 5b）；Phase 6 评审 minor 扫尾与文档收口完成。双门禁全绿（build web + build mp-weixin 11 项防回归，主包 642KB ≤ 1.5MB）、H5 产物伺服 200；真机/真实账号端到端冒烟待验（见 STATUS.md 待验项汇总）。
+
 ### M3：组件沉淀与发布
 
 - 原子组件沉淀（em-*-message 气泡族、输入栏等从页面级组件解耦）；pages_init.json 页面模板注册
