@@ -383,6 +383,39 @@ export class EmMessageDomain {
     list.push(item)
   }
 
+  // 本地系统通知（群事件灰条）：只落本地消息列表并 notify（触发聊天页滚底），不发服务端；
+  // id 恒空串（appendMessage 按 id 去重自动跳过），loadHistory 合并保留本地条目
+  insertLocalNotice(conversationId: string, chatType: ConversationTypeValue, text: string): void {
+    if (text === '') {
+      return
+    }
+    const item: EmMessageItem = {
+      id: '',
+      localId: `em-notice-${Date.now()}-${nextLocalSeq()}`,
+      conversationId,
+      chatType,
+      type: MESSAGE_TYPE.NOTICE,
+      text,
+      url: '',
+      thumbUrl: '',
+      width: 0,
+      height: 0,
+      time: Date.now(),
+      from: connectionStore.userId,
+      to: conversationId,
+      self: false,
+      status: MESSAGE_STATUS.SENT,
+      quote: null,
+      duration: 0,
+      fileName: '',
+      fileSize: 0,
+      ext: {},
+      rawType: ''
+    }
+    this.appendMessage(item)
+    this.notify(item)
+  }
+
   toMessageItem(message: Message): EmMessageItem {
     const id = message.msgServerId !== '' ? message.msgServerId : message.msgLocalId
     const item: EmMessageItem = {

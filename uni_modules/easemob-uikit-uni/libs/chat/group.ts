@@ -1,7 +1,8 @@
 // 群数据域：已加入群快照、群详情、成员游标分页（首屏后补拉 admin 合并角色）、公告，
 // 以及群管理写操作（创建/邀请/退群/解散/转让/资料/公告/成员/管理员/全员禁言）。
 // 事件接线对齐 vue 版 group-events.ts 语义裁剪（成员进出计数、资料/公告变更、
-// 被移出/解散清会话、邀请按 group kind 转 contact invites（含 groupId/群名快照）、群主/管理员/全员禁言角色同步）。
+// 被移出/解散清会话、邀请按 group kind 转 contact invites（含 groupId/群名快照）、群主/管理员/全员禁言角色同步、
+// 成员进出/群名变更/公告变更/转让群主插本地系统通知灰条——insertGroupNotice 经 hooks 落消息列表）。
 // SDK wire 字段归一（ownerId/owner.userId、maxMembers、joinApprovalRequired、
 // muteAllMembers、avatarUrl/avatarurl）集中在 toEmGroup/toEmGroupMember 边界。
 import type {
@@ -14,10 +15,11 @@ import type {
   JoinedGroupSummary,
   UserInfo
 } from 'easemob-websdk'
-import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS, GROUP_MEMBER_PAGE_SIZE, GROUP_MEMBER_ROLE } from '../constants'
+import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS, GROUP_MEMBER_PAGE_SIZE, GROUP_MEMBER_ROLE, GROUP_NOTICE_EVENT } from '../constants'
+import type { GroupNoticeEventValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { addInvite, updateInviteStatus } from '../store/contact'
-import { mergeUserInfo } from '../store/user'
+import { displayNameOf, mergeUserInfo } from '../store/user'
 import {
   appendGroupMembers,
   clearGroups,
@@ -33,16 +35,25 @@ import {
   upsertGroup
 } from '../store/group'
 import { createLogger } from '../utils/logger'
+import { useLocale } from '../use/useLocale'
 import type { CreateGroupParams, EmContactInvite, EmGroup, EmGroupMember } from '../types'
 import { ensureUserInfos } from './user-info'
 
 const logger = createLogger('group')
 
+/** 通知展示名的最小结构（SDK UserInfo/GroupUserInfo 双兼容） */
+interface NoticeUser {
+  userId: string
+  nickname?: string
+}
+
 /** 门面注入的群域钩子：被移出/群解散时清会话与本地消息（会话域本地删除入口）；
- * 群名变更时同步会话名（会话列表/聊天头部展示 conversation.name） */
+ * 群名变更时同步会话名（会话列表/聊天头部展示 conversation.name）；
+ * 群事件系统通知插入群消息列表（本地灰条，不发服务端） */
 export interface EmGroupHooks {
   removeConversationLocal: (conversationId: string) => void
   updateConversationName: (conversationId: string, name: string) => void
+  insertGroupNotice: (groupId: string, text: string) => void
 }
 
 export class EmGroupDomain {
@@ -82,7 +93,7 @@ export class EmGroupDomain {
       return
     }
     mgr.addEventHandler('emkit-group', {
-      // 成员入群：计数 +n；含己方时确保群在列表内（邀请自动入群等场景）
+      // 成员入群：计数 +n；含己方时确保群在列表内（邀请自动入群等场景）；插系统通知灰条
       onMembersJoined: (payload) => {
         logger.debug('onMembersJoined raw payload:', JSON.parse(JSON.stringify(payload)))
         const members = payload.members ?? []
@@ -90,42 +101,42 @@ export class EmGroupDomain {
           this.getGroupInfo(payload.groupId).catch(() => {})
         }
         incrementMemberCount(payload.groupId, members.length)
-        this.insertGroupNotice(payload.groupId, 'membersJoined')
+        this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.MEMBERS_JOINED, { members })
       },
-      // 成员退群：计数 -n
+      // 成员退群：计数 -n；插系统通知灰条
       onMembersExited: (payload) => {
         logger.debug('onMembersExited raw payload:', JSON.parse(JSON.stringify(payload)))
-        incrementMemberCount(payload.groupId, -(payload.members ?? []).length)
-        this.insertGroupNotice(payload.groupId, 'membersExited')
+        const members = payload.members ?? []
+        incrementMemberCount(payload.groupId, -members.length)
+        this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.MEMBERS_EXITED, { members })
       },
-      // 群资料变更：写详情缓存；名称变化同步会话名（会话列表/聊天头部展示 conversation.name）
+      // 群资料变更：写详情缓存；名称变化同步会话名（会话列表/聊天头部展示 conversation.name）+ 插系统通知
       onGroupInfoChanged: (payload) => {
         logger.debug('onGroupInfoChanged raw payload:', JSON.parse(JSON.stringify(payload)))
         const prev = groupStore.infoByGroupId[payload.groupId]
         const group = this.toEmGroup(payload.groupInfo)
         upsertGroup(group)
         if (group.name !== '' && prev != null && group.name !== prev.name) {
-          this.insertGroupNotice(payload.groupId, 'groupNameChanged')
+          this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.GROUP_NAME_CHANGED, { name: group.name })
         }
         this.hooks?.updateConversationName?.(payload.groupId, group.name)
       },
-      // 公告变更：写缓存（空串 = 已拉无公告）
+      // 公告变更：写缓存（空串 = 已拉无公告）+ 插系统通知
       onAnnouncementChanged: (payload) => {
         logger.debug('onAnnouncementChanged raw payload:', JSON.parse(JSON.stringify(payload)))
         setGroupAnnouncement(payload.groupId, payload.announcement ?? '')
-        this.insertGroupNotice(payload.groupId, 'announcementChanged')
+        this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.ANNOUNCEMENT_CHANGED)
       },
       // 己方被移出群（SDK 5.x 该事件只下发给被移出的当前用户）：清群缓存 + 删会话清消息
+      // （不插系统通知：removeConversationLocal 随即清消息缓存，插入即被擦除）
       onUserRemoved: (payload) => {
         logger.debug('onUserRemoved raw payload:', JSON.parse(JSON.stringify(payload)))
-        this.insertGroupNotice(payload.groupId, 'userRemoved')
         removeGroup(payload.groupId)
         this.hooks?.removeConversationLocal(payload.groupId)
       },
       // 群解散：同上
       onGroupDestroyed: (payload) => {
         logger.debug('onGroupDestroyed raw payload:', JSON.parse(JSON.stringify(payload)))
-        this.insertGroupNotice(payload.groupId, 'groupDestroyed')
         removeGroup(payload.groupId)
         this.hooks?.removeConversationLocal(payload.groupId)
       },
@@ -194,7 +205,7 @@ export class EmGroupDomain {
         })
         this.mergeInviterProfile(payload.inviter)
       },
-      // 群主变更：owner 为成员角色唯一权威，新旧群主角色同步修正
+      // 群主变更：owner 为成员角色唯一权威，新旧群主角色同步修正；插系统通知灰条
       onOwnerChanged: (payload) => {
         logger.debug('onOwnerChanged raw payload:', JSON.parse(JSON.stringify(payload)))
         const prevOwner = groupStore.infoByGroupId[payload.groupId]?.owner ?? payload.oldOwner?.userId ?? ''
@@ -206,7 +217,7 @@ export class EmGroupDomain {
         if (prevOwner !== '' && prevOwner !== newOwner) {
           updateGroupMemberRole(payload.groupId, prevOwner, GROUP_MEMBER_ROLE.MEMBER)
         }
-        this.insertGroupNotice(payload.groupId, 'ownerChanged')
+        this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.OWNER_CHANGED, { name: this.noticeNameOf(payload.newOwner) })
       },
       onAdminAdded: (payload) => {
         logger.debug('onAdminAdded raw payload:', JSON.parse(JSON.stringify(payload)))
@@ -214,7 +225,6 @@ export class EmGroupDomain {
         if (userId != null && userId !== '') {
           updateGroupMemberRole(payload.groupId, userId, GROUP_MEMBER_ROLE.ADMIN)
         }
-        this.insertGroupNotice(payload.groupId, 'adminAdded')
       },
       onAdminRemoved: (payload) => {
         logger.debug('onAdminRemoved raw payload:', JSON.parse(JSON.stringify(payload)))
@@ -222,12 +232,10 @@ export class EmGroupDomain {
         if (userId != null && userId !== '') {
           updateGroupMemberRole(payload.groupId, userId, GROUP_MEMBER_ROLE.MEMBER)
         }
-        this.insertGroupNotice(payload.groupId, 'adminRemoved')
       },
       onAllMemberMuteStateChanged: (payload) => {
         logger.debug('onAllMemberMuteStateChanged raw payload:', JSON.parse(JSON.stringify(payload)))
         updateGroup(payload.groupId, { mute: payload.isMuted })
-        this.insertGroupNotice(payload.groupId, 'allMemberMuteChanged')
       }
     })
   }
@@ -479,9 +487,53 @@ export class EmGroupDomain {
     setJoinedGroups(raw.map((g) => this.toEmGroup(g)))
   }
 
-  // TODO(M2.9 Phase 5)：群系统通知落消息列表（成员进出/群名变更/公告变更/被移出/解散/角色变更），
-  // 待聊天列表系统通知渲染接入后实现；当前仅更新 store，key 占位便于对照 vue NOTICE_EVENT_TYPE 接线。
-  private insertGroupNotice(_groupId: string, _eventKey: string): void {}
+  // 群事件系统通知（M2.9 Phase 5b）：本地插入群消息列表灰条（不落服务端），
+  // 消费点对齐 vue group-events 语义裁剪——成员进出/群名变更/公告变更/转让群主有文案；
+  // 管理员变更/全员禁言/被移出/解散不插（被移出与解散随即清会话清消息，插入即被擦除）。
+  private insertGroupNotice(groupId: string, eventKey: GroupNoticeEventValue, opts?: { members?: readonly NoticeUser[], name?: string }): void {
+    const { t } = useLocale()
+    let text = ''
+    if (eventKey === GROUP_NOTICE_EVENT.MEMBERS_JOINED) {
+      text = this.memberNoticeText(opts?.members ?? [], 'group.notice.memberJoined', 'group.notice.memberJoinedMultiple')
+    } else if (eventKey === GROUP_NOTICE_EVENT.MEMBERS_EXITED) {
+      text = this.memberNoticeText(opts?.members ?? [], 'group.notice.memberExited', 'group.notice.memberExitedMultiple')
+    } else if (eventKey === GROUP_NOTICE_EVENT.GROUP_NAME_CHANGED) {
+      text = t('group.notice.groupNameChanged', { name: opts?.name ?? '' })
+    } else if (eventKey === GROUP_NOTICE_EVENT.ANNOUNCEMENT_CHANGED) {
+      text = t('group.notice.announcementChanged')
+    } else if (eventKey === GROUP_NOTICE_EVENT.OWNER_CHANGED) {
+      text = t('group.notice.ownerChanged', { name: opts?.name ?? '' })
+    }
+    if (text === '') {
+      return
+    }
+    this.hooks?.insertGroupNotice?.(groupId, text)
+  }
+
+  // 成员变动通知文案：单成员直接展示，多成员取首位非当前用户并带总数（对齐 vue formatMemberNotice）
+  private memberNoticeText(members: readonly NoticeUser[], singleKey: string, multipleKey: string): string {
+    if (members.length === 0) {
+      return ''
+    }
+    const { t } = useLocale()
+    if (members.length === 1) {
+      return t(singleKey, { name: this.noticeNameOf(members[0]) })
+    }
+    const nonSelf = members.find((m) => m.userId !== connectionStore.userId) ?? members[0]
+    return t(multipleKey, { name: this.noticeNameOf(nonSelf), count: members.length })
+  }
+
+  // 通知展示名：自己显示「你」，其余昵称 > userStore 展示名（userId 兜底）
+  private noticeNameOf(user: NoticeUser | undefined): string {
+    if (user == null || user.userId === '') {
+      return ''
+    }
+    if (user.userId === connectionStore.userId) {
+      return useLocale().t('group.notice.you')
+    }
+    const nick = typeof user.nickname === 'string' ? user.nickname : ''
+    return nick !== '' ? nick : displayNameOf(user.userId)
+  }
 
   // SDK wire 边界：JoinedGroupSummary（ownerId）与 GroupDetail（owner.userId）双形态归一；
   // maxMembers→maxUsers、joinApprovalRequired→approval、muteAllMembers→mute

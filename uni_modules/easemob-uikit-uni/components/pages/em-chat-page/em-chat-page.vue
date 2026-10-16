@@ -52,10 +52,14 @@
         </view>
         <view
           :id="msgAnchorId(m)"
-          :class="[ns.e('msg'), m.self && ns.m('msg-self'), m.status === MESSAGE_STATUS.RECALLED && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && highlightPulseOn && ns.m('msg-highlight')]"
+          :class="[ns.e('msg'), m.self && ns.m('msg-self'), (m.status === MESSAGE_STATUS.RECALLED || m.type === MESSAGE_TYPE.NOTICE) && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && highlightPulseOn && ns.m('msg-highlight')]"
         >
         <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
           <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
+        </view>
+        <!-- 群系统通知（本地灰条，不落服务端）：居中 chip 形态同撤回提示条；无头像无气泡，长按菜单禁用 -->
+        <view v-else-if="m.type === MESSAGE_TYPE.NOTICE" :class="ns.e('notice')">
+          <em-text :text="m.text" :text-class="ns.e('notice-text')" :text-style="noticeTextStyle" :class="ns.e('notice-text-host')" />
         </view>
         <template v-else>
           <em-avatar :src="avatarOf(m.from)" :name="senderNameOf(m)" :size="36" :shape="avatarShape" />
@@ -337,6 +341,10 @@ function senderNameOf(m: EmMessageItem): string {
 
 const senderNameTextStyle =
   'font-family: var(--em-font-family); font-size: var(--em-font-size-12); line-height: 18px; font-weight: var(--em-font-weight-medium); color: var(--em-text-primary); white-space: nowrap;'
+
+// 系统通知灰条文字内联兜底（小程序样式隔离双通道，同 quotebar 口径）
+const noticeTextStyle =
+  'font-family: var(--em-font-family); font-size: var(--em-font-size-12); line-height: 18px; color: var(--em-text-tertiary); white-space: nowrap;'
 
 function showSenderName(m: EmMessageItem): boolean {
   return isGroupChat.value && props.senderNameMode === 'always' && !m.self && m.status !== MESSAGE_STATUS.RECALLED
@@ -791,6 +799,8 @@ const messageSummary = computed(() => {
 const messageActions = computed<EmActionSheetAction[]>(() => {
   const m = activeMessage.value
   if (m == null) return []
+  // 系统通知灰条：撤回/引用等菜单整体禁用（本地条目，无服务端语义）
+  if (m.type === MESSAGE_TYPE.NOTICE) return []
   const candidates: EmActionSheetAction[] = []
   if (m.type === MESSAGE_TYPE.TEXT) {
     candidates.push({ key: MESSAGE_MENU_KEY.COPY, text: t('message.action.copy'), icon: 'checkbox' })

@@ -19,8 +19,8 @@
         :show-member-grid="showMemberGrid"
         :show-group-name="showGroupName"
         :show-announcement="showAnnouncement"
-        @invite="emit('invite', $event)"
-        @open-members="emit('open-members', $event)"
+        @invite="onInvite"
+        @open-members="onOpenMembers"
         @edit-name="nameEditShow = true"
         @show-announcement="announcementShow = true"
       />
@@ -63,6 +63,26 @@
       v-model:name-edit-show="nameEditShow"
       v-model:announcement-show="announcementShow"
     />
+
+    <!-- 成员管理视图：页内全屏覆盖层（页内 view 切换，不碰路由），back 回主视图 -->
+    <em-group-members-view
+      v-if="isGroupChat && membersVisible"
+      :group-id="conversationId"
+      @back="membersVisible = false"
+      @chat-member="emit('chat-member', $event)"
+    />
+
+    <!-- 邀请入群弹层（库内闭环）：multiple 选人，disabledIds = 已在群成员；成功 toast + 重拉成员首屏兜底 -->
+    <em-select-contact
+      v-if="isGroupChat"
+      :items="inviteItems"
+      :show="inviteVisible"
+      :select-mode="SELECT_CONTACT_MODE.MULTIPLE"
+      :disabled-ids="memberIds"
+      :title="t('group.invite')"
+      @update:show="inviteVisible = $event"
+      @confirm="onInviteConfirm"
+    />
   </view>
 </template>
 
@@ -72,14 +92,18 @@ import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmButton from '../../em-button/em-button.vue'
 import EmGroupInfoBlocks from './em-group-info-blocks.vue'
 import EmGroupFieldDialog from './em-group-field-dialog.vue'
+import EmGroupMembersView from './em-group-members-view.vue'
+import EmSelectContact from '../../em-select-contact/em-select-contact.vue'
 import { EmKit } from '../../../libs'
-import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE } from '../../../libs/constants'
+import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE, SELECT_CONTACT_MODE } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle } from '../../../libs/store/config'
 import { connectionStore } from '../../../libs/store/connection'
 import { groupDisplayNameOf, groupStore } from '../../../libs/store/group'
+import { contactDisplayNameOf, contactStore } from '../../../libs/store/contact'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
+import type { EmSelectContactItem } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
@@ -109,10 +133,12 @@ const emit = defineEmits<{
   (e: 'deleted', conversationId: string): void
   // 退群/解散成功（内部已删会话清消息，宿主负责退场，与 deleted 同处理）
   (e: 'leaved', conversationId: string): void
-  // 邀请入群占位（Task 9 接真）
+  // 邀请入群（库内已闭环弹层 + 邀请写操作，事件仅通知宿主）
   (e: 'invite', groupId: string): void
-  // 成员管理视图占位（Task 9 接真）
+  // 成员管理视图已打开（库内页内视图切换，事件仅通知宿主）
   (e: 'open-members', groupId: string): void
+  // 成员私聊意图（宿主接线发起单聊：addConversation + 跳聊天页）
+  (e: 'chat-member', userId: string): void
 }>()
 
 const ns = useNamespace('chat-info-page')
@@ -143,6 +169,50 @@ const pinned = ref(false)
 // 群字段弹层显隐（编辑/保存逻辑在 em-group-field-dialog 内）
 const nameEditShow = ref(false)
 const announcementShow = ref(false)
+
+// ========== 成员管理视图（页内 view 切换，不碰路由） ==========
+const membersVisible = ref(false)
+
+function onOpenMembers(groupId: string): void {
+  membersVisible.value = true
+  emit('open-members', groupId)
+}
+
+// ========== 邀请入群（库内闭环：em-select-contact multiple + EmKit.inviteUsersToGroup） ==========
+const inviteVisible = ref(false)
+
+function onInvite(groupId: string): void {
+  inviteVisible.value = true
+  emit('invite', groupId)
+}
+
+// 候选联系人：展示名走 remark > nickname > userId 回落链（与 em-group-page 建群弹层同口径）
+const inviteItems = computed<EmSelectContactItem[]>(() =>
+  contactStore.items.map((c) => ({
+    userId: c.userId,
+    name: contactDisplayNameOf(c.userId),
+    avatar: c.avatarUrl !== '' ? c.avatarUrl : avatarOf(c.userId)
+  }))
+)
+
+// 已在群成员置灰不可选（选中后入群成功的成员仍允许从已选区移除，见 em-select-contact onToggle）
+const memberIds = computed<string[]>(() =>
+  (groupStore.memberMapByGroupId[props.conversationId] ?? []).map((m) => m.userId)
+)
+
+// 邀请确认：confirm 不自动关窗，成功才关（失败保留已选）；成功 toast + 重拉成员首屏兜底
+// （被邀请方接受/自动入群后 onMembersJoined 事件做计数增量，成员列表重拉保证即时可见）
+function onInviteConfirm(userIds: string[]): void {
+  EmKit.inviteUsersToGroup(props.conversationId, userIds)
+    .then(() => {
+      inviteVisible.value = false
+      uni.showToast({ title: t('group.inviteSuccess'), icon: 'success' })
+      EmKit.getGroupMemberList(props.conversationId).catch(() => {})
+    })
+    .catch(() => {
+      uni.showToast({ title: t('group.inviteFailed'), icon: 'none' })
+    })
+}
 
 // 当前用户群角色：memberMap 为准，owner 字段兜底（成员首屏未回时 owner 判定仍可用）
 const selfRole = computed(() => {

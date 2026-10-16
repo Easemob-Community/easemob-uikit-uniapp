@@ -53,7 +53,8 @@ class EmKitImpl {
         this.contact.bind(client, () => this.client.waitOnline())
         this.group.bind(client, () => this.client.waitOnline(), {
           removeConversationLocal: (conversationId) => this.chat.removeConversationLocal(conversationId),
-          updateConversationName: (conversationId, name) => this.chat.updateConversationName(conversationId, name)
+          updateConversationName: (conversationId, name) => this.chat.updateConversationName(conversationId, name),
+          insertGroupNotice: (groupId, text) => this.chat.insertGroupNotice(groupId, text)
         })
       })
       .catch((e) => kitLogger.warn('kit bind skipped:', e))
@@ -313,6 +314,11 @@ class EmKitImpl {
   async unmuteAllGroupMembers(groupId: string): Promise<void> {
     await this.client.whenReady()
     return this.group.unmuteAllGroupMembers(groupId)
+  }
+
+  // 群系统通知（本地灰条，不发服务端）：建群成功等本地链路插通知的入口
+  insertGroupNotice(groupId: string, text: string): void {
+    this.chat.insertGroupNotice(groupId, text)
   }
 
   // 导出调试日志全文（环形缓冲，含被 level 过滤掉的 debug 行）：

@@ -93,6 +93,27 @@
   color: var(--em-text-tertiary);
 }
 
+/* 群系统通知灰条：与撤回提示条同 chip 形态（居中灰底胶囊，12px 三级文字）；
+   名字等内容用 em-text 单行省略，宿主 max-width 用 rpx 定宽（蒸汽端 % max-width 多行文本链有裁切坑） */
+.em-chat-page__notice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 2px var(--em-spacing-2);
+  background-color: var(--em-message-chip-bg);
+  border-radius: 999px;
+  max-width: 560rpx;
+}
+
+.em-chat-page__notice-text-host {
+  min-width: 0;
+}
+
+.em-chat-page__notice-text {
+  font-size: var(--em-font-size-12);
+  color: var(--em-text-tertiary);
+}
+
 /* 引用卡（对齐 vue 版 quote-card）：气泡外下方，无背景无边框，2px 竖杠 + 「发送人：摘要」，最多两行折叠 */
 .em-chat-page__quote {
   display: flex;

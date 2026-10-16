@@ -9,6 +9,8 @@ export const MESSAGE_TYPE = {
   AUDIO: 'audio',
   VIDEO: 'video',
   FILE: 'file',
+  // 本地系统通知（群事件灰条）：只落本地消息列表，不发服务端
+  NOTICE: 'notice',
   OTHER: 'other'
 } as const
 
@@ -175,6 +177,34 @@ export const GROUP_MEMBER_GRID_COUNT = 9
 
 /** 群成员游标分页每页条数 */
 export const GROUP_MEMBER_PAGE_SIZE = 20
+
+/** 群系统通知事件 key（本地插入群消息列表的灰条通知；对照 vue NOTICE_EVENT_TYPE 语义裁剪） */
+export const GROUP_NOTICE_EVENT = {
+  GROUP_CREATED: 'groupCreated',
+  MEMBERS_JOINED: 'membersJoined',
+  MEMBERS_EXITED: 'membersExited',
+  GROUP_NAME_CHANGED: 'groupNameChanged',
+  ANNOUNCEMENT_CHANGED: 'announcementChanged',
+  OWNER_CHANGED: 'ownerChanged',
+  USER_REMOVED: 'userRemoved',
+  GROUP_DESTROYED: 'groupDestroyed',
+  ADMIN_ADDED: 'adminAdded',
+  ADMIN_REMOVED: 'adminRemoved',
+  ALL_MEMBER_MUTE_CHANGED: 'allMemberMuteChanged'
+} as const
+
+export type GroupNoticeEventValue = (typeof GROUP_NOTICE_EVENT)[keyof typeof GROUP_NOTICE_EVENT]
+
+/** 群成员操作菜单 action key（成员管理视图 em-action-sheet） */
+export const GROUP_MEMBER_ACTION = {
+  CHAT: 'chat',
+  SET_ADMIN: 'set-admin',
+  REMOVE_ADMIN: 'remove-admin',
+  TRANSFER_OWNER: 'transfer-owner',
+  REMOVE: 'remove'
+} as const
+
+export type GroupMemberActionValue = (typeof GROUP_MEMBER_ACTION)[keyof typeof GROUP_MEMBER_ACTION]
 
 /** 群公告最大长度（对齐 vue 版 GROUP_INFO_LIMIT.ANNOUNCEMENT_MAX_LENGTH = 512，跨 UIKit 校验口径一致） */
 export const GROUP_ANNOUNCEMENT_MAX_LENGTH = 512

@@ -10,14 +10,14 @@
           <em-avatar :src="memberAvatar(m)" :name="memberName(m)" :size="48" />
           <em-text :text="memberName(m)" :text-class="ns.e('grid-name')" :text-style="gridNameTextStyle" :class="ns.e('grid-name-host')" />
         </view>
-        <!-- 邀请格：本阶段占位 emit（Task 9 接邀请入群） -->
+        <!-- 邀请格：打开邀请入群弹层（chat-info-page 库内闭环） -->
         <view :class="ns.e('grid-cell')" @click="emit('invite', props.groupId)">
           <view :class="ns.e('grid-action-circle')">
             <EmIcon name="plus" :size="20" :class="ns.e('grid-action-icon')" />
           </view>
           <text :class="ns.e('grid-name')">{{ t('group.invite') }}</text>
         </view>
-        <!-- 更多格：本阶段占位 emit（Task 9 接成员管理视图） -->
+        <!-- 更多格：打开成员管理视图（chat-info-page 页内视图切换） -->
         <view :class="ns.e('grid-cell')" @click="emit('open-members', props.groupId)">
           <view :class="ns.e('grid-action-circle')">
             <EmIcon name="more" :size="20" :class="ns.e('grid-action-icon')" />
@@ -83,9 +83,9 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  // 邀请入群占位（Task 9 接真）；宿主可接管或提示
+  // 邀请入群意图（宿主 chat-info-page 库内闭环弹层；事件同时透传给页面宿主）
   (e: 'invite', groupId: string): void
-  // 成员管理视图占位（Task 9 接真）
+  // 成员管理视图意图（宿主 chat-info-page 页内视图切换）
   (e: 'open-members', groupId: string): void
   // 群名称编辑意图（仅 owner 发出；弹层在页面根级）
   (e: 'edit-name', groupId: string): void

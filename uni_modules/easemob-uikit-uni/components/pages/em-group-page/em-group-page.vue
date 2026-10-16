@@ -214,6 +214,8 @@ async function onCreateConfirm(userIds: string[]): Promise<void> {
       allowInvites: createAllowInvites.value
     })
     EmKit.addConversation(groupId, CONVERSATION_TYPE.GROUP_CHAT)
+    // 建群成功系统通知（本地灰条，不发服务端；对齐 vue groupCreated 通知时机）
+    EmKit.insertGroupNotice(groupId, t('group.notice.groupCreated'))
     createVisible.value = false
     uni.showToast({ title: t('group.createSuccess'), icon: 'none' })
   } catch (e) {

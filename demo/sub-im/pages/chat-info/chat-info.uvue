@@ -6,8 +6,7 @@
       :chat-type="chatType"
       @deleted="onExitToConversation"
       @leaved="onExitToConversation"
-      @invite="onManageComing"
-      @open-members="onManageComing"
+      @chat-member="onChatMember"
     />
   </view>
 </template>
@@ -15,12 +14,11 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE, useLocale } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const conversationId = ref('')
 const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)
-const { t } = useLocale()
 
 onLoad((options) => {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
@@ -37,9 +35,10 @@ function onExitToConversation() {
   uni.navigateBack({ delta: 2 })
 }
 
-// 邀请入群/成员管理占位（Task 9 接真）
-function onManageComing() {
-  uni.showToast({ title: t('group.manageComing'), icon: 'none' })
+// 群成员私聊：本地构造单聊会话 + 跳聊天页（邀请入群/成员管理视图已库内闭环，无需接线）
+function onChatMember(userId: string) {
+  EmKit.addConversation(userId, CONVERSATION_TYPE.SINGLE_CHAT)
+  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${userId}&chatType=${CONVERSATION_TYPE.SINGLE_CHAT}` })
 }
 </script>
 

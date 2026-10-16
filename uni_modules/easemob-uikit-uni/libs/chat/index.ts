@@ -155,6 +155,11 @@ export class EmChat {
     this.conversations.updateConversationName(conversationId, name)
   }
 
+  // 群系统通知（本地灰条，不发服务端）：群域事件与建群链路共用入口
+  insertGroupNotice(groupId: string, text: string): void {
+    this.messages.insertLocalNotice(groupId, CONVERSATION_TYPE.GROUP_CHAT, text)
+  }
+
   async recallMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
     return this.messages.recallMessage(conversationId, chatType, messageId)
   }
