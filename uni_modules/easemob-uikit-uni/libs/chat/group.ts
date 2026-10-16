@@ -343,7 +343,7 @@ export class EmGroupDomain {
       inviteNeedConfirm: params.inviteNeedConfirm ?? false,
       mute: false,
       disabled: false
-    })
+    }, true)
     this.getGroupInfo(result.groupId).catch(() => {})
     return result.groupId
   }

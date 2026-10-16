@@ -1,14 +1,15 @@
 <template>
-  <em-popup :visible="show" @update:visible="onPopupVisible">
-    <view :class="ns.e('sheet')" :style="sheetStyle">
-      <!-- 头部：标题 + 关闭（半屏底部弹层形态，对齐 vue 版 new-chat-modal 语义） -->
+  <em-popup :visible="show" :fullscreen="isMultiple" @update:visible="onPopupVisible">
+    <view :class="[ns.e('sheet'), isMultiple ? 'em-select-contact__sheet--full' : '']" :style="sheetStyle">
+      <!-- 头部：标题 + 关闭（multiple 为全屏形态，对齐 vue mobileFullscreen；小程序端关闭键避让胶囊） -->
       <view :class="ns.e('header')">
         <text :class="ns.e('title')">{{ titleText }}</text>
-        <view :class="ns.e('close')" @click="onClose">
+        <view :class="ns.e('close')" :style="closeStyle" @click="onClose">
           <EmIcon name="closeempty" :size="20" :class="ns.e('close-icon')" />
         </view>
       </view>
-      <em-search-bar v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
+      <!-- single：搜索在头部下（对齐 vue new-chat-modal） -->
+      <em-search-bar v-if="!isMultiple" v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
 
       <!-- multiple：已选头像条（横向滚动，点头像任意处移除，对齐 vue 移动端 contact-transfer-modal strip） -->
       <scroll-view v-if="isMultiple" :class="ns.e('strip')" scroll-x>
@@ -30,6 +31,9 @@
 
       <!-- multiple：panel-top 注入区（如建群弹层的群名/开关表单），位于已选条与列表之间（对齐 vue panel-top） -->
       <slot v-if="isMultiple" name="panel-top" />
+
+      <!-- multiple：搜索紧贴列表上沿（对齐 vue：strip → panel-top → ContactList 内置搜索 → 列表） -->
+      <em-search-bar v-if="isMultiple" v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
 
       <view :class="ns.e('body')">
         <scroll-view
@@ -105,6 +109,7 @@ import { TEXT_STYLE_NAME } from '../../libs/style/textStyles'
 import type { EmSelectContactItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLocale } from '../../libs/use/useLocale'
+import { getSafeAreaTop } from '../../libs/use/useSafeArea'
 import { groupContacts } from '../../libs/utils/pinyin'
 
 // 选人弹层原子组件：数据 props 进、事件 emits 出，不连 store 不碰路由。
@@ -144,12 +149,25 @@ const titleText = computed(() =>
 )
 const nameTextStyle = TEXT_STYLE_NAME
 
-// 半屏高度：按窗口高比例预计算（读取时刻快照，弹层存续期内不响应旋转，同 useSafeArea 口径）；
-// multiple 形态内容多（已选条 + 表单 + footer），对齐 vue mobileFullscreen 取 80%
+// 面板高度：single 保持 0.6 半屏（对齐 vue new-chat-modal）；multiple 内容多（已选条 + 表单 + 列表 + footer），
+// 对齐 vue contact-transfer-modal 的 mobileFullscreen 取窗口全高（读取时刻快照，弹层存续期内不响应旋转，同 useSafeArea 口径）；
+// multiple 高度须扣除顶部安全区——em-popup 全屏形态会注入 padding-top 避让刘海，不扣则底部确认键被顶出屏
 const sheetStyle = computed(() => {
-  const ratio = isMultiple.value ? 0.8 : 0.6
-  return `height: ${Math.round(uni.getWindowInfo().windowHeight * ratio)}px;`
+  if (isMultiple.value) {
+    return `height: ${uni.getWindowInfo().windowHeight - getSafeAreaTop()}px;`
+  }
+  return `height: ${Math.round(uni.getWindowInfo().windowHeight * 0.6)}px;`
 })
+
+// multiple 全屏时头部顶到屏幕上方：小程序端右上角被胶囊独占，关闭键右移避让（与 em-nav-bar 同公式）
+let capsuleRightPad = 0
+// #ifdef MP-WEIXIN
+const menuRect = uni.getMenuButtonBoundingClientRect()
+capsuleRightPad = (uni.getWindowInfo().windowWidth - menuRect.right) + menuRect.width + 8
+// #endif
+const closeStyle = computed(() =>
+  isMultiple.value && capsuleRightPad > 0 ? `right: ${capsuleRightPad}px;` : ''
+)
 
 const keyword = ref('')
 
@@ -253,11 +271,18 @@ function onClose(): void {
   emit('update:show', false)
 }
 
-function onPopupVisible(value: boolean): void {
-  if (!value) {
+// 关窗统一重置：× / 点遮罩 / 宿主成功关窗三条路径都只是改 show prop，
+// 重置必须挂 watch 才能全覆盖（原先挂在 em-popup 的 update:visible 回调上，只有遮罩点击触发，× 与宿主关窗会漏）；
+// activeKey 一并清零——重开时由 groupKeys watch 回落到首组高亮
+watch(() => props.show, (visible) => {
+  if (!visible) {
     keyword.value = ''
     selectedIds.value = []
+    activeKey.value = ''
   }
+})
+
+function onPopupVisible(value: boolean): void {
   emit('update:show', value)
 }
 </script>

@@ -1,6 +1,7 @@
 <template>
-  <!-- 通讯录入口项列表（对齐 vue 版 ContactNav）：图标 + 标题 + hot 红点 + 计数徽标 + 右箭头。
-       纯呈现原子组件：不连 store、不碰路由，点击原样透出 entry key 由宿主接线 -->
+  <!-- 通讯录入口项列表（对齐 vue 版 ContactNav）：可选左图标 + 标题(内联计数) + hot 红点 + 右箭头。
+       纯呈现原子组件：不连 store、不碰路由，点击原样透出 entry key 由宿主接线。
+       图标/红点一律 view 包裹——mp 样式隔离下父组件 wxss 够不到子组件宿主节点 -->
   <view :class="ns.b()">
     <view
       v-for="entry in entries"
@@ -8,13 +9,13 @@
       :class="ns.e('item')"
       @click="emit('entry-click', entry.key)"
     >
-      <EmIcon :name="entry.icon" :size="20" :class="ns.e('icon')" />
-      <text :class="ns.e('label')">{{ entry.label }}</text>
-      <!-- hot 红点：仅 count>0 时生效（对齐 vue 语义），数字已由计数徽标承担 -->
-      <em-badge v-if="entry.hot === true && hasCount(entry)" dot :class="ns.e('dot')" />
+      <view v-if="entry.icon" :class="ns.e('icon')"><EmIcon :name="entry.icon" :size="20" /></view>
+      <!-- 计数内联进标题（对齐 vue entryTitle：count>0 时「好友列表 (5)」），右侧无数字徽标 -->
+      <text :class="ns.e('label')">{{ entryText(entry) }}</text>
+      <!-- hot 红点：仅 count>0 时生效（对齐 vue 语义，8px 圆点而非数字） -->
+      <view v-if="entry.hot === true && hasCount(entry)" :class="ns.e('dot')"><em-badge dot /></view>
       <view :class="ns.e('spacer')"></view>
-      <em-badge v-if="hasCount(entry)" :count="entry.count ?? 0" :class="ns.e('badge')" />
-      <EmIcon name="right" :size="22" :class="ns.e('arrow')" />
+      <EmIcon name="right" :size="22" />
     </view>
   </view>
 </template>
@@ -42,6 +43,11 @@ const ns = useNamespace('contact-nav')
 
 function hasCount(entry: EmContactNavEntry): boolean {
   return entry.count != null && entry.count > 0
+}
+
+// 对齐 vue entryTitle：计数内联拼进标题（count>0 时「好友列表 (5)」）
+function entryText(entry: EmContactNavEntry): string {
+  return hasCount(entry) ? `${entry.label} (${entry.count ?? 0})` : entry.label
 }
 </script>
 

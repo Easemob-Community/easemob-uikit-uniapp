@@ -1,5 +1,8 @@
 <template>
   <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
+    <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar -->
+    <em-nav-bar :title="t('chat.info.title')" @back="emit('back')" />
+
     <scroll-view :class="ns.e('scroll')" scroll-y>
       <!-- 单聊分支：对方信息条（对齐 vue 版成员 strip 的单聊形态：48px 头像 + 昵称 + userId） -->
       <view v-if="!isGroupChat" :class="ns.e('profile')">
@@ -20,6 +23,7 @@
         :show-group-name="showGroupName"
         :show-announcement="showAnnouncement"
         @invite="onInvite"
+        @remove="onRemove"
         @open-members="onOpenMembers"
         @edit-name="nameEditShow = true"
         @show-announcement="announcementShow = true"
@@ -83,6 +87,17 @@
       @update:show="inviteVisible = $event"
       @confirm="onInviteConfirm"
     />
+
+    <!-- 移除成员弹层（库内闭环，对齐 vue member-remove-modal）：multiple 选人，候选 = 群成员（排除自己与群主） -->
+    <em-select-contact
+      v-if="isGroupChat"
+      :items="removeItems"
+      :show="removeVisible"
+      :select-mode="SELECT_CONTACT_MODE.MULTIPLE"
+      :title="t('group.memberList.remove')"
+      @update:show="removeVisible = $event"
+      @confirm="onRemoveConfirm"
+    />
   </view>
 </template>
 
@@ -90,6 +105,7 @@
 import { computed, onMounted, ref } from 'vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmButton from '../../em-button/em-button.vue'
+import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmGroupInfoBlocks from './em-group-info-blocks.vue'
 import EmGroupFieldDialog from './em-group-field-dialog.vue'
 import EmGroupMembersView from './em-group-members-view.vue'
@@ -100,7 +116,7 @@ import type { ConversationTypeValue } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle } from '../../../libs/store/config'
 import { connectionStore } from '../../../libs/store/connection'
-import { groupDisplayNameOf, groupStore } from '../../../libs/store/group'
+import { groupDisplayNameOf, groupMemberDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { contactDisplayNameOf, contactStore } from '../../../libs/store/contact'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { EmSelectContactItem } from '../../../libs/types'
@@ -129,12 +145,16 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
+  // 返回上一页（宿主页面负责 navigateBack，与 em-contact-list-page 同约定）
+  (e: 'back'): void
   // 删除会话成功（宿主页面负责 navigateBack 退场）
   (e: 'deleted', conversationId: string): void
   // 退群/解散成功（内部已删会话清消息，宿主负责退场，与 deleted 同处理）
   (e: 'leaved', conversationId: string): void
   // 邀请入群（库内已闭环弹层 + 邀请写操作，事件仅通知宿主）
   (e: 'invite', groupId: string): void
+  // 移除成员（库内已闭环选人弹层 + 移除写操作，事件仅通知宿主）
+  (e: 'remove-members', groupId: string): void
   // 成员管理视图已打开（库内页内视图切换，事件仅通知宿主）
   (e: 'open-members', groupId: string): void
   // 成员私聊意图（宿主接线发起单聊：addConversation + 跳聊天页）
@@ -211,6 +231,40 @@ function onInviteConfirm(userIds: string[]): void {
     })
     .catch(() => {
       uni.showToast({ title: t('group.inviteFailed'), icon: 'none' })
+    })
+}
+
+// ========== 移除成员（库内闭环：em-select-contact multiple + EmKit.removeGroupMembers） ==========
+const removeVisible = ref(false)
+
+function onRemove(groupId: string): void {
+  removeVisible.value = true
+  emit('remove-members', groupId)
+}
+
+// 候选成员：排除自己与群主（群主不可被移除）；展示名/头像与成员视图同口径
+const removeItems = computed<EmSelectContactItem[]>(() => {
+  const ownerId = groupStore.infoByGroupId[props.conversationId]?.owner ?? ''
+  const members = groupStore.memberMapByGroupId[props.conversationId] ?? []
+  return members
+    .filter((m) => m.userId !== connectionStore.userId && m.userId !== ownerId)
+    .map((m) => ({
+      userId: m.userId,
+      name: groupMemberDisplayNameOf(props.conversationId, m.userId),
+      avatar: m.avatar ?? avatarOf(m.userId)
+    }))
+})
+
+// 移除确认：成功才关窗（失败保留已选）；成功 toast + 重拉成员首屏兜底（SDK 回写本地 store 见 group 域）
+function onRemoveConfirm(userIds: string[]): void {
+  EmKit.removeGroupMembers(props.conversationId, userIds)
+    .then(() => {
+      removeVisible.value = false
+      uni.showToast({ title: t('group.memberRemoveSuccess'), icon: 'success' })
+      EmKit.getGroupMemberList(props.conversationId).catch(() => {})
+    })
+    .catch(() => {
+      uni.showToast({ title: t('group.memberRemoveFailed'), icon: 'none' })
     })
 }
 

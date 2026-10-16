@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <em-group-page @click-group="onClickGroup" @back="onBack" />
+    <em-group-page @click-group="onClickGroup" @created="onClickGroup" @back="onBack" />
   </view>
 </template>
 

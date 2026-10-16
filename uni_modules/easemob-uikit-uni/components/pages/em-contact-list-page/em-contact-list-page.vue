@@ -46,6 +46,9 @@
             </view>
           </view>
         </view>
+
+        <!-- 底部「没有更多了」（对齐 vue 版 contact-list no-more；SDK 本地全量无分页，恒 noMore 态） -->
+        <em-load-more v-if="groups.length > 0" :state="LOAD_MORE_STATE.NO_MORE" />
       </scroll-view>
 
       <em-alphabet-nav
@@ -73,10 +76,11 @@ import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
+import EmLoadMore from '../../em-load-more/em-load-more.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import { EmKit } from '../../../libs'
-import { ALPHABET_KEYS, CONTACT_MENU_KEY } from '../../../libs/constants'
+import { ALPHABET_KEYS, CONTACT_MENU_KEY, LOAD_MORE_STATE } from '../../../libs/constants'
 import type { ContactMenuKeyValue } from '../../../libs/constants'
 import { contactStore } from '../../../libs/store/contact'
 import { primaryColorStyle } from '../../../libs/store/config'

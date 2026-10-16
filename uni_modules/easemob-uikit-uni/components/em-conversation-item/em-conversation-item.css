@@ -4,14 +4,15 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: var(--em-spacing-3) var(--em-spacing-4);
+  padding: var(--em-spacing-2) var(--em-spacing-3);
   background-color: var(--em-bg-base);
+  border-radius: var(--em-radius);
+  margin-bottom: var(--em-spacing-1);
 }
 
-/* 置顶底色语义错位（--em-bg-hover）保持现状，另有任务核对 vue 版 */
+/* 置顶整项底色（对齐 vue 版 --uikit-bg-hover + 圆角 8px） */
 .em-conversation-item--pinned {
   background-color: var(--em-bg-hover);
-  border-radius: var(--em-radius);
 }
 
 .em-conversation-item__body {
@@ -21,9 +22,6 @@
   flex: 1;
   margin-left: var(--em-spacing-3);
   align-self: stretch;
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-bottom-color: var(--em-divider-color);
 }
 
 .em-conversation-item__top {
@@ -55,11 +53,10 @@
   color: var(--em-text-primary);
 }
 
-/* 置顶/免打扰图标徽标：弱化图标色（对齐 vue 版 pin-badge/mute-badge 的 --uikit-icon-muted） */
+/* 置顶/免打扰图标徽标的间距包裹（图标色走 em-icon 默认 --em-icon-muted，对齐 vue 版 pin-badge/mute-badge） */
 .em-conversation-item__flag {
   margin-left: var(--em-spacing-1);
   flex-shrink: 0;
-  color: var(--em-icon-muted);
 }
 
 .em-conversation-item__time {

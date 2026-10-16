@@ -2,13 +2,8 @@
   <!-- 成员管理视图：chat-info 页内全屏覆盖层（页内视图切换，不碰路由），back 回主视图；
        z-index 低于弹层基准 2000（action-sheet/select-contact 等 em-popup 族恒在其上） -->
   <view :class="ns.b()">
-    <!-- 标题栏：back + 「群成员 (N)」（对齐 vue group-member-list header 的标题 + 计数语义） -->
-    <view :class="ns.e('header')">
-      <view :class="ns.e('back')" @click="emit('back')">
-        <EmIcon name="left" :size="22" :class="ns.e('back-icon')" />
-      </view>
-      <text :class="ns.e('title')">{{ t('group.members') }} ({{ memberCount }})</text>
-    </view>
+    <!-- 标题栏：复用 em-nav-bar（状态栏/胶囊避让内置），back 回主视图；覆盖层全屏盖住主视图导航栏，恒单 header -->
+    <em-nav-bar :title="navTitle" @back="emit('back')" />
 
     <em-search-bar v-model="keyword" :placeholder="t('group.memberSearchPlaceholder')" />
 
@@ -54,6 +49,7 @@ import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmIcon from '../../em-icon/em-icon.vue'
 import EmLoadMore from '../../em-load-more/em-load-more.vue'
+import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmText from '../../em-text/em-text.vue'
 import { EmKit } from '../../../libs'
@@ -103,6 +99,9 @@ const memberCount = computed(() => {
   if (info != null) return info.memberCount
   return members.value.length
 })
+
+// 导航标题：「群成员 (N)」（对齐 vue group-member-list header 的标题 + 计数语义）
+const navTitle = computed(() => `${t('group.members')} (${memberCount.value})`)
 
 // 展示序：owner > admin > joinedAt（复用 sortGroupMembers，不改 store 原顺序——分页 append 依赖原顺序）
 const displayMembers = computed<EmGroupMember[]>(() => {

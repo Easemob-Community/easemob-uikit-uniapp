@@ -18,8 +18,8 @@
   border-radius: var(--em-input-radius);
 }
 
+/* 前置搜索图标的间距（图标色走 em-icon 默认 --em-icon-muted，隔离下 color 类够不到字形节点） */
 .em-search-bar__icon {
-  color: var(--em-icon-muted);
   margin-right: 6px;
   flex-shrink: 0;
 }
@@ -27,7 +27,7 @@
 .em-search-bar__input {
   flex: 1;
   height: 36px;
-  font-size: var(--em-font-size-14);
+  font-size: var(--em-font-size-15);
   color: var(--em-text-primary);
   background-color: transparent;
 }

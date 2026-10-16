@@ -105,10 +105,15 @@ function onClose(): void {
   emit('update:show', false)
 }
 
-function onPopupVisible(value: boolean): void {
-  if (!value) {
+// 关窗统一重置：× / 选人 / 草稿触发 @ 删除等关窗路径都只是改 show prop，
+// 重置挂 watch 才能全覆盖（原先挂在 em-popup 的 update:visible 回调上，仅遮罩点击触发）
+watch(() => props.show, (visible) => {
+  if (!visible) {
     searchText.value = ''
   }
+})
+
+function onPopupVisible(value: boolean): void {
   emit('update:show', value)
 }
 </script>

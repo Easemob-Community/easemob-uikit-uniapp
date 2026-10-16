@@ -93,6 +93,26 @@ export const CONVERSATION_MENU_KEY = {
 
 export type ConversationMenuKeyValue = (typeof CONVERSATION_MENU_KEY)[keyof typeof CONVERSATION_MENU_KEY]
 
+/** 会话列表筛选 tab key（对齐 vue 版 conversation-tabs 的 ConversationTabKey 与默认顺序） */
+export const CONVERSATION_TAB_KEY = {
+  ALL: 'all',
+  UNREAD: 'unread',
+  AT_ME: 'atMe',
+  SINGLE: 'single',
+  GROUP: 'group'
+} as const
+
+export type ConversationTabKeyValue = (typeof CONVERSATION_TAB_KEY)[keyof typeof CONVERSATION_TAB_KEY]
+
+/** 会话筛选 tab 默认全集与顺序（对齐 vue DEFAULT_CONVERSATION_TABS） */
+export const DEFAULT_CONVERSATION_TABS: ConversationTabKeyValue[] = [
+  CONVERSATION_TAB_KEY.ALL,
+  CONVERSATION_TAB_KEY.UNREAD,
+  CONVERSATION_TAB_KEY.AT_ME,
+  CONVERSATION_TAB_KEY.SINGLE,
+  CONVERSATION_TAB_KEY.GROUP
+]
+
 /** 聊天页消息长按菜单 action key */
 export const MESSAGE_MENU_KEY = {
   COPY: 'copy',
@@ -172,8 +192,8 @@ export const GROUP_MEMBER_ROLE = {
 
 export type GroupMemberRoleValue = (typeof GROUP_MEMBER_ROLE)[keyof typeof GROUP_MEMBER_ROLE]
 
-/** 群成员宫格首屏格数（聊天详情页成员九宫格，含加/减操作格前的成员展示上限） */
-export const GROUP_MEMBER_GRID_COUNT = 9
+/** 群成员宫格首屏成员展示上限（聊天详情页成员宫格，对齐 vue chat-info-drawer displayedMembers = 8；加/减操作格另计） */
+export const GROUP_MEMBER_GRID_COUNT = 8
 
 /** 群成员游标分页每页条数 */
 export const GROUP_MEMBER_PAGE_SIZE = 20

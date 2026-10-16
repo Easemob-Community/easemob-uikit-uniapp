@@ -156,3 +156,66 @@
 - **群系统通知**：`MESSAGE_TYPE.NOTICE='notice'` 一等本地类型（id 恒空串跳过去重/回执、localId 唯一、不发服务端、loadHistory 合并保留）；`insertGroupNotice` 落六类消费点——建群（em-group-page 成功链路）/成员加入（含多成员「等 N 人」）/成员退出/群名变更（仅实际变化时）/公告变更/转让群主；管理员变更/全员禁言/被移出/解散不插（后两者随清会话即擦除，语义裁剪）。聊天页 NOTICE 居中灰条 chip 渲染（复用撤回条形态，560rpx 定宽规避蒸汽端 % max-width 坑），长按菜单对 notice 禁用。
 - **Phase 6 评审 minor 扫尾**：conversation-item props 注释「红色前缀」→主色；死 i18n key `chat.announcementBanner.expand/collapse` 删除；spike 页 `loginAt===0` 守卫（同步先于 login resolve 不输出垃圾耗时）；成员操作「移出群聊」去 danger（vue 设计稿警示色从严，红色区仅退群/解散）；透出契约表补 `hasAtMe`。i18n 全量核查：zh/en key 集一致（199 个），模板无硬编码中文。
 - 验证：build web ✓ / build mp-weixin 11 项全绿（**主包 642KB** ≤ 1.5MB，分包 1234KB）/ H5 伺服 200。**待验**：群链路端到端与双角色群管理真实账号冒烟（汇总表新增五行）。
+
+## 2026-10-16 H5 视觉/交互按 vue 权威口径整改（用户红框四项）
+
+- **通讯录入口计数**：`em-contact-nav` 删右侧红色数字徽标，计数内联进标题（`entryText` 对齐 vue `entryTitle`：「群组列表 (30)」）；hot 红点保留（仅新请求）；`contact.entryGroup` 文案「群组」→「群组列表」（对齐 vue zh-CN）。
+- **chat-info 成员宫格**：「邀请(+)」「更多(···)」两格 → vue 口径「添加(+)」「移除(−)」+ 宫格下方通栏「查看全部 ⌄」；`GROUP_MEMBER_GRID_COUNT` 9→8（对齐 vue displayedMembers）；权限门控（添加 = owner/admin 或 `allowInvites`，移除 = 仅 owner/admin）；移除闭环复用 `em-select-contact`（候选=排除自己与群主的成员）→ `EmKit.removeGroupMembers` 批量接口；新增 i18n `chat.info.add`/`chat.info.checkAll`/`group.memberList.remove`/`group.memberRemoveSuccess/Failed`（zh/en 同步）。
+- **双 header 修复**：`demo/pages.json` chat-info 补 `navigationStyle:custom` + `titleNView:false`（同分包其余页既有配置，此页漏配）；`em-chat-info-page` 顶部加 `em-nav-bar`（back 透出，demo 接线 navigateBack，与 contact-list 同约定）；`em-group-members-view` 自绘 header 换 `em-nav-bar`（胶囊/状态栏避让内置），旧 header 样式删除。
+- **字母索引条**：`em-alphabet-nav` 定高 27×22px 居中 → 撑满列表区、字母格 flex:1 等比（封顶 20px、9px/500、视觉 16px/热区 24px content-box padding + background-clip，对齐 vue contact-alphabet-nav；max-height 蒸汽端不生效时退化为等比撑满，无裁剪）。已选头像 × 角标与 vue 同构，未动。
+- 验证：build web ✓ / build mp-weixin 11 项全绿（主包 644KB ≤ 1.5MB）/ H5 伺服 200。**待验**：四屏真实账号视觉回归（通讯录内联计数、宫格添加/移除/查看全部、成员视图单 header、建群字母条密度与 × 角标）。
+
+## 2026-10-16 创建群组面板按 vue mobileFullscreen 复刻（二次整改）
+
+- **分组头居中 bug**：`em-select-contact__group-header` 缺 `flex-direction: row`，uvue/mp 端 view 默认 column 致 `align-items:center` 把字母水平居中（用户截图 L/P/W 居中即此）；已补并注释防回退（em-contact-list-page 同位置本就有 row）。
+- **multiple 全屏化**：选人弹层 multiple 模式 80% 半屏 → 窗口全高（对齐 vue contact-transfer-modal 的 mobileFullscreen；列表区过矮曾是 27 个字母挤成一团的根因）；`em-popup` 新增 `fullscreen` prop（面板去顶部圆角），sheet 同步去圆角；single 模式 0.6 半屏不变。
+- **搜索框位置**：multiple 下搜索从头部下移到 panel-top 之下、紧贴列表（对齐 vue 视觉序：strip → 表单 → 搜索 → 列表）；single 不变。
+- **胶囊避让**：multiple 全屏时头部 × 关闭键在 MP-WEIXIN 端按 em-nav-bar 同公式右移避让胶囊。
+- **字母条单元格**：回退 content-box/background-clip 写法（蒸汽端不支持时内容盒 8px 会裁 9px 字母），单元格定宽 24px、active 高亮块覆盖整格（与原 28px 高亮口径一致）。
+- 验证：build web ✓ / build mp-weixin 11 项全绿（主包 645KB）/ H5 伺服 200。**待验**：建群面板全屏形态、分组头左对齐、字母条密度三端真机/模拟器视觉。
+
+## 2026-10-16 建群/成员列表入口三连问对齐 vue（三次整改）
+
+- **成员列表入口**：`em-group-info-blocks` 宫格区补假搜索框（常驻，36px/圆角 999/`--em-bg-hover`，对齐 vue `chat-info-drawer__fake-search`），点击进成员管理视图；与「查看全部」（>8 人时）构成双入口，修复 ≤8 人群无成员管理入口的缺口。
+- **建群后进聊天页**：`em-group-page` 建群成功新增 `created` emit（对齐 vue `selectConversation` 语义），demo group.uvue 复用 `onClickGroup` 接线（预热 + 跳聊天页）。
+- **建群面板配置门控（对齐 vue create-group-modal config 默认值）**：新增 `showNameInput`/`showSettings` props（均默认 false）——默认面板 = 纯选人 + 自动群名（前 3 名成员昵称「、」拼接、>3 补「...」，新增 i18n `group.createDefaultName`「群聊」），公开群/允许成员邀请开关与群名输入框仅宿主显式开启才显示；群名不再必填（空值回落自动群名，对齐 vue finalName）。vue 设置区的入群需审批/被邀请人需确认/最大成员数属一期裁剪未实现。
+- 验证：build web ✓ / build mp-weixin 11 项全绿 / H5 伺服 200（上一轮已验，本轮构建产物同链路）。**待验**：假搜索框入口、建群直跳聊天页、默认无开关的建群面板三端视觉。
+
+## 2026-10-16 新建群群列表置顶（产品决策，偏离 vue 口径）
+
+- 事实核查：vue 原版 `store.addGroup` 同样 push 到群列表**末尾**（group-list 默认 `sortBy:'none'` 保持 store 顺序），「新群排最下」与原 uikit 一致，非实现偏差；vue 建群后直跳聊天页弱化了该感知。
+- 按用户明确期望改为置顶：`upsertGroup(group, toFront?)` 新增第二参（默认 false 保持 vue push 语义），`chat/group.ts createGroup` 传 `toFront: true`（unshift 头部）。
+- 已知边界：`getJoinedGroups` 全量刷新后列表顺序以 SDK 返回为准（EmGroup 无时间戳字段，无法持久按创建时间排序），置顶仅保证本地创建当次回显。
+- 验证：build web ✓ / build mp-weixin 11 项全绿。**待验**：建群后回群列表确认新群在顶部。
+
+## 2026-10-16 四屏视觉对齐 vue demo 整改（会话 tab / 卡片化 / 图标补字形）
+
+- **范围依据**：用户提供的 mp 真机截图 vs 本机 vue uikit demo 截图四屏对照（会话列表/通讯录/好友列表/群组列表）。`PLAN.md` 会话页清单已补「筛选 tab」范围项（纯 UI+本地过滤、数据零新增）。
+- **会话筛选 tab（新）**：新原子组件 `em-conversation-tabs`（胶囊 13px/bg-secondary/active 主色+bg-active，对齐 vue conversation-tabs，可横滑无翻页箭头）；`CONVERSATION_TAB_KEY` + `DEFAULT_CONVERSATION_TABS` 入 constants；i18n 增 tabAll/tabUnread/tabAtMe/tabSingle/tabGroup + 分 tab 空态 emptyUnread/emptyAtMe/emptySingle/emptyGroup（zh/en 与 vue 同文案）；`em-conversation-page` 新增 `tabs` prop（默认五项，空数组隐藏）+ activeTab 内部状态 + 四维过滤（unread/atMe/single/group，store 数据零改动）。
+- **列表统一卡片口径（对齐 vue cell card 变体）**：会话/好友/群/通讯录入口四列表全部去 hairline 分隔线，改 白底圆角 8px + 项间距 4px + 容器 padding 4px；条目行高 64、内容 padding 8/12；会话置顶整项 `--em-bg-hover` 灰底；群 item 成员数改 11px secondary；好友列表底部补 `em-load-more`「没有更多了」footer。
+- **通讯录首页**：入口顺序改 contact/group/notice（对齐 vue entryOrder，黑名单维持二期裁剪）；`EmContactNavEntry.icon` 改可选（缺省不渲染左图标，对齐 vue 默认）；`em-contact-page` 不再硬编码图标。
+- **mp 宿主类失效清理**：`em-conversation-item`（__flag/__unread）、`em-contact-nav`（__icon/__dot）改普通 view 包裹（父组件 class 打 virtualHost 子组件在 mp 静默失效，坑集 #8a）；`em-search-bar__icon` 删冗余 color。
+- **图标补字形（pin/bell-slash）**：`scripts/patch-icons.py`（Remix Icon Apache-2.0，subset+官方 Merger+码点重映射，幂等）合并 U+E700 pin / U+E701 bell-slash；`em-icons.ts` 补映射；会话 item 置顶/免打扰与长按菜单换用新字形（原 top/eye-slash 代偿与过时注释清除）。
+- **mp 字体缓存坑（根因定案）**：合并字形后模拟器恒渲染旧字体（旧字形正常、新字形 blank），改 post 表/官方 Merger 重打包/重启开发者工具均无效，H5 Chromium 同字体正常——微信 mp @font-face 按**族名**持久缓存。定案：族名带版本号 `em-icons-v2`，**每次改 ttf 必须递增**（坑集 #8b + em-icon-strategy skill 已落纪律）。
+- 验证：build web ✓ / build mp-weixin 11 项全绿（主包 652KB ≤ 1.5MB）/ H5 伺服 200；H5 真实账号四屏截图复核全对（tab 过滤正确、置顶灰底+pin+bell-slash、通讯录顺序、群卡片）；mp 模拟器四屏复核全对（族名升版后 pin/bell-slash 渲染正常、好友列表 footer、旧红框两处空白均消失；pfh 会话实为群聊属正常数据）。
+- **待验/遗留**：① em-alphabet-nav active 高亮色（vue 源码=主色块，demo 截图似深色块）未与 vue demo 实机并排核对；② 群 item 是否有 1px 描边（demo 截图似有）同待核对；③ H5 端联系人同步为 0（群组 33 正常，mp 联系人 5 正常）疑似存量 H5 数据层问题，与本轮无关，待查；④ 蒸汽 App 端四屏回归未做。
+
+## 2026-10-16 修复：Android 刘海屏遮挡全屏弹层顶部（建群页标题入状态栏）
+
+症状：Android 真机（刘海屏）从会话页「+」进创建群组，「创建群组」标题与关闭 × 与系统状态栏同一行、被刘海遮挡。根因：`em-select-contact` multiple 走 `em-popup` 的 **fullscreen** 形态全屏贴屏顶，而 `em-popup` 的 `panelStyle` 只处理底部 `padding-bottom`（Home 指示条），**顶部安全区从未处理**；页面级路径（`em-nav-bar`）早已有 `padding-top: getSafeAreaTop()`，弹层路径漏了。`em-select-contact` 是全库唯一 `:fullscreen` 使用方。落地：
+- `em-popup.vue`：`panelStyle` 重构——bottom 位统一拼装；`fullscreen` 时追加 `padding-top: getSafeAreaTop()`（>0 才加），底部 safeArea 逻辑不变。
+- `em-select-contact.vue`：multiple 全屏 sheet 高度 `windowHeight` → `windowHeight - getSafeAreaTop()`（panel 新增 top padding 后不扣会把底部确认键顶出屏）；single 半屏不变。
+- 坑集 skill 蒸汽端新增条目（全屏弹层顶部安全区口径）。官方文档佐证：app-android `safeAreaInsets.top` 自 HBuilderX 4.25 起返回状态栏高度，读法本身没错。
+- 验证：build web ✓ / build mp-weixin 11 项全绿 / H5 伺服 200。**待验**：Android 刘海真机复测建群页标题与确认键位置；顺带抽查聊天页/会话页导航栏在 Android 上未受影响（若 `getSafeAreaTop()` 在 Android 蒸汽端返回 0，需另起 spike 修 `useSafeArea.ts`）。
+
+## 2026-10-16 修复：建群选人弹层关窗后已选/搜索词不重置
+
+根因：重置逻辑挂在 `onPopupVisible`（em-popup 的 `update:visible`，仅遮罩点击触发）；× 按钮与建群成功宿主关窗（`createVisible=false`）两条路径直接改 `show` prop，绕过重置，而弹层组件随页面存活（ref 状态不销毁），下次打开残留上次人选。解法：`em-select-contact` 改 `watch(() => props.show)` 置 false 时统一重置 `keyword`/`selectedIds`，三条关窗路径全覆盖。验证：build web + mp-weixin 11 项全绿。
+
+## 2026-10-16 弹层状态重置全量审计（同类问题排查）
+
+对全库弹层/有内部状态组件排查「关窗重置挂错钩子」同类问题，结论与落地：
+- **em-mention-picker**：同款模式（searchText 重置挂在 `update:visible`，仅遮罩点击触发），当前被父级 `mentionKeyword` computed（关窗即置 ''）掩盖未暴露；已对齐 `watch(props.show)` 统一重置，去掉对父级行为的隐式依赖。
+- **em-popup 竞态（真 bug）**：关窗 260ms 后摘 DOM 的 `setTimeout` 未取消——260ms 内快速重开，stale 定时器会把已打开的弹层摘掉。已加 `hideTimer`（clearTimeout + `!props.visible` 双保险）。
+- **em-select-contact**：关窗重置补 `activeKey` 清零（重开索引条高亮回落首组，语义同冷启动）。
+- 无问题：em-group-field-dialog（nameInput 打开回显 / announcementEditing 关窗复位均走 watch）；em-action-sheet（无内部状态）；em-conversation-page / em-chat-page / em-group-page 宿主侧状态均有显式重置路径。

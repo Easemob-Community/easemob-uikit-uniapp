@@ -52,7 +52,11 @@
         {
           "path": "pages/chat-info/chat-info",
           "style": {
-            "navigationBarTitleText": "聊天信息"
+            "navigationBarTitleText": "聊天信息",
+            "navigationStyle": "custom",
+            "app-plus": {
+              "titleNView": false
+            }
           }
         },
         {

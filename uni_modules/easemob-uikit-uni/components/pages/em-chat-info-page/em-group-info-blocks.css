@@ -30,6 +30,30 @@
   color: var(--em-text-primary);
 }
 
+/* 假搜索框（对齐 vue fake-search：36px 高、圆角 999、#F5F5F5 底 = --em-bg-hover、13px 三级灰） */
+.em-group-info-blocks__fake-search {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 36px;
+  margin: var(--em-spacing-2) var(--em-spacing-3) 0;
+  padding: 0 var(--em-spacing-3);
+  border-radius: var(--em-input-radius);
+  background-color: var(--em-bg-hover);
+}
+
+.em-group-info-blocks__fake-search-icon {
+  color: var(--em-text-tertiary);
+  flex-shrink: 0;
+}
+
+.em-group-info-blocks__fake-search-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  color: var(--em-text-tertiary);
+  margin-left: 6px;
+}
+
 /* 宫格：flex wrap 五列（ucss 无 grid），格宽 20%（单行 nowrap 文本，避开多行 text 百分比坑） */
 .em-group-info-blocks__grid {
   display: flex;
@@ -63,7 +87,7 @@
   margin-top: 4px;
 }
 
-/* 邀请/更多操作格：48px 实线圆 + 图标（对齐 vue grid-action-circle） */
+/* 添加/移除操作格：48px 实线圆 + 图标（对齐 vue grid-action-circle） */
 .em-group-info-blocks__grid-action-circle {
   display: flex;
   align-items: center;
@@ -79,6 +103,27 @@
 
 .em-group-info-blocks__grid-action-icon {
   color: var(--em-text-tertiary);
+}
+
+/* 查看全部：通栏文字 + 下箭头（对齐 vue view-all：margin-top 12px、11px、二级文字色） */
+.em-group-info-blocks__view-all {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--em-spacing-3);
+  padding: 4px var(--em-spacing-2) var(--em-spacing-3);
+}
+
+.em-group-info-blocks__view-all-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-11);
+  color: var(--em-text-secondary);
+}
+
+.em-group-info-blocks__view-all-icon {
+  color: var(--em-text-secondary);
+  margin-left: 4px;
 }
 
 /* 字段行（群名称/群公告）：label 小灰 + 值行 + 右侧操作图标，底部发丝线 */

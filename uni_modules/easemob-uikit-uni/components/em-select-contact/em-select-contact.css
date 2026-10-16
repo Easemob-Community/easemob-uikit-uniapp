@@ -8,6 +8,12 @@
   border-top-right-radius: 12px;
 }
 
+/* multiple 全屏形态（对齐 vue mobileFullscreen）：贴屏顶去圆角 */
+.em-select-contact__sheet--full {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 .em-select-contact__header {
   display: flex;
   flex-direction: row;
@@ -101,10 +107,13 @@
   color: var(--em-text-tertiary);
 }
 
-/* multiple：分组头（28px 高、11px/500、弱化灰，与 em-contact-list-page 分组头同口径） */
+/* multiple：分组头（28px 高、11px/500、弱化灰，与 em-contact-list-page 分组头同口径）；
+   必须显式 flex-direction: row——uvue/mp 端 view 默认 flex-direction: column，
+   缺省时 align-items: center 会把字母水平居中（实测 mp 渲染成居中字母） */
 .em-select-contact__group-header {
   height: 28px;
   display: flex;
+  flex-direction: row;
   align-items: center;
   padding: 0 var(--em-spacing-4);
   background-color: var(--em-bg-elevated);

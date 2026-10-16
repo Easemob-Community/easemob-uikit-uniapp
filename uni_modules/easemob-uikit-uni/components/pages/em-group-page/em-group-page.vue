@@ -44,7 +44,8 @@
     </scroll-view>
 
     <!-- 建群弹层（控制器裁定落在本组件内）：em-select-contact multiple + #panel-top 注入群名/开关表单
-         （对齐 vue create-group-modal = contact-transfer-modal + panel-top 的移动端形态） -->
+         （对齐 vue create-group-modal = contact-transfer-modal + panel-top 的移动端形态；
+         群名输入框/群设置区默认隐藏，由 showNameInput/showSettings 门控，对齐 vue config 默认 false） -->
     <em-select-contact
       :items="contactItems"
       :show="createVisible"
@@ -54,25 +55,28 @@
       @confirm="onCreateConfirm"
     >
       <template #panel-top>
-        <view :class="ns.e('form')">
+        <view v-if="showNameInput || showSettings" :class="ns.e('form')">
           <input
+            v-if="showNameInput"
             :class="ns.e('name-input')"
             v-model="createName"
             :placeholder="t('group.createNamePlaceholder')"
             :maxlength="GROUP_NAME_MAX_LENGTH"
           />
-          <view :class="ns.e('switch-row')" @click="createPublic = !createPublic">
-            <text :class="ns.e('switch-label')">{{ t('group.createPublic') }}</text>
-            <view :class="switchClass(createPublic)">
-              <view :class="ns.e('switch-thumb')" />
+          <block v-if="showSettings">
+            <view :class="ns.e('switch-row')" @click="createPublic = !createPublic">
+              <text :class="ns.e('switch-label')">{{ t('group.createPublic') }}</text>
+              <view :class="switchClass(createPublic)">
+                <view :class="ns.e('switch-thumb')" />
+              </view>
             </view>
-          </view>
-          <view :class="ns.e('switch-row')" @click="createAllowInvites = !createAllowInvites">
-            <text :class="ns.e('switch-label')">{{ t('group.createAllowInvites') }}</text>
-            <view :class="switchClass(createAllowInvites)">
-              <view :class="ns.e('switch-thumb')" />
+            <view :class="ns.e('switch-row')" @click="createAllowInvites = !createAllowInvites">
+              <text :class="ns.e('switch-label')">{{ t('group.createAllowInvites') }}</text>
+              <view :class="switchClass(createAllowInvites)">
+                <view :class="ns.e('switch-thumb')" />
+              </view>
             </view>
-          </view>
+          </block>
         </view>
       </template>
     </em-select-contact>
@@ -104,8 +108,22 @@ import { useLocale } from '../../../libs/use/useLocale'
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
+interface Props {
+  /** 建群面板是否显示群名称输入框（对齐 vue config.showNameInput，默认 false：自动取前 3 名成员昵称当群名） */
+  showNameInput?: boolean
+  /** 建群面板是否显示群设置区（公开群/允许成员邀请开关，对齐 vue config.showSettings，默认 false） */
+  showSettings?: boolean
+}
+
+withDefaults(defineProps<Props>(), {
+  showNameInput: false,
+  showSettings: false
+})
+
 const emit = defineEmits<{
   (e: 'click-group', groupId: string): void
+  // 建群成功（库内已 addConversation + 建群系统通知；宿主接线跳聊天页，对齐 vue selectConversation 语义）
+  (e: 'created', groupId: string): void
   (e: 'back'): void
 }>()
 
@@ -195,15 +213,19 @@ function onOpenCreate(): void {
   createVisible.value = true
 }
 
-// 建群确认：群名必填校验 → EmKit.createGroup（成功即 upsert 群 store，列表自动刷新）→
-// 本地构造群会话（对齐 vue create-group-modal 的 addConversation）+ 成功 toast；
+// 自动群名（对齐 vue generatedName）：取前 3 名成员昵称「、」拼接，>3 人补「...」，空选兜底「群聊」
+function autoGroupName(userIds: string[]): string {
+  const names = userIds.slice(0, 3).map((id) => contactDisplayNameOf(id))
+  if (userIds.length > 3) names.push('...')
+  return names.join('、') || t('group.createDefaultName')
+}
+
+// 建群确认：群名 = 输入框值（showNameInput 开启时）或自动群名（对齐 vue finalName 回落链）→
+// EmKit.createGroup（成功即 upsert 群 store，列表自动刷新）→ 本地构造群会话（对齐 vue addConversation）→
+// 建群系统通知 + 成功 toast + emit created（宿主跳聊天页，对齐 vue selectConversation）；
 // confirm 不自动关窗，成功才关（失败保留已选与表单）
 async function onCreateConfirm(userIds: string[]): Promise<void> {
-  const name = createName.value.trim()
-  if (name === '') {
-    uni.showToast({ title: t('group.createNameRequired'), icon: 'none' })
-    return
-  }
+  const name = createName.value.trim() !== '' ? createName.value.trim() : autoGroupName(userIds)
   if (creating.value) return
   creating.value = true
   try {
@@ -218,6 +240,7 @@ async function onCreateConfirm(userIds: string[]): Promise<void> {
     EmKit.insertGroupNotice(groupId, t('group.notice.groupCreated'))
     createVisible.value = false
     uni.showToast({ title: t('group.createSuccess'), icon: 'none' })
+    emit('created', groupId)
   } catch (e) {
     uni.showToast({ title: t('group.createFailed'), icon: 'none' })
   } finally {

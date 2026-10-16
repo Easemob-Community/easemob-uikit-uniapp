@@ -1,29 +1,39 @@
 <template>
   <view :class="ns.b()">
-    <!-- 成员宫格：角色排序前 N-2 名 + 邀请格 + 更多格（对齐 vue chat-info-drawer 成员区） -->
+    <!-- 成员宫格：角色排序前 8 名 + 添加格 + 移除格 + 下方「查看全部」（对齐 vue chat-info-drawer 成员区） -->
     <view v-if="showMemberGrid" :class="ns.e('section')">
       <view :class="ns.e('section-label-row')">
         <text :class="ns.e('section-label')">{{ t('group.members') }} ({{ memberCount }})</text>
+      </view>
+      <!-- 假搜索框：readonly 视觉同搜索输入框，点击进成员管理视图（对齐 vue fake-search，常驻入口） -->
+      <view :class="ns.e('fake-search')" @click="emit('open-members', props.groupId)">
+        <EmIcon name="search" :size="20" :class="ns.e('fake-search-icon')" />
+        <text :class="ns.e('fake-search-text')">{{ t('group.memberSearchPlaceholder') }}</text>
       </view>
       <view :class="ns.e('grid')">
         <view v-for="m in gridMembers" :key="m.userId" :class="ns.e('grid-cell')">
           <em-avatar :src="memberAvatar(m)" :name="memberName(m)" :size="48" />
           <em-text :text="memberName(m)" :text-class="ns.e('grid-name')" :text-style="gridNameTextStyle" :class="ns.e('grid-name-host')" />
         </view>
-        <!-- 邀请格：打开邀请入群弹层（chat-info-page 库内闭环） -->
-        <view :class="ns.e('grid-cell')" @click="emit('invite', props.groupId)">
+        <!-- 添加格：打开邀请入群弹层（chat-info-page 库内闭环）；群主/管理员恒可见，普通成员需群允许邀请（对齐 vue canAddMember） -->
+        <view v-if="canAddMember" :class="ns.e('grid-cell')" @click="emit('invite', props.groupId)">
           <view :class="ns.e('grid-action-circle')">
             <EmIcon name="plus" :size="20" :class="ns.e('grid-action-icon')" />
           </view>
-          <text :class="ns.e('grid-name')">{{ t('group.invite') }}</text>
+          <text :class="ns.e('grid-name')">{{ t('chat.info.add') }}</text>
         </view>
-        <!-- 更多格：打开成员管理视图（chat-info-page 页内视图切换） -->
-        <view :class="ns.e('grid-cell')" @click="emit('open-members', props.groupId)">
+        <!-- 移除格：打开移除成员选人弹层（chat-info-page 库内闭环）；仅群主/管理员可见（对齐 vue canRemoveMembers） -->
+        <view v-if="canRemoveMembers" :class="ns.e('grid-cell')" @click="emit('remove', props.groupId)">
           <view :class="ns.e('grid-action-circle')">
-            <EmIcon name="more" :size="20" :class="ns.e('grid-action-icon')" />
+            <EmIcon name="minus" :size="20" :class="ns.e('grid-action-icon')" />
           </view>
-          <text :class="ns.e('grid-name')">{{ t('group.more') }}</text>
+          <text :class="ns.e('grid-name')">{{ t('group.memberList.remove') }}</text>
         </view>
+      </view>
+      <!-- 查看全部：成员超首屏时显示（对齐 vue view-all），点击进成员管理视图 -->
+      <view v-if="hasMoreMembers" :class="ns.e('view-all')" @click="emit('open-members', props.groupId)">
+        <text :class="ns.e('view-all-text')">{{ t('chat.info.checkAll') }}</text>
+        <EmIcon name="arrow-down" :size="16" :class="ns.e('view-all-icon')" />
       </view>
     </view>
 
@@ -85,6 +95,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   // 邀请入群意图（宿主 chat-info-page 库内闭环弹层；事件同时透传给页面宿主）
   (e: 'invite', groupId: string): void
+  // 移除成员意图（宿主 chat-info-page 库内闭环选人弹层；事件同时透传给页面宿主）
+  (e: 'remove', groupId: string): void
   // 成员管理视图意图（宿主 chat-info-page 页内视图切换）
   (e: 'open-members', groupId: string): void
   // 群名称编辑意图（仅 owner 发出；弹层在页面根级）
@@ -104,11 +116,21 @@ const memberCount = computed(() => {
   return (groupStore.memberMapByGroupId[props.groupId] ?? []).length
 })
 
-// 首屏成员：owner > admin > joinedAt 排序，宫格总数 GROUP_MEMBER_GRID_COUNT 含邀请/更多两格
+// 首屏成员：owner > admin > joinedAt 排序，展示上限 GROUP_MEMBER_GRID_COUNT（对齐 vue displayedMembers = 8，操作格另计）
 const gridMembers = computed<EmGroupMember[]>(() => {
   const members = groupStore.memberMapByGroupId[props.groupId] ?? []
-  return sortGroupMembers(members).slice(0, GROUP_MEMBER_GRID_COUNT - 2)
+  return sortGroupMembers(members).slice(0, GROUP_MEMBER_GRID_COUNT)
 })
+
+// 操作格权限（对齐 vue chat-info-drawer）：添加 = 群主/管理员恒可见，普通成员需群允许邀请；移除 = 仅群主/管理员
+const canAddMember = computed(() => {
+  if (props.isOwner || props.isAdmin) return true
+  return groupStore.infoByGroupId[props.groupId]?.allowInvites === true
+})
+const canRemoveMembers = computed(() => props.isOwner || props.isAdmin)
+
+// 查看全部按钮：成员总数超首屏展示数时显示（对齐 vue hasMoreMembers）
+const hasMoreMembers = computed(() => memberCount.value > gridMembers.value.length)
 
 function memberName(m: EmGroupMember): string {
   return groupMemberDisplayNameOf(props.groupId, m.userId)

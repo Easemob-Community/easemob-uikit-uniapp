@@ -15,14 +15,15 @@ description: Use when adding/replacing icons in easemob-uikit-uni（选图标方
 
 | 文件 | 作用 |
 |---|---|
-| `em-icons.ttf` | 字体本体。当前为占位字体，来自 DCloud uni-icons 的 `uniicons.ttf`（Apache-2.0，https://github.com/dcloudio/uni-ui） |
+| `em-icons.ttf` | 字体本体。当前为占位字体（DCloud uni-icons，Apache-2.0）+ 经 `scripts/patch-icons.py` 合并的 Remix Icon 字形（pin/bell-slash 等缺省字形，Apache-2.0） |
 | `em-icons.ts` | 图标名 → unicode 码点映射表（`EmIcons` + `EmIconName` 类型），新增/替换图标只改这里 |
 | `em-icon.vue` | 原子组件：props `name` / `size` / `color`，emits `click`；`@font-face` 相对路径引 ttf，`<text>` 渲染码点，颜色默认走 `--em-icon-muted` token |
+| `em-icon.css` | `@font-face` 与 `.em-icon` 字体族声明。**族名带版本号（`em-icons-vN`）**——微信 mp 端 @font-face 按族名持久缓存，ttf 内容更新不重载（2026-10-16 实测：合并新字形后模拟器恒渲染旧字体，重启开发者工具无效，族名升版即恢复）。**每次改动 em-icons.ttf 内容，必须同步递增族名版本号** |
 
 ## 常用操作
 
-- **加新图标**：在 `em-icons.ts` 的 `EmIcons` 里加一行 `'name': '\ueXXX'`（码点须在 ttf 中存在），业务侧 `<em-icon name="name" />`。不要在组件里写死码点。
-- **替换正式字体（一期→正式版）**：设计师在 iconfont.cn 维护项目 → 下载 ttf 覆盖 `em-icons.ttf` → 用其 `iconfont.json` 重新生成 `em-icons.ts`。**只动这两个文件，组件与业务代码零改动**——这正是选字体方案的原因。
+- **加新图标**：① ttf 无对应字形时先跑 `scripts/patch-icons.py`（从 Remix Icon 合并字形到私用区码点，幂等，JOBS 表加行即可）；② 在 `em-icons.ts` 的 `EmIcons` 里加一行 `'name': '\ueXXX'`（码点须在 ttf 中存在），业务侧 `<em-icon name="name" />`，不要在组件里写死码点；③ **递增 em-icon.css 族名版本号**（mp 缓存，见上表）。
+- **替换正式字体（一期→正式版）**：设计师在 iconfont.cn 维护项目 → 下载 ttf 覆盖 `em-icons.ttf` → 用其 `iconfont.json` 重新生成 `em-icons.ts` → 递增族名版本号。业务代码零改动——这正是选字体方案的原因。
 - **需要点击的图标**：直接用 `em-icon` 的 `@click`，不要在外层再包 button。
 
 ## 约束对照（ucss 子集）

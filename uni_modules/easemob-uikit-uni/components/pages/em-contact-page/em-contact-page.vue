@@ -38,7 +38,8 @@ import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
 
 // 通讯录入口页（对齐 vue 版 address-book-container home 视图）：
-// 三入口 = 新请求（pending 计数 + hot 红点）/ 群组 / 好友列表；
+// 三入口顺序 = 好友列表 / 群组 / 新请求（对齐 vue entryOrder contact/group/notice，黑名单为二期裁剪项）；
+// 新请求带 pending 计数 + hot 红点；入口无左图标（vue 默认 entry.icon undefined）；
 // 好友字母列表已迁至 em-contact-list-page，点击入口原样透出 key 由宿主接线路由
 defineOptions({ styleIsolation: 'app-and-page' })
 
@@ -57,23 +58,20 @@ const allEntries = computed<EmContactNavEntry[]>(() => {
   const pendingCount = pendingInviteCount()
   return [
     {
-      key: CONTACT_ENTRY_KEY.NOTICE,
-      label: t('contact.newRequests'),
-      count: pendingCount,
-      hot: pendingCount > 0,
-      icon: 'personadd'
+      key: CONTACT_ENTRY_KEY.CONTACT,
+      label: t('contact.entryContact'),
+      count: contactStore.items.length
     },
     {
       key: CONTACT_ENTRY_KEY.GROUP,
       label: t('contact.entryGroup'),
-      count: groupStore.items.length,
-      icon: 'chatboxes'
+      count: groupStore.items.length
     },
     {
-      key: CONTACT_ENTRY_KEY.CONTACT,
-      label: t('contact.entryContact'),
-      count: contactStore.items.length,
-      icon: 'contact'
+      key: CONTACT_ENTRY_KEY.NOTICE,
+      label: t('contact.newRequests'),
+      count: pendingCount,
+      hot: pendingCount > 0
     }
   ]
 })

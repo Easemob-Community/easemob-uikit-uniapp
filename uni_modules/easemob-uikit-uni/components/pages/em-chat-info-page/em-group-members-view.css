@@ -13,40 +13,6 @@
   background-color: var(--em-bg-base);
 }
 
-/* 标题栏（对齐 vue group-member-list header：15px semibold 标题 + 发丝线底边） */
-.em-group-members-view__header {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  height: 48px;
-  padding: 0 var(--em-spacing-4);
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-bottom-color: var(--em-divider-color);
-  flex-shrink: 0;
-}
-
-.em-group-members-view__back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-left: calc(0px - var(--em-spacing-2));
-}
-
-.em-group-members-view__back-icon {
-  color: var(--em-text-primary);
-}
-
-.em-group-members-view__title {
-  font-family: var(--em-font-family);
-  font-size: var(--em-font-size-15);
-  font-weight: var(--em-font-weight-semibold);
-  color: var(--em-text-primary);
-  margin-left: var(--em-spacing-2);
-}
-
 .em-group-members-view__scroll {
   flex: 1;
   height: 0;

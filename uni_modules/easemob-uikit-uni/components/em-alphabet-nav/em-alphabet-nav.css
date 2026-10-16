@@ -1,21 +1,28 @@
 @import '../../libs/style/variables.css';
 
-/* 覆盖于列表区右侧、垂直居中：宽 28px（视觉=热区），高度由组件内联
-   style 按 字母数 × 22px 给定，容器高 = 字母块高，触摸/视觉/滑动映射一致
-   （flex 子项 max-height 封顶在编译端不生效，勿回退该写法） */
+/* 撑满列表区高度（对齐 vue 版 contact-alphabet-nav）：字母格 flex:1 等比分配行高，
+   单项封顶 20px（max-height 在蒸汽编译端不生效时退化为等比撑满，无裁剪风险：
+   容器不定高，随列表区伸缩） */
 .em-alphabet-nav {
   position: absolute;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   right: 4px;
-  width: 28px;
-  transform: translateY(-50%);
+  width: 24px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  padding: 4px 0;
+  z-index: 10;
 }
 
-/* 单项定高 22px（与组件内 CELL_HEIGHT 常量一致） */
+/* 字母格 24px 宽（视觉=热区）；active 高亮块覆盖整格（圆角收口），
+   不走 content-box/background-clip——蒸汽端不支持时内容盒只剩 8px 会裁掉 9px 字母 */
 .em-alphabet-nav__cell {
-  height: 22px;
+  flex: 1;
+  min-height: 0;
+  max-height: 20px;
+  width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -32,7 +39,7 @@
 
 .em-alphabet-nav__text {
   font-family: var(--em-font-family);
-  font-size: var(--em-font-size-10);
+  font-size: var(--em-font-size-9);
   font-weight: var(--em-font-weight-medium);
   line-height: 12px;
   color: var(--em-text-tertiary);

@@ -10,12 +10,13 @@
 .em-conversation-page__scroll {
   flex: 1;
   height: 0;
+  padding: var(--em-spacing-1);
 }
 
 .em-conversation-page__skeleton {
   display: flex;
   flex-direction: column;
-  padding: 8px 16px;
+  padding: 8px 12px;
 }
 
 .em-conversation-page__skeleton-item {

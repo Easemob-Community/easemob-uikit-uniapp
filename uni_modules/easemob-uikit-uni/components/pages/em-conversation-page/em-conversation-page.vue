@@ -8,6 +8,9 @@
       @action="onOpenCreate"
     />
 
+    <!-- 筛选 tab（对齐 vue 版 conversation-tabs：全部/未读/@我/单聊/群组，tabs 传空数组可隐藏） -->
+    <em-conversation-tabs v-if="tabs.length > 0" :tabs="tabs" :active="activeTab" @change="onTabChange" />
+
     <em-search-bar v-if="showSearch" v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
 
     <scroll-view :class="ns.e('scroll')" scroll-y>
@@ -70,12 +73,13 @@ import { computed, ref } from 'vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
+import EmConversationTabs from '../../em-conversation-tabs/em-conversation-tabs.vue'
 import EmConversationItem from '../../em-conversation-item/em-conversation-item.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmSelectContact from '../../em-select-contact/em-select-contact.vue'
 import { EmKit } from '../../../libs'
-import { CONVERSATION_MENU_KEY, CONVERSATION_TYPE } from '../../../libs/constants'
+import { CONVERSATION_MENU_KEY, CONVERSATION_TAB_KEY, CONVERSATION_TYPE, DEFAULT_CONVERSATION_TABS } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { draftStore } from '../../../libs/store/draft'
@@ -83,7 +87,7 @@ import { connectionStore } from '../../../libs/store/connection'
 import { contactDisplayNameOf, contactStore } from '../../../libs/store/contact'
 import { groupDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
-import type { ConversationTypeValue } from '../../../libs/constants'
+import type { ConversationTypeValue, ConversationTabKeyValue } from '../../../libs/constants'
 import type { EmActionSheetAction, EmConversationItem as EmConversationData, EmSelectContactItem } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
@@ -95,12 +99,15 @@ defineOptions({ styleIsolation: 'app-and-page' })
 interface Props {
   /** 顶部搜索条显隐，默认 true */
   showSearch?: boolean
+  /** 筛选 tab 及顺序（对齐 vue conversation-tabs），默认全部五项；传空数组隐藏 tab 栏 */
+  tabs?: ConversationTabKeyValue[]
   /** 列表空态文案（仅空列表场景，搜索无结果仍走 searchEmpty 文案）；空串走 i18n 默认 */
   emptyText?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showSearch: true,
+  tabs: () => DEFAULT_CONVERSATION_TABS,
   emptyText: ''
 })
 
@@ -114,14 +121,30 @@ const { themeClass } = useTheme()
 const { t } = useLocale()
 const { config } = useConfig()
 
-// 空态文案：搜索无结果 > emptyText prop > i18n 默认（#empty 插槽整体优先于三者，见模板）
+// 空态文案：搜索无结果 > emptyText prop > 分 tab i18n 默认（#empty 插槽整体优先于三者，见模板）
 const emptyTipText = computed(() => {
   if (keyword.value.trim() !== '') return t('conversation.searchEmpty')
-  return props.emptyText !== '' ? props.emptyText : t('conversation.empty')
+  return props.emptyText !== '' ? props.emptyText : tabEmptyText.value[activeTab.value] ?? t('conversation.empty')
 })
 
 const syncing = computed(() => conversationStore.syncing)
 const keyword = ref('')
+
+// 筛选 tab 激活态（页面内部状态，不透出；对齐 vue conversation-list effectiveActiveTab）
+const activeTab = ref<ConversationTabKeyValue>(CONVERSATION_TAB_KEY.ALL)
+
+function onTabChange(tab: ConversationTabKeyValue): void {
+  activeTab.value = tab
+}
+
+// 分 tab 空态文案（对齐 vue 版 conversation-list tabEmptyTexts）
+const tabEmptyText = computed<Record<ConversationTabKeyValue, string>>(() => ({
+  [CONVERSATION_TAB_KEY.ALL]: t('conversation.empty'),
+  [CONVERSATION_TAB_KEY.UNREAD]: t('conversation.emptyUnread'),
+  [CONVERSATION_TAB_KEY.AT_ME]: t('conversation.emptyAtMe'),
+  [CONVERSATION_TAB_KEY.SINGLE]: t('conversation.emptySingle'),
+  [CONVERSATION_TAB_KEY.GROUP]: t('conversation.emptyGroup')
+}))
 
 // 首次同步骨架：条数与行宽对齐 vue 版 conversation-list（6 条、40%/70% 两行）
 const SKELETON_COUNT = 6
@@ -158,6 +181,14 @@ const items = computed<Entry[]>(() => {
       const time = draft != null && draft.time > item.lastMessageTime ? draft.time : item.lastMessageTime
       const hasAtMe = conversationStore.atMeByConversationId[item.conversationId] === true
       return { item, name, avatar, draft, timeText: formatConversationTime(time), hasAtMe }
+    })
+    .filter((entry) => {
+      // 筛选 tab 维度（对齐 vue 版 conversation-list：unread=unreadCount>0、atMe=atMeMap 命中、single/group=chatType）
+      if (activeTab.value === CONVERSATION_TAB_KEY.UNREAD) return entry.item.unreadCount > 0
+      if (activeTab.value === CONVERSATION_TAB_KEY.AT_ME) return entry.hasAtMe
+      if (activeTab.value === CONVERSATION_TAB_KEY.SINGLE) return entry.item.chatType === CONVERSATION_TYPE.SINGLE_CHAT
+      if (activeTab.value === CONVERSATION_TAB_KEY.GROUP) return entry.item.chatType === CONVERSATION_TYPE.GROUP_CHAT
+      return true
     })
     .filter((entry) => {
       if (kw === '') return true
@@ -209,8 +240,8 @@ const itemActions = computed<EmActionSheetAction[]>(() => {
   if (item == null) return []
   // 候选全集按 uiConfig.conversationMenuKeys 过滤排序（默认 pin/mute/delete 全量）
   const candidates: EmActionSheetAction[] = [
-    { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: 'top' },
-    { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: 'eye-slash' },
+    { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: 'pin' },
+    { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: 'bell-slash' },
     { key: CONVERSATION_MENU_KEY.DELETE, text: t('conversation.delete'), icon: 'trash', danger: true }
   ]
   return config.conversationMenuKeys

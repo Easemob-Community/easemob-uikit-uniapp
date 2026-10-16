@@ -40,6 +40,12 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **根因**：uni-app x 的 `uni.onXxx(callback)` 返回监听 **id（number）**，`uni.offXxx(id)` 按 id 反注册；经典 uni-app 是按函数引用。
 - **解法**：保存 onXxx 返回值，offXxx 传 id。范式见 `libs/use/useKeyboardHeight.ts`（onMounted 注册、onUnmounted 反注册）。`EmKit.onMessage` 泄漏 P0 修复同理（返回取消函数，页面 onUnmounted 必须调用）。
 
+### 5a. 全屏弹层顶部贴屏顶，被刘海/状态栏遮挡（Android 实测）
+- **症状**：全屏弹层（如建群选人 `em-select-contact` multiple）的标题行与系统状态栏同一行，被刘海遮挡。
+- **根因**：Android 蒸汽端窗口 edge-to-edge，内容渲染到状态栏/刘海下；页面级自绘导航（`em-nav-bar`）有 `padding-top: getSafeAreaTop()`，但弹层路径（`em-popup` fullscreen）原本只处理底部 safeArea，顶部漏了。
+- **解法**：`em-popup` 的 `panelStyle` 在 `fullscreen` 时追加 `padding-top: getSafeAreaTop()`；**内容方配 `height: windowHeight` 时必须扣除同一值**，否则总高超窗把底部确认键顶出屏（`em-select-contact` 已按此口径落地）。底部短弹层（action-sheet 等）够不到屏幕顶，无需处理。
+- **口径**：app-android `safeAreaInsets.top` 自 HBuilderX 4.25 起返回状态栏高度（官方 getWindowInfo 文档），`getSafeAreaTop()` 直接读即可；若真机发现返回 0，另起 spike 修 `useSafeArea.ts`。
+
 ## 小程序（mp-weixin）
 
 ### 6. 原生事件穿组件边界冒泡
@@ -53,6 +59,15 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 ### 8. 样式隔离 apply-shared 限制
 - **症状**：父组件给子组件内部 text 写的 class 规则全部失效（摘要落默认 16px 近黑）。
 - **解法**：跨隔离文字样式走内联 `text-style`（var() token 可穿透）+ `text-class` 双通道。
+
+### 8a. 父组件 class 打在 virtualHost 子组件（EmIcon 等）上静默失效
+- **症状**：`<EmIcon :class="ns.e('flag')">` 的 margin/color 在 mp 不生效（置顶图标紧贴名字）；H5/App 正常。EmIcon/em-text 均为 virtualHost，class 穿透到内部节点后被隔离拦截。
+- **解法**：间距/布局一律用普通 `<view>` 包裹子组件（class 落包裹 view）；颜色等文字样式走子组件 props（em-icon 的 `color` prop / em-text 的 `text-style`）。em-text 宿主布局 class（flex/min-width）是唯一验证可用的例外（见编码纪律）。
+
+### 8b. @font-face 字体按族名持久缓存，ttf 更新不重载
+- **症状**：`em-icons.ttf` 合并新字形后，模拟器里旧字形正常、新字形全 blank；改 post 表/换官方 Merger 重打包/重启开发者工具全无效；H5（Chromium）同字体渲染正常。
+- **根因**：微信 mp 端 @font-face 按 **font-family 族名**持久缓存字体内容，同名不重新注册。
+- **解法**：族名带版本号（`em-icons-vN`），**每次改动 ttf 内容必须递增版本号**（em-icon.css @font-face 与 .em-icon 同步改；纪律见 skill `em-icon-strategy`）。
 
 ## 编译/热更新（dev watch）
 

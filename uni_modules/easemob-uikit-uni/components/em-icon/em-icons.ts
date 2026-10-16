@@ -1,6 +1,8 @@
 // 图标名 → unicode 码点映射。占位字体 em-icons.ttf 来自 DCloud uni-icons（Apache-2.0，
-// https://github.com/dcloudio/uni-ui）。正式版替换为设计师 iconfont.cn 项目导出后，
-// 用其 iconfont.json 重新生成本文件即可，组件与业务代码零改动。
+// https://github.com/dcloudio/uni-ui），并经 scripts/patch-icons.py 合并 Remix Icon 字形
+// （Apache-2.0，pin/bell-slash 等 uni-icons 缺省字形）。正式版替换为设计师 iconfont.cn
+// 项目导出后，用其 iconfont.json 重新生成本文件即可，组件与业务代码零改动。
+// 注意：ttf 内容任何变更都必须同步递增 em-icon.css 的字体族名版本号（mp 端按族名持久缓存）。
 export const EmIcons = {
   'arrow-down': '\ue6be',
   'arrow-left': '\ue6bc',
@@ -109,6 +111,8 @@ export const EmIcons = {
   'paperclip': '\ue652',
   'paperplane': '\ue672',
   'paperplane-filled': '\ue675',
+  'pin': '\ue700',
+  'bell-slash': '\ue701',
   'person': '\ue699',
   'person-filled': '\ue69d',
   'personadd': '\ue69f',

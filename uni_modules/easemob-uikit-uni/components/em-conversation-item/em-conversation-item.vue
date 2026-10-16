@@ -10,9 +10,9 @@
         <view :class="ns.e('name-wrap')">
           <!-- hasAtMe 时名字主色高亮（对齐 vue 版 conversation-item__name.is-at-me），text-class/text-style 双通道同步切档 -->
           <em-text :text="name" :text-class="ns.e('name') + (hasAtMe ? ' ' + ns.m('name-at-me') : '')" :text-style="hasAtMe ? nameAtMeTextStyle : nameTextStyle" :class="ns.e('name-host')" />
-          <!-- 置顶/免打扰徽标：em-icons 无 pin/bell-slash 字形，置顶用 top、免打扰用 eye-slash（与长按菜单图标一致），弱化图标色 -->
-          <EmIcon v-if="item.isPinned" name="top" :size="12" :class="ns.e('flag')" />
-          <EmIcon v-if="item.isMuted" name="eye-slash" :size="12" :class="ns.e('flag')" />
+          <!-- 置顶/免打扰徽标：12px 弱化图标色（对齐 vue 版 filled/pin、filled/bell-slash）；view 包裹——mp 样式隔离下父组件 wxss 够不到子组件宿主 -->
+          <view v-if="item.isPinned" :class="ns.e('flag')"><EmIcon name="pin" :size="12" /></view>
+          <view v-if="item.isMuted" :class="ns.e('flag')"><EmIcon name="bell-slash" :size="12" /></view>
         </view>
         <text :class="ns.e('time')">{{ timeText }}</text>
       </view>
@@ -23,9 +23,11 @@
           <text v-else-if="draft != null" :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
           <em-text :text="draft != null ? draft.text : item.lastMessageText" :text-class="ns.e('summary')" :text-style="summaryTextStyle" :class="ns.e('summary-host')" />
         </view>
-        <!-- 免打扰未读降级为静默点，其余数字徽标（99+ 截断收口 em-badge） -->
-        <em-badge v-if="item.unreadCount > 0 && item.isMuted" dot :class="ns.e('unread')" />
-        <em-badge v-else-if="item.unreadCount > 0" :count="item.unreadCount" :class="ns.e('unread')" />
+        <!-- 免打扰未读降级为静默点，其余数字徽标（99+ 截断收口 em-badge）；view 包裹避 mp 宿主类失效 -->
+        <view v-if="item.unreadCount > 0" :class="ns.e('unread')">
+          <em-badge v-if="item.isMuted" dot />
+          <em-badge v-else :count="item.unreadCount" />
+        </view>
       </view>
     </view>
   </view>

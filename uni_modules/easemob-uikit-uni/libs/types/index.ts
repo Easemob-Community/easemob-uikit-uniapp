@@ -189,7 +189,7 @@ export interface EmContactNavEntry {
   label: string
   count?: number      // 计数徽标，>0 才展示
   hot?: boolean       // 红点（仅 count>0 时生效，对齐 vue 语义）
-  icon: string        // em-icon 图标名
+  icon?: string       // em-icon 图标名（可选，缺省不渲染左图标，对齐 vue entry.icon 默认 undefined）
 }
 
 export type EmThemeMode = ThemeModeValue

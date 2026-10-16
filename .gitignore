@@ -7,3 +7,5 @@ dist/
 # 本地凭据（严禁提交真实 appkey/token）
 local.credentials.*
 .superpowers/
+# 本地 Python 虚拟环境（patch-icons 用）
+.venv-icons/

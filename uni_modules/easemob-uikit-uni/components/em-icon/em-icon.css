@@ -1,12 +1,15 @@
 @import '../../libs/style/variables.css';
 
+/* 字体族名带版本：微信 mp 端 @font-face 按族名持久缓存，ttf 内容更新不重载（实测 2026-10-16：
+   合并新字形后模拟器始终渲染旧字体，重启开发者工具无效；族名升版即绕开）。
+   每次更新 em-icons.ttf 内容时同步递增族名版本号。 */
 @font-face {
-  font-family: 'em-icons';
+  font-family: 'em-icons-v2';
   src: url('./em-icons.ttf');
 }
 
 .em-icon {
-  font-family: 'em-icons';
+  font-family: 'em-icons-v2';
   color: var(--em-icon-muted);
   line-height: 1;
   text-align: center;

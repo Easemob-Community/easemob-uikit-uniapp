@@ -44,8 +44,10 @@ export function setJoinedGroups(groups: EmGroup[]): void {
   groupStore.loaded = true
 }
 
-// 单群详情合并：items 有则原位更新（代理上 patch 字段），无则追加；详情缓存恒整对象替换
-export function upsertGroup(group: EmGroup): void {
+// 单群详情合并：items 有则原位更新（代理上 patch 字段），无则追加；详情缓存恒整对象替换；
+// toFront=true 时新群插到列表头部（建群本地回显置顶的产品决策，见 STATUS 2026-10-16；
+// getJoinedGroups 全量刷新后顺序仍以 SDK 返回为准）
+export function upsertGroup(group: EmGroup, toFront = false): void {
   const existing = groupStore.items.find((g) => g.groupId === group.groupId)
   if (existing != null) {
     existing.name = group.name
@@ -60,6 +62,8 @@ export function upsertGroup(group: EmGroup): void {
     existing.inviteNeedConfirm = group.inviteNeedConfirm
     existing.mute = group.mute
     existing.disabled = group.disabled
+  } else if (toFront) {
+    groupStore.items.unshift(group)
   } else {
     groupStore.items.push(group)
   }
