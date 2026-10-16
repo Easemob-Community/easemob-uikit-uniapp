@@ -230,13 +230,14 @@ function checkboxClass(entry: EmSelectContactItem): string {
 }
 
 function onToggle(entry: EmSelectContactItem): void {
-  if (isDisabled(entry)) return
   const index = selectedIds.value.indexOf(entry.userId)
+  // 已选后变 disabled 的项允许从已选区移除（如邀请入群时对方已被拉入群），只拦截新增选中
   if (index >= 0) {
     selectedIds.value.splice(index, 1)
-  } else {
-    selectedIds.value.push(entry.userId)
+    return
   }
+  if (isDisabled(entry)) return
+  selectedIds.value.push(entry.userId)
 }
 
 function onConfirm(): void {

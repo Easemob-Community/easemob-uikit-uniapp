@@ -163,6 +163,15 @@ const quoteIcon = computed<EmIconName>(() => quoteIconNameOf(props.quote?.type))
 const inputFocus = ref(false)
 const panel = ref<'none' | 'emoji' | 'media'>('none')
 
+// 禁言翻转瞬间复位面板/语音/焦点（禁用态 guard 只拦新操作，已开的面板/语音模式需主动收）
+watch(() => props.disabled, (v) => {
+  if (v) {
+    panel.value = 'none'
+    exitVoiceMode()
+    inputFocus.value = false
+  }
+})
+
 // 禁用态守卫：任何交互尝试统一 emit disabled-tap（父组件 toast），不改动内部状态
 function guardDisabled(): boolean {
   if (props.disabled) {
