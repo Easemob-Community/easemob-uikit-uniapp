@@ -195,6 +195,8 @@ easemob-uikit-uniapp/
 - **明确不做**：黑名单/白名单管理页（联系人页入口预留）、群共享文件、公开群入群申请审批、群名片、群已读回执详情、@ 光标处插入（uni `<input>` 无 selectionStart，物理上限）、群聊消息搜索、群公告富文本、presence。
 - **门禁**：先补 GroupManager 五端 spike（重点小程序端群同步时序，追加 `docs/SPIKE-SDK-CONNECTIVITY.md`），不过则暂停 UI 开发。
 - **伪装模式预留**（承 `docs/EVAL-MULTI-SCENARIO.md` §6-3）：群形态 UI（人数/公告条/昵称行档位/成员事件渲染策略）设计时预留隐藏开关位；伪装形态下 `open-info` 由宿主接管。开关本体二期随伪装场景落地，M2.9 只保证不留硬编码分支。
+- **补注（2026-10-16 终审消歧）**：会话页「+」菜单落地为两项（发起会话/创建群组），添加好友入口在联系人页 nav action（范围表「三项」为早期表述，以落地形态为准）。
+- **补注（2026-10-16 终审消歧）**：全员禁言管理 UI（Switch）不在 M2.9——`muteAllGroupMembers`/`unmuteAllGroupMembers` API 已透出供宿主接线，M2.9 只落地「读 group.mute 禁输入」。
 
 > 进度（2026-10-16）：Phase 0-5 全部落地——群数据层与 chatType 贯通（Phase 1）、会话/聊天页群化与发起会话（Phase 2）、@ 提及全链路（Phase 3）、群列表页/建群/选人 multiple（Phase 4a）、联系人页入口化 + 群邀请 kind 分化（Phase 4b）、chat-info 群分支与全员禁言（Phase 5a）、成员管理/邀请接真/群系统通知（Phase 5b）；Phase 6 评审 minor 扫尾与文档收口完成。双门禁全绿（build web + build mp-weixin 11 项防回归，主包 642KB ≤ 1.5MB）、H5 产物伺服 200；真机/真实账号端到端冒烟待验（见 STATUS.md 待验项汇总）。
 

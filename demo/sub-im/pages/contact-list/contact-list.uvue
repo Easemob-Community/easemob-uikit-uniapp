@@ -18,7 +18,7 @@ onLoad(() => {
 function onSelect(userId: string) {
   EmKit.enterConversation(userId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
   EmKit.loadHistory(userId, CONVERSATION_TYPE.SINGLE_CHAT).catch(() => {})
-  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${userId}` })
+  uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${userId}&chatType=${CONVERSATION_TYPE.SINGLE_CHAT}` })
 }
 
 function onBack(): void {

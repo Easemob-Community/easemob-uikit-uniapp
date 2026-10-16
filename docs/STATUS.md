@@ -92,6 +92,7 @@
 | @ 提及全链路（@→选人→ext→高亮/徽标；蒸汽端嵌套 text 的 mention click） | H5/真机 | |
 | 群系统通知上屏（建群/成员进出/改名/公告/转让）+ notice 长按菜单禁用 | H5/mp | |
 | 蒸汽真机群形态视觉：成员管理覆盖层 fixed 定位与弹层叠放、角色角标、宫格五列、multiple 已选条横滚 | App 三真机 | |
+| `EmContactNavEntry` 预留 `visible` 字段未加（PLAN 裁剪项「黑名单入口预留 visible 控制」），M4 黑名单落地时补 | 全端 | 非 breaking |
 
 ## 已验证基线（历史 SPIKE）
 
