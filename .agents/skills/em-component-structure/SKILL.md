@@ -93,7 +93,7 @@ custom 优先级高于内置，原子组件无 `-page` 后缀不受影响。**�
 | `em-chat-inputbar` | `modelValue`（草稿）、`quote`、`features`（inputFeatures 逐项开关）、`emojis`、`disabled`（禁用态：输入/发送/语音/面板全断，M2.9 全员禁言用）、`placeholder`（空串回落内置文案）；emits `send`/`quote-close`/`media-select`/`voice-send`/`mention-trigger`（草稿尾部新增 `@` 触发，尾部追加是物理上限）/`disabled-tap`（禁用态操作尝试，父组件据此 toast）；disabled 翻转瞬间内置复位面板/语音模式/焦点；**手动键盘避让内置**（adjust-position=false + margin-bottom 顶起，见 em-crossend-pitfalls #3） |
 | `em-mention-picker` | @ 提及选人弹层（M2.9 Phase 3，对齐 vue mention-picker h5 分支）：props `show`/`contacts(MentionContact[])`/`keyword`（@ 后尾部字符，watch 同步进搜索框）/`title`；emits `select(contact)`/`update:show`（选择即关）；不连 store |
 | `em-text-message` | props `message`/`mentionContacts`（@名字→userId 解析表，缺省回落原始名字）；emits `long-press`/`mention-click(userId)`；`ext.em_at_list` 非空时 parseMentions 分片高亮（`--em-mention-color`） |
-| `em-conversation-item` | `item`/`name`/`avatar`/`timeText`/`draft` 五 props 收装配数据；emits `click` + `long-press` |
+| `em-conversation-item` | `item`/`name`/`avatar`/`timeText`/`draft`/`hasAtMe`（群聊「有人@我」未读标记，名字与摘要前缀主色高亮）收装配数据；emits `click` + `long-press` |
 | `em-nav-bar` | `title`/`subtitle`/`showBack`/`actionIcon`；emits `back`/`action`；插槽 `#title`/`#action`；小程序胶囊避让内置 |
 | `em-video-message`/`em-file-message` | 点击行为上移 chat-page，组件发 `preview`/`download` emit（与 em-image-message 同模式） |
 | `em-avatar` | `placeholderColors` 五色板 prop；徽标壳 `__badge` 保留、本体收口 em-badge |

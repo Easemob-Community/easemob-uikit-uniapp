@@ -332,13 +332,14 @@ async function armGroupSyncTiming() {
       if (payload?.dataType !== 'group') {
         return
       }
-      const cost = Date.now() - loginAt
+      // loginAt 在 login resolve 后才打点；同步先于此时完成则耗时不输出垃圾值
+      const cost = loginAt === 0 ? '' : ` @+${Date.now() - loginAt}ms`
       if (payload?.status === 'failed') {
-        logGroup(`[时序] onSyncDataFinished(group) 失败 @+${cost}ms: ${payload?.error?.stage ?? ''} ${payload?.error?.message ?? ''}`)
+        logGroup(`[时序] onSyncDataFinished(group) 失败${cost}: ${payload?.error?.stage ?? ''} ${payload?.error?.message ?? ''}`)
         return
       }
       EmKit.getJoinedGroups().then((groups) => {
-        logGroup(`[时序] onSyncDataFinished(group) @+${cost}ms → 复测 getJoinedGroups: ${groups.length} 个群（登录后立即调用为 ${syncImmediateCount} 个）`)
+        logGroup(`[时序] onSyncDataFinished(group)${cost} → 复测 getJoinedGroups: ${groups.length} 个群（登录后立即调用为 ${syncImmediateCount} 个）`)
       }).catch((e: any) => {
         logGroup('[时序] 同步后复测失败：' + describeError(e))
       })

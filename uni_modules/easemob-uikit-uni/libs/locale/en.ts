@@ -47,8 +47,6 @@ export default {
 
   'chat.memberCount': '{count} members',
   'chat.announcementBanner.title': 'Group Announcement',
-  'chat.announcementBanner.expand': 'Expand',
-  'chat.announcementBanner.collapse': 'Collapse',
 
   'chat.info.title': 'Chat Info',
   'chat.info.conversationMute': 'Mute Notifications',

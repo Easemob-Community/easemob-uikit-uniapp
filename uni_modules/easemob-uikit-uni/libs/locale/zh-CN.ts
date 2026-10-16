@@ -47,8 +47,6 @@ export default {
 
   'chat.memberCount': '{count} 名成员',
   'chat.announcementBanner.title': '群公告',
-  'chat.announcementBanner.expand': '展开',
-  'chat.announcementBanner.collapse': '收起',
 
   'chat.info.title': '聊天信息',
   'chat.info.conversationMute': '会话免打扰',

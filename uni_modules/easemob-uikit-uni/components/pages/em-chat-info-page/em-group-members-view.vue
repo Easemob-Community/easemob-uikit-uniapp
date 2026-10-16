@@ -195,9 +195,10 @@ function actionsOf(m: EmGroupMember): EmActionSheetAction[] {
       actions.push({ key: GROUP_MEMBER_ACTION.SET_ADMIN, text: t('group.memberAction.setAdmin'), icon: 'personadd' })
     }
     actions.push({ key: GROUP_MEMBER_ACTION.TRANSFER_OWNER, text: t('group.memberAction.transferOwner'), icon: 'redo' })
-    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'trash', danger: true })
+    // 转让/移除不标 danger（vue 设计稿警示色从严，红色区仅退群/解散）
+    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'trash' })
   } else if (isAdmin.value && m.role === GROUP_MEMBER_ROLE.MEMBER) {
-    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'trash', danger: true })
+    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'trash' })
   }
   return actions
 }

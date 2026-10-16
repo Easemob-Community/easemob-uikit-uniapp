@@ -49,7 +49,7 @@ interface Props {
   avatar: string                                    // 头像 URL（已合并 userStore 与 conversation.avatar）
   timeText: string                                  // 五档格式化时间（formatConversationTime，草稿时间优先在页面侧已并入）
   draft: { text: string, time: number } | null      // 草稿态；null 展示最后消息摘要
-  hasAtMe?: boolean                                 // 群聊「有人@我」未读标记（摘要红色前缀），默认 false
+  hasAtMe?: boolean                                 // 群聊「有人@我」未读标记（摘要主色前缀），默认 false
 }
 
 withDefaults(defineProps<Props>(), {
