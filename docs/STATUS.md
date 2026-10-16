@@ -134,3 +134,11 @@
 - 新页面级组件 `em-contact-list-page`：好友列表零回归平移（分组/索引/搜索/menuKeys 长按删除/骨架空态），emits select/back。
 - demo：`sub-im/pages/contact-list` 注册；contact.uvue 三入口分发（notice→contact-requests、group→group、contact→contact-list）。
 - 验证：build web ✓ / build mp-weixin 11 项全绿（主包 590KB）/ H5 伺服 200。**待验**：三入口跳转、群邀请接受入群全链路、群邀请事件真机载荷字段。
+
+## 2026-10-16 M2.9 Phase 5a（chat-info 群分支 + 全员禁言禁输入）
+
+- 新内聚子组件 `em-group-info-blocks`（纯展示）+ `em-group-field-dialog`（页面根级弹层）：成员宫格（9 格=成员角色排序+邀请/更多占位格，emit invite/open-members 待 Task 9 接真）、群名 owner 可编辑（乐观更新失败回滚，maxlength=255）、群公告查看/编辑（owner/admin，x/512 计数，对齐 vue 权限与上限）。
+- 退群（成员）/解散（owner）红色区：二次确认 → leaveGroup/destroyGroup（domain 清 6 项群缓存）→ 复用删除会话链路（消息/游标/atMe 复位）→ emit `leaved`，demo 返回会话列表。
+- 全员禁言：群聊 + `group.mute` + 非 owner/admin → inputbar 禁用（placeholder「全员禁言中」+ guardDisabled 拦截发送/面板/语音 + toast）；mute 事件实时回写响应式生效；owner/admin 豁免。
+- 伪装预留：宫格/群名/公告三区块独立 props（showMemberGrid/showGroupName/showAnnouncement，默认显示）。
+- 单聊分支零回归。验证：build web ✓ / build mp-weixin 11 项全绿（主包 621KB）/ H5 伺服 200。**待验**：群分支端到端（双角色真实账号）、宫格五列蒸汽真机视觉。
