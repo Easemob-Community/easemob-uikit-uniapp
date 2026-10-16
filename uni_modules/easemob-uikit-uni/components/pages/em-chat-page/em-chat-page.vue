@@ -134,11 +134,14 @@
       :quote="quoteInfo"
       :features="config.inputFeatures"
       :emojis="config.emojiList"
+      :disabled="isMutedAll"
+      :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
       @send="onSend"
       @quote-close="quoteInfo = null"
       @media-select="onMediaSelect"
       @voice-send="onVoiceSend"
       @mention-trigger="onMentionTrigger"
+      @disabled-tap="onMuteAllTap"
     />
 
     <!-- @提及成员选择面板（仅群聊 + enableMention 时由 mention-trigger 打开；选人后尾部追加 @{name} 空格） -->
@@ -189,7 +192,7 @@ import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmPopup from '../../em-popup/em-popup.vue'
 import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
-import { CONVERSATION_TYPE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
+import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
 import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
@@ -361,6 +364,28 @@ const announcementCanExpand = computed(() => {
   return units * 12 > available
 })
 
+// ========== 全员禁言禁输入（仅群聊）：group.mute === true 且当前用户非 owner/admin 时输入栏禁用 ==========
+
+// 当前用户群角色：memberMap 为准，owner 字段兜底（成员首屏未回时 owner 不受限）
+const selfGroupRole = computed(() => {
+  if (!isGroupChat.value) return null
+  const members = groupStore.memberMapByGroupId[props.conversationId] ?? []
+  return members.find((m) => m.userId === connectionStore.userId)?.role ?? null
+})
+
+const isMutedAll = computed(() => {
+  if (!isGroupChat.value || connectionStore.userId === '') return false
+  const info = groupStore.infoByGroupId[props.conversationId]
+  if (info?.mute !== true) return false
+  if (info.owner === connectionStore.userId) return false
+  return selfGroupRole.value !== GROUP_MEMBER_ROLE.OWNER && selfGroupRole.value !== GROUP_MEMBER_ROLE.ADMIN
+})
+
+// 禁用态下的操作尝试（点工具/发送/按住说话）：toast 提示
+function onMuteAllTap(): void {
+  uni.showToast({ title: t('group.muteAllToast'), icon: 'none' })
+}
+
 // ========== @提及链路（仅群聊 + enableMention；单聊全门控，isGroupChat 为唯一分流点） ==========
 
 const mentionVisible = ref(false)
@@ -380,7 +405,7 @@ const mentionContacts = computed<MentionContact[]>(() => {
 
 // @ 触发（inputbar 检测草稿尾部新增 @）：确保群成员已拉（memberMapByGroupId 无则拉首屏）再开面板
 function onMentionTrigger(): void {
-  if (!isGroupChat.value || !props.enableMention) return
+  if (!isGroupChat.value || !props.enableMention || isMutedAll.value) return
   if (groupStore.memberMapByGroupId[props.conversationId] == null) {
     EmKit.getGroupMemberList(props.conversationId).catch(() => {})
   }
@@ -628,6 +653,11 @@ async function onLoadMore(): Promise<void> {
 }
 
 async function onSend(): Promise<void> {
+  // 全员禁言防御门控（inputbar 禁用态已拦发送动作，此处兜底草稿 confirm 等旁路）
+  if (isMutedAll.value) {
+    onMuteAllTap()
+    return
+  }
   const text = draft.value.trim()
   if (text === '') return
   const quote = quoteInfo.value != null ? quoteInfo.value : undefined

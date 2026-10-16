@@ -1,17 +1,26 @@
 <template>
   <view class="page">
-    <em-chat-info-page v-if="conversationId !== ''" :conversation-id="conversationId" :chat-type="chatType" @deleted="onDeleted" />
+    <em-chat-info-page
+      v-if="conversationId !== ''"
+      :conversation-id="conversationId"
+      :chat-type="chatType"
+      @deleted="onExitToConversation"
+      @leaved="onExitToConversation"
+      @invite="onManageComing"
+      @open-members="onManageComing"
+    />
   </view>
 </template>
 
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE, useLocale } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const conversationId = ref('')
 const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)
+const { t } = useLocale()
 
 onLoad((options) => {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
@@ -23,9 +32,14 @@ onLoad((options) => {
   chatType.value = type === CONVERSATION_TYPE.GROUP_CHAT ? CONVERSATION_TYPE.GROUP_CHAT : CONVERSATION_TYPE.SINGLE_CHAT
 })
 
-// 删除会话后退回会话列表（聊天详情 ← 聊天页 ← 会话列表，delta 2）
-function onDeleted() {
+// 删除会话/退群/解散后退回会话列表（聊天详情 ← 聊天页 ← 会话列表，delta 2）
+function onExitToConversation() {
   uni.navigateBack({ delta: 2 })
+}
+
+// 邀请入群/成员管理占位（Task 9 接真）
+function onManageComing() {
+  uni.showToast({ title: t('group.manageComing'), icon: 'none' })
 }
 </script>
 

@@ -33,10 +33,11 @@
       </view>
       <input
         v-else
-        :class="ns.e('input')"
+        :class="[ns.e('input'), disabled && ns.m('input-disabled')]"
         v-model="text"
         :focus="inputFocus"
-        :placeholder="t('chat.placeholder')"
+        :placeholder="placeholder !== '' ? placeholder : t('chat.placeholder')"
+        :disabled="disabled"
         confirm-type="send"
         :adjust-position="false"
         @confirm="onSend"
@@ -102,12 +103,18 @@ interface Props {
   features?: EmInputFeatures
   /** emoji 面板字符集，默认内置 96（constants DEFAULT_EMOJI_LIST） */
   emojis?: string[]
+  /** 禁用态（全员禁言等）：输入/发送/语音/面板全断，交互尝试统一 emit disabled-tap 由父组件提示 */
+  disabled?: boolean
+  /** placeholder 覆盖（空串回落内置 chat.placeholder 文案；禁用态父组件传入「全员禁言中」等） */
+  placeholder?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   quote: null,
   features: () => ({ voice: true, emoji: true, image: true, camera: true, video: true, file: true }),
-  emojis: () => DEFAULT_EMOJI_LIST
+  emojis: () => DEFAULT_EMOJI_LIST,
+  disabled: false,
+  placeholder: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })
@@ -121,6 +128,8 @@ const emit = defineEmits<{
   // 草稿尾部新增 @ 字符时触发（uni input 无光标 API，只支持尾部追加触发，与 emoji 同款限制）；
   // 纯增量事件，是否响应（群聊 @ 提及）由父组件门控
   (e: 'mention-trigger'): void
+  // 禁用态下的任何操作尝试（点工具/发送/按住说话），父组件据此 toast 提示
+  (e: 'disabled-tap'): void
 }>()
 
 const ns = useNamespace('chat-inputbar')
@@ -154,7 +163,17 @@ const quoteIcon = computed<EmIconName>(() => quoteIconNameOf(props.quote?.type))
 const inputFocus = ref(false)
 const panel = ref<'none' | 'emoji' | 'media'>('none')
 
+// 禁用态守卫：任何交互尝试统一 emit disabled-tap（父组件 toast），不改动内部状态
+function guardDisabled(): boolean {
+  if (props.disabled) {
+    emit('disabled-tap')
+    return true
+  }
+  return false
+}
+
 function onToggleEmoji(): void {
+  if (guardDisabled()) return
   panel.value = panel.value === 'emoji' ? 'none' : 'emoji'
   if (panel.value !== 'none') {
     inputFocus.value = false
@@ -194,6 +213,7 @@ const rootStyle = computed(() => {
 // ========== 发送 ==========
 
 function onSend(): void {
+  if (guardDisabled()) return
   if (props.modelValue.trim() === '') return
   panel.value = 'none'
   emit('send')
@@ -203,6 +223,7 @@ function onSend(): void {
 
 // uni 的 input 跨端拿不到光标位置（selectionStart 是 DOM 概念），一期追加到末尾
 function onEmoji(emoji: string): void {
+  if (guardDisabled()) return
   emit('update:modelValue', props.modelValue + emoji)
 }
 
@@ -231,6 +252,7 @@ const mediaItems = computed<MediaItem[]>(() => {
 const hasMediaFeatures = computed(() => mediaItems.value.length > 0)
 
 function onToggleMedia(): void {
+  if (guardDisabled()) return
   panel.value = panel.value === 'media' ? 'none' : 'media'
   if (panel.value !== 'none') {
     inputFocus.value = false
@@ -251,6 +273,7 @@ const CANCEL_THRESHOLD = 60
 let recordStartY = 0
 
 function onToggleVoiceMode(): void {
+  if (guardDisabled()) return
   if (voiceMode.value) {
     exitVoiceMode()
   } else {
@@ -270,6 +293,7 @@ function exitVoiceMode(): void {
 }
 
 function onRecordTouchStart(e: TouchEvent): void {
+  if (guardDisabled()) return
   if (recording.value) return
   try {
     startRecord()
