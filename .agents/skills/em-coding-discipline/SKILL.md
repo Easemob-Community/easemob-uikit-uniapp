@@ -48,7 +48,7 @@ description: Use when writing or reviewing ANY code in easemob-uikit-uni（新�
 
 ## 主题 / i18n / 图标
 
-- 主题：`--em-*` CSS 变量双层 class（`.em-theme-light`/`.em-theme-dark`），App 端主题类挂组件根节点；`useTheme().setTheme('dark'|'light')`。
+- 主题：`--em-*` CSS 变量双层 class（`.em-theme-light`/`.em-theme-dark`），App 端主题类挂组件根节点；`useTheme().setTheme('auto'|'light'|'dark')`（默认 auto 跟随系统，偏好持久化 `emkit.themeMode`）。新增页面需 `initTheme()`（App onLaunch 或页面 setup 兜底）+ 根节点绑 `themeClass`；原生导航栏/tabBar 用 `syncNativeThemeUI()` 同步（H5 无对应 API，由宿主 CSS/DOM 接管）。
 - i18n：中/英，文案无硬编码；宿主注入用 `mergeMessages(locale, table)`（门面透出）。
 - 图标：一律 `em-icon` 字体图标，**禁 svg/png**（策略见 skill `em-icon-strategy`）。
 

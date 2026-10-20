@@ -34,10 +34,17 @@ uni_modules/easemob-uikit-uni/
 
 ## 消息生命周期（libs/chat/message.ts）
 
-- **`toMessageItem` 统一收口**：发送/接收/历史三路径都经它转 `EmMessageItem`（含 quote 解析还原、ext/rawType 填充、4.x `img`/`audio` wire 兼容映射——SDK wire 字面量只许出现在这个边界）。
+- **`toMessageItem` 统一收口**：发送/接收/历史三路径都经它转 `EmMessageItem`（含 quote 解析还原、ext/rawType 填充、`custom` wire → `MESSAGE_TYPE.CUSTOM` + `customEvent`/`customParams`、4.x `img`/`audio` wire 兼容映射——SDK wire 字面量只许出现在这个边界）。
 - cmd 信号消息（typing，`CMD_ACTION = 'TypingBegin'`）在 onMessage/loadHistory 边界拦截，**不落消息列表**。
 - 撤回走 onMessageRecalled 落 recalled 态；失败消息原位保留，`EmKit.resendMessage` 重建投递；已读回执 `sendMessageReadReceipts`（≤50 条 serverId 批量）+ `onMessageReadReceipts` 落 `peerReadTimeByConversationId`。
 - 引用：`EmMessageItem.quote`（EmQuoteInfo 快照）随消息 ext `emQuote` 发送；输入栏引用条 + 气泡引用卡的展示映射纯函数收口 `libs/utils/quote.ts`。
+- **流式消息（M2.13）**：`onStreamMessage` 分片按 `msgServerId` 幂等合并进同条 TEXT 气泡（`EmMessageItem.stream`，`STREAM_MESSAGE_STATUS` 常量，`libs/utils/stream.ts` 判定纯文本/富格式）；`streamItemByKey` O(1) 索引 + `uiConfig.streamThrottle`（默认 50ms）合批写 store，终态立即落盘；`onMessage` 走 `ingestIncoming` 做丢片补偿。高频增量只走 `EmKit.onStreamMessage`，不塞 `onMessage`；聊天页 `em-text-message` 渲染光标/异常，markdown 走 `#stream-message` 插槽。
+
+## 会话域（libs/chat/conversation.ts）
+
+- 会话列表同步协议**不携带免打扰字段**：`ConversationItem.remindType` 在快照中恒为 `DEFAULT`（群 joined-group 同步可能带入）。`toConversationItem` 对已有会话必须**保留本地 `isMuted`**，不能按快照重置；冷启动/跨端校正走 `syncConversationMuteStates()`（`PushManager.getConversationSilentModes`，单次 ≤20，`DURATION` 按 `expireTimestamp` 判定）。
+- 本端 `setConversationMuted` 乐观回写 + 失败回滚；其他端改动由 ChatClient 级 `onMultiDeviceConversation` 的 `CONVERSATION_MUTE_INFO_CHANGED` 实时回写。否则「进聊天页正常、回列表消失」（`clearConversationUnreadMessageCount` 与 `syncConversations` 都会重建列表）。
+- **列表顺序必须显式排序**，不直接用 SDK 快照顺序：置顶优先、置顶区间按 `pinnedTime` 倒序（无置顶时间回落 `lastMessageTime`），非置顶按 `lastMessageTime` 倒序（对齐 vue `sortedConversationList`）。SDK 快照会因 `lastAccess`/资料刷新/未读清零等非消息因素重排置顶区间，表现为「进会话再回来置顶顺序变了」。
 
 ## 联系人数据层（libs/chat/contact.ts）
 
@@ -55,13 +62,15 @@ uni_modules/easemob-uikit-uni/
 
 ## 配置体系（三层混合）
 
-**全局 `EmKitConfig` 行为开关** + **页面组件呈现 props** + **少量具名插槽**（不做 provider/inject、不做 ChatConfig 单对象透传）。13 项全局开关：enableDraft/enableTyping/showTime/recallTimeLimit/typingThrottle/typingTimeout/timeDividerInterval/inputFeatures{voice,emoji,image,camera,video,file}/messageMenuKeys/conversationMenuKeys/emojiList/primaryColor。组件透出契约见 `em-component-structure`。自定义消息出口：`#custom-message` 插槽按 `EmMessageItem.rawType` 判别渲染，`ext` 为业务载荷唯一通道。
+**全局 `EmKitConfig` 行为开关** + **页面组件呈现 props** + **少量具名插槽**（不做 provider/inject、不做 ChatConfig 单对象透传）。15 项全局开关：enableDraft/enableTyping/showTime/recallTimeLimit/typingThrottle/typingTimeout/timeDividerInterval/enableStreamMessage/streamThrottle/inputFeatures{voice,emoji,image,camera,video,file}/messageMenuKeys/conversationMenuKeys/emojiList/primaryColor。组件透出契约见 `em-component-structure`。自定义消息：`EmKit.sendCustom(to, chatType, event, params?, ext?)` 发送，`#custom-message` 插槽按 `EmMessageItem.customEvent` 判别渲染（`customParams`/`ext` 为载荷，`rawType='custom'` 兼容旧判别）。
+
+未读：总未读 `totalConversationUnread` + `useUnreadCounts()`；单会话 `conversationUnreadCountOf(id)`（快照）+ `useConversationUnreadCount(id)`（响应式）。多场景扩展（M2.11/M2.12）：`#banner`/`title`/`showAction`/`insertLocalNotice`/`quickReplies`/`extraMessageMenus`，用法见 `docs/GUIDE-MULTI-SCENARIO.md`。
 
 ## 横切机制
 
 - **弹层**：`usePopup` —— z-index 运行时递增分配器（基准 2000）+ `holdTabBar`/`releaseTabBar` 计数器（小程序/App 原生 tabBar 盖不住，弹层开时 `uni.hideTabBar`、全关恢复；H5 条件编译跳过）。基座 `em-popup`（自研 overlay + view，不用 page-container）→ `em-action-sheet`。
 - **安全区**：`useSafeArea`（`getSafeAreaBottom/Top` 读取快照）。输入栏无面板时根节点承担底部安全区；键盘弹起时键盘区已覆盖安全区不再叠加（见坑集 #3）。
-- **软键盘**：`useKeyboardHeight` 统一高度源（扣安全区/可写/按 id 反注册），消费点 = chat-page 弹起滚底 + inputbar 手动避让 + 面板高度对齐 `max(kb, PANEL_MIN_HEIGHT=280)`。
+- **软键盘**：`useKeyboardHeight` 统一高度源（App/小程序；H5 运行时无 `onKeyboardHeightChange`，条件编译跳过注册，否则聊天页 setup 白屏），消费点 = chat-page 弹起滚底 + inputbar 手动避让 + 面板高度对齐 `max(kb, PANEL_MIN_HEIGHT=280)`。
 - **日志**：`libs/utils/logger.ts` —— `createLogger(ns)` 统一 `[emkit:<ns>]` 前缀（debug 走 console.log 求全端稳定）；2000 行内存环形缓冲与 console 级别解耦；`EmKit.exportLogs()` 分端导出（H5 Blob 下载 / 小程序·App 写 USER_DATA_PATH 兜底剪贴板），配套 `getLogText/clearLogs`。
 - **i18n**：`useLocale` 的 messages 为 reactive store，`mergeMessages(locale, table)` 从门面透出（zh-CN/en 内置）。
 

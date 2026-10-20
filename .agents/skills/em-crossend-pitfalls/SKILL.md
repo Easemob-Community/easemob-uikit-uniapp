@@ -32,8 +32,20 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **症状**：输入框聚焦后整个页面上移，顶部自绘导航栏被推出屏幕。
 - **根因**：**uni-app x 没有经典 uni-app 的 adjustResize/adjustPan 体系，`pages.json` 的 `app-plus.softinputMode` 在 x 端无效**（配了也从未生效）。x 端上推由 input 组件 `adjust-position`（默认 true）控制：输入框在 scroll-view 之外时 transform 上移**整个页面**（输入框在 scroll-view 内才只滚动容器）。
 - **解法**（对齐 hello-uni-app-x `keyboard-adjust` 官方示例）：input 置 `:adjust-position="false"` 关系统上推 → 用键盘高度手动顶起底部输入栏（flex column 下消息区自动压缩，nav-bar 不动）。本库已封装 `libs/use/useKeyboardHeight.ts` + `em-chat-inputbar` 落地。
-- **要点**：iOS/鸿蒙上报键盘高度**已含底部安全区，须扣除**（composable 内已处理，Android/小程序/H5 不扣）；`@blur` 清零兜底部分端收起不补发 0 高度事件；H5 端 `adjust-position` 无效（浏览器自管 resize，行为不变）。
+- **要点**：iOS/鸿蒙上报键盘高度**已含底部安全区，须扣除**（composable 内已处理，Android/小程序不扣）；`@blur` 清零兜底部分端收起不补发 0 高度事件；H5 端 `adjust-position` 无效（浏览器自管 resize，行为不变）。
 - **遗留**：会话页/联系人页搜索聚焦同因顶飞，fix 待铺。
+
+### 4a. H5 运行时没有 `uni.onKeyboardHeightChange`（聊天页白屏 P0，2026-10-20 修复）
+- **症状**：H5 登录后点会话，聊天页空白；控制台 `TypeError: uni.onKeyboardHeightChange is not a function`。App/小程序正常。
+- **根因**：uni-app x 的 H5 运行时未实现该 API，且编译器只重写它认识的 API，不认识的 `uni.*` 会原样留成裸全局；H5 的 `window.uni` 只有统计 `report`。该调用在 `useKeyboardHeight` 顶层、又被 `em-chat-page`/`em-chat-inputbar` 的 setup 立即执行，异常直接打断整页挂载。
+- **解法**：`useKeyboardHeight` 用 `#ifndef WEB` 包住 on/off 注册；H5 分支不监听（浏览器 visualViewport 自管）。验证口径：H5 产物所有 chunk 中 `onKeyboardHeightChange` 出现次数必须为 0，并用未登录 mock 页把聊天页挂起来做运行时冒烟。
+- **纪律**：H5 新增 uni API 前先确认运行时是否实现；不确认就条件编译 + 可选调用，禁止裸调。
+
+### 4b. H5 长按后仍派发 click（菜单与点击同时触发）
+- **症状**：H5 长按会话条目，长按菜单和“进入会话”同时发生；长按图片/语音，菜单与预览/播放同时发生。
+- **根因**：uni-app 的 longpress 只是 350ms 定时器派发的自定义事件，没有 preventDefault，也不会抑制 touchend 后的原生 click；`@longpress` + `@click` 同元素必然双触发（Chrome 实测点击序列 `touchstart → longpress → touchend → click`）。
+- **解法**：`libs/use/useLongPressClickGuard.ts`——touchstart 记时，click 时按住 ≥350ms 视为长按抬手并吞掉；桌面鼠标/键盘 click 无 touchstart 不受影响。已接入会话条目、好友列表行、图片/语音/视频/文件气泡。
+- **纪律**：任何同时有 `@longpress` 与 `@click` 的元素都套该守卫，不要用“longpress 标记位 + 超时”方案（长按持有时长不定，会误伤或漏放）。
 
 ### 5. `uni.onXxx` 反注册签名不同（监听泄漏）
 - **症状**：按经典 uni-app 写法 `uni.offXxx(callback)` 编译告警，运行时不解绑，反复进出页面回调 N 次。
@@ -45,6 +57,13 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **根因**：Android 蒸汽端窗口 edge-to-edge，内容渲染到状态栏/刘海下；页面级自绘导航（`em-nav-bar`）有 `padding-top: getSafeAreaTop()`，但弹层路径（`em-popup` fullscreen）原本只处理底部 safeArea，顶部漏了。
 - **解法**：`em-popup` 的 `panelStyle` 在 `fullscreen` 时追加 `padding-top: getSafeAreaTop()`；**内容方配 `height: windowHeight` 时必须扣除同一值**，否则总高超窗把底部确认键顶出屏（`em-select-contact` 已按此口径落地）。底部短弹层（action-sheet 等）够不到屏幕顶，无需处理。
 - **口径**：app-android `safeAreaInsets.top` 自 HBuilderX 4.25 起返回状态栏高度（官方 getWindowInfo 文档），`getSafeAreaTop()` 直接读即可；若真机发现返回 0，另起 spike 修 `useSafeArea.ts`。
+
+### 5b. 原生 `<button>` 文字贴按钮底部（Android/鸿蒙蒸汽端，H5/小程序正常居中）
+- **症状**：原生 `<button>` 同时写了 `height` 与 `line-height`（如都 40px），App 端文字贴在按钮下沿、上方空一大截；H5 与微信小程序同一份样式却天然居中。
+- **根因**：蒸汽端 button 是原生实现，**文字竖直居中是靠组件默认的上下 padding，不靠 line-height**（官方 `docs/component/button.md` tips；默认文字 18px / 行高 2.5）。显式 `height` 把盒子钉死，但默认 `padding-top/bottom` 仍在，把行盒整体下推、底部被固定高度裁掉，视觉上只剩贴底的字。H5/mp 是 CSS/WebView button：line-height 直接负责居中、默认竖直 padding 为 0，所以只有 App 端翻车。**不是编译器 bug**。
+- **解法**：凡给原生 button 写了 `height` + `line-height`，必须同时 `padding-top: 0; padding-bottom: 0`（官方推荐写法；`padding: 0 12px` 这类简写已含竖直 0，天然正常）。
+- **现状**：本库组件一律用 `em-button`（view + text + flex `align-items:center`，不走原生 button）→ 免疫；demo 原生 button 已按上述修完（login / mine / style-lab），contact / spike 原本就是 `padding: 0 xx` 故无此 bug。
+- **纪律**：ucss 只有 class 选择器、App 端样式不继承，写不出全局 `button {}` 复位——约束只能落在每个 button 的 class 上；新写原生 button（仅 mp 开放能力才需要）必自查 height / line-height / padding 三件套。
 
 ## 小程序（mp-weixin）
 
