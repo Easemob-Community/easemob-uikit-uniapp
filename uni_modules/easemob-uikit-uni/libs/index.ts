@@ -4,11 +4,12 @@ import { EmContact } from './chat/contact'
 import { EmGroupDomain } from './chat/group'
 import { ensureUserInfos } from './chat/user-info'
 import { connectionStore } from './store/connection'
-import { contactStore } from './store/contact'
-import { conversationStore } from './store/conversation'
+import { contactRequestUnreadCount, contactStore } from './store/contact'
+import { clearConversations, conversationStore, conversationUnreadCountOf as unreadCountOfConversation, totalConversationUnread } from './store/conversation'
+import { clearAllDrafts } from './store/draft'
 import { groupStore } from './store/group'
-import { messageStore } from './store/message'
-import { userStore } from './store/user'
+import { clearMessages, messageStore } from './store/message'
+import { clearUsers, userStore } from './store/user'
 import { copyText, exportTextFile } from './platform'
 import { clearLogBuffer, createLogger, getLogText } from './utils/logger'
 import type { ConversationTypeValue } from './constants'
@@ -35,6 +36,20 @@ class EmKitImpl {
   readonly users = userStore
   readonly contacts = contactStore
   readonly groups = groupStore
+
+  // 未读数便捷入口（非响应式快照；响应式请用 useUnreadCounts()/useTabBarBadge()）
+  get conversationUnreadCount(): number {
+    return totalConversationUnread.value
+  }
+
+  get contactRequestUnreadCount(): number {
+    return contactRequestUnreadCount.value
+  }
+
+  // 单会话未读快照（入口角标）；响应式用 useConversationUnreadCount(id)
+  conversationUnreadCountOf(conversationId: string): number {
+    return unreadCountOfConversation(conversationId)
+  }
 
   private client = new EmClient()
   private chat = new EmChat()
@@ -76,13 +91,35 @@ class EmKitImpl {
     this.group.getJoinedGroups().catch(() => {})
   }
 
-  logout(): Promise<void> {
-    return this.client.logout()
+  // 登出：先退出当前会话，再断开 SDK，最后清空所有账号私有状态。
+  // 不清的话，同一设备换账号会看到上一个账号的会话/消息/联系人/草稿/邀请（联调双账号时必踩）。
+  async logout(): Promise<void> {
+    try {
+      this.chat.leaveConversation()
+    } catch (e) {}
+    try {
+      await this.client.logout()
+    } finally {
+      this.chat.reset()
+      this.contact.reset()
+      this.group.reset()
+      clearConversations()
+      clearMessages()
+      clearUsers()
+      clearAllDrafts()
+    }
   }
 
-  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[]): Promise<EmMessageItem> {
+  // ext：业务上下文载荷（多场景直进会话时携带订单/商品/来源页等），与引用/提及内部 key 合并
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[], ext?: Record<string, unknown>): Promise<EmMessageItem> {
     await this.client.whenReady()
-    return this.chat.sendText(to, chatType, text, quote, mentions)
+    return this.chat.sendText(to, chatType, text, quote, mentions, ext)
+  }
+
+  // 自定义消息（卡片消息主通道）：接收侧经 #custom-message 插槽按 customEvent 渲染
+  async sendCustom(to: string, chatType: ConversationTypeValue, event: string, params?: Record<string, string>, ext?: Record<string, unknown>): Promise<EmMessageItem> {
+    await this.client.whenReady()
+    return this.chat.sendCustom(to, chatType, event, params, ext)
   }
 
   makeQuote(item: EmMessageItem): EmQuoteInfo {
@@ -178,6 +215,12 @@ class EmKitImpl {
 
   onMessage(handler: EmMessageHandler): () => void {
     return this.chat.onMessage(handler)
+  }
+
+  /** 订阅流式消息更新（M2.13，AI 流式输出）：分片合批后回调，msg.stream 携带最新全文/状态；
+   *  返回取消函数（页面 onUnmounted 必须调用）。渲染由 store 响应式驱动，此订阅供外部副作用使用 */
+  onStreamMessage(handler: EmMessageHandler): () => void {
+    return this.chat.onStreamMessage(handler)
   }
 
   // 按需确保一批用户的昵称/头像已缓存（微任务合批，单次请求）
@@ -316,6 +359,11 @@ class EmKitImpl {
     return this.group.unmuteAllGroupMembers(groupId)
   }
 
+  // 系统提示消息（本地灰条，不发服务端）：交易状态/医疗提示/客服转接等场景通用
+  insertLocalNotice(conversationId: string, chatType: ConversationTypeValue, text: string): void {
+    this.chat.insertLocalNotice(conversationId, chatType, text)
+  }
+
   // 群系统通知（本地灰条，不发服务端）：建群成功等本地链路插通知的入口
   insertGroupNotice(groupId: string, text: string): void {
     this.chat.insertGroupNotice(groupId, text)
@@ -355,20 +403,34 @@ export * from './constants'
 export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio } from './platform'
 export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult } from './platform'
 export { useNamespace } from './use/useNamespace'
-export { useTheme } from './use/useTheme'
+export {
+  useTheme,
+  initTheme,
+  setTheme,
+  getTheme,
+  syncNativeThemeUI,
+  THEME_STORAGE_KEY
+} from './use/useTheme'
+export type { EmThemeInitOptions, EmThemeSyncOptions } from './use/useTheme'
 export { useLocale, mergeMessages } from './use/useLocale'
 export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
 export { nextZIndex } from './use/usePopup'
 export { useConfig, setConfig } from './store/config'
 export { themeStore } from './store/theme'
 export { userStore, displayNameOf, avatarOf, mergeUserInfo } from './store/user'
-export { contactStore, contactDisplayNameOf, pendingInviteCount } from './store/contact'
+export { contactStore, contactDisplayNameOf, pendingInviteCount, contactRequestUnreadCount } from './store/contact'
+export { conversationStore, totalConversationUnread, conversationUnreadCountOf } from './store/conversation'
+export { useUnreadCounts, getUnreadCounts, useConversationUnreadCount } from './use/useUnreadCounts'
+export type { EmUnreadCounts } from './use/useUnreadCounts'
+export { useTabBarBadge, syncTabBarBadges } from './use/useTabBarBadge'
+export type { EmTabBarBadgeOptions, EmTabBarBadgeController } from './use/useTabBarBadge'
 export { groupStore, groupDisplayNameOf, groupMemberDisplayNameOf, sortGroupMembers } from './store/group'
 export { ensureUserInfos } from './chat/user-info'
 export { setPinyinAdapter, groupContacts, matchContact, resolveAlphabetKeyByOffsetY } from './utils/pinyin'
 export type { EmPinyinResult, EmContactGroup } from './utils/pinyin'
 export { filterActiveMentions, parseMentions } from './utils/mention'
 export type { EmMentionSegment } from './utils/mention'
+export { isStreamActive, isStreamTerminal, isPlainTextStream, isRichStream } from './utils/stream'
 export { ensureSdkModule, setSdkLoader, setSdkModule } from './client/sdk'
 export type { EmSdkModule } from './client/sdk'
 export { createLogger, setLogLevel, getLogLevel, getLogText, clearLogBuffer, getLogBufferSize } from './utils/logger'

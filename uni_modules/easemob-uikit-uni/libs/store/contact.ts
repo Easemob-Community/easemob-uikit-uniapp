@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS } from '../constants'
 import { getStorage, setStorage } from '../platform'
 import type { EmContactItem, EmContactInvite } from '../types'
@@ -52,6 +52,13 @@ export function contactDisplayNameOf(userId: string): string {
 export function pendingInviteCount(): number {
   return contactStore.invites.filter((i) => !i.outgoing && i.status === CONTACT_INVITE_STATUS.PENDING).length
 }
+
+/**
+ * 联系人请求未读数（响应式，tabbar/入口角标数据源）。
+ * 口径：收到的、仍 pending 的好友申请/群邀请；我方发出后被处理的通知不计。
+ * pendingInviteCount() 保留为同步快照函数，两者同一口径。
+ */
+export const contactRequestUnreadCount = computed(() => pendingInviteCount())
 
 // 新增/合并申请：同 id 覆盖（防事件重放重复），否则置顶插入；回写落 reactive 代理
 export function addInvite(invite: EmContactInvite): void {

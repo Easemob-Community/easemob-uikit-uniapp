@@ -35,3 +35,10 @@ export function avatarOf(userId: string): string {
   if (userId === '') return ''
   return userStore.infoByUserId[userId]?.avatarUrl ?? ''
 }
+
+// 登出/换账号清空用户资料缓存（昵称/头像/请求态均按账号隔离）
+export function clearUsers(): void {
+  userStore.infoByUserId = {}
+  userStore.loadingByUserId = {}
+  userStore.failedByUserId = {}
+}

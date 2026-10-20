@@ -46,3 +46,9 @@ export function clearDraft(conversationId: string): void {
 export function getDraft(conversationId: string): DraftEntry | null {
   return draftStore.draftByConversationId[conversationId] ?? null
 }
+
+// 登出/换账号清空（草稿含用户输入内容，不能跨账号残留）
+export function clearAllDrafts(): void {
+  draftStore.draftByConversationId = {}
+  persist()
+}

@@ -209,6 +209,7 @@ export default {
   'message.cmd': '[指令]',
   'message.custom': '[自定义消息]',
   'message.unsupported': '[暂不支持的消息]',
+  'message.stream.error': '（内容生成异常）',
   'message.seconds': '{seconds}"',
   'message.preview.unsupported': '暂不支持预览',
   'message.action.quote': '引用',

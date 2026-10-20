@@ -5,7 +5,7 @@
 // SDK wire 协议字段的兼容映射保留在各域文件的边界处（规范允许的例外）。
 // 消息/会话方法全部显式携带 chatType（M2.9 群基础，breaking）；
 // 群数据域在 ./group（EmGroupDomain），由 libs/index.ts 的 EmKitImpl 直接组合。
-import type { ChatClient, Message } from 'easemob-websdk'
+import type { ChatClient, Message, MultiDeviceEvent, StreamMessage } from 'easemob-websdk'
 import { CONVERSATION_TYPE, MESSAGE_EXT_KEY } from '../constants'
 import type { ConversationTypeValue } from '../constants'
 import { connectionStore } from '../store/connection'
@@ -43,8 +43,8 @@ export class EmChat {
           return
         }
         const item = this.messages.toMessageItem(message)
-        this.messages.appendMessage(item)
-        this.messages.notify(item)
+        // 统一入口含流式丢片补偿：同 msgServerId 的流式副本存在时用完整消息覆盖并收敛终态
+        this.messages.ingestIncoming(item)
         ensureUserInfos([item.from])
         // 群聊「有人@我」检测（接收侧）：ext em_at_list 含当前 userId 且非自己发送才置位；
         // 清除时机在 enterConversation（对齐 vue 版 conversation.hasAtMe 语义）
@@ -59,10 +59,21 @@ export class EmChat {
           this.messages.sendReadReceipts(item.conversationId, item.chatType).catch(() => {})
         }
       },
+      // 流式消息（AI 流式输出）：分片合并 / 合批写 store 全部收口消息域；
+      // onMessage 仍只承载「完整消息」语义，流式增量走 EmKit.onStreamMessage 专用订阅
+      onStreamMessage: (message: StreamMessage) => {
+        this.messages.handleStreamMessage(message)
+      },
       onConversationListUpdate: (payload) => {
-        logger.debug('onConversationListUpdate raw payload:', JSON.parse(JSON.stringify(payload)))
+        // 热路径：每条消息都会触发会话列表更新，这里只打数量，避免每次深拷贝整份 payload
+        logger.debug('onConversationListUpdate, count:', payload.items.length)
         conversationStore.items = payload.items.map((c) => this.conversations.toConversationItem(c))
         ensureUserInfos(conversationStore.items.filter((c) => c.chatType === CONVERSATION_TYPE.SINGLE_CHAT).map((c) => c.conversationId))
+        // 会话列表快照不携带免打扰状态（见 toConversationItem）：仅在服务端会话同步/基线重置后
+        // 追加一次 PushManager 批量校正；消息/profile 热路径不查，避免每条消息一次 REST
+        if (payload.patch?.reset === true || payload.reason === 'conversation') {
+          this.conversations.syncConversationMuteStates()
+        }
       },
       onMessageRecalled: (payload) => {
         this.messages.markRecalled(payload.conversationId, payload.messageId)
@@ -71,6 +82,15 @@ export class EmChat {
         receipts.forEach((r) => {
           this.messages.applyPeerReadTime(r.conversationType, r.conversationId, r.timestamp)
         })
+      }
+    })
+    // 多设备会话事件（ChatClient 级）：其他端切免打扰后本端列表 icon 同步；
+    // 会话列表快照不携带该状态，多设备事件是运行期唯一实时来源（轮询校正见 syncConversationMuteStates）
+    client.addEventHandler('emkit-multi-device', {
+      onMultiDeviceConversation: (event: MultiDeviceEvent) => {
+        if (event.category !== 'conversation') return
+        if (event.operation !== 'CONVERSATION_MUTE_INFO_CHANGED') return
+        this.conversations.applyMuteInfoChanged(event.conversationId, event.remindType)
       }
     })
   }
@@ -84,8 +104,18 @@ export class EmChat {
     return this.messages.onMessage(handler)
   }
 
-  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[]): Promise<EmMessageItem> {
-    return this.messages.sendText(to, chatType, text, quote, mentions)
+  // 流式消息订阅（M2.13）：分片合批后回调（msg.stream 为最新全文/状态），返回取消函数
+  onStreamMessage(handler: EmMessageHandler): () => void {
+    return this.messages.onStreamMessage(handler)
+  }
+
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[], ext?: Record<string, unknown>): Promise<EmMessageItem> {
+    return this.messages.sendText(to, chatType, text, quote, mentions, ext)
+  }
+
+  // 自定义消息（卡片消息主通道）：event 业务事件名 / params SDK 字符串参数 / ext 结构化载荷
+  async sendCustom(to: string, chatType: ConversationTypeValue, event: string, params?: Record<string, string>, ext?: Record<string, unknown>): Promise<EmMessageItem> {
+    return this.messages.sendCustom(to, chatType, event, params, ext)
   }
 
   makeQuote(item: EmMessageItem): EmQuoteInfo {
@@ -124,6 +154,12 @@ export class EmChat {
     this.conversations.leaveConversation()
   }
 
+  // 登出/换账号：清域内计时器、失败消息的本地 File 缓存与当前会话游标
+  reset(): void {
+    this.conversations.reset()
+    this.messages.reset()
+  }
+
   async pinConversation(conversationId: string, chatType: ConversationTypeValue, pinned: boolean): Promise<void> {
     return this.conversations.pinConversation(conversationId, chatType, pinned)
   }
@@ -155,9 +191,14 @@ export class EmChat {
     this.conversations.updateConversationName(conversationId, name)
   }
 
-  // 群系统通知（本地灰条，不发服务端）：群域事件与建群链路共用入口
+  // 系统提示消息（本地灰条，不发服务端）：多场景通用入口（交易状态/医疗提示/转接通知）
+  insertLocalNotice(conversationId: string, chatType: ConversationTypeValue, text: string): void {
+    this.messages.insertLocalNotice(conversationId, chatType, text)
+  }
+
+  // 群系统通知别名（群域事件与建群链路沿用）；等价 insertLocalNotice(groupId, groupChat, text)
   insertGroupNotice(groupId: string, text: string): void {
-    this.messages.insertLocalNotice(groupId, CONVERSATION_TYPE.GROUP_CHAT, text)
+    this.insertLocalNotice(groupId, CONVERSATION_TYPE.GROUP_CHAT, text)
   }
 
   async recallMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {

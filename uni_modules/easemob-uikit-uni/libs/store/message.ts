@@ -19,3 +19,12 @@ export function getMessages(conversationId: string): EmMessageItem[] {
   }
   return messageStore.messagesByConversationId[conversationId]
 }
+
+// 登出/换账号清空（消息是账号私有数据，不能留给下一个登录者）
+export function clearMessages(): void {
+  messageStore.messagesByConversationId = {}
+  messageStore.cursorByConversationId = {}
+  messageStore.hasMoreByConversationId = {}
+  messageStore.peerReadTimeByConversationId = {}
+  messageStore.peerTypingByConversationId = {}
+}

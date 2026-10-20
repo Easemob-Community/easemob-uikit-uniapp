@@ -209,6 +209,7 @@ export default {
   'message.cmd': '[Command]',
   'message.custom': '[Custom]',
   'message.unsupported': '[Unsupported message]',
+  'message.stream.error': ' (content generation failed)',
   'message.seconds': '{seconds}s',
   'message.preview.unsupported': 'Preview not supported yet',
   'message.action.quote': 'Quote',

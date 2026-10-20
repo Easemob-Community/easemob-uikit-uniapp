@@ -5,21 +5,25 @@ import type {
   ChatClient,
   CmdMessageBody,
   CompatibleFile,
+  CustomMessageBody,
   Message,
   FileMessageBody,
   ImageMessageBody,
+  StreamMessage,
   TextMessageBody,
   VideoMessageBody,
   VoiceMessageBody
 } from 'easemob-websdk'
-import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../constants'
-import type { ConversationTypeValue } from '../constants'
+import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
+import type { ConversationTypeValue, StreamMessageStatusValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { uiConfig } from '../store/config'
 import { getMessages, messageStore } from '../store/message'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
-import type { EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
+import type { EmMessageHandler, EmMessageItem, EmQuoteInfo, EmStreamInfo } from '../types'
+import { isStreamTerminal } from '../utils/stream'
 import { useLocale } from '../use/useLocale'
+import { displayNameOf } from '../store/user'
 import { ensureUserInfos } from './user-info'
 
 // localId 兜底序号（SDK msgLocalId 为空时保证唯一）
@@ -29,12 +33,13 @@ function nextLocalSeq(): number {
   return localSeq
 }
 
-// 文本消息 ext 组装：引用（emQuote 自定义 key）与 @提及（em_at_list userId 数组，与 vue 版互认）；
-// 两者皆空返回 undefined（不挂 ext，保持现状行为）
-function buildTextExt(quote?: EmQuoteInfo, mentions?: string[]): Record<string, unknown> | undefined {
-  const ext: Record<string, unknown> = {}
+// 文本消息 ext 组装：业务 ext（多场景上下文，如订单/商品/来源页）+ 引用（emQuote 自定义 key）
+// + @提及（em_at_list userId 数组，与 vue 版互认）；内部 key 后写，业务 ext 不可覆盖它们；
+// 全空返回 undefined（不挂 ext，保持现状行为）
+function buildTextExt(quote?: EmQuoteInfo, mentions?: string[], extraExt?: Record<string, unknown>): Record<string, unknown> | undefined {
+  const ext: Record<string, unknown> = extraExt != null ? { ...extraExt } : {}
   if (quote != null) {
-    ext[MESSAGE_EXT_KEY.QUOTE] = { msgId: quote.msgId, from: quote.from, text: quote.text, type: quote.type }
+    ext[MESSAGE_EXT_KEY.QUOTE] = { msgId: quote.msgId, from: quote.from, fromName: quote.fromName ?? '', text: quote.text, type: quote.type }
   }
   if (mentions != null && mentions.length > 0) {
     ext[MESSAGE_EXT_KEY.MENTION] = mentions
@@ -60,11 +65,42 @@ export interface EmChatContext {
 
 export class EmMessageDomain {
   readonly handlers: EmMessageHandler[] = []
+  // 流式消息专用订阅（M2.13）：高频分片只走此通道，不污染 onMessage（新消息语义）。
+  // 订阅方按需做副作用（外部 AI 面板/埋点），聊天页渲染仍由 store 响应式驱动
+  readonly streamHandlers: EmMessageHandler[] = []
   readReceiptOn = true
   private typingSentAt: Record<string, number> = {}
   private typingTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+  // 失败消息的原始上传文件（H5 File）：SDK web 上传只认 File/Blob，而 EmMessageItem 只持久化 URL/path；
+  // 只在内存持有，发送成功 / 删除本地消息 / 登出时释放（重发 H5 图片/视频/文件需要它）。
+  private uploadFileByLocalId: Record<string, unknown> = {}
+  // 历史加载飞行中去重（会话页预热 + 聊天页 mount 会并发调用同一会话）
+  private historyPromiseByConversationId: Record<string, Promise<void>> = {}
+  // 会话代次：登出/换账号时自增，飞行中的历史请求回来后据此丢弃，避免把旧账号消息写进新会话缓存
+  private sessionEpoch = 0
+  // 流式消息索引：`<conversationId>|<msgServerId>` → store 响应式代理。
+  // 高频分片按 O(1) 定位同一条气泡（不遍历消息列表），且必须持代理而非原始对象
+  // （蒸汽端对原始对象 mutation 不触发更新，见 deliver 同款注释）
+  private streamItemByKey: Record<string, EmMessageItem> = {}
+  // 分片合批缓冲：同一消息在一个节流窗口内只落最新全文/状态，窗口结束一次性写 store + 通知
+  private pendingStreamByKey: Record<string, { item: EmMessageItem, stream: EmStreamInfo }> = {}
+  private streamTimerByKey: Record<string, ReturnType<typeof setTimeout>> = {}
 
   constructor(private ctx: EmChatContext) {}
+
+  // 登出/换账号重置域内状态：typing 计时器（防旧账号残留）与失败消息的本地 File 缓存
+  reset(): void {
+    Object.keys(this.typingTimers).forEach((key) => clearTimeout(this.typingTimers[key]))
+    this.typingTimers = {}
+    this.typingSentAt = {}
+    this.uploadFileByLocalId = {}
+    this.historyPromiseByConversationId = {}
+    Object.keys(this.streamTimerByKey).forEach((key) => clearTimeout(this.streamTimerByKey[key]))
+    this.streamTimerByKey = {}
+    this.pendingStreamByKey = {}
+    this.streamItemByKey = {}
+    this.sessionEpoch += 1
+  }
 
   // 返回取消函数：宿主（聊天页）卸载时调用，防 handlers 数组只增不减（反复进出聊天页会叠加触发）
   onMessage(handler: EmMessageHandler): () => void {
@@ -81,6 +117,226 @@ export class EmMessageDomain {
     this.handlers.forEach((h) => h(item))
   }
 
+  /** 订阅流式消息更新（分片合批后触发，≤1000/streamThrottle 次/秒）；返回取消函数 */
+  onStreamMessage(handler: EmMessageHandler): () => void {
+    this.streamHandlers.push(handler)
+    return () => {
+      const idx = this.streamHandlers.indexOf(handler)
+      if (idx >= 0) {
+        this.streamHandlers.splice(idx, 1)
+      }
+    }
+  }
+
+  notifyStream(item: EmMessageItem): void {
+    this.streamHandlers.forEach((h) => h(item))
+  }
+
+  // ===== 流式消息（M2.13，AI 流式输出） =====
+
+  /**
+   * SDK onStreamMessage 入口：分片按 msgServerId 合并到同一条文本气泡。
+   * - `fullText` 幂等覆盖（服务端已排序合并，不依赖 deltaText / 分片到达顺序）；
+   * - 首个分片立即建气泡（低首字延迟），后续分片按 uiConfig.streamThrottle 合批写 store；
+   * - 终态分片（COMPLETED/START_COMPLETED/ERROR）不受节流约束，立即落盘；
+   * - enableStreamMessage=false 时整体忽略，等 onMessage 完整消息一次性上屏（SDK 语义不变）。
+   */
+  handleStreamMessage(message: StreamMessage): void {
+    if (!uiConfig.enableStreamMessage) return
+    const stream = message.stream
+    // 流式仅文本消息；其它类型（未来扩展）不进本链路
+    if (stream == null || (message.type as string) !== MESSAGE_TYPE.TEXT) return
+    const conversationId = message.conversationId !== '' ? message.conversationId : this.peerOf(message)
+    const msgId = message.msgServerId !== '' ? message.msgServerId : message.msgLocalId
+    if (conversationId === '' || msgId === '') return
+
+    const key = this.streamKeyOf(conversationId, msgId)
+    const info = this.toStreamInfo(stream)
+    let item: EmMessageItem | undefined = this.streamItemByKey[key]
+    if (item == null) {
+      // 先于首个分片到达的完整消息（或历史回流）已存在：直接挂流式状态，不新建气泡
+      item = this.findStreamItem(conversationId, msgId, message.msgLocalId)
+    }
+    if (item == null) {
+      item = this.toMessageItem(message)
+      item.text = info.fullText
+      item.stream = info
+      const stored = this.appendMessage(item)
+      if (stored == null) return
+      // appendMessage 返回 reactive 数组里的代理：后续分片 mutation 才会触发蒸汽端细粒度更新
+      this.streamItemByKey[key] = stored
+      ensureUserInfos([stored.from])
+      this.notifyStream(stored)
+      return
+    }
+
+    // serverId/localId 切换（首个分片缺 serverId）时把索引迁到稳定 key，顺带清掉旧 key 的 pending/计时器
+    this.adoptStreamKey(key, item)
+    // 乱序/重复分片防御：非终态旧分片不覆盖新内容（服务端 fullText 已含全部增量）。
+    // 比较基线取「已落盘 seq 与待落盘 pending seq 的较大者」，否则未 flush 的新分片会被乱序旧片覆盖
+    const pending = this.pendingStreamByKey[key]
+    const currentSeq = pending != null
+      ? pending.stream.seq
+      : (item.stream?.seq ?? -1)
+    if (!isStreamTerminal(info.status) && info.seq < currentSeq) return
+
+    if (pending != null) {
+      pending.item = item
+      pending.stream = info
+    } else {
+      this.pendingStreamByKey[key] = { item, stream: info }
+    }
+    this.scheduleStreamFlush(key, isStreamTerminal(info.status))
+  }
+
+  /**
+   * onMessage 完整消息入口（流式丢片补偿）：同 msgServerId 的流式副本仍在时，
+   * 用完整消息覆盖并收敛为终态，避免离线/断连错过分片后残留半截内容；
+   * 其余情况维持「追加 + 通知」的新消息语义。
+   */
+  ingestIncoming(item: EmMessageItem): void {
+    let existing: EmMessageItem | undefined
+    if (item.id !== '') {
+      existing = this.streamItemByKey[this.streamKeyOf(item.conversationId, item.id)]
+        ?? this.findStreamItem(item.conversationId, item.id, item.localId)
+      // 终态覆盖前清掉该消息所有索引/合批计时器（localId/serverId 双 key 场景也不残留）
+      if (existing != null) {
+        this.clearStreamKeysForItem(existing)
+      }
+    }
+    if (existing != null && existing.stream != null) {
+      // localId 是列表 :key / 滚动锚点，必须保持稳定
+      const localId = existing.localId
+      const terminal: EmStreamInfo = {
+        ...existing.stream,
+        status: STREAM_MESSAGE_STATUS.COMPLETED,
+        deltaText: '',
+        fullText: item.text
+      }
+      Object.assign(existing, item)
+      existing.localId = localId
+      existing.stream = terminal
+      this.notify(existing)
+      // 终态也可能由完整消息先到（终态分片丢失）：给流式订阅方补一次终态回调
+      this.notifyStream(existing)
+      return
+    }
+    this.appendMessage(item)
+    this.notify(item)
+  }
+
+  /** 清理指定会话的流式索引/合批缓冲（清空记录、删除会话、登出时调用，防计时器回写幽灵消息） */
+  forgetStreams(conversationId: string): void {
+    const prefix = `${conversationId}|`
+    const keys: Record<string, boolean> = {}
+    Object.keys(this.streamItemByKey).forEach((key) => { keys[key] = true })
+    Object.keys(this.pendingStreamByKey).forEach((key) => { keys[key] = true })
+    Object.keys(keys).forEach((key) => {
+      if (key.indexOf(prefix) === 0) {
+        this.clearStreamKey(key)
+      }
+    })
+  }
+
+  private streamKeyOf(conversationId: string, msgId: string): string {
+    return `${conversationId}|${msgId}`
+  }
+
+  private findStreamItem(conversationId: string, msgId: string, msgLocalId: string): EmMessageItem | undefined {
+    return getMessages(conversationId).find(
+      (m) => m.id === msgId || (msgLocalId !== '' && m.localId === msgLocalId)
+    )
+  }
+
+  private toStreamInfo(stream: NonNullable<StreamMessage['stream']>): EmStreamInfo {
+    const info: EmStreamInfo = {
+      customType: stream.customType ?? '',
+      seq: stream.seq,
+      // SDK 公开状态值与 constants.STREAM_MESSAGE_STATUS 一一对应（wire 边界转换点）
+      status: stream.status as StreamMessageStatusValue,
+      deltaText: stream.deltaText,
+      fullText: stream.fullText,
+      errorType: stream.errorType
+    }
+    if (typeof stream.finishReason === 'number') {
+      info.finishReason = stream.finishReason
+    }
+    return info
+  }
+
+  private scheduleStreamFlush(key: string, immediate: boolean): void {
+    // 终态立即落盘：最后一段内容不能因节流窗口延迟；0 = 显式关闭合批（逐片写）
+    if (immediate || uiConfig.streamThrottle <= 0) {
+      this.flushStream(key)
+      return
+    }
+    // 节流（非防抖）：窗口从首个待写分片起算，持续到达的分片不会饿死首字更新
+    if (this.streamTimerByKey[key] != null) return
+    const delay = uiConfig.streamThrottle
+    this.streamTimerByKey[key] = setTimeout(() => {
+      delete this.streamTimerByKey[key]
+      this.flushStream(key)
+    }, delay)
+  }
+
+  private flushStream(key: string): void {
+    const timer = this.streamTimerByKey[key]
+    if (timer != null) {
+      clearTimeout(timer)
+      delete this.streamTimerByKey[key]
+    }
+    const pending = this.pendingStreamByKey[key]
+    if (pending == null) return
+    delete this.pendingStreamByKey[key]
+    // 运行期关闭流式：丢弃未落盘分片（后续完整消息走 onMessage）
+    if (!uiConfig.enableStreamMessage) return
+    const item = pending.item
+    const info = pending.stream
+    const prev = item.stream
+    if (item.text === info.fullText && prev != null && prev.seq === info.seq && prev.status === info.status) {
+      return
+    }
+    item.text = info.fullText
+    item.stream = info
+    // 终态后释放索引（消息仍留在列表；最终 onMessage 兜底时按 id 在列表中找回，不会重复建气泡）
+    if (isStreamTerminal(info.status)) {
+      delete this.streamItemByKey[key]
+    }
+    this.notifyStream(item)
+  }
+
+  private clearStreamKey(key: string): void {
+    const timer = this.streamTimerByKey[key]
+    if (timer != null) {
+      clearTimeout(timer)
+      delete this.streamTimerByKey[key]
+    }
+    delete this.pendingStreamByKey[key]
+    delete this.streamItemByKey[key]
+  }
+
+  /** 同一气泡的 key 迁移（首个分片缺 serverId → 后续分片带上）：清旧 key 的索引与 pending，避免双份回写。
+   *  已在新 key 下时 O(1) 短路，不在每片热路径上扫描 */
+  private adoptStreamKey(key: string, item: EmMessageItem): void {
+    if (this.streamItemByKey[key] === item) return
+    this.clearStreamKeysForItem(item)
+    this.streamItemByKey[key] = item
+  }
+
+  /** 清理指向同一消息的全部索引/pending/计时器（仅在 key 迁移与终态覆盖时调用） */
+  private clearStreamKeysForItem(item: EmMessageItem): void {
+    Object.keys(this.streamItemByKey).forEach((k) => {
+      if (this.streamItemByKey[k] === item) {
+        this.clearStreamKey(k)
+      }
+    })
+    Object.keys(this.pendingStreamByKey).forEach((k) => {
+      if (this.pendingStreamByKey[k].item === item) {
+        this.clearStreamKey(k)
+      }
+    })
+  }
+
   async readyChatManager() {
     if (this.ctx.client == null) {
       throw new Error('call EmKit.init() first')
@@ -92,16 +348,35 @@ export class EmMessageDomain {
   }
 
   // mentions：@提及的 userId 列表（发前已用 filterActiveMentions 过滤），挂 ext.em_at_list 与 vue 版互认
-  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[]): Promise<EmMessageItem> {
+  // ext：业务上下文载荷（多场景：订单号/商品 id/来源页），与引用/提及内部 key 合并，内部 key 优先
+  async sendText(to: string, chatType: ConversationTypeValue, text: string, quote?: EmQuoteInfo, mentions?: string[], ext?: Record<string, unknown>): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
     const message = chatManager.createTextMessage({
       conversationId: to,
       conversationType: chatType,
       content: text,
       // 引用挂在消息 ext 上（emQuote 自定义 key），接收方/历史消息解析还原
-      ext: buildTextExt(quote, mentions)
+      ext: buildTextExt(quote, mentions, ext)
     })
-    return this.deliver(message, to, text, quote, '', mentions)
+    return this.deliver(message, to, text, quote, '', mentions, undefined, ext)
+  }
+
+  // 自定义消息（多场景卡片消息的主通道）：event 为业务事件名（宿主自有命名空间），
+  // params 为字符串参数表（SDK 协议字段），ext 承载结构化业务载荷；接收侧落 customEvent/customParams/ext。
+  // 发送侧同样经 #custom-message 插槽渲染，保证「所见即所发」
+  async sendCustom(to: string, chatType: ConversationTypeValue, event: string, params?: Record<string, string>, ext?: Record<string, unknown>): Promise<EmMessageItem> {
+    if (event === '') {
+      throw new Error('sendCustom: event is required')
+    }
+    const chatManager = await this.readyChatManager()
+    const message = chatManager.createCustomMessage({
+      conversationId: to,
+      conversationType: chatType,
+      event,
+      params,
+      ext
+    })
+    return this.deliver(message, to, '', undefined, '', undefined, undefined, ext)
   }
 
   // 引用快照：文本截断 50 字，非文本消息用 locale 摘要（对齐 summaryOf 的文案纪律）
@@ -116,15 +391,40 @@ export class EmMessageDomain {
       text = t('message.video')
     } else if (item.type === MESSAGE_TYPE.FILE) {
       text = item.fileName !== '' ? `${t('message.file')}${item.fileName}` : t('message.file')
+    } else if (item.type === MESSAGE_TYPE.CUSTOM) {
+      text = t('message.custom')
     } else if (item.type !== MESSAGE_TYPE.TEXT) {
       text = t('message.unsupported')
     }
-    return { msgId: item.id, from: item.from, text: text.slice(0, 50), type: item.type }
+    return { msgId: item.id, from: item.from, fromName: displayNameOf(item.from), text: text.slice(0, 50), type: item.type }
   }
 
   // SDK 5.x createXxxMessage 的 data 不收字符串路径：H5 要 File 对象，小程序/App 要 MiniAppFile { path, name, size }
   private asCompatibleFile(path: string, name: string, size: number, webFile: unknown | null): CompatibleFile {
     return (webFile != null ? webFile : { path, name, size }) as CompatibleFile
+  }
+
+  // H5 的 chooseVideo 只给 blob URL（不是 File），而 SDK web 上传适配器只接受 File/Blob。
+  // 这里把 blob:/data: 取回并包成 File；非 H5 或普通路径返回 null（走 MiniAppFile）。
+  // 失败返回 null，交给 SDK 的原路径逻辑报错（不吞错：发送失败会落 FAILED 气泡）。
+  private async webFileOf(path: string, name: string): Promise<unknown | null> {
+    // #ifdef WEB
+    if (path.indexOf('blob:') === 0 || path.indexOf('data:') === 0) {
+      try {
+        const resp = await fetch(path)
+        if (resp == null) return null
+        const blob = await resp.blob()
+        return new File([blob], name !== '' ? name : 'file', { type: blob.type })
+      } catch (e) {
+        return null
+      }
+    }
+    // #endif
+    return null
+  }
+
+  private isRemoteUrl(path: string): boolean {
+    return path.indexOf('http://') === 0 || path.indexOf('https://') === 0
   }
 
   async sendImage(to: string, chatType: ConversationTypeValue, image: EmPickedImage): Promise<EmMessageItem> {
@@ -135,7 +435,7 @@ export class EmMessageDomain {
       data: this.asCompatibleFile(image.path, image.name, image.size, image.webFile),
       filename: image.name
     })
-    return this.deliver(message, to, '', undefined, image.path)
+    return this.deliver(message, to, '', undefined, image.path, undefined, image.webFile)
   }
 
   async sendAudio(to: string, chatType: ConversationTypeValue, filePath: string, duration: number): Promise<EmMessageItem> {
@@ -152,15 +452,17 @@ export class EmMessageDomain {
 
   async sendVideo(to: string, chatType: ConversationTypeValue, video: EmPickedVideo): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
+    // H5 chooseVideo 只回 blob URL，SDK web 上传需要 File：这里转一次，并留给失败重发复用
+    const webFile = await this.webFileOf(video.path, video.name)
     const message = chatManager.createVideoMessage({
       conversationId: to,
       conversationType: chatType,
-      data: this.asCompatibleFile(video.path, video.name, video.size, null),
+      data: this.asCompatibleFile(video.path, video.name, video.size, webFile),
       duration: video.duration,
       width: video.width,
       height: video.height
     })
-    return this.deliver(message, to, '', undefined, video.path)
+    return this.deliver(message, to, '', undefined, video.path, undefined, webFile)
   }
 
   async sendFile(to: string, chatType: ConversationTypeValue, file: EmPickedFile): Promise<EmMessageItem> {
@@ -174,13 +476,15 @@ export class EmMessageDomain {
       filename: file.name,
       fileSize: file.size
     })
-    return this.deliver(message, to, '', undefined, file.path)
+    return this.deliver(message, to, '', undefined, file.path, undefined, file.webFile)
   }
 
   // 先落本地 sending 态，sendMessage 后回写 sent/failed；失败保留供重发。
   // 返回 store 代理上的消息项（发送回写后的最终态），供业务事件透出（em-chat-page 的 send emit）
   // localUrl：语音/视频/文件的本地临时路径，SDK 未回写 body.url 时兜底（本地回显/播放/重发用）
-  private async deliver(message: Message, to: string, fallbackText: string, quote?: EmQuoteInfo, localUrl = '', mentions?: string[]): Promise<EmMessageItem> {
+  // localFile：H5 的原始 File，发送失败时留在内存供重发（SDK web 上传只认 File/Blob）
+  // extraExt：业务 ext，SDK 未随 createXxxMessage 回带时兜底进本地消息（仅补缺，不覆盖内部 key）
+  private async deliver(message: Message, to: string, fallbackText: string, quote?: EmQuoteInfo, localUrl = '', mentions?: string[], localFile: unknown | null = null, extraExt?: Record<string, unknown>): Promise<EmMessageItem> {
     const chatManager = this.ctx.client?.chatManager
     if (chatManager == null) {
       throw new Error('call EmKit.init() first')
@@ -197,8 +501,19 @@ export class EmMessageDomain {
     if (mentions != null && mentions.length > 0 && item.ext[MESSAGE_EXT_KEY.MENTION] == null) {
       item.ext[MESSAGE_EXT_KEY.MENTION] = mentions
     }
+    // 业务 ext 兜底：SDK 回带优先，缺的 key 补进来（引用/提及 key 已在上面写过，不覆盖）
+    if (extraExt != null) {
+      Object.keys(extraExt).forEach((key) => {
+        if (item.ext[key] == null) {
+          item.ext[key] = extraExt[key]
+        }
+      })
+    }
     this.appendMessage(item)
     this.notify(item)
+    if (localFile != null) {
+      this.uploadFileByLocalId[item.localId] = localFile
+    }
     // 状态回写必须落在 store 的响应式代理上：item 是原始对象，蒸汽（vapor）端
     // 细粒度绑定对原始对象的 mutation 不触发更新（VDOM 端靠整树重渲染掩盖了这点），
     // 真机上会卡在 sending 态。getMessages 经 reactive 数组读取，返回的是代理。
@@ -208,6 +523,8 @@ export class EmMessageDomain {
       stored.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
       stored.time = sent.timestamp
       stored.status = MESSAGE_STATUS.SENT
+      delete this.uploadFileByLocalId[item.localId]
+      this.applyMediaBody(stored, sent)
     } catch (e) {
       stored.status = MESSAGE_STATUS.FAILED
       throw e
@@ -215,7 +532,73 @@ export class EmMessageDomain {
     return stored
   }
 
-  async loadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize = 20): Promise<void> {
+  // 发送成功后把 SDK 回填的 body 元数据写回本地 item（item 是 toMessageItem 的副本）：
+  // 不回写会让自发送图片一直用 em-image-message 的 120×160 默认尺寸，视频/封面也不会更新。
+  private applyMediaBody(stored: EmMessageItem, sent: Message): void {
+    const body = sent.body as unknown as Record<string, unknown> | null | undefined
+    if (body == null) return
+    const num = (key: string): number => {
+      const value = body[key]
+      return typeof value === 'number' && value > 0 ? value : 0
+    }
+    const str = (key: string): string => {
+      const value = body[key]
+      return typeof value === 'string' ? value : ''
+    }
+    if (stored.type === MESSAGE_TYPE.IMAGE) {
+      const w = num('width')
+      const h = num('height')
+      if (w > 0 && h > 0) {
+        stored.width = w
+        stored.height = h
+      }
+      const full = str('bigImageUrl') !== '' ? str('bigImageUrl') : (str('originalImageUrl') !== '' ? str('originalImageUrl') : str('url'))
+      // 本地 blob/临时路径优先保留用于即时预览；只有当前没有可用 URL 时才用服务端地址
+      if (stored.url === '' && full !== '') stored.url = full
+      const thumb = str('thumbnailUrl')
+      if (thumb !== '') stored.thumbUrl = thumb
+      return
+    }
+    if (stored.type === MESSAGE_TYPE.VIDEO) {
+      const w = num('width')
+      const h = num('height')
+      if (w > 0 && h > 0) {
+        stored.width = w
+        stored.height = h
+      }
+      const thumb = str('thumbnailUrl')
+      if (thumb !== '') stored.thumbUrl = thumb
+      return
+    }
+    if (stored.type === MESSAGE_TYPE.AUDIO) {
+      const duration = num('duration')
+      if (duration > 0) stored.duration = duration
+      return
+    }
+    if (stored.type === MESSAGE_TYPE.FILE) {
+      const size = num('fileSize')
+      if (size > 0) stored.fileSize = size
+    }
+  }
+
+  // 会话页预热与聊天页 onMounted 会对同一会话几乎同时调用 loadHistory；
+  // 共享同一 Promise 防止两次请求读到同一 cursor 后各自推进游标、重复拉页。
+  loadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize = 20): Promise<void> {
+    const inFlight = this.historyPromiseByConversationId[conversationId]
+    if (inFlight != null) {
+      return inFlight
+    }
+    const promise = this.doLoadHistory(conversationId, chatType, pageSize)
+    this.historyPromiseByConversationId[conversationId] = promise
+    return promise.finally(() => {
+      if (this.historyPromiseByConversationId[conversationId] === promise) {
+        delete this.historyPromiseByConversationId[conversationId]
+      }
+    })
+  }
+
+  private async doLoadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize: number): Promise<void> {
+    const epoch = this.sessionEpoch
     const chatManager = await this.readyChatManager()
     const cursor = messageStore.cursorByConversationId[conversationId] ?? ''
     const page = await chatManager.getHistoryMessages({
@@ -225,6 +608,8 @@ export class EmMessageDomain {
       pageSize,
       searchDirection: 'up'
     })
+    // 登出/换账号后回来的旧请求：丢弃，不写游标/消息
+    if (epoch !== this.sessionEpoch) return
     messageStore.cursorByConversationId[conversationId] = page.cursor
     messageStore.hasMoreByConversationId[conversationId] = page.hasMore
     const list = getMessages(conversationId)
@@ -323,6 +708,7 @@ export class EmMessageDomain {
 
   // 仅从本地消息列表移除，不联服务端
   deleteLocalMessage(conversationId: string, localId: string): void {
+    delete this.uploadFileByLocalId[localId]
     const list = messageStore.messagesByConversationId[conversationId]
     if (list == null) {
       return
@@ -344,24 +730,93 @@ export class EmMessageDomain {
       return
     }
     let message: Message
+    const remote = this.isRemoteUrl(item.url)
+    const cachedFile = this.uploadFileByLocalId[localId] ?? null
+    // 文本/自定义消息没有本地媒体文件，不走媒体可用性校验
+    const isTextLike = item.type === MESSAGE_TYPE.TEXT || item.type === MESSAGE_TYPE.CUSTOM
+    if (!isTextLike && !remote && item.url === '' && cachedFile == null) {
+      // 媒体消息的本地临时文件已被系统清理（或 H5 刷新后丢失）：明确失败，别发一条空消息
+      throw new Error('local media file is unavailable')
+    }
+    const name = item.fileName !== ''
+      ? item.fileName
+      : (item.url !== '' ? item.url.slice(item.url.lastIndexOf('/') + 1) : 'file')
     if (item.type === MESSAGE_TYPE.IMAGE) {
-      const name = item.url.slice(item.url.lastIndexOf('/') + 1)
-      message = chatManager.createImageMessage({
+      message = remote
+        ? chatManager.createImageMessage({ conversationId, conversationType: chatType, originalUrl: item.url, filename: name })
+        : chatManager.createImageMessage({
+          conversationId,
+          conversationType: chatType,
+          data: this.asCompatibleFile(item.url, name, 0, cachedFile ?? await this.webFileOf(item.url, name)),
+          filename: name
+        })
+    } else if (item.type === MESSAGE_TYPE.AUDIO) {
+      message = remote
+        ? chatManager.createVoiceMessage({ conversationId, conversationType: chatType, originalUrl: item.url, duration: item.duration })
+        : chatManager.createVoiceMessage({
+          conversationId,
+          conversationType: chatType,
+          data: this.asCompatibleFile(item.url, name, 0, null),
+          duration: item.duration
+        })
+    } else if (item.type === MESSAGE_TYPE.VIDEO) {
+      message = remote
+        ? chatManager.createVideoMessage({
+          conversationId,
+          conversationType: chatType,
+          originalUrl: item.url,
+          duration: item.duration,
+          width: item.width,
+          height: item.height
+        })
+        : chatManager.createVideoMessage({
+          conversationId,
+          conversationType: chatType,
+          data: this.asCompatibleFile(item.url, name, 0, cachedFile ?? await this.webFileOf(item.url, name)),
+          duration: item.duration,
+          width: item.width,
+          height: item.height
+        })
+    } else if (item.type === MESSAGE_TYPE.FILE) {
+      message = remote
+        ? chatManager.createFileMessage({ conversationId, conversationType: chatType, originalUrl: item.url, filename: item.fileName, fileSize: item.fileSize })
+        : chatManager.createFileMessage({
+          conversationId,
+          conversationType: chatType,
+          data: this.asCompatibleFile(item.url, item.fileName, item.fileSize, cachedFile ?? await this.webFileOf(item.url, item.fileName)),
+          filename: item.fileName,
+          fileSize: item.fileSize
+        })
+    } else if (item.type === MESSAGE_TYPE.CUSTOM) {
+      // 自定义消息重发：event/params 从消息体还原，业务 ext 原样带上（引用等内部 key 不适用于 custom）
+      message = chatManager.createCustomMessage({
         conversationId,
         conversationType: chatType,
-        data: this.asCompatibleFile(item.url, name, 0, null)
+        event: item.customEvent,
+        params: Object.keys(item.customParams).length > 0 ? { ...item.customParams } : undefined,
+        ext: Object.keys(item.ext).length > 0 ? { ...item.ext } : undefined
       })
-    } else {
+    } else if (item.type === MESSAGE_TYPE.TEXT) {
       const quote = item.quote
-      // 重发保留 @提及 ext（item.ext 在发送时已兜底写入）；其余业务 ext 不重建（发送链路唯一挂点）
+      // 重发保留 @提及 ext（item.ext 在发送时已兜底写入）与业务 ext（订单/商品/来源页）；
+      // 引用/提及两个内部 key 由 buildTextExt 按快照重建，其余 key 原样透传
       const rawMentions = item.ext[MESSAGE_EXT_KEY.MENTION]
       const mentions = Array.isArray(rawMentions) ? rawMentions.filter((x): x is string => typeof x === 'string') : undefined
+      const extraExt: Record<string, unknown> = {}
+      Object.keys(item.ext).forEach((key) => {
+        if (key !== MESSAGE_EXT_KEY.QUOTE && key !== MESSAGE_EXT_KEY.MENTION) {
+          extraExt[key] = item.ext[key]
+        }
+      })
       message = chatManager.createTextMessage({
         conversationId,
         conversationType: chatType,
         content: item.text,
-        ext: buildTextExt(quote != null ? quote : undefined, mentions)
+        ext: buildTextExt(quote != null ? quote : undefined, mentions, extraExt)
       })
+    } else {
+      // 自定义/系统通知没有重建通道：明确失败，避免旧实现把它们退化成一条空文本
+      throw new Error(`resend unsupported message type: ${item.type}`)
     }
     item.status = MESSAGE_STATUS.SENDING
     try {
@@ -369,18 +824,23 @@ export class EmMessageDomain {
       item.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
       item.time = sent.timestamp
       item.status = MESSAGE_STATUS.SENT
+      delete this.uploadFileByLocalId[localId]
+      this.applyMediaBody(item, sent)
     } catch (e) {
       item.status = MESSAGE_STATUS.FAILED
       throw e
     }
   }
 
-  appendMessage(item: EmMessageItem): void {
+  /** 追加新消息并返回 store 中的响应式代理（重复 id 返回 null）。
+   *  流式链路依赖返回值：原始对象 mutation 在蒸汽端不触发细粒度更新（见 deliver 注释） */
+  appendMessage(item: EmMessageItem): EmMessageItem | null {
     const list = getMessages(item.conversationId)
     if (list.some((m) => m.id === item.id && item.id !== '')) {
-      return
+      return null
     }
     list.push(item)
+    return list[list.length - 1]
   }
 
   // 本地系统通知（群事件灰条）：只落本地消息列表并 notify（触发聊天页滚底），不发服务端；
@@ -410,7 +870,9 @@ export class EmMessageDomain {
       fileName: '',
       fileSize: 0,
       ext: {},
-      rawType: ''
+      rawType: '',
+      customEvent: '',
+      customParams: {}
     }
     this.appendMessage(item)
     this.notify(item)
@@ -441,7 +903,9 @@ export class EmMessageDomain {
       fileName: '',
       fileSize: 0,
       ext: {},
-      rawType: ''
+      rawType: '',
+      customEvent: '',
+      customParams: {}
     }
     // SDK ext 透传给宿主（自定义消息业务载荷的唯一通道；引用 emQuote 等内部 key 原样可见）
     if (message.ext != null && typeof message.ext === 'object') {
@@ -455,8 +919,12 @@ export class EmMessageDomain {
       const text = q['text']
       if (typeof msgId === 'string' && typeof from === 'string' && typeof text === 'string') {
         const quote: EmQuoteInfo = { msgId, from, text }
+        const fromName = q['fromName']
+        if (typeof fromName === 'string' && fromName !== '') {
+          quote.fromName = fromName
+        }
         const type = q['type']
-        if (type === MESSAGE_TYPE.TEXT || type === MESSAGE_TYPE.IMAGE || type === MESSAGE_TYPE.AUDIO || type === MESSAGE_TYPE.VIDEO || type === MESSAGE_TYPE.FILE || type === MESSAGE_TYPE.OTHER) {
+        if (type === MESSAGE_TYPE.TEXT || type === MESSAGE_TYPE.IMAGE || type === MESSAGE_TYPE.AUDIO || type === MESSAGE_TYPE.VIDEO || type === MESSAGE_TYPE.FILE || type === MESSAGE_TYPE.CUSTOM || type === MESSAGE_TYPE.OTHER) {
           quote.type = type
         }
         item.quote = quote
@@ -494,9 +962,22 @@ export class EmMessageDomain {
       item.url = body.url ?? ''
       item.fileName = body.filename ?? ''
       item.fileSize = body.fileSize ?? body.fileLength ?? 0
-    } else {
-      // 未识别类型（自定义消息）：保留 wire type 原文，宿主经 #custom-message 插槽按 rawType 判别渲染
+    } else if (mtype === 'custom') {
+      // 自定义消息：event/params 是 SDK 协议字段，业务结构化载荷走 ext；
+      // rawType 仍置 'custom'（旧宿主 rawType 非空判别兼容），新宿主按 customEvent 分发卡片
+      item.type = MESSAGE_TYPE.CUSTOM
       item.rawType = mtype
+      const body = message.body as CustomMessageBody
+      item.customEvent = body.event ?? ''
+      item.customParams = body.params != null ? { ...body.params } : {}
+    } else {
+      // 未识别类型：保留 wire type 原文，宿主经 #custom-message 插槽按 rawType 判别渲染
+      item.rawType = mtype
+    }
+    // 流式元信息（onStreamMessage / 历史中的流式终态消息）：渲染层据此展示光标/异常提示，
+    // 宿主经 #stream-message 插槽接管 markdown 等富格式；普通消息保持 undefined
+    if (message.stream != null) {
+      item.stream = this.toStreamInfo(message.stream)
     }
     return item
   }

@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import type { EmConversationItem } from '../types'
 
 // 会话列表全局唯一 store（裸 reactive，零依赖）：
@@ -8,3 +8,34 @@ export const conversationStore = reactive({
   syncing: false,
   atMeByConversationId: {} as Record<string, boolean>
 })
+
+/**
+ * 会话总未读数（底部 tabbar 角标等场景的响应式数据源）。
+ * 口径：所有会话 unreadCount 之和，包含免打扰会话（微信/企微口径；免打扰只抑制提醒，不抹掉未读数）。
+ * 宿主可直接 `computed(() => totalConversationUnread.value)` 或使用 useUnreadCounts()。
+ */
+export const totalConversationUnread = computed(() => {
+  let total = 0
+  for (const item of conversationStore.items) {
+    if (item.unreadCount > 0) total += item.unreadCount
+  }
+  return total
+})
+
+/**
+ * 单个会话的未读数（同步快照）：不存在/已清零返回 0。
+ * 响应式场景用 useConversationUnreadCount(id)（computed），非 setup（原生回调/onLaunch）用本函数。
+ * 口径与 totalConversationUnread 一致：含免打扰会话（免打扰只抑制提醒，不清零未读）。
+ */
+export function conversationUnreadCountOf(conversationId: string): number {
+  if (conversationId === '') return 0
+  const item = conversationStore.items.find((c) => c.conversationId === conversationId)
+  return item != null && item.unreadCount > 0 ? item.unreadCount : 0
+}
+
+// 登出/换账号清空（会话列表与 @我 标记都是账号私有状态）
+export function clearConversations(): void {
+  conversationStore.items = []
+  conversationStore.syncing = false
+  conversationStore.atMeByConversationId = {}
+}

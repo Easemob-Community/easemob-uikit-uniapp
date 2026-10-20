@@ -10,6 +10,8 @@ import type {
   MessageMenuKeyValue,
   MessageStatusValue,
   MessageTypeValue,
+  ResolvedThemeModeValue,
+  StreamMessageStatusValue,
   ThemeModeValue
 } from '../constants'
 
@@ -44,6 +46,11 @@ export interface EmUiConfig {
   typingTimeout: number
   /** 聊天页时间分隔条间隔（毫秒），默认 300000（5 分钟） */
   timeDividerInterval: number
+  /** 流式消息（AI 流式输出）开关，默认 true；关闭后 onStreamMessage 分片不再合并，
+   *  等待 SDK 完整消息（onMessage）到达后一次性上屏 */
+  enableStreamMessage: boolean
+  /** 流式分片合批间隔（毫秒），默认 50；0 = 逐片立即写（高刷演示/调试用） */
+  streamThrottle: number
   /** 输入栏功能集，默认全开 */
   inputFeatures: EmInputFeatures
   /** 消息长按菜单项与顺序，默认 copy/quote/recall/delete 全量 */
@@ -80,6 +87,10 @@ export interface EmKitConfig {
   typingTimeout?: number
   /** 时间分隔条间隔（毫秒），默认 300000 */
   timeDividerInterval?: number
+  /** 流式消息开关（AI 流式输出），默认 true；false = 忽略 onStreamMessage 分片，等完整消息上屏 */
+  enableStreamMessage?: boolean
+  /** 流式分片合批间隔（毫秒），默认 50；0 = 逐片立即写 */
+  streamThrottle?: number
   /** 输入栏功能集（缺项保持默认开），默认全开 */
   inputFeatures?: Partial<EmInputFeatures>
   /** 消息长按菜单项与顺序，默认四项全量 */
@@ -109,6 +120,8 @@ export type EmMessageStatus = MessageStatusValue
 export interface EmQuoteInfo {
   msgId: string
   from: string
+  /** 引用时刻的发送人展示名快照（昵称 > userId）；老数据缺省时消费方回落 from */
+  fromName?: string
   text: string   // 引用时刻的快照摘要（文本截断，非文本走 locale 摘要）
   type?: EmMessageType   // 被引用消息类型（非文本用于引用卡类型图标；老数据缺省即无图标）
 }
@@ -135,9 +148,35 @@ export interface EmMessageItem {
   fileSize: number   // 文件消息大小（字节）
   /** SDK 消息 ext 透传（自定义消息的业务载荷挂这里；发送方的引用等内部 key 也原样可见，宿主只读勿改） */
   ext: Record<string, unknown>
-  /** 未识别消息类型的 SDK wire type 原文（text/image/voice/video/file 五种内置类型恒为空串；
-   *  #custom-message 插槽的判别依据：rawType 非空即自定义消息） */
+  /** 未识别消息类型的 SDK wire type 原文（text/image/audio/video/file/notice 五种内置类型恒为空串；
+   *  CUSTOM 为 'custom'（旧宿主用 rawType 非空判别自定义消息仍成立）；
+   *  #custom-message 插槽的新判别依据是 customEvent） */
   rawType: string
+  /** 自定义消息事件名（wire custom body.event；仅 MESSAGE_TYPE.CUSTOM 非空，插槽按它分发卡片类型） */
+  customEvent: string
+  /** 自定义消息字符串参数（wire custom body.params；结构化业务载荷优先走 ext，二者都原样透出） */
+  customParams: Record<string, string>
+  /** 流式消息元信息（M2.13）：仅 SDK 流式消息 / 历史中的流式终态消息携带；
+   *  普通消息为 undefined。渲染层按 status 展示打字机光标 / 终态收敛 / 异常提示 */
+  stream?: EmStreamInfo
+}
+
+/** 流式消息元信息（SDK StreamMessageMeta 的中立子集，字段名与 wire 对齐便于宿主迁移） */
+export interface EmStreamInfo {
+  /** 业务自定义流类型（如 'text' / 'markdown'）；缺省按纯文本处理 */
+  customType: string
+  /** 当前分片序号（服务端排序后的序号） */
+  seq: number
+  /** 流式状态：START/IN_PROGRESS 为传输中；COMPLETED/START_COMPLETED/ERROR 为终态 */
+  status: StreamMessageStatusValue
+  /** 当前分片新增文本（增量；展示以 fullText 为准，deltaText 供宿主做动画/统计） */
+  deltaText: string
+  /** 截至当前分片的累计全文（与 message.text 同值；服务端已排序合并） */
+  fullText: string
+  /** 流式处理错误码，0 = 无错误 */
+  errorType: number
+  /** 服务端返回的结束原因（SDK 提供时透传） */
+  finishReason?: number
 }
 
 export type EmMessageHandler = (msg: EmMessageItem) => void
@@ -151,6 +190,9 @@ export interface EmConversationItem {
   lastMessageText: string
   lastMessageTime: number
   isPinned: boolean
+  /** 置顶时间戳（毫秒，未置顶为 0）；列表排序用：置顶区间按置顶时间倒序（对齐 vue 版），
+   *  进入会话 / 最后消息变化都不改变置顶顺序 */
+  pinnedTime: number
   isMuted: boolean
 }
 
@@ -192,7 +234,11 @@ export interface EmContactNavEntry {
   icon?: string       // em-icon 图标名（可选，缺省不渲染左图标，对齐 vue entry.icon 默认 undefined）
 }
 
-export type EmThemeMode = ThemeModeValue
+/** 主题偏好（auto 跟随系统 / light / dark），宿主设置项 */
+export type EmThemePreference = ThemeModeValue
+
+/** 实际生效的明暗主题（themeStore.mode / themeClass 用） */
+export type EmThemeMode = ResolvedThemeModeValue
 
 /** 群组条目（SDK GroupDetail/JoinedGroupSummary 的中立子集，wire 字段在 chat 边界归一） */
 export interface EmGroup {
@@ -266,3 +312,20 @@ export interface EmActionSheetAction {
   danger?: boolean
   disabled?: boolean
 }
+
+/** 消息长按菜单的业务追加动作（em-chat-page extraMessageMenus，M2.12） */
+export interface EmMessageMenuExtra extends EmActionSheetAction {
+  /** 只在指定消息类型上出现（缺省全部；NOTICE 本地灰条恒不出现） */
+  types?: EmMessageType[]
+}
+
+/** 快捷回复条目（em-quick-reply-bar / em-chat-page.quickReplies，M2.12） */
+export interface EmQuickReply {
+  /** 芯片展示文案 */
+  label: string
+  /** 点击后填入/发送的文本，缺省用 label（label 短、text 长时分开配） */
+  text?: string
+}
+
+/** 快捷回复点击行为：fill=替换当前草稿（默认，用户可编辑后再发）；send=直接发送 */
+export type EmQuickReplyMode = 'fill' | 'send'

@@ -1,7 +1,7 @@
 /* 环信 UIKit uni 版设计 token（一期最小集）
  * 数值平移自 easemob-uikit-vue/packages/uikit-core/src/theme/index.css（--uikit-* → --em-*）
  * 平移/裁剪/降级明细见 docs/DESIGN-TOKENS.md
- * 用法：页面级组件根节点挂 .em-theme-light / .em-theme-dark（useTheme().themeClass），
+ * 用法：页面级组件根节点挂 .em-theme-light / .em-theme-dark（useTheme().themeClass，默认 auto 跟随系统），
  * 并在样式中 import 本文件。ucss 纪律：无继承、无伪元素，组件内用 var(--em-*) 消费。
  *
  * 注意：主题靠根节点 class 切换（App 端无 :root），CSS 自定义属性未定义时 var() 无回退

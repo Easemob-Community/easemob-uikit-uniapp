@@ -4,6 +4,7 @@ import {
   DEFAULT_EMOJI_LIST,
   MESSAGE_MENU_KEY,
   RECALL_TIME_LIMIT,
+  STREAM_FLUSH_INTERVAL,
   TIME_DIVIDER_INTERVAL,
   TYPING_THROTTLE,
   TYPING_TIMEOUT
@@ -21,6 +22,8 @@ export const uiConfig = reactive<EmUiConfig>({
   typingThrottle: TYPING_THROTTLE,
   typingTimeout: TYPING_TIMEOUT,
   timeDividerInterval: TIME_DIVIDER_INTERVAL,
+  enableStreamMessage: true,
+  streamThrottle: STREAM_FLUSH_INTERVAL,
   inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true },
   messageMenuKeys: [MESSAGE_MENU_KEY.COPY, MESSAGE_MENU_KEY.QUOTE, MESSAGE_MENU_KEY.RECALL, MESSAGE_MENU_KEY.DELETE],
   conversationMenuKeys: [CONVERSATION_MENU_KEY.PIN, CONVERSATION_MENU_KEY.MUTE, CONVERSATION_MENU_KEY.DELETE],
@@ -63,6 +66,8 @@ export function applyKitConfig(kitConfig: EmKitConfig): void {
   if (kitConfig.typingThrottle !== undefined) patch.typingThrottle = kitConfig.typingThrottle
   if (kitConfig.typingTimeout !== undefined) patch.typingTimeout = kitConfig.typingTimeout
   if (kitConfig.timeDividerInterval !== undefined) patch.timeDividerInterval = kitConfig.timeDividerInterval
+  if (kitConfig.enableStreamMessage !== undefined) patch.enableStreamMessage = kitConfig.enableStreamMessage
+  if (kitConfig.streamThrottle !== undefined) patch.streamThrottle = kitConfig.streamThrottle
   if (kitConfig.inputFeatures != null) patch.inputFeatures = { ...uiConfig.inputFeatures, ...kitConfig.inputFeatures }
   if (kitConfig.messageMenuKeys != null) patch.messageMenuKeys = [...kitConfig.messageMenuKeys]
   if (kitConfig.conversationMenuKeys != null) patch.conversationMenuKeys = [...kitConfig.conversationMenuKeys]

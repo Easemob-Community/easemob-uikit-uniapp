@@ -9,7 +9,10 @@ export const MESSAGE_TYPE = {
   AUDIO: 'audio',
   VIDEO: 'video',
   FILE: 'file',
-  // 本地系统通知（群事件灰条）：只落本地消息列表，不发服务端
+  // 自定义消息（wire 'custom'，事件名/字符串参数在 body，业务载荷另可挂 ext）：
+  // 多场景卡片消息的唯一收发通道，#custom-message 插槽按 customEvent 判别
+  CUSTOM: 'custom',
+  // 本地系统通知（群事件/交易状态灰条）：只落本地消息列表，不发服务端
   NOTICE: 'notice',
   OTHER: 'other'
 } as const
@@ -24,6 +27,28 @@ export const MESSAGE_STATUS = {
 } as const
 
 export type MessageStatusValue = (typeof MESSAGE_STATUS)[keyof typeof MESSAGE_STATUS]
+
+/** 流式消息状态（M2.13）：与 websdk StreamMessageStatus 公开值一一对应。
+ *  wire 字面量集中在此处，chat 边界转成 EmStreamInfo 后业务代码只认常量。
+ *  终态 = COMPLETED / START_COMPLETED（单分片完成）/ ERROR；传输中 = START / IN_PROGRESS */
+export const STREAM_MESSAGE_STATUS = {
+  START: 'STREAM_START',
+  START_COMPLETED: 'STREAM_START_COMPLETED',
+  IN_PROGRESS: 'STREAM_IN_PROGRESS',
+  COMPLETED: 'STREAM_COMPLETED',
+  ERROR: 'STREAM_ERROR'
+} as const
+
+export type StreamMessageStatusValue = (typeof STREAM_MESSAGE_STATUS)[keyof typeof STREAM_MESSAGE_STATUS]
+
+/** 流式消息业务自定义类型（stream.customType）：内核只内置纯文本渲染，
+ *  markdown 等富格式由宿主经 em-chat-page 的 #stream-message 插槽接管 */
+export const STREAM_CUSTOM_TYPE = {
+  TEXT: 'text',
+  MARKDOWN: 'markdown'
+} as const
+
+export type StreamCustomTypeValue = (typeof STREAM_CUSTOM_TYPE)[keyof typeof STREAM_CUSTOM_TYPE]
 
 export const CONVERSATION_TYPE = {
   SINGLE_CHAT: 'singleChat',
@@ -57,12 +82,17 @@ export const CONNECTION_STATUS = {
 
 export type ConnectionStatusValue = (typeof CONNECTION_STATUS)[keyof typeof CONNECTION_STATUS]
 
+// 主题偏好：AUTO 跟随系统（默认），LIGHT/DARK 为强制档；解析后的实际主题只有 light/dark
 export const THEME_MODE = {
+  AUTO: 'auto',
   LIGHT: 'light',
   DARK: 'dark'
 } as const
 
 export type ThemeModeValue = (typeof THEME_MODE)[keyof typeof THEME_MODE]
+
+/** 实际生效的明暗主题（AUTO 解析后形态） */
+export type ResolvedThemeModeValue = 'light' | 'dark'
 
 export const LOCALE = {
   ZH_CN: 'zh-CN',
@@ -104,6 +134,9 @@ export const CONVERSATION_TAB_KEY = {
 
 export type ConversationTabKeyValue = (typeof CONVERSATION_TAB_KEY)[keyof typeof CONVERSATION_TAB_KEY]
 
+/** PushManager 批量查询会话免打扰（getConversationSilentModes）单次上限，SDK 硬限制 20 */
+export const CONVERSATION_SILENT_MODE_BATCH_SIZE = 20
+
 /** 会话筛选 tab 默认全集与顺序（对齐 vue DEFAULT_CONVERSATION_TABS） */
 export const DEFAULT_CONVERSATION_TABS: ConversationTabKeyValue[] = [
   CONVERSATION_TAB_KEY.ALL,
@@ -134,6 +167,11 @@ export const TYPING_THROTTLE = 5 * 1000
 
 /** typing 信号：接收方「正在输入」展示超时（超时未续即清除），对齐 vue 版 5s */
 export const TYPING_TIMEOUT = 5 * 1000
+
+/** 流式消息：分片合并的最小重绘间隔（毫秒）。SDK 高频下发时按此间隔合批写 store，
+ *  把「每个分片一次响应式更新 + 一次列表滚动」压到 ≤20 次/秒；0 = 不分批（逐片即写）。
+ *  终态分片不受节流约束，立即落盘，保证最后一段内容不延迟 */
+export const STREAM_FLUSH_INTERVAL = 50
 
 /** 输入栏底部面板（emoji/媒体）最小高度 px：对齐 vue 版 panelHeightVar 兜底 280px；
  * 曾测得真实键盘高度高于此值时面板高度跟随键盘，键盘↔面板互切无跳变 */
