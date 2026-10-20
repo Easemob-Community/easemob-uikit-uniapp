@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '']" @click="onClick" @longpress="onLongpress">
+  <view :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '']" @touchstart="onTouchStart" @click="onClick" @longpress="onLongpress">
     <view :class="[ns.e('icon'), iconTypeClass]">
       <EmIcon :name="iconName" :size="20" :class="ns.e('icon-glyph')" />
     </view>
@@ -17,6 +17,7 @@ import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import type { EmMessageItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
+import { useLongPressClickGuard } from '../../libs/use/useLongPressClickGuard'
 import { useLocale } from '../../libs/use/useLocale'
 
 interface Props {
@@ -34,6 +35,8 @@ const emit = defineEmits<{
 
 const ns = useNamespace('file-message')
 const { t } = useLocale()
+// H5 长按后仍会补发 click：吞掉长按抬手那一次 click，避免菜单与下载提示同时触发
+const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
 const fileName = computed(() => props.message.fileName !== '' ? props.message.fileName : t('message.file'))
 
@@ -71,20 +74,27 @@ const fileType = computed<FileTypeKey>(() => {
   return 'file'
 })
 
-// 底色走 class 修饰符（避开内联 var() 在蒸汽端的风险）；字形用 em-icons 现有映射里语义最近的
+// 底色走 class 修饰符（避开内联 var() 在蒸汽端的风险）；
+// 字形逐项对齐 vue file-message 的 FILE_TYPE_RULES（doc 类目用根级 doc.svg，其余用 file/*，兜底 file/empty）
 const iconTypeClass = computed(() => `em-file-message__icon--${fileType.value}`)
 
 const iconName = computed<EmIconName>(() => {
   const type = fileType.value
-  if (type === 'img') return 'image'
-  if (type === 'video') return 'videocam'
-  if (type === 'audio') return 'sound'
-  return 'paperclip'
+  if (type === 'pdf') return 'file-pdf'
+  if (type === 'xls') return 'file-xls'
+  if (type === 'doc') return 'doc'
+  if (type === 'ppt') return 'file-ppt'
+  if (type === 'md') return 'file-md'
+  if (type === 'img') return 'file-img'
+  if (type === 'video') return 'file-video'
+  if (type === 'audio') return 'file-audio'
+  return 'file-empty'
 })
 
 // 点击行为纯 emit 透传：默认下载/打开逻辑由宿主（em-chat-page 的 download 监听）实现；
 // 一期下载不做，宿主默认 toast 提示
 function onClick(): void {
+  if (shouldSkipClick()) return
   emit('download', props.message)
 }
 

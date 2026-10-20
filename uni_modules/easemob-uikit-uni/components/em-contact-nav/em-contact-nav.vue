@@ -15,7 +15,7 @@
       <!-- hot 红点：仅 count>0 时生效（对齐 vue 语义，8px 圆点而非数字） -->
       <view v-if="entry.hot === true && hasCount(entry)" :class="ns.e('dot')"><em-badge dot /></view>
       <view :class="ns.e('spacer')"></view>
-      <EmIcon name="right" :size="22" />
+      <EmIcon name="chevron-right" :size="22" />
     </view>
   </view>
 </template>

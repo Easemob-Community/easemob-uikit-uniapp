@@ -3,7 +3,7 @@
     <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧「+」建群 -->
     <em-nav-bar
       :title="t('group.title')"
-      action-icon="plusempty"
+      action-icon="circle-plus"
       @back="emit('back')"
       @action="onOpenCreate"
     />
@@ -23,7 +23,7 @@
       </view>
       <em-empty
         v-else-if="items.length === 0"
-        icon="chatboxes"
+        icon="person-double"
         :description="keyword.trim() !== '' ? t('group.noSearchResult') : t('group.empty')"
       />
 

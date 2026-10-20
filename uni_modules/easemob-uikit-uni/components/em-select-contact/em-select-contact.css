@@ -126,14 +126,11 @@
   color: var(--em-text-tertiary);
 }
 
-/* multiple：自绘 checkbox（20px 圆形描边，选中主色底 + 白勾，对齐 vue EmCheckbox 圆形档） */
+/* multiple：checkbox 图形由 em-icon 承担（选中 filled/circle/checked，未选 circle/empty，对齐 vue EmCheckbox），
+   容器只做 20×20 占位与行内间距，不再画描边/底色，避免与字体图标叠加成双圈 */
 .em-select-contact__checkbox {
   width: 20px;
   height: 20px;
-  border-radius: 10px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--em-border-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,17 +138,14 @@
   flex-shrink: 0;
 }
 
-.em-select-contact__checkbox--checked {
-  background-color: var(--em-primary-color);
-  border-color: var(--em-primary-color);
+/* 未选：弱化灰（vue --uikit-text-tertiary）；选中：主色（vue --uikit-primary-color）。
+   双类选择器压过 em-icon.css 的 `.em-icon { color: var(--em-icon-muted) }`（同单类时依赖样式注入顺序） */
+.em-select-contact__checkbox .em-select-contact__checkbox-icon {
+  color: var(--em-text-tertiary);
 }
 
-.em-select-contact__checkbox--disabled {
-  opacity: 0.4;
-}
-
-.em-select-contact__check-icon {
-  color: var(--em-text-inverse);
+.em-select-contact__checkbox .em-select-contact__checkbox-icon--checked {
+  color: var(--em-primary-color);
 }
 
 .em-select-contact__row--disabled {

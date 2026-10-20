@@ -1,10 +1,10 @@
 <template>
   <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
-    <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧 personadd 添加好友 -->
+    <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧 person/plus 添加好友（对齐 vue address-book header-extra） -->
     <em-nav-bar
       :title="t('contact.title')"
       :show-back="false"
-      action-icon="personadd"
+      action-icon="person-plus"
       @action="emit('add')"
     />
 

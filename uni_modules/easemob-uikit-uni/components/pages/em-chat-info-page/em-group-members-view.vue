@@ -10,7 +10,7 @@
     <scroll-view :class="ns.e('scroll')" scroll-y @scrolltolower="onScrollToLower">
       <em-empty
         v-if="!initialLoading && displayMembers.length === 0"
-        :icon="keyword.trim() !== '' ? 'search' : 'person'"
+        :icon="keyword.trim() !== '' ? 'search' : 'person-double'"
         :description="keyword.trim() !== '' ? t('group.memberNoResult') : t('group.memberEmpty')"
       />
 
@@ -23,7 +23,7 @@
           <text v-else-if="m.role === GROUP_MEMBER_ROLE.ADMIN" :class="[ns.e('role'), ns.m('role-admin')]">{{ t('group.role.admin') }}</text>
         </view>
         <view v-if="hasActions(m)" :class="ns.e('more')" @click="onOpenActions(m)">
-          <EmIcon name="more" :size="20" :class="ns.e('more-icon')" />
+          <EmIcon name="vertical" :size="16" :class="ns.e('more-icon')" />
         </view>
       </view>
 
@@ -185,19 +185,19 @@ const activeMemberName = computed(() => (activeMember.value != null ? memberName
 function actionsOf(m: EmGroupMember): EmActionSheetAction[] {
   if (m.userId === connectionStore.userId) return []
   const actions: EmActionSheetAction[] = [
-    { key: GROUP_MEMBER_ACTION.CHAT, text: t('group.memberAction.chat'), icon: 'chatbubble' }
+    { key: GROUP_MEMBER_ACTION.CHAT, text: t('group.memberAction.chat'), icon: 'bubble-circle' }
   ]
   if (isOwner.value) {
     if (m.role === GROUP_MEMBER_ROLE.ADMIN) {
-      actions.push({ key: GROUP_MEMBER_ACTION.REMOVE_ADMIN, text: t('group.memberAction.removeAdmin'), icon: 'person' })
+      actions.push({ key: GROUP_MEMBER_ACTION.REMOVE_ADMIN, text: t('group.memberAction.removeAdmin'), icon: 'shield-person' })
     } else {
-      actions.push({ key: GROUP_MEMBER_ACTION.SET_ADMIN, text: t('group.memberAction.setAdmin'), icon: 'personadd' })
+      actions.push({ key: GROUP_MEMBER_ACTION.SET_ADMIN, text: t('group.memberAction.setAdmin'), icon: 'shield-person' })
     }
-    actions.push({ key: GROUP_MEMBER_ACTION.TRANSFER_OWNER, text: t('group.memberAction.transferOwner'), icon: 'redo' })
+    actions.push({ key: GROUP_MEMBER_ACTION.TRANSFER_OWNER, text: t('group.memberAction.transferOwner'), icon: 'person-arrows' })
     // 转让/移除不标 danger（vue 设计稿警示色从严，红色区仅退群/解散）
-    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'trash' })
+    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'person-minus' })
   } else if (isAdmin.value && m.role === GROUP_MEMBER_ROLE.MEMBER) {
-    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'trash' })
+    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'person-minus' })
   }
   return actions
 }

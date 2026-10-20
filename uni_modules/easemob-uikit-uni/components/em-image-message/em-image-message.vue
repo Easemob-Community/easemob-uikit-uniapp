@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), 'em-bubble']" @click="onPreview" @longpress="onLongpress">
+  <view :class="[ns.b(), 'em-bubble']" @touchstart="onTouchStart" @click="onPreview" @longpress="onLongpress">
     <image
       :class="ns.e('image')"
       :src="message.thumbUrl !== '' ? message.thumbUrl : message.url"
@@ -13,6 +13,7 @@
 import { computed } from 'vue'
 import type { EmMessageItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
+import { useLongPressClickGuard } from '../../libs/use/useLongPressClickGuard'
 
 interface Props {
   message: EmMessageItem
@@ -28,6 +29,8 @@ const emit = defineEmits<{
 }>()
 
 const ns = useNamespace('image-message')
+// H5 长按后仍会补发 click：吞掉长按抬手那一次 click，避免菜单与图片预览同时触发
+const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
 // 气泡图尺寸：按宽高比约束在 120~200px 区间
 const imageStyle = computed(() => {
@@ -42,6 +45,7 @@ const imageStyle = computed(() => {
 })
 
 function onPreview(): void {
+  if (shouldSkipClick()) return
   emit('preview', props.message)
 }
 

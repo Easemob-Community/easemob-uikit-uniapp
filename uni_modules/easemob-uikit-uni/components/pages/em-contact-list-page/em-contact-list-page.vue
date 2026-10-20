@@ -24,7 +24,7 @@
         </view>
         <em-empty
           v-else-if="groups.length === 0"
-          icon="person"
+          icon="person-single"
           :description="keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty')"
         />
 
@@ -37,6 +37,7 @@
             v-for="c in group.items"
             :key="c.userId"
             :class="ns.e('item')"
+            @touchstart="onTouchStart"
             @click="onSelect(c)"
             @longpress="onLongPress(c)"
           >
@@ -89,6 +90,7 @@ import type { EmActionSheetAction, EmContactItem } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
+import { useLongPressClickGuard } from '../../../libs/use/useLongPressClickGuard'
 import { groupContacts, matchContact } from '../../../libs/utils/pinyin'
 import { TEXT_STYLE_NAME } from '../../../libs/style/textStyles'
 
@@ -115,6 +117,8 @@ const emit = defineEmits<{
 const ns = useNamespace('contact-list-page')
 const { themeClass } = useTheme()
 const { t } = useLocale()
+// H5 长按后仍会补发 click：长按删除菜单与点击进会话会同时触发，这里吞掉长按抬手那一次 click
+const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
 const syncing = computed(() => contactStore.syncing)
 const keyword = ref('')
@@ -191,6 +195,7 @@ watch(groupKeys, (keys) => {
 })
 
 function onSelect(c: EmContactItem): void {
+  if (shouldSkipClick()) return
   emit('select', c.userId)
 }
 

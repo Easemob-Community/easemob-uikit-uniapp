@@ -33,7 +33,7 @@
       <!-- 查看全部：成员超首屏时显示（对齐 vue view-all），点击进成员管理视图 -->
       <view v-if="hasMoreMembers" :class="ns.e('view-all')" @click="emit('open-members', props.groupId)">
         <text :class="ns.e('view-all-text')">{{ t('chat.info.checkAll') }}</text>
-        <EmIcon name="arrow-down" :size="16" :class="ns.e('view-all-icon')" />
+        <EmIcon name="chevron-down" :size="16" :class="ns.e('view-all-icon')" />
       </view>
     </view>
 
@@ -42,7 +42,7 @@
       <text :class="ns.e('field-label')">{{ t('group.name') }}</text>
       <view :class="ns.e('field-main')">
         <em-text :text="groupName" :text-class="ns.e('field-value')" :text-style="fieldValueTextStyle" :class="ns.e('field-value-host')" />
-        <EmIcon v-if="isOwner" name="compose" :size="18" :class="ns.e('field-action-icon')" />
+        <EmIcon v-if="isOwner" name="rect-notched-pen" :size="22" :class="ns.e('field-action-icon')" />
       </view>
     </view>
 
@@ -51,7 +51,7 @@
       <text :class="ns.e('field-label')">{{ t('group.announcement') }}</text>
       <view :class="ns.e('field-main')">
         <em-text :text="announcement !== '' ? announcement : t('group.announcementEmpty')" :text-class="ns.e('field-value')" :text-style="announcementTextStyle" :class="ns.e('field-value-host')" />
-        <EmIcon name="arrow-right" :size="16" :class="ns.e('field-action-icon')" />
+        <EmIcon name="rect-notched-pen" :size="22" :class="ns.e('field-action-icon')" />
       </view>
     </view>
   </view>

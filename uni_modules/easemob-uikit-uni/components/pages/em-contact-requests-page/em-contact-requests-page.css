@@ -22,6 +22,24 @@
   background-color: var(--em-bg-base);
 }
 
+/* 对方拒绝通知的头像位：dspntd 自带白色圆底（vue 固定白底，不随主题变色），48×48 与头像同尺寸 */
+.em-contact-requests-page__decline-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.em-contact-requests-page__decline-avatar .em-contact-requests-page__decline-avatar-icon {
+  /* 白底固定不随主题：图标必须用固定深灰，否则暗色 text-primary 会在白圆上消失 */
+  color: #5E686E;
+}
+
 .em-contact-requests-page__item-body {
   display: flex;
   flex-direction: row;

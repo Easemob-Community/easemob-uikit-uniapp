@@ -41,21 +41,7 @@
   justify-content: center;
 }
 
-/* 播放三角：纯 border 绘制（em-icons 无 play 字形，ucss 兼容的 view 画法） */
-.em-video-message__play-triangle {
-  width: 0;
-  height: 0;
-  border-top-width: 7px;
-  border-top-style: solid;
-  border-top-color: transparent;
-  border-bottom-width: 7px;
-  border-bottom-style: solid;
-  border-bottom-color: transparent;
-  border-left-width: 12px;
-  border-left-style: solid;
-  border-left-color: #ffffff;
-  margin-left: 3px;
-}
+/* 播放三角由 em-icon triangle 渲染（对齐 vue video-message），容器只负责半透明圆底 */
 
 .em-video-message__duration {
   position: absolute;

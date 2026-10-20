@@ -28,4 +28,7 @@
   lines: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* H5/小程序不认 uvue 的 lines 属性（同 line1 的 nowrap 坑），用 2×18px 行高封顶兜底；
+     App 端仍走 lines: 2，max-height 不影响其自身折叠。 */
+  max-height: 36px;
 }

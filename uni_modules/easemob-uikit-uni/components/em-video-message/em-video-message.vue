@@ -1,17 +1,16 @@
 <template>
-  <view :class="[ns.b(), 'em-bubble']" :style="sizeStyle" @click="onPlay" @longpress="onLongpress">
+  <view :class="[ns.b(), 'em-bubble']" :style="sizeStyle" @touchstart="onTouchStart" @click="onPlay" @longpress="onLongpress">
     <image
       v-if="message.thumbUrl !== ''"
       :class="ns.e('thumb')"
       :src="message.thumbUrl"
       mode="aspectFill"
     />
-    <view v-else :class="ns.e('placeholder')">
-      <EmIcon name="videocam" :size="28" />
-    </view>
+    <view v-else :class="ns.e('placeholder')"></view>
     <view :class="ns.e('overlay')">
       <view :class="ns.e('play')">
-        <view :class="ns.e('play-triangle')"></view>
+        <!-- 播放三角逐项对齐 vue video-message：Icon triangle 20 / 白色（不再用 border 手绘 / videocam 占位） -->
+        <EmIcon name="triangle" :size="20" color="#ffffff" />
       </view>
     </view>
     <view v-if="message.duration > 0" :class="ns.e('duration')">
@@ -25,6 +24,7 @@ import { computed } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import type { EmMessageItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
+import { useLongPressClickGuard } from '../../libs/use/useLongPressClickGuard'
 import { formatVideoDuration } from '../../libs/utils/time'
 
 interface Props {
@@ -41,6 +41,8 @@ const emit = defineEmits<{
 }>()
 
 const ns = useNamespace('video-message')
+// H5 长按后仍会补发 click：吞掉长按抬手那一次 click，避免菜单与视频预览同时触发
+const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
 // 展示尺寸按宽高比约束在 240 内；无元数据回落 16:9 占位（对齐 vue 版，避免加载后撑高列表）
 const MAX_WIDTH = 240
@@ -62,6 +64,7 @@ const durationText = computed(() => formatVideoDuration(props.message.duration))
 
 // 点击行为纯 emit 透传（与 em-image-message 对齐）：默认播放/预览逻辑由宿主（em-chat-page 的 preview 监听）实现
 function onPlay(): void {
+  if (shouldSkipClick()) return
   emit('preview', props.message)
 }
 

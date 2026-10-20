@@ -5,7 +5,7 @@
       <view :class="ns.e('header')">
         <text :class="ns.e('title')">{{ displayTitle }}</text>
         <view :class="ns.e('close')" @click="onClose">
-          <EmIcon name="closeempty" :size="20" :class="ns.e('close-icon')" />
+          <EmIcon name="xmark-bold" :size="20" :class="ns.e('close-icon')" />
         </view>
       </view>
       <em-search-bar v-model="searchText" :placeholder="t('mention.searchPlaceholder')" />
@@ -29,7 +29,7 @@
             />
           </view>
         </view>
-        <em-empty v-if="filtered.length === 0" icon="search" :description="t('mention.noResult')" size="small" />
+        <em-empty v-if="filtered.length === 0" icon="at" :description="t('mention.noResult')" size="small" />
       </scroll-view>
     </view>
   </em-popup>

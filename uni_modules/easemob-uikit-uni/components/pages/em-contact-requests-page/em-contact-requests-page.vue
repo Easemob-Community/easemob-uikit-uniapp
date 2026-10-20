@@ -4,10 +4,14 @@
     <em-nav-bar :title="t('contact.newRequests')" @back="emit('back')" />
 
     <scroll-view :class="ns.e('scroll')" scroll-y>
-      <em-empty v-if="invites.length === 0" icon="personadd" :description="t('contact.requests.empty')" />
+      <em-empty v-if="invites.length === 0" icon="person-single" :description="t('contact.requests.empty')" />
 
       <view v-for="invite in invites" :key="invite.id" :class="ns.e('item')">
-        <em-avatar :src="avatarSrcOf(invite)" :name="avatarNameOf(invite)" :size="48" />
+        <!-- 对方拒绝通知：白底圆形「人 + 双 X」dspntd 48px（对齐 vue contact-notice-list__decline-avatar） -->
+        <view v-if="isDeclinedByPeer(invite)" :class="ns.e('decline-avatar')">
+          <EmIcon name="dspntd" :size="48" :class="ns.e('decline-avatar-icon')" />
+        </view>
+        <em-avatar v-else :src="avatarSrcOf(invite)" :name="avatarNameOf(invite)" :size="48" />
         <view :class="ns.e('item-body')">
           <view :class="ns.e('item-main')">
             <em-text :text="titleOf(invite)" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
@@ -45,6 +49,7 @@ import { computed, ref } from 'vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmButton from '../../em-button/em-button.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
+import EmIcon from '../../em-icon/em-icon.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import { EmKit } from '../../../libs'
 import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS } from '../../../libs/constants'
@@ -62,6 +67,12 @@ import { TEXT_STYLE_NAME, TEXT_STYLE_SUBTITLE } from '../../../libs/style/textSt
 // 条目 = 48px 头像 + 名称 + 附言副标题；pending 态接受/拒绝双按钮，已处理态弱化状态文字；
 // group kind 条目主标题为群名（群名快照 > groupStore > groupId 回落链），接受/拒绝走群邀请 API
 defineOptions({ styleIsolation: 'app-and-page' })
+
+// 返回动作以 back 事件透出（宿主页面接线 navigateBack）；必须显式声明，否则模板里的
+// emit 在运行时是 undefined（Vue 只暴露 $emit），点返回会 TypeError 且不返回。
+const emit = defineEmits<{
+  (e: 'back'): void
+}>()
 
 // 名称/附言文字内联样式收口 libs/style/textStyles.ts（小程序样式隔离，须走 text-style；详见 em-text 注释）
 const nameTextStyle = TEXT_STYLE_NAME
@@ -124,6 +135,11 @@ function statusTextOf(invite: EmContactInvite): string {
 
 function isActionable(invite: EmContactInvite): boolean {
   return !invite.outgoing && invite.status === CONTACT_INVITE_STATUS.PENDING
+}
+
+// 对方拒绝通知（我方发出、已被对方拒绝）：头像位换 dspntd（对齐 vue isDeclinedByPeer）
+function isDeclinedByPeer(invite: EmContactInvite): boolean {
+  return invite.outgoing && invite.status === CONTACT_INVITE_STATUS.DECLINED
 }
 
 // 处理中幂等防重（对齐 vue 版 processingIds）

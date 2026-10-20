@@ -4,7 +4,7 @@
     <em-nav-bar
       :title="t('conversation.title')"
       :show-back="false"
-      action-icon="plusempty"
+      action-icon="circle-plus"
       @action="onOpenCreate"
     />
 
@@ -26,7 +26,7 @@
       </view>
       <view v-else-if="items.length === 0">
         <slot name="empty">
-          <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list'" :description="emptyTipText" />
+          <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText" />
         </slot>
       </view>
 
@@ -165,6 +165,16 @@ interface Entry {
 // 群头像取群 avatar，缺失走 em-avatar 文字占位（图标纪律禁 svg/png 默认群头像）。
 // 草稿优先：时间取草稿时间与最后消息时间的较大者（对齐 Web 版 displayTime 规则）
 // 搜索：本地过滤名称 / 会话 ID / 摘要（一期不做服务端漫游消息搜索）
+// 排序（对齐 vue 版 sortedConversationList）：置顶优先，置顶区间按置顶时间倒序；
+// 非置顶按最后消息时间倒序。不能直接用 SDK 快照顺序——它会被 lastAccess/资料刷新等
+// 非消息因素带动重排，导致「点进会话再回来置顶顺序变了」。sort 稳定，同时间保持原相对顺序。
+function compareEntry(a: Entry, b: Entry): number {
+  if (a.item.isPinned !== b.item.isPinned) return a.item.isPinned ? -1 : 1
+  const aTime = a.item.isPinned && a.item.pinnedTime > 0 ? a.item.pinnedTime : a.item.lastMessageTime
+  const bTime = b.item.isPinned && b.item.pinnedTime > 0 ? b.item.pinnedTime : b.item.lastMessageTime
+  return bTime - aTime
+}
+
 const items = computed<Entry[]>(() => {
   const kw = keyword.value.trim().toLowerCase()
   return conversationStore.items
@@ -196,6 +206,7 @@ const items = computed<Entry[]>(() => {
         || entry.item.conversationId.toLowerCase().includes(kw)
         || entry.item.lastMessageText.toLowerCase().includes(kw)
     })
+    .sort(compareEntry)
 })
 
 function onSelect(conversationId: string): void {
@@ -231,17 +242,18 @@ const itemSheetVisible = ref(false)
 const activeItem = ref<EmConversationData | null>(null)
 
 const createActions = computed<EmActionSheetAction[]>(() => [
-  { key: CONVERSATION_MENU_KEY.NEW_CHAT, text: t('conversation.menu.newChat'), icon: 'chat' },
-  { key: CONVERSATION_MENU_KEY.CREATE_GROUP, text: t('conversation.menu.createGroup'), icon: 'chatboxes' }
+  { key: CONVERSATION_MENU_KEY.NEW_CHAT, text: t('conversation.menu.newChat'), icon: 'bubble-rect-empty' },
+  { key: CONVERSATION_MENU_KEY.CREATE_GROUP, text: t('conversation.menu.createGroup'), icon: 'person-double' }
 ])
 
 const itemActions = computed<EmActionSheetAction[]>(() => {
   const item = activeItem.value
   if (item == null) return []
   // 候选全集按 uiConfig.conversationMenuKeys 过滤排序（默认 pin/mute/delete 全量）
+  // 图标逐项对齐 vue conversation-item 右键菜单：pin/slash ↔ pin、bell ↔ bell/slash
   const candidates: EmActionSheetAction[] = [
-    { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: 'pin' },
-    { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: 'bell-slash' },
+    { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: item.isPinned ? 'pin-slash' : 'pin' },
+    { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: item.isMuted ? 'bell' : 'bell-slash' },
     { key: CONVERSATION_MENU_KEY.DELETE, text: t('conversation.delete'), icon: 'trash', danger: true }
   ]
   return config.conversationMenuKeys

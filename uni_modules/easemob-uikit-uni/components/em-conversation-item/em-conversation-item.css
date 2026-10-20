@@ -45,6 +45,21 @@
   min-width: 0;
 }
 
+/* @我图标：14px 主色，紧贴名字左侧（对齐 vue conversation-item__at-me-icon）。
+   双类选择器压过 em-icon.css 的 `.em-icon` 默认色 */
+.em-conversation-item__name-wrap .em-conversation-item__at-me-icon {
+  color: var(--em-primary-color);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+/* 草稿铅笔：14px 警示色（对齐 vue conversation-item__draft-icon） */
+.em-conversation-item__message .em-conversation-item__draft-icon {
+  color: var(--em-danger-color);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
 .em-conversation-item__name {
   font-family: var(--em-font-family);
   font-size: var(--em-font-size-15);

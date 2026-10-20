@@ -1,18 +1,21 @@
 <template>
   <view
     :class="[ns.b(), item.isPinned ? ns.m('pinned') : '']"
-    @click="emit('click', item.conversationId)"
-    @longpress="emit('long-press', item.conversationId)"
+    @touchstart="onTouchStart"
+    @click="onClick(item.conversationId)"
+    @longpress="onLongPress(item.conversationId)"
   >
     <em-avatar :src="avatar" :name="name" :size="48" />
     <view :class="ns.e('body')">
       <view :class="ns.e('top')">
         <view :class="ns.e('name-wrap')">
+          <!-- 群聊有人@我：名字前 at 14px 主色（对齐 vue conversation-item__at-me-icon） -->
+          <EmIcon v-if="hasAtMe" name="at" :size="14" :class="ns.e('at-me-icon')" />
           <!-- hasAtMe 时名字主色高亮（对齐 vue 版 conversation-item__name.is-at-me），text-class/text-style 双通道同步切档 -->
           <em-text :text="name" :text-class="ns.e('name') + (hasAtMe ? ' ' + ns.m('name-at-me') : '')" :text-style="hasAtMe ? nameAtMeTextStyle : nameTextStyle" :class="ns.e('name-host')" />
           <!-- 置顶/免打扰徽标：12px 弱化图标色（对齐 vue 版 filled/pin、filled/bell-slash）；view 包裹——mp 样式隔离下父组件 wxss 够不到子组件宿主 -->
-          <view v-if="item.isPinned" :class="ns.e('flag')"><EmIcon name="pin" :size="12" /></view>
-          <view v-if="item.isMuted" :class="ns.e('flag')"><EmIcon name="bell-slash" :size="12" /></view>
+          <view v-if="item.isPinned" :class="ns.e('flag')"><EmIcon name="pin-filled" :size="12" /></view>
+          <view v-if="item.isMuted" :class="ns.e('flag')"><EmIcon name="bell-slash-filled" :size="12" /></view>
         </view>
         <text :class="ns.e('time')">{{ timeText }}</text>
       </view>
@@ -20,7 +23,11 @@
         <view :class="ns.e('message')">
           <!-- 群聊「有人@我」主色前缀（对齐 vue 版 conversation-item__at-me-prefix：primary + medium，atMe 期间优先于草稿态） -->
           <text v-if="hasAtMe" :class="ns.e('at-me')">{{ t('conversation.atMeInMessage') }}</text>
-          <text v-else-if="draft != null" :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
+          <!-- 草稿态：rect/pencil 14px 警示色 + [草稿]（对齐 vue conversation-item__draft-icon） -->
+          <block v-else-if="draft != null">
+            <EmIcon name="rect-pencil" :size="14" :class="ns.e('draft-icon')" />
+            <text :class="ns.e('draft')">[{{ t('conversation.draft') }}]</text>
+          </block>
           <em-text :text="draft != null ? draft.text : item.lastMessageText" :text-class="ns.e('summary')" :text-style="summaryTextStyle" :class="ns.e('summary-host')" />
         </view>
         <!-- 免打扰未读降级为静默点，其余数字徽标（99+ 截断收口 em-badge）；view 包裹避 mp 宿主类失效 -->
@@ -40,6 +47,7 @@ import EmIcon from '../em-icon/em-icon.vue'
 import EmText from '../em-text/em-text.vue'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLocale } from '../../libs/use/useLocale'
+import { useLongPressClickGuard } from '../../libs/use/useLongPressClickGuard'
 import { TEXT_STYLE_NAME, TEXT_STYLE_SUBTITLE } from '../../libs/style/textStyles'
 import type { EmConversationItem } from '../../libs/types'
 
@@ -74,6 +82,18 @@ const summaryTextStyle = TEXT_STYLE_SUBTITLE
 
 const ns = useNamespace('conversation-item')
 const { t } = useLocale()
+
+// H5 长按后浏览器仍会补发 click：长按菜单与点击进会话会同时触发，这里吞掉长按抬手那一次 click
+const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
+
+function onClick(conversationId: string): void {
+  if (shouldSkipClick()) return
+  emit('click', conversationId)
+}
+
+function onLongPress(conversationId: string): void {
+  emit('long-press', conversationId)
+}
 </script>
 
 <style>

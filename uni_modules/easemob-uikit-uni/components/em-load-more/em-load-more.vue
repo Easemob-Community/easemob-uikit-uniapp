@@ -3,7 +3,7 @@
        消费契约：scroll-view @scrolltolower → 消费方检查 hasMore && !loading 锁 → 触发加载并切 state -->
   <view :class="ns.b()">
     <view v-if="state === LOAD_MORE_STATE.LOADING" :class="ns.e('row')">
-      <EmIcon name="spinner-cycle" :size="14" :class="ns.e('spinner')" />
+      <EmIcon name="loading-arc-normal" :size="14" :class="ns.e('spinner')" />
       <text :class="ns.e('text')">{{ t('common.loading') }}</text>
     </view>
     <view v-else-if="state === LOAD_MORE_STATE.BUTTON" :class="ns.e('row')" @click="emit('load')">

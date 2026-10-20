@@ -14,7 +14,7 @@
           <EmIcon
             v-if="hasIcon(action)"
             :name="iconNameOf(action)"
-            :size="20"
+            :size="16"
             :class="[ns.e('icon'), action.danger === true ? 'em-action-sheet__icon--danger' : '']"
           />
           <em-text :text="action.text" :text-class="actionTextClass(action)" :text-style="actionTextStyle(action)" />
@@ -81,8 +81,9 @@ function hasIcon(action: EmActionSheetAction): boolean {
   return action.icon != null && action.icon !== ''
 }
 
+// 只在 hasIcon 为真时调用；不再回落旧版 more 别名（无 icon 的 action 与 vue 一致，不渲染图标位）
 function iconNameOf(action: EmActionSheetAction): EmIconName {
-  return (action.icon ?? 'more') as EmIconName
+  return action.icon as EmIconName
 }
 
 function actionTextClass(action: EmActionSheetAction): string {

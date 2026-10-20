@@ -5,7 +5,7 @@
       <view :class="ns.e('header')">
         <text :class="ns.e('title')">{{ titleText }}</text>
         <view :class="ns.e('close')" :style="closeStyle" @click="onClose">
-          <EmIcon name="closeempty" :size="20" :class="ns.e('close-icon')" />
+          <EmIcon name="xmark-bold" :size="20" :class="ns.e('close-icon')" />
         </view>
       </view>
       <!-- single：搜索在头部下（对齐 vue new-chat-modal） -->
@@ -22,7 +22,7 @@
           >
             <em-avatar :src="entry.avatar" :name="entry.name" :size="44" />
             <view :class="ns.e('strip-remove')">
-              <EmIcon name="closeempty" :size="8" :class="ns.e('strip-remove-icon')" />
+              <EmIcon name="xmark-bold" :size="8" :class="ns.e('strip-remove-icon')" />
             </view>
           </view>
           <text v-if="selectedItems.length === 0" :class="ns.e('strip-empty')">{{ t('group.createSelectedEmpty') }}</text>
@@ -66,15 +66,20 @@
                 :class="rowClass(entry)"
                 @click="onToggle(entry)"
               >
-                <view :class="checkboxClass(entry)">
-                  <EmIcon v-if="isSelected(entry.userId)" name="checkmarkempty" :size="12" :class="ns.e('check-icon')" />
+                <!-- checkbox 逐项对齐 vue EmCheckbox：选中 filled/circle/checked（主色），未选 circle/empty（弱化灰） -->
+                <view :class="ns.e('checkbox')">
+                  <EmIcon
+                    :name="isSelected(entry.userId) ? 'circle-checked-filled' : 'circle-empty'"
+                    :size="20"
+                    :class="[ns.e('checkbox-icon'), isSelected(entry.userId) ? 'em-select-contact__checkbox-icon--checked' : '']"
+                  />
                 </view>
                 <em-avatar :src="entry.avatar" :name="entry.name" :size="40" />
                 <em-text :text="entry.name" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
               </view>
             </view>
           </block>
-          <em-empty v-if="filtered.length === 0" icon="search" :description="t('contact.noSearchResult')" />
+          <em-empty v-if="filtered.length === 0" icon="person-single" :description="t('contact.noSearchResult')" />
         </scroll-view>
 
         <em-alphabet-nav
@@ -237,14 +242,6 @@ function isDisabled(entry: EmSelectContactItem): boolean {
 
 function rowClass(entry: EmSelectContactItem): string {
   return [ns.e('row'), isDisabled(entry) ? 'em-select-contact__row--disabled' : ''].join(' ').trim()
-}
-
-function checkboxClass(entry: EmSelectContactItem): string {
-  return [
-    ns.e('checkbox'),
-    isSelected(entry.userId) ? 'em-select-contact__checkbox--checked' : '',
-    isDisabled(entry) ? 'em-select-contact__checkbox--disabled' : ''
-  ].join(' ').trim()
 }
 
 function onToggle(entry: EmSelectContactItem): void {

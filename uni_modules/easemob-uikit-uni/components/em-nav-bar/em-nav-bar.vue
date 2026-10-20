@@ -3,7 +3,7 @@
        胶囊独占，只能整体自绘；右侧 action 经 capsulePad 预留胶囊宽度落在其左侧（微信/TUIKit 通行做法） -->
   <view :class="ns.b()" :style="headerStyle">
     <view v-if="showBack" :class="ns.e('back')" @click="onBack">
-      <EmIcon name="left" :size="22" :class="ns.e('back-icon')" />
+      <EmIcon name="chevron-left" :size="22" :class="ns.e('back-icon')" />
     </view>
     <view :class="[ns.e('main'), showBack ? 'em-nav-bar__main--after-back' : '']">
       <slot name="title">
