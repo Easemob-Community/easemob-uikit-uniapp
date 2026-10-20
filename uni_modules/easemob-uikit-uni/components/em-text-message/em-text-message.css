@@ -34,3 +34,41 @@
   color: var(--em-bubble-text-self);
   opacity: 0.9;
 }
+
+/* 流式消息：打字机光标（对齐 vue 版 __stream-cursor；颜色跟随气泡文字色）。
+   H5/mp 走 @keyframes 闪烁；蒸汽端 5.26 不支持 CSS 动画，静默降级为常亮光标 */
+.em-text-message__stream-cursor {
+  color: var(--em-bubble-text-other);
+  font-size: var(--em-font-size-15);
+  line-height: 23px;
+  opacity: 0.85;
+  animation: em-text-message-cursor-blink 1s step-end infinite;
+}
+
+.em-text-message--stream-cursor-self {
+  color: var(--em-bubble-text-self);
+}
+
+@keyframes em-text-message-cursor-blink {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 流式消息：异常提示（保留已生成的部分内容，尾部追加提示）。
+   margin 落不到行内文本上，改用文案自带前导空格分隔 */
+.em-text-message__stream-error {
+  color: var(--em-text-tertiary);
+  font-size: var(--em-font-size-11);
+  line-height: 23px;
+  opacity: 0.75;
+}
+
+.em-text-message--stream-error-self {
+  color: var(--em-bubble-text-self);
+}

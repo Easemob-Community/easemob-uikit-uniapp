@@ -2,7 +2,7 @@
   <view :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '']" @longpress="onLongpress">
     <!-- 无 @提及（ext.em_at_list 为空/无）走原纯文本渲染；有则按 parseMentions 分片，
          @ 片段套高亮类可点击（对齐 vue 版 text-message 的 msgSegments，链接识别不在一期） -->
-    <text v-if="segments.length === 0" :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">{{ message.text }}</text>
+    <text v-if="segments.length === 0" :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">{{ message.text }}<text v-if="isStreaming" :class="[ns.e('stream-cursor'), message.self && ns.m('stream-cursor-self')]">▍</text><text v-else-if="isStreamError" :class="[ns.e('stream-error'), message.self && ns.m('stream-error-self')]">{{ t('message.stream.error') }}</text></text>
     <text v-else :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">
       <template v-for="(seg, idx) in segments" :key="idx">
         <text
@@ -18,10 +18,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { MESSAGE_EXT_KEY } from '../../libs/constants'
+import { MESSAGE_EXT_KEY, STREAM_MESSAGE_STATUS } from '../../libs/constants'
 import type { EmMessageItem, MentionContact } from '../../libs/types'
 import { parseMentions } from '../../libs/utils/mention'
+import { isPlainTextStream, isStreamActive } from '../../libs/utils/stream'
 import { useNamespace } from '../../libs/use/useNamespace'
+import { useLocale } from '../../libs/use/useLocale'
 
 interface Props {
   message: EmMessageItem
@@ -43,6 +45,19 @@ const emit = defineEmits<{
 }>()
 
 const ns = useNamespace('text-message')
+const { t } = useLocale()
+
+/**
+ * 流式消息展示态（M2.13）：分片合并由数据层完成，这里只负责展示。
+ * 仅内核纯文本流（customType 缺省/'text'）显示打字机光标与异常提示；
+ * markdown 等富格式由宿主经 em-chat-page 的 #stream-message 插槽接管，回调本组件时按普通文本兜底。
+ */
+const streamState = computed(() => props.message.stream)
+const isPlainStream = computed(() => isPlainTextStream(streamState.value))
+/** 传输中：气泡尾部打字机光标（蒸汽端 5.26 不支持 CSS 动画，静态光标降级） */
+const isStreaming = computed(() => isPlainStream.value && isStreamActive(streamState.value?.status))
+/** 异常结束：保留已生成内容，尾部追加「内容生成异常」提示 */
+const isStreamError = computed(() => isPlainStream.value && streamState.value?.status === STREAM_MESSAGE_STATUS.ERROR)
 
 interface TextSegment {
   type: 'text' | 'mention'

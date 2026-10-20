@@ -1,14 +1,23 @@
 <template>
   <view :class="ns.b()" :style="rootStyle">
+    <!-- 快捷回复条（M2.12）：常用语胶囊，点选事件交给父组件（填草稿/直接发送）；禁言态自动隐藏 -->
+    <em-quick-reply-bar
+      v-if="quickReplies.length > 0 && !disabled"
+      :items="quickReplies"
+      @select="onQuickReply"
+    />
+
     <!-- 引用条（对齐 vue 版 quote-bar）：无边框无底色，2px 竖杠 + 摘要单行省略 + 18×18 纯图标关闭 -->
     <view v-if="quote != null" :class="ns.e('quotebar')">
       <view :class="ns.e('quotebar-line')"></view>
-      <EmIcon v-if="hasQuoteIcon" :name="quoteIcon" :size="13" :class="ns.e('quotebar-icon')" />
+      <!-- 引用条类型图标：逐项对齐 vue quote-bar（文本类型也带 circle/quote） -->
+      <EmIcon :name="quoteIcon" :size="14" :class="ns.e('quotebar-icon')" />
       <em-text :text-class="ns.e('quotebar-text')" :text-style="quotebarTextStyle" :class="ns.e('quotebar-host')">
         <text :class="ns.e('quotebar-sender')">{{ quoteFrom }}</text><text :class="ns.e('quotebar-preview')">{{ quoteSuffix }}</text>
       </em-text>
+      <!-- 关闭键对齐 vue quote-bar：circle/xmark 18，不是弹层通用的 xmark/bold -->
       <view :class="ns.e('quotebar-close')" @click="emit('quote-close')">
-        <EmIcon name="close" :size="18" />
+        <EmIcon name="circle-xmark" :size="18" />
       </view>
     </view>
 
@@ -18,8 +27,8 @@
     </view>
 
     <view :class="ns.e('bar')">
-      <view v-if="features.voice" :class="[ns.e('tool'), ns.m('tool-first')]" @click="onToggleVoiceMode">
-        <EmIcon :name="voiceMode ? 'compose' : 'mic'" :size="20" />
+      <view v-if="showVoice" :class="[ns.e('tool'), ns.m('tool-first'), voiceMode && ns.m('tool-active')]" @click="onToggleVoiceMode">
+        <EmIcon name="mic" :size="24" />
       </view>
       <view
         v-if="voiceMode"
@@ -44,15 +53,15 @@
         @focus="onInputFocus"
         @blur="onInputBlur"
       />
-      <view v-if="features.emoji" :class="[ns.e('tool'), !features.voice && ns.m('tool-first')]" @click="onToggleEmoji">
-        <text :class="ns.e('emoji-btn')">😀</text>
+      <view v-if="features.emoji" :class="[ns.e('tool'), !showVoice && ns.m('tool-first'), panel === 'emoji' && ns.m('tool-active')]" @click="onToggleEmoji">
+        <EmIcon name="circle-face" :size="24" />
       </view>
       <view
         v-if="hasMediaFeatures"
-        :class="[ns.e('tool'), !features.voice && !features.emoji && ns.m('tool-first'), panel === 'media' && ns.m('tool-active')]"
+        :class="[ns.e('tool'), !showVoice && !features.emoji && ns.m('tool-first'), panel === 'media' && ns.m('tool-active')]"
         @click="onToggleMedia"
       >
-        <EmIcon name="plus" :size="20" />
+        <EmIcon name="circle-plus" :size="24" />
       </view>
       <view :class="ns.e('send')" @click="onSend">
         <text :class="ns.e('send-text')">{{ t('chat.send') }}</text>
@@ -85,14 +94,15 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
+import EmQuickReplyBar from '../em-quick-reply-bar/em-quick-reply-bar.vue'
 import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import { DEFAULT_EMOJI_LIST, MEDIA_PANEL_KEY, PANEL_MIN_HEIGHT } from '../../libs/constants'
 import { cancelRecord, isRecording, startRecord, stopRecord } from '../../libs/platform'
 import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
 import { useKeyboardHeight } from '../../libs/use/useKeyboardHeight'
-import type { EmInputFeatures, EmQuoteInfo } from '../../libs/types'
-import { quoteHasIcon, quoteIconNameOf, quoteSuffixOf } from '../../libs/utils/quote'
+import type { EmInputFeatures, EmQuickReply, EmQuoteInfo } from '../../libs/types'
+import { quoteIconNameOf, quoteSuffixOf } from '../../libs/utils/quote'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLocale } from '../../libs/use/useLocale'
 
@@ -107,6 +117,8 @@ interface Props {
   disabled?: boolean
   /** placeholder 覆盖（空串回落内置 chat.placeholder 文案；禁用态父组件传入「全员禁言中」等） */
   placeholder?: string
+  /** 快捷回复常用语（M2.12；空数组不渲染，禁用态隐藏）；点击仅 emit，填草稿/发送由父组件决定 */
+  quickReplies?: EmQuickReply[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -114,7 +126,8 @@ const props = withDefaults(defineProps<Props>(), {
   features: () => ({ voice: true, emoji: true, image: true, camera: true, video: true, file: true }),
   emojis: () => DEFAULT_EMOJI_LIST,
   disabled: false,
-  placeholder: ''
+  placeholder: '',
+  quickReplies: () => []
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })
@@ -130,13 +143,27 @@ const emit = defineEmits<{
   (e: 'mention-trigger'): void
   // 禁用态下的任何操作尝试（点工具/发送/按住说话），父组件据此 toast 提示
   (e: 'disabled-tap'): void
+  // 快捷回复点选：父组件按 quickReplyMode 决定填草稿还是直接发送（M2.12）
+  (e: 'quick-reply', item: EmQuickReply): void
 }>()
 
 const ns = useNamespace('chat-inputbar')
 
+// H5 端录音尚未接 MediaRecorder（platform.startRecord 在 H5 直接抛错），
+// 展示麦克风只会得到「按住→不支持→退出语音模式」的坏体验，故 H5 隐藏语音入口；
+// 其余端（App/小程序）保持 features.voice 开关语义。
+// #ifdef WEB
+const VOICE_SUPPORTED = false
+// #endif
+// #ifndef WEB
+const VOICE_SUPPORTED = true
+// #endif
+
 // 引用条文字内联兜底（小程序样式隔离，见 em-text 注释）
 const quotebarTextStyle = 'font-size: var(--em-font-size-13); color: var(--em-text-secondary);'
 const { t } = useLocale()
+
+const showVoice = computed(() => props.features.voice && VOICE_SUPPORTED)
 
 const text = computed({
   get: () => props.modelValue,
@@ -152,10 +179,13 @@ watch(() => props.modelValue, (v, old) => {
 
 // ========== 引用条显示 ==========
 
-const quoteFrom = computed(() => props.quote?.from ?? '')
+// 引用条展示昵称快照；老数据（无 fromName）回落 userId
+const quoteFrom = computed(() => {
+  const name = props.quote?.fromName ?? ''
+  return name !== '' ? name : (props.quote?.from ?? '')
+})
 // 引用条展示映射收口 libs/utils/quote.ts（与聊天页引用卡共用纯函数）
 const quoteSuffix = computed(() => quoteSuffixOf(props.quote, t))
-const hasQuoteIcon = computed(() => quoteHasIcon(props.quote?.type))
 const quoteIcon = computed<EmIconName>(() => quoteIconNameOf(props.quote?.type))
 
 // ========== 键盘/面板互斥（对齐 vue 版 h5-input：none/emoji/media 三态，开面板收键盘，聚焦收面板） ==========
@@ -179,6 +209,12 @@ function guardDisabled(): boolean {
     return true
   }
   return false
+}
+
+// 快捷回复点选：禁用态兜底拦截，其余情况原样上抛（是否发送由父组件 quickReplyMode 决定）
+function onQuickReply(item: EmQuickReply): void {
+  if (guardDisabled()) return
+  emit('quick-reply', item)
 }
 
 function onToggleEmoji(): void {
@@ -249,10 +285,10 @@ interface MediaItem {
 // 候选在 computed 内显式标注 MediaItem[]：经 .filter 后字面量失去 contextual typing，icon 会被放宽成 string
 const mediaItems = computed<MediaItem[]>(() => {
   const candidates: MediaItem[] = [
-    { key: MEDIA_PANEL_KEY.ALBUM, text: t('chat.media.album'), icon: 'image', feature: 'image' },
+    { key: MEDIA_PANEL_KEY.ALBUM, text: t('chat.media.album'), icon: 'rect-img', feature: 'image' },
     { key: MEDIA_PANEL_KEY.CAMERA, text: t('chat.media.camera'), icon: 'camera', feature: 'camera' },
-    { key: MEDIA_PANEL_KEY.VIDEO, text: t('chat.media.video'), icon: 'videocam', feature: 'video' },
-    { key: MEDIA_PANEL_KEY.FILE, text: t('chat.media.file'), icon: 'paperclip', feature: 'file' }
+    { key: MEDIA_PANEL_KEY.VIDEO, text: t('chat.media.video'), icon: 'video', feature: 'video' },
+    { key: MEDIA_PANEL_KEY.FILE, text: t('chat.media.file'), icon: 'folder', feature: 'file' }
   ]
   return candidates.filter((item) => props.features[item.feature])
 })

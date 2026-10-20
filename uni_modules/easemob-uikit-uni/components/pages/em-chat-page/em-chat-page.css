@@ -217,6 +217,14 @@
   position: relative;
 }
 
+/* 自定义消息出口壳：只承接 longpress（宿主卡片内容的事件冒泡）与宽度约束，不改变卡片自身布局 */
+.em-chat-page__custom {
+  display: flex;
+  flex-direction: row;
+  max-width: 100%;
+  min-width: 0;
+}
+
 /* 状态图标（仅己方消息）：绝对定位在气泡左外侧、与气泡底边对齐；不占布局宽度 */
 .em-chat-page__state {
   position: absolute;
@@ -230,7 +238,7 @@
   margin-right: var(--em-spacing-1);
 }
 
-/* 失败红叹号（em-icons 无 circle-bang，info-filled 实心圆点是语义最近的警示形），点击触发重发 */
+/* 失败红叹号：circle/bang 14px，点击触发重发（对齐 vue message-bubble-wrapper 状态图） */
 .em-chat-page__state-icon-failed {
   color: var(--em-danger-color);
 }
@@ -240,7 +248,7 @@
   animation: em-chat-page-spin 1s linear infinite;
 }
 
-/* 已读对勾：弱化灰；未读空心圆：主题色（对齐 vue 版 status-icon--unread 口径） */
+/* 已读 circle/checked：弱化灰；未读 circle/empty-1：主题色（对齐 vue 版 status-icon--unread 口径） */
 .em-chat-page--state-icon-read {
   color: var(--em-text-tertiary);
 }
