@@ -9,3 +9,5 @@ local.credentials.*
 .superpowers/
 # 本地 Python 虚拟环境（patch-icons 用）
 .venv-icons/
+# Python 字节码缓存（图标构建脚本运行产物）
+__pycache__/
