@@ -13,7 +13,9 @@
 | 项 | Web 版 | uni 版 |
 |---|---|---|
 | 挂载点 | `:root` + `[data-uikit-theme="dark"]` 属性选择器 | `.em-theme-light` / `.em-theme-dark` class，页面级组件根节点绑定（App 端挂根节点的 RiceUI trick） |
-| 切换执行 | `store/theme.ts` 写 documentElement attribute | `useTheme().setTheme('light'\|'dark')` 改 reactive store，`themeClass` computed 供模板绑定 |
+| 切换执行 | `store/theme.ts` 写 documentElement attribute | `useTheme().setTheme('auto'\|'light'\|'dark')` 改 reactive store（默认 auto），`themeClass` computed 供模板绑定；`initTheme()` 读偏好/系统主题并订阅系统变化 |
+| 系统跟随 | `usePreferredColorScheme`（media query） | `auto` 时 App 读 `deviceInfo.osTheme` + `onOsThemeChange`、Web 用 `matchMedia`、小程序读 `hostTheme` + `onHostThemeChange`；偏好持久化 `emkit.themeMode` |
+| 原生 chrome | — | `syncNativeThemeUI()` 动态 setNavigationBarColor / setTabBarStyle；demo 配 `theme.json` + manifest `darkmode` 保证首帧 |
 | 密度档 | `[data-uikit-density]` 三档 | 一期不做，直接取 normal 档数值 |
 | 动画档 | `[data-uikit-anim-level]` 三档 + ripple | 一期不做 |
 

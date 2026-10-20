@@ -4,6 +4,7 @@
 > 前提：**H5 移动端交互形态**，暂不考虑 PC Web 形态。
 > 性质：评估结论 + 缺口清单 + 落地路线建议，**作为后续立项依据**；实施时须先改 `PLAN.md` 再动代码（AGENTS.md 硬约束 1）。
 > 关联：客服单场景初评见会话计划稿；本文为其扩展与定稿。
+> **落地状态（2026-10-20）**：P0-1 ~ P0-4 已按 `PLAN.md` M2.11 落地（发送侧 ext/sendCustom、`#banner`、`title`/`showAction`、本地系统提示消息）；P1-1 ~ P1-3 已按 `PLAN.md` M2.12 落地（单会话未读 API、快捷回复条、自定义长按菜单动作）。M2.9 群基础亦已完成，路线 B 的群能力不再阻塞（伪装 UI 开关仍待批次）。详见 §7。
 
 ## 1. 共同底座：四场景共享的接入模型
 
@@ -46,7 +47,7 @@
 | 直进客服会话 | ✅ |
 | 进线携带业务上下文（商品/订单/来源页） | ❌ 发送侧无 ext 通道（P0-1） |
 | 欢迎语/自助菜单卡片 | ⚠️ 服务端下发 + `#custom-message` 渲染可行；本地自动发不行 |
-| 入口未读角标 | ⚠️ 需宿主手搓（`EmKit.conversations.items` 里找）（P1） |
+| 入口未读角标 | ✅ `useUnreadCounts()` 响应式 + `useTabBarBadge()` 原生角标（P1 部分落地） |
 | 标题改「在线客服」 | ⚠️ 只能 `mergeUserInfo` hack；nav-bar 本体 `#title` 插槽未透出（P0-3） |
 | 人工/机器人切换、排队 | 后端职责，UIKit 无关 |
 
@@ -99,7 +100,7 @@ props（`conversationId`/`avatarShape`）、插槽（`#custom-message`/`#empty`�
 | P0-2 | P0 | 消息列表上方 `#banner` 具名插槽（固定位，不随滚动） | 3/4（医疗病情条、招聘职位条、交易商品条） | 小 |
 | P0-3 | P0 | chat-page `title` / `showAction` props（nav-bar 插槽透出） | 4/4 | 极小 |
 | P0-4 | P0* | 系统提示消息（本地插入 API + 居中灰条渲染型） | 交易/医疗/伪装群成员进出与转接 | 中 |
-| P1-1 | P1 | 未读数 API + 未读变更订阅（`unreadCountOf(conversationId)`） | 客服/交易入口角标 | 小 |
+| P1-1 | P1 | 未读数 API + 未读变更订阅（总未读/请求未读已落地 `useUnreadCounts`；per-conversation `unreadCountOf` 待补） | 客服/交易入口角标 | 小 |
 | P1-2 | P1 | 快捷回复条（inputbar 上方扩展位） | 招聘/客服 | 中 |
 | P1-3 | P1 | 自定义长按菜单动作注入（现为纯裁剪） | 交易「查看订单」、医疗「查看处方」 | 中 |
 | P2-1 | P2 | H5 录音 | 医疗/客服 | 物理边界，二期或宿主自集成 |
@@ -123,7 +124,7 @@ props（`conversationId`/`avatarShape`）、插槽（`#custom-message`/`#empty`�
 
 用户 + 多服务方成员同群，UI 隐去群特征，历史靠群漫游继承。
 
-- **现状：完全阻塞**。`syncConversations` 过滤非单聊（`libs/chat/conversation.ts` 仅放行 `SINGLE_CHAT`）；`sendText`/`loadHistory`/`enterConversation` 全链路无 `chatType` 参数；`enableSyncData` 未开 `'group'`。全部压在 M2.9（群基础，已立项未落地）。
+- **现状（评估时）：完全阻塞；2026-10-16 M2.9 群基础已落地**——`syncConversations` 不再过滤群聊、`sendText`/`loadHistory`/`enterConversation` 全链路显式 `chatType`、`enableSyncData` 已含 `'group'`。路线 B 的「群能力」已解除阻塞；剩余缺口是下表所列伪装 UI 开关（见 §7）。
 - **M2.9 完成 ≠ 伪装场景可用**。M2.9 落地的是正常群形态（群名+人数/成员昵称行/群公告条/@提及），伪装场景要把这些**关掉**，M2.9 之上还需：
 
 | 伪装需求 | 说明 |
@@ -145,7 +146,7 @@ props（`conversationId`/`avatarShape`）、插槽（`#custom-message`/`#empty`�
 | 招聘 | **A 足够** | 换 HR 低频，转接卡片即可 |
 | 二手交易 | **A 为主 + 仲裁 B** | 买卖双方纯单聊；平台仲裁介入建三人群（低频，可二期） |
 
-**时间线结论**：路线 B 的任何场景在 M2.9 落地前不可用。排期上以路线 A 先覆盖客服/招聘/交易，医疗团队与仲裁群随 M2.9 解锁。
+**时间线结论**：路线 B 的群能力已随 M2.9 解锁（2026-10-16），客服/招聘/交易仍以路线 A 起步即可；医疗团队与仲裁群的「伪装形态」还需 §6-3 的开关批次，未完成前可按正常群形态上线。
 
 ## 6. 落地路线建议
 
@@ -153,8 +154,28 @@ props（`conversationId`/`avatarShape`）、插槽（`#custom-message`/`#empty`�
 2. **P1 批次（「好用」）**：P1-1 未读 API、P1-2 快捷回复、P1-3 自定义菜单动作。
 3. **M2.9 增补「伪装模式」**：群形态 UI 全套隐藏开关（人数/公告/昵称行档位/成员事件渲染策略）+ 伪装形态下 `open-info` 由宿主接管。**必须在 M2.9 设计群形态 UI 时预留开关位，事后补易长成硬编码分支**。实施时将本条款同步进 `PLAN.md` M2.9 节。
 4. **边界项**（P2-1 H5 录音、P2-2 位置消息）如实写入接入文档，由场景方自行决策。
-5. 配套文档：落地时新增 `docs/GUIDE-CUSTOMER-SERVICE-INTEGRATION.md`（或泛化为多场景接入指引），含 init→login→navigateTo 全代码示例、easycom 规则、`whenReady` 加载态、未读角标取法、`mergeUserInfo` 注入对端资料。
+5. 配套文档：落地时新增 `docs/GUIDE-CUSTOMER-SERVICE-INTEGRATION.md`（或泛化为多场景接入指引），含 init→login→navigateTo 全代码示例、easycom 规则、`whenReady` 加载态、未读角标取法、`mergeUserInfo` 注入对端资料。**已于 2026-10-20 落地为 `docs/GUIDE-MULTI-SCENARIO.md`（泛化版，含 P0 四项能力示例）。**
+
+## 7. 落地状态（2026-10-20 更新）
+
+> §4.2 的缺口清单是 2026-10-15 评估时点快照；**当前状态以本节为准**。
+
+| 编号 | 状态 | 落地内容 |
+|---|---|---|
+| P0-1 发送侧 ext / sendCustom | ✅ | `EmKit.sendText(to, chatType, text, quote?, mentions?, ext?)` 业务 ext 与 `emQuote`/`em_at_list` 合并（内部 key 优先）；`EmKit.sendCustom(to, chatType, event, params?, ext?)`；`MESSAGE_TYPE.CUSTOM` 一等类型 + `EmMessageItem.customEvent/customParams`；失败重发支持 custom；`#custom-message` 默认占位改「[自定义消息]」 |
+| P0-2 `#banner` | ✅ | `em-chat-page` nav-bar 与群公告条之间固定位插槽（不随消息滚动） |
+| P0-3 `title` / `showAction` | ✅ | `title` 覆盖导航标题（空串回落昵称链）；`showAction=false` 隐藏右上角详情入口，宿主接管业务信息页 |
+| P0-4 系统提示消息 | ✅ | `EmKit.insertLocalNotice(conversationId, chatType, text)` 通用入口；`insertGroupNotice(groupId, text)` 保留为群聊别名；复用 `MESSAGE_TYPE.NOTICE` 居中灰条 + 长按菜单禁用 |
+| P1-1 未读 API | ✅ | 总未读：`useUnreadCounts()` / `getUnreadCounts()` / `useTabBarBadge()`；单会话未读：`useConversationUnreadCount(id)`（响应式）/ `conversationUnreadCountOf(id)`（快照）/ `EmKit.conversationUnreadCountOf(id)` |
+| P1-2 快捷回复条 | ✅ | 新原子 `em-quick-reply-bar`（label/text 胶囊，横向滚动）；`em-chat-page` 增 `quickReplies` + `quickReplyMode('fill'\|'send')`，输入栏上方渲染，禁用态/空列表自动隐藏 |
+| P1-3 自定义菜单动作 | ✅ | `em-chat-page` 增 `extraMessageMenus`（`EmMessageMenuExtra`，支持 `types` 过滤）+ `message-menu(key, message)` emit；追加在内置项之后、删除项之前（删除保持末位），内置 key 保留、NOTICE 不显示 |
+| P2-1 H5 录音 / P2-2 位置消息 | — | 按边界项处理（H5 录音入口已隐藏，位置消息一期砍） |
+| M2.9 群基础 | ✅ | 2026-10-16 完成（chatType 贯通/群会话/群形态/@提及/群管理/群系统通知） |
+| M2.11 / M2.12 | ✅ | 2026-10-20 P0 四项 + P1 三项落地（见上表） |
+| 伪装模式（§6-3） | ◐ 预留 | M2.9 已预留群形态独立开关（`showMemberCount`/`senderNameMode`/`showAnnouncement`/`enableMention` + chat-info 三开关），P0-3 `showAction` 可接管 `open-info`；仍缺 `senderNameMode='on-change'` 档、群指示「一键隐藏」组合配置、成员事件渲染策略档位，待伪装批次立项 |
+
+**接入指引**：`docs/GUIDE-MULTI-SCENARIO.md`（四场景 init→login→navigateTo、P0/P1 能力代码示例、平台边界）。
 
 ---
 
-*本文档为评估存档，不产生代码变更；落地时按 §6 逐批立项并先改 `PLAN.md`。*
+*本文档为评估存档；§1–§6 保留评估时点结论，§7 记录落地状态。后续批次（P1/伪装模式）立项时先改 `PLAN.md`。*

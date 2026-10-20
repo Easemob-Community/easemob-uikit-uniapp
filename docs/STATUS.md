@@ -78,6 +78,9 @@
 
 | 项 | 端 | 备注 |
 |---|---|---|
+| 多场景 P0 端到端（sendCustom 收发/失败重发、sendText 业务 ext 对端回读、`#banner`/`title`/`showAction`、`insertLocalNotice` 灰条） | H5/mp | 需真实账号双端互发 |
+| 多场景 P1 端到端（`quickReplies` fill/send 与禁言隐藏、`extraMessageMenus` 顺序/`types` 过滤/`message-menu` 回传、单会话未读入口角标与进会话清零） | H5/mp | 需真实账号；键盘弹起时快捷条占位观感一并看 |
+| AI 流式消息端到端（真实 `onStreamMessage`：分片合并/丢片补偿/终态收敛/异常、`enableStreamMessage=false` 完整消息延迟上屏、断连重连） | H5/mp/App | 需业务服务端下发流式消息；H5 demo mock 已验渲染态 |
 | 手动避让时序与高度精度（iOS/鸿蒙扣安全区后贴合度；鸿蒙原「adjustPan 不回弹」是否随手动方案消失） | App 三真机 | 用户已验 Android「顶飞消解」 |
 | 会话页/联系人页搜索聚焦顶飞 nav-bar（同根因，fix 待从 chat-page 铺到 conversation/contact 页） | App | 已立案 |
 | mp-weixin `onKeyboardHeightChange` 回调与面板跟随观感 | 小程序 | |
@@ -219,3 +222,161 @@
 - **em-popup 竞态（真 bug）**：关窗 260ms 后摘 DOM 的 `setTimeout` 未取消——260ms 内快速重开，stale 定时器会把已打开的弹层摘掉。已加 `hideTimer`（clearTimeout + `!props.visible` 双保险）。
 - **em-select-contact**：关窗重置补 `activeKey` 清零（重开索引条高亮回落首组，语义同冷启动）。
 - 无问题：em-group-field-dialog（nameInput 打开回显 / announcementEditing 关窗复位均走 watch）；em-action-sheet（无内部状态）；em-conversation-page / em-chat-page / em-group-page 宿主侧状态均有显式重置路径。
+
+## 2026-10-16 正式图标库接入：build-icons.py 全量构建 em-icons 字体（287 字形）
+
+占位字体（DCloud uni-icons + Remix 补丁）替换为 vue 版 uikit 权威图标库全量字形。落地：
+- **新脚本 `scripts/build-icons.py`**（依赖 `.venv-icons`：fonttools/svgpathtools/skia-python，.gitignore 已含）：扫描 vue 仓库 `packages/uikit-core/src/assets/icons-v2`（sibling 路径，可 `--icons` 覆盖）→ 9 个描边图标经 skia `Paint.getFillPath` 转填充轮廓（round cap/join，栅格 IoU 全 1.0）→ 2 个非 24 画布（list/bullet 17×15、filled/circle/checked 20×20）等比缩放居中 → 三次贝塞尔 cu2qu 转二次 → FontBuilder 打包私用区 U+E000–U+E11E，59KB。
+- **命名**：规范名 = 路径拍平 kebab（`filled/` → `-filled` 后缀，`_` 统一转 `-`）；`em-icons.ts` 由脚本全量生成（420 键 = 287 规范 + 133 旧版 uni-icons 别名；与规范名同键的旧名不重复输出），存量业务与外部接入者零改动。34 个在用的旧名全部有映射；36 个语义弱匹配别名（cart→rects、flag→pin-fill、heart→flower 等，多为未使用键）已在构建报告单列，待设计师/业务复核后可改 ALIASES 表重跑。
+- **族名升版**：`em-icon.css` `em-icons-v2` → `em-icons-v3`（mp 按族名持久缓存，改 ttf 必升版）。
+- **skill 更新**：`em-icon-strategy` 正式字体流程改为 build-icons.py 全量重建（幂等，--dry-run 只校验）；patch-icons.py 降级为补单个临时字形用。
+- 验证：字形抽检 31/31 与源 SVG 栅格 IoU=1.0；build web ✓ / build mp-weixin 11 项全绿（主包 673KB ≤1.5MB）/ H5 伺服 200。**待验**：mp 模拟器与 H5 实际渲染走查一轮常用图标（聊天页输入栏 mic/compose/plus、会话 item pin/bell-slash、消息状态等）；弱匹配别名清单复核。
+
+## 2026-10-20 图标字体排查工具：verify-icons.py（mp「图标全不显示」分诊）
+
+新增 `scripts/verify-icons.py`（零侵入，只读）：一次检查 6 类导致 mp 端 blank 的成因 —— ①空字形(numberOfContours==0) ②`em-icons.ts`↔cmap 双向覆盖 ③`em-icon.css` 内联 base64 与 `em-icons.ttf` 的 md5 是否同一份（**码点位移 + 只更新一半 = 整片 blank，最常见**）④族名版本号存在性 ⑤css 体积（>200KB 警戒）⑥几何异常（越界 / advance=0 / 整片字形脱离 em box= y 翻转写错，mp 会整块裁掉）。退出码 0/1，可直接进 `uni.sh` 门禁。
+当前基线跑通：ttf 85.9KB / 450 字形 / 287 码点 + 133 别名 / inline md5 一致 / `em-icons-v10`。两条 WARN 挂账：①基础字体残留 166 个未映射私用区码点（体积浪费，可裁）②`hhea.descent=0` 且存在负 y 字形（head.yMin=-113），mp `text` 固定宽高时会裁掉下探部分——待真机确认是否有图标底部缺角。
+
+## 2026-10-20 P0/P1 缺陷修复（H5 运行时回归 + 数据正确性）
+
+- **P0 H5 聊天页白屏**：`useKeyboardHeight` 在 H5 调用不存在的 `uni.onKeyboardHeightChange`（uni-app x H5 运行时未实现，编译器留成裸 `uni.*`，H5 的 `window.uni` 只有统计 `report`），`em-chat-page`/`em-chat-inputbar` setup 直接抛错、整页挂载失败。改为 `#ifndef WEB` 才注册监听；App/小程序逻辑不变。验证：H5 产物全部 chunk 中 `onKeyboardHeightChange` 出现 **0 次**；临时 mock 页（未登录、塞两条消息）实测聊天页成功挂载（`.em-chat-page`/`.em-chat-inputbar` 存在、气泡渲染），仅剩预期的 `loadHistory: call EmKit.init() first` 日志。
+- **P1 H5 长按与点击冲突**：新增 `libs/use/useLongPressClickGuard.ts`（touchstart 记时，click 时按住 ≥350ms 视为长按抬手并吞掉）。接入会话条目、好友列表行、图片/语音/视频/文件气泡；长按菜单不再连带进入会话、打开预览或开始播放。桌面鼠标/键盘 click 无 touchstart，不受影响。
+- **P1 好友申请页返回键**：补 `defineEmits<{ (e: 'back'): void }>()`（模板原先引用了未定义的 `emit`，点击会 TypeError）。
+- **P1 媒体失败重发**：`resendMessage` 按类型重建（图片/语音/视频/文件），远端 URL 走 `originalUrl`，本地临时文件缺失时明确抛错而不是退化成空文本；H5 失败消息把原始 `File` 留在内存供重发；`sendVideo` 对 H5 `blob:` URL 转 `File` 后再交给 SDK，修复 H5 视频发送的输入类型。
+- **P1 登出账号隔离**：`EmKit.logout` 现在清 conversation/message/contact/group/user/draft（含持久化的邀请与草稿）以及域内 typing 计时器/失败 File 缓存；历史加载增加 sessionEpoch，登出后返回的旧请求直接丢弃。修复同设备换账号串上一账号数据的问题。
+- **P1 发送失败反馈**：聊天页文本/图片/视频/文件/语音/重发失败统一 toast `message.send.failed`；用户取消选图不再误报。
+- **H5 语音入口**：H5 暂隐藏麦克风（录音尚未接 MediaRecorder，`platform.startRecord` 在 H5 直接抛错），App/小程序保持 `inputFeatures.voice` 语义。
+- **P2**：发送成功后回写图片/视频 body 宽高与缩略图（自发送图片不再固定 120×160）；引用快照增 `fromName`（输入栏引用条不再显示 userId，老数据回落）；`em-text` 两行折叠补 `max-height: 36px` 兜底（H5/小程序不认 `lines`）；会话列表热路径去掉整份 payload 深拷贝；`loadHistory` 飞行中去重（预热与聊天页 mount 并发不再重复拉页）。
+- 验证：`build web` ✓ / `build mp-weixin` 11 项防回归全绿（主包 734KB、分包 1283KB）/ H5 产物伺服 200。**待验（需真实账号）**：H5 长按菜单、媒体失败重发、H5 视频发送、换账号隔离；视频内联播放/文件下载/链接识别仍是一期未落地项，本轮未动。
+
+## 2026-10-20 图标 1:1 对齐 vue icons-v2（组件调用点全面收口）
+
+字体本体此前已由 `build-icons.py` 全量收录 vue `icons-v2` 287 字形，但组件内部大量沿用旧版 uni-icons 别名（`close`/`compose`/`more`/`sound`/`image`/`videocam`/`checkmarkempty`/`info-filled`/`spinner-cycle`/`chatbubble`/`personadd` 等），其中 36 个是「语义最近」弱匹配，导致同一功能在 vue 与本项目显示不同字形。本轮按 vue 对应组件逐个对齐调用点，别名只留给外部接入者：
+- **输入栏 ↔ vue h5-input / simple-input / quote-bar**：语音=mic（去掉 compose）、表情=circle-face（替换 😀 文本）、更多=circle-plus、更多面板=rect-img/camera/video/folder；引用条类型图标=file-img/file-video/mic/doc/circle-quote（文本也带 circle-quote，size 14），引用关闭=circle-xmark 18（不是弹层通用的 xmark-bold）。
+- **消息状态 ↔ vue message-bubble-wrapper**：发送中=loading-arc-normal、失败=circle-bang、单聊已读/未读=circle-checked / circle-empty-1（原 checkmarkempty/circle 代偿）。
+- **长按菜单 ↔ vue message-interactive**：复制=rects、引用=arrow-turn-left、撤回=arrow-lft-uturn、删除=trash；action-sheet 图标尺寸 20→16（对齐 vue list 项）。
+- **会话条目/菜单 ↔ vue conversation-item/list**：置顶/免打扰徽标=filled 版 pin-filled / bell-slash-filled；右键菜单按状态切 pin-slash↔pin、bell↔bell-slash；新建会话=bubble-rect-empty、建群=person-double；空态=list-bullet。
+- **输入气泡 ↔ vue voice-message / video-message / file-message**：语音空闲=triangle 22、播放态=3 根 6/10/6 波柱（无动画）；视频播放覆盖层=triangle 20 白色（删掉 border 手绘三角与 videocam 占位）；文件类型图标逐项=file-pdf/file-xls/doc/file-ppt/file-md/file-img/file-video/file-audio/file-empty。
+- **会话/通讯录/群组页 ↔ vue address-book / chat-info-drawer / group-member-list**：header 动作=vertical（聊天详情）/person-plus（加好友）/circle-plus（会话、群组）；通讯录右箭头=chevron-right、返回=chevron-left；群成员更多=vertical 16，成员菜单=bubble-circle/shield-person/person-arrows/person-minus；群资料编辑=rect-notched-pen 22、查看全部=chevron-down 16；空态=person-single/person-double/bubble-rect-2/list-bullet/at（@提及）。
+- **会话条目补图标**：@我=名字前 at 14px 主色、草稿=rect-pencil 14px 警示色（此前只留文本前缀，status 里挂账的「@ 字形缺失」随正式字体解决）；通讯录申请页「对方已拒绝」头像位=dspntd 48px 白底圆（对齐 vue contact-notice-list）。
+- **多选 ↔ vue EmCheckbox**：选人弹层 checkbox 从「自绘圆框 + checkmarkempty」改为 circle-checked-filled（主色）/ circle-empty（弱化灰），容器不再画描边底色；关闭/移除=xmark-bold。
+- **新增 `scripts/check-icon-parity.py`**：校验 287 个 vue SVG 均有同名规范键、420 键均有 ttf 字形、组件/demo 字面量图标名全部存在，内部再用旧别名即 WARN（退出码 0/1）。当前输出 `OK 全部一致`（420 键 = 287 规范 + 133 别名）。
+- **demo/style-lab**：图标走查列表与 em-empty 示例改用规范键（chevron-left/rect-img/plane/bubble-rect-2 等），去掉“占位字体”过时文案。
+- 验证：`check-icon-parity.py` ✓（287/287）；`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 736KB / 分包 1283KB）；H5 产物伺服 200；另生成 287 字形 SVG↔字体双列对照图人工走查（描边转曲仅字重轻微差异，轮廓与源 SVG 一致）。**待验**：H5/小程序真机逐屏对照（输入栏、状态列、会话徽标、成员菜单、选人 checkbox）。
+
+## 2026-10-20 修复：会话免打扰 icon 回列表后消失（本地状态被会话快照重置）
+
+症状：会话已标记免打扰，列表条目偶尔不显示 bell-slash-filled；进入聊天页再返回后必现消失，但免打扰实际仍生效。
+
+根因（非 Vue 响应式问题）：会话列表同步协议不携带免打扰字段，SDK `ConversationItem.remindType` 在快照中恒为 `DEFAULT`（群会话仅 joined-group 同步可能带入）。原 `toConversationItem` 直接 `isMuted: c.remindType === 'NONE'`，因此每次会话列表重建都会把本地已标记的 `isMuted` 抹成 false；进入聊天页时 `enterConversation` → `clearConversationUnreadMessageCount` 会触发 `onConversationListUpdate(reason='local')`，返回列表时 demo `onShow` 又调 `syncConversations`，两条路径都会触发重建，所以「进聊天页才正常、回会话就丢」。
+
+落地（对齐 vue `uikit-sdk-websdk5` 的 `patchConversationMuteStates` / `mergeWithExistingConversations`）：
+- `libs/chat/conversation.ts`：`toConversationItem` 已有会话保留本地 `isMuted`（新会话才用快照兜底）；新增 `syncConversationMuteStates()` 走 `PushManager.getConversationSilentModes` 批量权威校正（单次 ≤20，`CONVERSATION_SILENT_MODE_BATCH_SIZE`；`DURATION` 规则按 `expireTimestamp` 未过期判定），`syncConversations` 与「服务端会话同步/基线重置」后异步触发；`setConversationMuted` 改乐观回写 + 失败回滚。
+- `libs/chat/index.ts`：绑定 ChatClient 级 `onMultiDeviceConversation`，处理 `CONVERSATION_MUTE_INFO_CHANGED`，其他端切免打扰实时回写。
+- `libs/constants/index.ts`：新增批量查询上限常量。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 738KB / 分包 1283KB）；H5 产物伺服 200。**待验（需真实账号）**：单聊/群聊标记免打扰 → 进聊天 → 返回列表 icon 保持；杀进程冷启动后 icon 回显；A 端切免打扰 B 端实时同步。
+
+## 2026-10-20 修复：进入会话后置顶会话顺序被打乱
+
+症状：有 2 个置顶会话时，点击进入其中一个再返回，置顶区间内的先后顺序会变；置顶时间/最后消息都没变。
+
+根因：列表页直接按 SDK `conversationStore.items` 的快照顺序渲染，自身没有排序。SDK 的快照顺序会被 `lastAccess`、资料刷新（`updatedAt`）、未读清零等非「最后消息」因素带动（其会话排序在 `pinnedTimestamp` 缺失/相等时回落到 `lastMessageAt ?? updatedAt`），进入会话恰好会触发 `setCurrentConversation` / `clearConversationUnreadMessageCount` / `ensureUserInfos`，于是置顶区间重排。vue 版不直接使用 SDK 顺序，而是 `sortedConversationList` 显式排序。
+
+落地：
+- `libs/types/index.ts`：`EmConversationItem` 增 `pinnedTime`（毫秒，未置顶 0）。
+- `libs/chat/conversation.ts`：`toConversationItem` 映射 `pinnedTimestamp`（缺失沿用前值，置顶状态缺失也不回退）；`pinConversation` 取 SDK 返回的 `pinnedTime` 回写，取消置顶清零；`addConversation` 初始化 0。
+- `components/pages/em-conversation-page/em-conversation-page.vue`：列表 computed 末尾显式排序——置顶优先、置顶区间按 `pinnedTime` 倒序（无置顶时间回落 `lastMessageTime`），非置顶按 `lastMessageTime` 倒序；`sort` 稳定，同时间保持原相对顺序。进入会话/新消息都不会改变置顶区间顺序，只有重新置顶/取消置顶才变。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 738KB / 分包 1283KB）；H5 产物伺服 200。**待验（需真实账号）**：2 个置顶会话反复进出顺序稳定；置顶/取消置顶后顺序按操作时间正确；非置顶会话仍按最后消息时间排。
+
+## 2026-10-20 语音播放态波形跳动（效果补齐）
+
+- 症状：语音气泡点击播放后，三根波形柱是静止的（组件已有 wave 结构，柱高固定 6/10/6）。
+- 落地：`em-audio-message` 播放态改为 4 帧高度序列（4/9/6 → 9/5/10 → 6/10/5 → 10/6/8），**180ms/帧 JS `setInterval` 驱动**（蒸汽端不跑 CSS `@keyframes`，同引用定位脉冲口径）；柱高走内联 style，柱间改用 BEM `--wave-bar-gap` 修饰类；播放态整体 `opacity: 0.85`（对齐 vue `voice-message__bubble--playing`）；停止播放/切歌/组件卸载都清计时器，播放结束回调复位 `playing`。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 738KB / 分包 1283KB）；H5 产物伺服 200。**待验**：三端真机播放态跳动观感与停止/切歌时序。
+
+## 2026-10-20 底部 tabBar 图标 + 响应式未读角标（P1-1 部分落地）
+
+- **tabBar 图标**：demo `pages.json` 三项补 `iconPath`/`selectedIconPath`（81×81 透明 PNG，未选 `#919BA1` / 选中 `#009EFF`，与 tabBar color/selectedColor 一致）：会话=bubble/rect、联系人=person/double、我的=person/single 的线性/面性档。
+- **PNG 生成链路**：新增 `scripts/build-tabbar-icons.py`，直接取 `em-icons.ttf` 字形轮廓（字体由 `build-icons.py` 从 vue icons-v2 同源构建），24 设计画布映射 60×60 居中，skia 输出 81×81；换 tabBar 图标或重构建字体后重跑即可，不再手绘/另找图。原生 tabBar 只接受图片是平台限制，也是 em-icon「禁 png」策略的唯一例外（skill 已注明）。
+- **响应式未读数 API**：
+  - `store/conversation.ts` 新增 `totalConversationUnread` computed（所有会话 unreadCount 之和，含免打扰，微信口径）。
+  - `store/contact.ts` 新增 `contactRequestUnreadCount` computed（收到的 pending 好友申请/群邀请；`pendingInviteCount()` 保留为同步快照）。
+  - 新增 `libs/use/useUnreadCounts.ts`：`useUnreadCounts()` 返回 `{ conversationUnread, contactRequestUnread }` 两个 ComputedRef；`getUnreadCounts()` 供非 setup 快照。
+  - `libs/index.ts` 导出以上能力；`EmKit` 增 `conversationUnreadCount` / `contactRequestUnreadCount` getter（非响应式便捷值）。
+- **原生 tabBar 角标**：新增 `libs/use/useTabBarBadge.ts`（`useTabBarBadge(options)` + `syncTabBarBadges(options)`）：watch 两个 computed → `uni.setTabBarBadge/removeTabBarBadge`，0 移除、>99 显示 `99+`、失败静默。平台限制「当前页必须是 tabBar 页」，故除 `onMounted`/watch 外在 `onShow` 再同步一次，从聊天页返回 tab 页可补上期间错过的角标更新。
+- **demo 接线**：会话页/联系人页 setup 调 `useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })`；文档 README 增「未读角标 / tabBar（响应式）」示例，EVAL 表 P1-1/入口角标标记部分落地。
+- 验证：`build web` ✓ / `build mp-weixin` 11 项防回归全绿（主包 749KB / 分包 1283KB）/ H5 产物 tabBar 三图标渲染截图核对（含选中态）、原生角标 `3` / `99+` 截图核对通过；`app.json` tabBar 三项 iconPath 与 static 产物已核对。**待验**：微信模拟器/真机角标数字与 99+ 截断、从聊天页返回 tab 页角标补齐、免打扰会话是否计入总未读的产品口径确认。
+
+## 2026-10-20 修复：原生 `<button>` 在 App 端文字贴底（蒸汽端按钮居中口径）
+
+- **症状**：demo 登录页 / 我的页 / 样式实验室的原生 `<button>`（`height` 与 `line-height` 同值）在 Android 蒸汽端文字贴在按钮下沿、上方空一大截；H5 与微信小程序同一份样式却垂直居中。
+- **根因**：蒸汽端 button 是原生实现，**文字竖直居中靠组件默认的上下 padding，不靠 line-height**（官方 `docs/component/button.md` tips）。显式 `height` 把盒子钉死，但默认 `padding-top/bottom` 仍在，把行盒整体下推、底部被固定高度裁掉，视觉上只剩贴底的字。H5/mp 的 button 是 CSS/WebView 实现，line-height 直接居中、默认竖直 padding 为 0，所以只有 App 端异常。**不是编译器 bug，也不需要全局 reset**。
+- **落地**：
+  - `demo/pages/login/login.uvue` `.login__btn`、`demo/pages/mine/mine.uvue` `.mine__logout`、`demo/sub-im/pages/style-lab/style-lab.uvue` `.lab__btn` 各补 `padding-top: 0; padding-bottom: 0`；`contact` / `spike` 的 button 原本就是 `padding: 0 xx`（竖直 0），实测正常，无需改动。
+  - 组件库零改动：库内按钮一律走 `em-button`（view + text + flex 居中，非原生 button），天然免疫。
+  - 沉淀 skill `em-crossend-pitfalls` 5b，含「ucss 只有 class 选择器、App 无继承，写不出全局 `button {}` 复位，约束只能逐 class 落地」的口径。
+- 验证：Android 真机（HBuilderX dev + HMR）逐页截图对照——登录页「登录 / SDK Spike 页」、我的页「退出登录」、样式实验室「切到暗色 / English」修复前后均由贴底变为垂直居中；`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 749KB / 分包 1283KB）；H5 产物伺服 200。**待验**：鸿蒙真机同规则复核（同一 App 原生实现，预期一致）、iOS 未验。
+
+## 2026-10-20 深色模式跟随系统 + Demo 全量接线（M2.10）
+
+- **主题引擎（libs）**：`THEME_MODE` 增 `AUTO`；`themeStore` 拆 `preference`（auto/light/dark，持久化 `emkit.themeMode`）/ `mode`（解析后实际主题）/ `systemMode`。`initTheme()`（幂等，App onLaunch + 页面 setup 兜底）读偏好与系统主题并订阅变化：App 用 `getDeviceInfo().osTheme` + `onOsThemeChange`，Web 用 `matchMedia('(prefers-color-scheme: dark)')`，微信小程序用 `getAppBaseInfo().hostTheme` + `onHostThemeChange`（`onThemeChange` 兜底）。`setTheme()` 支持三档并写存储；`useTheme()` 增 `isDark`，`themeClass` 仍由根节点消费。
+- **原生 chrome**：新增 `syncNativeThemeUI(options)`（导航栏 + tabBar，`tabBarPages` 命中当前页才同步 tabBar，H5 无 `setNavigationBarColor` 时判函数存在跳过）；App 端 `setAppTheme({theme: preference})` 让原生弹窗等系统 UI 跟随。H5 没有上述 API：生效主题写到 `<html data-em-theme>`，`demo/index.html` 的全局 CSS 覆盖导航栏/tabBar 底色，`demo/common/theme.ts` 的 `syncH5Chrome()` 再按 hash 路由直写 tabBar 选中态文字色（H5 runtime 无 `getCurrentPages`，不能靠路由 API）。
+- **Demo 接线（13 页全覆盖）**：`demo/common/theme.ts` 的 `useDemoTheme()` = `initTheme({tabBarPages})` + onShow/主题变化时 `syncNativeThemeUI()`；全部页面根节点绑定 `themeClass` 并 `@import variables.css`。登录页为固定深色品牌页（渐变 + 光晕，两种主题下都不变），只接 `useTheme()` 初始化与 `navigationBarTextStyle: white` 状态栏前景，不消费明暗 token、不做原生 chrome 同步；其余页面（我的/通讯录添加好友弹窗/Spike/Text Probe/占位等）硬编码色值全部改 `--em-*` token（含 input 文字色，避免暗色黑字黑底）。「我的」页深色开关改为「跟随系统 / 浅色 / 深色」三档单选（`em-icon` circle-checked-filled/circle-empty），即时生效并持久化；样式实验室改为三档循环，显示「跟随系统（当前深色/浅色）」。
+- **首帧原生 chrome**：新增 `demo/theme.json`（light/dark 双份 nav/tab 色），`pages.json` globalStyle/tabBar 改 `@变量` 引用；`manifest.json` 增 `mp-weixin.darkmode: true`、`web.darkmode: true`、`app.defaultAppTheme: "auto"`。
+- **库内暗色修复**：好友申请「对方已拒绝」白底圆形图标由 `--em-text-primary` 改固定 `#5E686E`（暗色下原值在白圆上不可见）。
+- **验证**：`build web` ✓ / `build mp-weixin` 11 项防回归全绿（主包 775KB ≤ 1.5MB，分包 1313KB）/ H5 伺服 200。H5 headless Chrome + CDP 实测：①系统亮色 → 浅色；②系统强制深色（`--force-dark-mode`）→ 全页深色（导航栏/tabBar/卡片/输入框/文字均正确）；③系统深色 + 持久化 `light` → 整页浅色且导航栏/tabBar 同步（`data-em-theme` + tabBar DOM 覆盖生效）；④「我的」页点「浅色」→ `em-theme-light`、原生 chrome、tabBar 选中态（我的蓝/其余灰）同帧切换且 `localStorage.emkit.themeMode='light'`；⑤`Emulation.setEmulatedMedia` 切系统 light/dark（偏好 auto）→ 页面与原生 chrome 动态跟随；⑥style-lab 冷启动深色整页截图复核（文字/背景/气泡/图标/em-empty/em-skeleton 全 token 正确）。登录页为固定深色品牌页（新渐变设计），两种系统主题下截图一致、无导航栏白条。
+- **待验**：微信开发者工具/真机（`hostTheme` 跟随与手选覆盖、tabBar/nav 动态色、`darkmode:true` 下首帧）；Android/iOS/鸿蒙真机（`onOsThemeChange` 动态切换、`setAppTheme` 对 `showModal` 的跟随、自定义 nav 页状态栏前景色）；「我的」三档选择与样式实验室循环的三端观感。
+
+## 2026-10-20 Demo 登录页按 vue3 Demo 复刻（H5 窄屏断点）
+
+- 参照 `/Users/neohuang/Desktop/WorkCommonUse/Demo/easemob-demo-vue3` 登录页 `<768px` 断点（hero 隐藏、单列表单卡片）重做 `demo/pages/login/login.uvue`：
+  - **背景**：150deg 深蓝渐变 `#100c35 → #1e1272 → #133080 → #0062c0` + 两层满屏线性渐变光晕（右上紫粉、210px 级过渡）模拟 vue3 的 conic + blur 光斑。未用圆形光斑（会留圆弧硬边与 banding），未用 radial/conic（uni-app x App 端 `background-image` 仅支持 `linear-gradient`）。
+  - **卡片**：24px 圆角、`rgba(12,8,40,.78)` + 1px 10% 白描边 + `backdrop-filter: blur(24px)`，上下各 1px shimmer 线；右上 `</>` 开发者入口（展开时紫色高亮）。
+  - **表单**：8px 圆角输入框（1.5px 描边、6% 白底、`#b0bec5` placeholder、聚焦 0.7 蓝边 + 3px 光晕、`cursor-color` 品牌蓝）、52px `#009eff` 主按钮（16px/700、2px 字距，`view + text` 实现避开原生 button 端差）、红色小字错误行。
+  - **品牌/页脚/导航**：左上「环信 + 简开发 智连接 / 声网旗下品牌」字标；页脚版权 + SDK 版本 + Spike 页入口；登录页改 `navigationStyle: custom`（H5 无白条），`safeAreaInsets.top` 补状态栏、底部 safe area 补页脚。
+  - **能力不变**：appkey/userId/token 登录、开发者密码换 token、Spike 入口、SDK 版本展示均保留。
+- 验证：H5 390×844 截图与 vue3 参考并排比对（背景/卡片/输入框/按钮/页脚色彩与尺寸对齐）；320/360/768/1440 断点目测无横向溢出（320 标题换行可接受）；空值校验错误态、输入聚焦态、开发者面板展开态截图核对；`build web` ✓、`build mp-weixin` 11 项防回归全绿（主包 774KB / 分包 1313KB）、H5 产物伺服 200。**待验**：App/小程序真机（`backdrop-filter` 在 App 5.25+ Vapor 生效、mp 忽略；自定义导航栏状态栏让位）；≥768 桌面断点的 hero 双栏本期未复刻（按 H5 窄屏断点复刻，hero 依赖 1.2MB 位图与多层装饰）。
+- **Android 底部白底修复**：App 端 `min-height: 100vh` 的 vh 只到系统栏以内，而页面画布是含手势条区域的全屏高度，差集露出页面容器背景（`backgroundColorContent` 默认白，Android 系统导航栏背景也取该色）→ 底部一条白带；H5/小程序 vh 即可视区，无此问题。修复：根节点 `height: 100%`（占满 App 画布）+ `min-height: 100vh`（H5/小程序兜底）+ `box-sizing: border-box`；登录页 style 补 `backgroundColorContent: "#100c35"`。H5 390/1440 截图与修复前一致；`build web` ✓、`build mp-weixin` 11 项防回归全绿。**待验**：Android 真机复核白带消失、手势条区域渐变连续。
+
+## 2026-10-20 多场景扩展能力 P0 批次（M2.11，承 docs/EVAL-MULTI-SCENARIO.md）
+
+- **P0-1 发送侧业务载荷**：`EmKit.sendText(to, chatType, text, quote?, mentions?, ext?)` 增第 6 参业务 ext，`buildTextExt` 先铺业务 key、再写 `emQuote`/`em_at_list`（内部 key 优先，业务不可覆盖）；新增 `EmKit.sendCustom(to, chatType, event, params?, ext?)`；`MESSAGE_TYPE.CUSTOM='custom'` 一等类型，`EmMessageItem` 增 `customEvent`/`customParams`（`toMessageItem` 从 wire `body.event/params` 归一，`rawType` 仍置 `'custom'` 兼容旧判别），发送/接收/历史三路径统一；失败重发支持 custom（event/params/ext 重建），文本重发保留业务 ext；`makeQuote` 与聊天页菜单摘要对 custom 回落 `message.custom`；`#custom-message` 默认占位由「暂不支持」改「[自定义消息]」。
+- **P0-2 `#banner` 插槽**：`em-chat-page` 在 nav-bar 与群公告条之间新增固定位具名插槽（不随消息滚动；无作用域，宿主自管样式），承载医疗病情条/招聘职位条/交易商品条。
+- **P0-3 `title` / `showAction` props**：`title` 非空覆盖导航标题（空串回落原昵称链）；`showAction` 默认 true，false 时 `action-icon` 置空隐藏右上角详情入口（`open-info` 由宿主接管，服务伪装模式）。
+- **P0-4 系统提示消息通用化**：`EmKit.insertLocalNotice(conversationId, chatType, text)` 对外；`EmKit.insertGroupNotice(groupId, text)` 保留为群聊别名（内部转调）。渲染复用既有 `MESSAGE_TYPE.NOTICE` 居中灰条 + 长按菜单禁用，本地条目跨 `loadHistory` 合并保留。
+- **文档**：新增 `docs/GUIDE-MULTI-SCENARIO.md`（四场景 init→login→navigateTo、P0 能力代码示例、平台边界）；`docs/EVAL-MULTI-SCENARIO.md` 增 §7 落地状态并校正 §5.2 路线 B 现状；`PLAN.md` 新立 M2.11。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 776KB / 分包 1313KB）；H5 产物伺服 200。**待验（需真实账号）**：H5/mp 双端 sendCustom 收发 + `customEvent` 插槽分发 + 失败重发；sendText 业务 ext 对端回读与引用/@同发时的 key 优先级；`#banner`/`title`/`showAction` 三端视觉；`insertLocalNotice` 灰条进出会话保留。
+
+## 2026-10-20 多场景 P1 批次（M2.12）
+
+- **P1-1 单会话未读**：`libs/store/conversation.ts` 增 `conversationUnreadCountOf(conversationId)`（同步快照，含免打扰口径与总未读一致）；`useUnreadCounts.ts` 增 `useConversationUnreadCount(conversationId): ComputedRef<number>`；`EmKit.conversationUnreadCountOf(id)` 便捷快照；`libs` 门面导出三者。入口角标：「客服/卖家/HR 未读」不再需要宿主自己遍历会话数组。
+- **P1-2 快捷回复条**：新原子组件 `em-quick-reply-bar`（props `items: EmQuickReply[]`（label/text），emits `select`，横向滚动胶囊，样式对齐 conversation-tabs）；`em-chat-inputbar` 增 `quickReplies` prop + `quick-reply` emit（禁用态/空列表自动隐藏，内部置顶渲染）；`em-chat-page` 增 `quickReplies` 与 `quickReplyMode('fill'|'send')`（默认 fill = 整句替换草稿；send = 直接发送，不挂引用/@提及），发送失败统一 toast。
+- **P1-3 自定义长按菜单动作**：`EmMessageMenuExtra`（继承 `EmActionSheetAction` + `types` 过滤）与 `EmQuickReply`/`EmQuickReplyMode` 类型；`em-chat-page` 增 `extraMessageMenus` prop 与 `message-menu(key, message)` emit；业务项追加在 `messageMenuKeys` 配置项之后、删除项之前（删除保持末位），内置 key（copy/quote/recall/delete）保留不可覆盖，NOTICE 灰条不显示，`types` 缺省为全部类型。
+- **文档**：`docs/GUIDE-MULTI-SCENARIO.md` 增 §3.7/§3.8 与单会话未读用法、场景配方更新；`docs/EVAL-MULTI-SCENARIO.md` §7 P1 三项置 ✅；`PLAN.md` 新立 M2.12；契约 skill 与 README 同步。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 784KB / 分包 1313KB）；H5 产物伺服 200。**待验（需真实账号）**：快捷回复 fill/send 两模式与禁言群隐藏；extraMessageMenus 追加顺序/`types` 过滤/`message-menu` 回传；单会话未读随进会话清零、入口角标三端视觉。
+
+## 2026-10-20 AI 流式消息（M2.13）
+
+- **数据链路**：`libs/chat/index.ts` 接线 SDK `chatManager.onStreamMessage` → `EmMessageDomain.onStreamMessage`；按 `msgServerId`（兜底 `msgLocalId`）定位同一条 TEXT 消息，`text` 以 `stream.fullText` 幂等覆盖、不新建气泡；首个分片立即建气泡（低首字延迟）。`toMessageItem` 把 wire `stream` 归一为中立 `EmStreamInfo`（status 走 `STREAM_MESSAGE_STATUS` 常量，wire 值只在此边界出现）；`EmMessageItem` 增可选 `stream`。
+- **丢片补偿**：`onMessage` 改走 `ingestIncoming`——同 `msgServerId` 的流式副本存在时用完整消息覆盖并收敛 `COMPLETED` 终态（保留原 `localId` 作列表 key/滚动锚点），离线/断连错过分片不再残留半截内容。
+- **高性能**：`streamItemByKey`（`conversationId|msgServerId` → store 响应式代理）做 O(1) 定位；分片按 `uiConfig.streamThrottle`（默认 `STREAM_FLUSH_INTERVAL=50ms`）合批写 store + 通知（终态立即落盘、0=逐片即写）；`appendMessage` 改为返回 reactive 代理（蒸汽端 mutation 原始对象不触发更新）；流式增量走 `EmKit.onStreamMessage` 专用订阅，不进 `onMessage` 新消息语义。
+- **渲染**：`em-text-message` 仅对 `customType` 缺省/`'text'` 的流展示内核态——传输中尾部 `▍` 光标（H5/mp `@keyframes` 闪烁，5.26 蒸汽端静态降级）、终态收敛普通文本、`STREAM_ERROR` 尾部 i18n「内容生成异常」；`em-chat-page` 新增 `#stream-message` 作用域插槽接管 markdown 等富格式（未提供时纯文本兜底）。
+- **配置**：`EmKitConfig.enableStreamMessage`（默认 true；false 时忽略分片，等完整消息一次上屏）+ `streamThrottle`；`EmUiConfig`/`uiConfig`/`applyKitConfig`/`setConfig` 全链路贯通（运行时可切）。
+- **滚动**：聊天页新增 `@scroll`/`@scrolltolower` 维护 `streamFollow`，流式跟随独立节流 120ms；用户上翻暂停跟随、回底/主动发送恢复；另加「列表尾部 localId 变化才滚底」watch，历史 prepend 不误滚（纯文本流也适用宿主本地注入）。
+- **Demo**：聊天页悬浮「AI 演示」（完成 / 异常 / 停止，mock 分片注入当前会话）；「我的」页运行时开关 `enableStreamMessage`；样式实验室独立流式气泡演示（分片数/状态/合批间隔）。`demo/common/ai-stream-demo.ts` 为参考实现（`startMockStream`/`runMockAiStream`），关闭流式时按完整消息一次性注入。
+- **文档**：README 增「AI 流式消息」章节（能力、接入代码、配置表、`#stream-message` 用法、Demo 路径、安全提示）；`docs/GUIDE-MULTI-SCENARIO.md` 增 §3.9（AI 客服配方）与场景表 AI 流式项；PLAN 新立 M2.13；changelog/插件 readme/架构 skill 同步。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 796KB ≤ 1.5MB / 分包合计 1337KB）；H5 产物伺服 200；H5 headless Chrome + CDP 冒烟（样式实验室：点「开始流式」0.9s 后分片 16/状态传输中/光标存在/文本 91 字 → 终态分片 27/状态完成/光标消失/文本 155 字；「异常中断」→ 状态异常 + 尾部「（内容生成异常）」；「我的」运行时开关：描述即时在「已启用」/「已禁用」间切换）；临时 Node 域逻辑用例 13 项全过（首片建气泡/节流窗口不落盘/窗口末端写最新全文/乱序旧片不回退/终态立即落盘且只一条气泡/终态订阅回调/final onMessage 丢片补偿与 localId 保持/关闭开关忽略分片/forgetStreams 丢 pending）。**待验（需真实账号/真机）**：真实 `onStreamMessage` 端到端（H5/mp/App 三端分片合并、丢片补偿、断连重连）；聊天页「AI 演示」悬浮入口与真实会话内的跟随滚动；蒸汽端光标观感（静态降级）与高频流式滚动是否抖动；markdown 插槽宿主接管形态；`enableStreamMessage=false` 时完整消息延迟上屏。
+
+## 2026-10-20 多场景能力 Demo 演示（P0/P1 可交互验收）
+
+- **入口页**：新增 `demo/sub-im/pages/scenario/scenario.uvue`（「我的」页入口）：最近单聊选择/手输对端 userId → `chat?conversationId=...&chatType=singleChat&scene=1`；页面含演示步骤说明，主题/原生 chrome 走 `useDemoTheme`。
+- **聊天页演示层**（仅 demo）：`demo/sub-im/pages/chat/chat.uvue` 增 `?scene=1` 分支——
+  - 右侧「场景开关」浮钮（与既有「AI 演示」浮钮上下错开）打开 `em-popup` 面板；
+  - 六项开关实时改 props：`#banner` / `title="在线客服"` / `showAction=false` / `quickReplies` / `quickReplyMode('fill'|'send')` / `extraMessageMenus`；
+  - 面板动作：发送商品卡片（`EmKit.sendCustom('productCard', params, ext)`）、发送带业务 ext 的文本（`EmKit.sendText(..., ext)`）、插入交易提示（`EmKit.insertLocalNotice`）；
+  - 面板顶部用 `useConversationUnreadCount(conversationId)` + `useUnreadCounts()` 实时显示本会话/总未读；
+  - `#custom-message` 示例商品卡（`customEvent='productCard'`，`ext` 取 title/price/orderId）+ 兜底卡；`#banner` 示例订单条；`extraMessageMenus` 命中后 `showModal` 展示业务载荷。
+  - 既有 AI 流式演示入口原样保留。
+- 演示样式全部留在 demo 层（`--em-*` token），不进入 UIKit 组件默认行为；`scene` 缺省时聊天页与原有形态一致。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 796KB / 分包 1337KB）；H5 产物伺服 200；H5 headless 500×844 截图走查入口页排版（macOS headless 最小布局宽 500，390 宽截图只是裁切、非页面溢出）。
+- **待验（需真实账号）**：六项开关逐项开关回归；390 宽真机/小程序模拟器下场景面板高度与快捷条占位；发送商品卡在对端/重进会话后的渲染；业务长按菜单在卡片与文本上的命中。

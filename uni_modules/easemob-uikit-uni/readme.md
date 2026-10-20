@@ -2,7 +2,9 @@
 
 环信 IM 的 uni-app 版 UIKit（uni-app x 蒸汽模式）。
 
-> 开发中。已包含登录接入、会话列表页、聊天页（5 种气泡 + 长按菜单/引用/撤回/重发/已读回执）、聊天详情页、联系人页（通讯录 + 好友申请）与日志导出；逻辑层在 `libs/`，组件层在 `components/`。
+> 开发中。已包含登录接入、会话列表页、聊天页（5 种气泡 + 长按菜单/引用/撤回/重发/已读回执 + AI 流式消息）、聊天详情页、联系人页（通讯录 + 好友申请）与日志导出；逻辑层在 `libs/`，组件层在 `components/`。
+>
+> AI 流式消息（M2.13）：`onStreamMessage` 分片合并 + 纯文本打字机光标/异常提示，`EmKitConfig.enableStreamMessage`/`streamThrottle` 可配置，`#stream-message` 插槽接管 markdown；接入示例见仓库 README「AI 流式消息」章节。
 
 ## 使用方式（目标形态）
 

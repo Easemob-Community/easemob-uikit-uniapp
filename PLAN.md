@@ -30,12 +30,12 @@
 | 页面 | 组件名 | 内容 |
 |---|---|---|
 | 会话列表页 | `em-conversation-page` | 头像+未读徽标、昵称、最后消息摘要、时间、草稿、`@我` 提示、置顶/免打扰标记、会话搜索（本地过滤名称/摘要）、筛选 tab（全部/未读/@我/单聊/群组，对齐 vue conversation-tabs，纯 UI+本地过滤、数据零新增）、滑动删除、点击进入聊天 |
-| 聊天页 | `em-chat-page` | 消息列表（list-view 复用）、5 种气泡、输入栏、长按菜单、群公告条位、下拉加载历史 |
+| 聊天页 | `em-chat-page` | 消息列表（list-view 复用）、5 种气泡、输入栏、长按菜单（支持业务动作追加）、群公告条位、业务横幅位（`#banner`）、下拉加载历史、自定义消息收发（`#custom-message` + `EmKit.sendCustom`）、快捷回复条 |
 | 登录接入 | demo 内置 `pages/login` | appkey + userId + token 登录；demo 提供「测试 token 获取」入口（仅开发用） |
 
 ### 1.2 消息气泡（5 种 + 出口）
 
-- 文本（`em-text-message`）：链接识别、`@` 高亮
+- 文本（`em-text-message`）：链接识别、`@` 高亮；流式文本（AI 流式输出：打字机光标 / 终态收敛 / 异常提示，M2.13）
 - 图片（`em-image-message`）：缩略气泡 + `uni.previewImage` 原生预览（**不做自研预览手势层**）
 - 语音（`em-voice-message`）：时长刻度、播放态动画、未读红点
 - 视频（`em-video-message`）：封面 + 原生 `video` 组件播放
@@ -53,10 +53,11 @@
 - 输入栏：文本/语音切换（按住说话）、表情入口（一期仅 emoji 字符面板，**不做表情包**）、相册/拍摄/文件 三个扩展动作
 - typing 提示：默认开，不配开关
 - 草稿：默认开，不配开关
+- 流式消息：默认开（`EmKitConfig.enableStreamMessage` 可关），分片合批、底部跟随、`#stream-message` 富格式插槽（M2.13）
 
 ### 1.4 基座能力
 
-- 主题：`--em-*` CSS 变量双层 class（`.em-theme-light` / `.em-theme-dark`），App 端主题类挂组件根节点（RiceUI trick）；`useTheme().setTheme('dark'|'light')`
+- 主题：`--em-*` CSS 变量双层 class（`.em-theme-light` / `.em-theme-dark`），App 端主题类挂组件根节点（RiceUI trick）；`useTheme().setTheme('auto'|'light'|'dark')`，默认 auto 跟随系统（App osTheme / Web prefers-color-scheme / 小程序 hostTheme），偏好持久化 + 系统变化动态解析
 - i18n：中/英，文案无硬编码
 - Avatar：内置徽标（未读数/红点），形状走主题（`avatarShape`）
 - 状态管理：裸 `reactive` store，**零运行时依赖**（不装 pinia/dayjs/lodash）
@@ -170,7 +171,7 @@ easemob-uikit-uniapp/
 - **组件透出**：`em-chat-page` 增 `avatarShape` prop + `send`/`recall`/`delete` emits + `#custom-message`（PLAN 承诺的自定义消息出口，未识别 type 时渲染）/`#empty` 插槽；`em-conversation-page` 增 `showSearch`/`emptyText` + `#empty`；`em-contact-page` 增 `menuKeys`（长按菜单）；`em-video-message` 补 `preview` emit（与 em-image-message 对齐，默认行为不变）、`em-file-message` 补 `download` 事件；`em-nav-bar` 补 `#title`/`#action` 插槽；`em-avatar` 占位五色板提为 `placeholderColors` prop
 - **i18n 注入口**：`useLocale` 增 `mergeMessages(locale, table)`（业务方运行时注入新语言/覆盖文案；messages 表从模块私有常量改为可变 store，zh-CN/en 为初始值）
 - 消费点接线：`libs/chat/message.ts`（撤回窗口/typing/cmd 拦截）、`em-chat-page`（分隔条间隔/菜单构建）、`em-chat-inputbar`（features → 面板项增删/emoji 集/voice 显隐）
-- 明确不做（留二期）：formatter/filterFn 函数注入、`readIconDisplay` 档位、bubbleShape 全局开关、theme `auto` 跟随系统实现、群相关配置
+- 明确不做（留二期）：formatter/filterFn 函数注入、`readIconDisplay` 档位、bubbleShape 全局开关、群相关配置
 
 ### M2.7：空状态与骨架屏组件（2026-10-15）
 
@@ -199,6 +200,49 @@ easemob-uikit-uniapp/
 - **补注（2026-10-16 终审消歧）**：全员禁言管理 UI（Switch）不在 M2.9——`muteAllGroupMembers`/`unmuteAllGroupMembers` API 已透出供宿主接线，M2.9 只落地「读 group.mute 禁输入」。
 
 > 进度（2026-10-16）：Phase 0-5 全部落地——群数据层与 chatType 贯通（Phase 1）、会话/聊天页群化与发起会话（Phase 2）、@ 提及全链路（Phase 3）、群列表页/建群/选人 multiple（Phase 4a）、联系人页入口化 + 群邀请 kind 分化（Phase 4b）、chat-info 群分支与全员禁言（Phase 5a）、成员管理/邀请接真/群系统通知（Phase 5b）；Phase 6 评审 minor 扫尾与文档收口完成。双门禁全绿（build web + build mp-weixin 11 项防回归，主包 642KB ≤ 1.5MB）、H5 产物伺服 200；真机/真实账号端到端冒烟待验（见 STATUS.md 待验项汇总）。
+
+### M2.10：深色模式跟随系统 + Demo 全量接线（2026-10-20 立项）
+
+- **范围（自 M2.6「明确不做」提前）**：主题偏好三档 `auto|light|dark`（默认 auto）；`auto` 动态跟随系统（App `onOsThemeChange` + `deviceInfo.osTheme`、Web `matchMedia('(prefers-color-scheme: dark)')`、微信小程序 `onHostThemeChange` + `hostTheme`）；偏好持久化 `emkit.themeMode`；App 端同步 `uni.setAppTheme` 让原生弹窗等系统 UI 跟随；新增 `syncNativeThemeUI()` 动态同步原生导航栏/tabBar（页面 onShow 与主题变化时调用）；demo `pages.json` + `theme.json` + `manifest.darkmode/defaultAppTheme` 首帧原生 chrome 适配。
+- **Demo 全量接线**：13 个页面（登录/会话/通讯录/我的/聊天/聊天详情/好友列表/新请求/群组/样式实验室/Spike/Text Probe/占位）根节点绑定 themeClass；登录页为固定深色品牌页（渐变设计，不消费明暗 token），其余页面 token 化；「我的」页改为「跟随系统 / 浅色 / 深色」三档选择（选择即持久化、即时生效）。
+- **库内修复**：好友申请「对方已拒绝」白底圆形图标在暗色改固定深灰（原 `--em-text-primary` 在暗色白圆上不可见）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 伺服 200；真机/小程序模拟器深浅色切换与系统跟随待验（见 STATUS.md）。
+
+### M2.11：多场景扩展能力 P0 批次（2026-10-20 立项，承 `docs/EVAL-MULTI-SCENARIO.md` §4.2/§6）
+
+- **背景**：多场景评估（客服/医疗/招聘/二手交易）结论为「直进 1v1 聊天页」底座可用，P0 四项缺口阻断四场景「可上线」。本里程碑只做 P0，P1（快捷回复条/自定义菜单动作）另行立项。
+- **范围**：
+  - **P0-1 发送侧业务载荷**：`sendText` 增可选业务 `ext`（与引用/提及内部 key 合并，`emQuote`/`em_at_list` 优先不被覆盖）；新增 `EmKit.sendCustom(to, chatType, event, params?, ext?)`；`MESSAGE_TYPE.CUSTOM` 升为一等类型 + `EmMessageItem.customEvent`/`customParams`（接收侧 `#custom-message` 按 customEvent 判别，`ext` 仍是业务载荷通道）；失败重发支持 custom。
+  - **P0-2 `#banner` 插槽**：`em-chat-page` 在 nav-bar 与群公告条之间提供固定位具名插槽（不随消息滚动），承载医疗病情条/招聘职位条/交易商品条。
+  - **P0-3 `title` / `showAction` props**：`title` 覆盖导航标题（空串回落现有昵称链）；`showAction` 默认 true，false 时隐藏右上角详情入口（业务信息页由宿主接管，同时服务伪装模式）。
+  - **P0-4 系统提示消息通用化**：`EmKit.insertLocalNotice(conversationId, chatType, text)` 对外透出（原 `insertGroupNotice(groupId, text)` 保留为群聊别名）；复用既有 `MESSAGE_TYPE.NOTICE` 居中灰条渲染与长按菜单禁用。
+- **明确不做**：P1 批次；per-conversation 未读 API（`useUnreadCounts` 已覆盖入口角标）；伪装模式群形态隐藏开关全套（M2.9 已预留 props 位，开关本体随伪装场景另立项）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200。
+- **产出**：`docs/GUIDE-MULTI-SCENARIO.md`（四场景接入指引：init→login→navigateTo、P0 四项能力代码示例、平台边界）。
+
+### M2.12：多场景 P1 批次（2026-10-20 立项，承 `docs/EVAL-MULTI-SCENARIO.md` §4.2/§6）
+
+- **背景**：P0 已落地（M2.11），四场景「可上线」；P1 提升「好用度」，补齐入口未读、常用语、业务动作三个高频缺口。
+- **范围**：
+  - **P1-1 per-conversation 未读**：`conversationUnreadCountOf(conversationId)` 同步快照 + `useConversationUnreadCount(conversationId)` 响应式 computed + `EmKit.conversationUnreadCountOf(id)`；数据源仍为 `conversationStore.items`，不新增轮询。
+  - **P1-2 快捷回复条**：新原子组件 `em-quick-reply-bar`（`items: EmQuickReply[]`（label/text）、`select` emit、横向滚动胶囊）；`em-chat-page` 增 `quickReplies` 与 `quickReplyMode('fill'|'send')`（默认 fill = 替换草稿），由输入栏上方内置渲染（禁用态/空列表自动隐藏）。
+  - **P1-3 自定义长按菜单动作**：`EmMessageMenuExtra`（继承 `EmActionSheetAction` + `types` 过滤）；`em-chat-page` 增 `extraMessageMenus` prop 与 `message-menu(key, message)` emit；自定义项追加在内置项之后、删除项之前（删除保持末位），内置 key 保留不可覆盖，NOTICE 灰条不显示。
+  - **demo 演示（用户验收要求）**：我的页入口「多场景能力演示」→ 选择对端 → 聊天页 `?scene=1` 显示「场景开关」面板；六项开关实时控制 `#banner`/`title`/`showAction`/`quickReplies`/`quickReplyMode`/`extraMessageMenus`，面板内演示 `sendCustom` 商品卡、`sendText` 业务 ext、`insertLocalNotice` 交易提示与单会话未读。
+- **明确不做**：P2 边界（H5 录音、位置消息）；伪装模式批次（`senderNameMode='on-change'`/群指示一键隐藏，另立项）；自定义菜单整菜单接管（vue 的 `#message-action-menu` 全接管，一期只做追加动作）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200。
+- **产出**：`docs/GUIDE-MULTI-SCENARIO.md` 增 P1 用法；EVAL §7 状态更新；契约 skill 同步。
+
+### M2.13：AI 流式消息（Stream Message，2026-10-20 立项，对齐 vue 版「内核薄、插件厚」）
+
+- **背景**：AI 客服 / IM 内 AI 对话是社区高频诉求；vue 版已内置 `onStreamMessage` 分片合并与纯文本流式渲染（参照其 `docs/STREAMING-MESSAGE-PLAN.md` 与 `apps/docs/guide/ai-stream-message.md`）。uni 版补齐同等能力，并针对蒸汽端/小程序做高频分片合批，避免逐片重绘与滚动抖动。
+- **范围**：
+  - **数据链路**：`EmKit` 接线 SDK `onStreamMessage`，按 `msgServerId` 把分片幂等合并到同一条 TEXT 气泡（`body.content = stream.fullText`，不产生新气泡）；`onMessage` 完整消息到达时覆盖未完成流式副本（丢片补偿）并收敛终态；`EmMessageItem` 增可选 `stream: EmStreamInfo`。
+  - **高性能**：分片索引 O(1) 定位（`conversationId|msgServerId` → store 代理）；按 `streamThrottle`（默认 50ms）合批写 store + 通知，终态立即落盘；`EmKit.onStreamMessage` 专用订阅（不把高频增量塞进 `onMessage` 新消息语义）；聊天页流式跟随滚动节流 120ms 且用户上翻时暂停。
+  - **渲染**：`em-text-message` 内核纯文本流展示——传输中气泡尾部打字机光标、终态收敛普通文本、ERROR 尾部「内容生成异常」；`customType='markdown'` 等富格式由 `em-chat-page` 新增 `#stream-message` 插槽接管（未接管时纯文本兜底）。
+  - **配置**：`EmKitConfig.enableStreamMessage`（默认 true；关闭后忽略分片、等完整消息一次上屏）+ `streamThrottle`（默认 50ms，0 = 逐片即写）；`useConfig()/setConfig()` 支持运行时切换。
+  - **Demo/文档**：聊天页「AI 演示」悬浮入口（mock 分片注入，完成/异常/停止）；「我的」页流式开关；样式实验室流式气泡演示；README 增接入章节。
+- **明确不做**：markdown 渲染器内置（重依赖不进内核，留插槽）；客户端发送流式消息（SDK 语义只收不发）；AI 模型直连/API Key 管理（生产走业务服务端代理）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200；真机/真实账号 `onStreamMessage` 端到端待验（见 STATUS.md）。
 
 ### M3：组件沉淀与发布
 
