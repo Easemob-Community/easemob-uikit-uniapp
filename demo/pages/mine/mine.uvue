@@ -1,5 +1,5 @@
 <template>
-  <view class="mine">
+  <view class="mine" :class="themeClass">
     <view class="mine__header">
       <em-avatar :src="avatar" :name="nick" :size="56" />
       <view class="mine__profile">
@@ -9,13 +9,53 @@
     </view>
 
     <view class="mine__group">
-      <view class="mine__cell">
-        <text class="mine__cell-label">深色模式</text>
-        <switch :checked="isDark" @change="onThemeChange" color="#009EFF" />
+      <view class="mine__group-head">
+        <text class="mine__group-title">深色模式</text>
+      </view>
+      <view
+        class="mine__cell mine__cell--theme"
+        v-for="option in themeOptions"
+        :key="option.value"
+        @click="onPickTheme(option.value)"
+      >
+        <view class="mine__cell-main">
+          <text class="mine__cell-label">{{ option.label }}</text>
+          <text class="mine__cell-desc">{{ option.description }}</text>
+        </view>
+        <em-icon
+          :name="themeStore.preference === option.value ? 'circle-checked-filled' : 'circle-empty'"
+          :size="20"
+          :color="themeStore.preference === option.value ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
+        />
       </view>
     </view>
 
     <view class="mine__group">
+      <view class="mine__group-head">
+        <text class="mine__group-title">AI 流式消息（M2.13）</text>
+      </view>
+      <view class="mine__cell mine__cell--theme" @click="onToggleStream">
+        <view class="mine__cell-main">
+          <text class="mine__cell-label">流式输出开关</text>
+          <text class="mine__cell-desc">{{ config.enableStreamMessage ? '已启用：分片逐字上屏 + 打字机光标（默认）' : '已禁用：等待完整消息一次性上屏' }}</text>
+        </view>
+        <em-icon
+          :name="config.enableStreamMessage ? 'circle-checked-filled' : 'circle-empty'"
+          :size="20"
+          :color="config.enableStreamMessage ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
+        />
+      </view>
+      <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
+        <text class="mine__cell-label">流式气泡演示（样式实验室）</text>
+        <text class="mine__cell-arrow">›</text>
+      </view>
+    </view>
+
+    <view class="mine__group">
+      <view class="mine__cell" @click="onOpen('/sub-im/pages/scenario/scenario')">
+        <text class="mine__cell-label">多场景能力演示</text>
+        <text class="mine__cell-arrow">›</text>
+      </view>
       <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
         <text class="mine__cell-label">样式实验室</text>
         <text class="mine__cell-arrow">›</text>
@@ -37,15 +77,32 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { EmKit, useTheme, avatarOf, displayNameOf, CONNECTION_STATUS, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
+import { computed } from 'vue'
+import { EmKit, avatarOf, displayNameOf, setConfig, useConfig, CONNECTION_STATUS, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmThemePreference } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
 
-const { themeStore, setTheme } = useTheme()
+// 默认 auto：跟随系统深浅色；light/dark 为宿主强制档（选择持久化在设备本地）
+const { themeStore, themeClass, setTheme } = useDemoTheme()
+
+// AI 流式消息运行时开关（演示 EmKitConfig.enableStreamMessage 的运行时覆盖能力）
+const { config } = useConfig()
+
+function onToggleStream() {
+  const next = !config.enableStreamMessage
+  setConfig({ enableStreamMessage: next })
+  uni.showToast({ title: next ? '已开启流式输出' : '已关闭流式输出', icon: 'none' })
+}
 
 const userId = computed(() => EmKit.state.userId)
 const nick = computed(() => displayNameOf(userId.value))
 const avatar = computed(() => avatarOf(userId.value))
-const isDark = ref(themeStore.mode === THEME_MODE.DARK)
+
+const themeOptions: { value: EmThemePreference, label: string, description: string }[] = [
+  { value: THEME_MODE.AUTO, label: '跟随系统', description: '系统深色时自动切换' },
+  { value: THEME_MODE.LIGHT, label: '浅色', description: '始终使用浅色' },
+  { value: THEME_MODE.DARK, label: '深色', description: '始终使用深色' }
+]
 
 const statusText = computed(() => {
   switch (EmKit.state.status) {
@@ -55,10 +112,8 @@ const statusText = computed(() => {
   }
 })
 
-function onThemeChange(e: any) {
-  const dark = e.detail.value as boolean
-  isDark.value = dark
-  setTheme(dark ? THEME_MODE.DARK : THEME_MODE.LIGHT)
+function onPickTheme(mode: EmThemePreference) {
+  setTheme(mode)
 }
 
 function onOpen(url: string) {
@@ -87,11 +142,13 @@ async function onLogout() {
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
 .mine {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #f5f5f5;
+  background-color: var(--em-bg-secondary);
 }
 
 .mine__header {
@@ -99,7 +156,7 @@ async function onLogout() {
   flex-direction: row;
   align-items: center;
   padding: 24px 16px;
-  background-color: #ffffff;
+  background-color: var(--em-bg-base);
 }
 
 .mine__profile {
@@ -111,20 +168,29 @@ async function onLogout() {
 .mine__name {
   font-size: 17px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--em-text-primary);
 }
 
 .mine__status {
   margin-top: 4px;
   font-size: 12px;
-  color: #999999;
+  color: var(--em-text-tertiary);
 }
 
 .mine__group {
   display: flex;
   flex-direction: column;
   margin-top: 10px;
-  background-color: #ffffff;
+  background-color: var(--em-bg-base);
+}
+
+.mine__group-head {
+  padding: 12px 16px 4px;
+}
+
+.mine__group-title {
+  font-size: 13px;
+  color: var(--em-text-tertiary);
 }
 
 .mine__cell {
@@ -136,14 +202,32 @@ async function onLogout() {
   padding: 0 16px;
 }
 
+.mine__cell--theme {
+  height: auto;
+  min-height: 56px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.mine__cell-main {
+  display: flex;
+  flex-direction: column;
+}
+
 .mine__cell-label {
   font-size: 15px;
-  color: #1a1a1a;
+  color: var(--em-text-primary);
+}
+
+.mine__cell-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--em-text-tertiary);
 }
 
 .mine__cell-arrow {
   font-size: 16px;
-  color: #c9cdcf;
+  color: var(--em-icon-muted);
 }
 
 .mine__footer {
@@ -153,9 +237,11 @@ async function onLogout() {
 .mine__logout {
   height: 40px;
   line-height: 40px;
+  padding-top: 0;
+  padding-bottom: 0;
   font-size: 15px;
-  color: #ff3355;
-  background-color: #ffffff;
+  color: var(--em-danger-color);
+  background-color: var(--em-bg-base);
   border-radius: 6px;
 }
 </style>

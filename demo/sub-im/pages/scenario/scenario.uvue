@@ -1,0 +1,215 @@
+<template>
+  <scroll-view scroll-y :class="['scene', themeClass]">
+    <view class="scene__body">
+      <view class="scene__hero">
+        <text class="scene__title">多场景能力演示</text>
+        <text class="scene__desc">P0/P1 能力实机演示：业务横幅、客服标题/隐藏详情入口、快捷回复、业务长按动作、自定义卡片、系统提示、单会话未读。</text>
+      </view>
+
+      <view class="scene__card">
+        <text class="scene__label">对端 userId</text>
+        <input
+          v-model="peerId"
+          class="scene__input"
+          placeholder="输入聊天对象 userId"
+          placeholder-class="scene__placeholder"
+        />
+        <view v-if="recentPeers.length > 0" class="scene__chips">
+          <view
+            v-for="peer in recentPeers"
+            :key="peer.conversationId"
+            class="scene__chip"
+            @click="peerId = peer.conversationId"
+          >
+            <text class="scene__chip-text">{{ peer.name !== '' ? peer.name : peer.conversationId }}</text>
+          </view>
+        </view>
+        <text class="scene__hint">默认取最近单聊会话；没有会话时手动输入对端 userId。</text>
+      </view>
+
+      <view class="scene__card">
+        <text class="scene__label">演示步骤</text>
+        <text class="scene__step">1. 进入演示会话后，点右侧「场景开关」按钮打开能力面板。</text>
+        <text class="scene__step">2. 开关实时生效：横幅 / 标题 / 详情入口 / 快捷回复 / 业务长按动作。</text>
+        <text class="scene__step">3. 面板内可发送商品卡片、带 ext 的文本、插入系统状态提示。</text>
+        <text class="scene__step">4. 长按商品卡片或文本气泡，体验「查看订单 / 查看处方」业务动作。</text>
+      </view>
+
+      <view class="scene__btn" @click="openChat">
+        <text class="scene__btn-text">进入演示会话</text>
+      </view>
+    </view>
+  </scroll-view>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import { CONVERSATION_TYPE, EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmConversationItem } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
+const peerId = ref('')
+
+// 最近单聊会话：给演示对端提供可点选项（会话列表为空时退回手输）
+const recentPeers = computed<EmConversationItem[]>(() =>
+  EmKit.conversations.items
+    .filter((item) => item.chatType === CONVERSATION_TYPE.SINGLE_CHAT)
+    .slice(0, 5)
+)
+
+onLoad(() => {
+  const stored = uni.getStorageSync('demo.scene.peer') as string
+  if (stored !== '') {
+    peerId.value = stored
+  } else if (recentPeers.value.length > 0) {
+    peerId.value = recentPeers.value[0].conversationId
+  }
+})
+
+function openChat(): void {
+  const id = peerId.value.trim()
+  if (id === '') {
+    uni.showToast({ title: '请输入对端 userId', icon: 'none' })
+    return
+  }
+  uni.setStorageSync('demo.scene.peer', id)
+  uni.navigateTo({
+    url: `/sub-im/pages/chat/chat?conversationId=${encodeURIComponent(id)}&chatType=singleChat&scene=1`
+  })
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.scene {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--em-bg-secondary);
+}
+
+/* 间距用子项 margin 而非容器 padding：H5 下 scroll-view 内容盒对 padding 的宽度解析会把右侧顶出 16px */
+.scene__body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.scene__hero {
+  display: flex;
+  flex-direction: column;
+  margin: var(--em-spacing-4) var(--em-spacing-4) 0;
+  padding: var(--em-spacing-4);
+  border-radius: var(--em-radius);
+  background-color: var(--em-bg-base);
+}
+
+.scene__title {
+  font-family: var(--em-font-family);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+}
+
+.scene__desc {
+  margin-top: var(--em-spacing-2);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 20px;
+  color: var(--em-text-secondary);
+}
+
+.scene__card {
+  display: flex;
+  flex-direction: column;
+  margin: var(--em-spacing-3) var(--em-spacing-4) 0;
+  padding: var(--em-spacing-4);
+  border-radius: var(--em-radius);
+  background-color: var(--em-bg-base);
+}
+
+.scene__label {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 18px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+}
+
+.scene__input {
+  margin-top: var(--em-spacing-2);
+  padding: 0 var(--em-spacing-3);
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--em-bg-secondary);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-14);
+  color: var(--em-text-primary);
+}
+
+.scene__placeholder {
+  color: var(--em-text-tertiary);
+}
+
+.scene__chips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: var(--em-spacing-2);
+}
+
+.scene__chip {
+  margin-right: var(--em-spacing-2);
+  margin-bottom: var(--em-spacing-1);
+  padding: var(--em-spacing-1) var(--em-spacing-3);
+  border-radius: 999px;
+  background-color: var(--em-bg-secondary);
+}
+
+.scene__chip-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 16px;
+  color: var(--em-text-primary);
+}
+
+.scene__hint {
+  margin-top: var(--em-spacing-2);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 18px;
+  color: var(--em-text-tertiary);
+}
+
+.scene__step {
+  margin-top: var(--em-spacing-2);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 20px;
+  color: var(--em-text-secondary);
+}
+
+.scene__btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin: var(--em-spacing-4) var(--em-spacing-4) 0;
+  height: 48px;
+  border-radius: 8px;
+  background-color: var(--em-primary-color);
+}
+
+.scene__btn-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-16);
+  line-height: 22px;
+  font-weight: var(--em-font-weight-medium);
+  color: #FFFFFF;
+}
+</style>

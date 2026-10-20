@@ -3,7 +3,7 @@
     <view class="lab__header">
       <text class="lab__title">样式实验室 Style Lab</text>
       <view class="lab__actions">
-        <button class="lab__btn" @click="toggleTheme">{{ themeStore.mode === THEME_MODE.LIGHT ? '切到暗色' : '切到亮色' }}</button>
+        <button class="lab__btn" @click="cycleTheme">主题：{{ themeLabel }}</button>
         <button class="lab__btn" @click="toggleLocale">{{ themeStore.locale === LOCALE.ZH_CN ? 'English' : '中文' }}</button>
       </view>
     </view>
@@ -70,14 +70,14 @@
     </view>
 
     <view class="lab__section">
-      <text class="lab__section-title">em-icon（占位字体 uni-icons，正式版换设计师 iconfont）</text>
+      <text class="lab__section-title">em-icon（vue icons-v2 同款字形全量字体）</text>
       <view class="lab__icons">
         <view v-for="icon in iconNames" :key="icon" class="lab__icon-item">
           <em-icon :name="icon" :size="24" />
           <text class="lab__icon-name">{{ icon }}</text>
         </view>
         <view class="lab__icon-item">
-          <em-icon name="paperplane" :size="24" color="#07c160" />
+          <em-icon name="plane" :size="24" color="#07c160" />
           <text class="lab__icon-name">custom color</text>
         </view>
       </view>
@@ -85,9 +85,9 @@
 
     <view class="lab__section">
       <text class="lab__section-title">em-empty（空状态：normal / small / large）</text>
-      <em-empty icon="list" :description="t('conversation.empty')" />
+      <em-empty icon="list-bullet" :description="t('conversation.empty')" />
       <em-empty icon="search" size="small" :description="t('conversation.searchEmpty')" />
-      <em-empty icon="chatbubble" size="large" :title="t('chat.title')" :description="t('chat.noMessages')" />
+      <em-empty icon="bubble-rect-2" size="large" :title="t('chat.title')" :description="t('chat.noMessages')" />
     </view>
 
     <view class="lab__section">
@@ -102,23 +102,116 @@
       <em-skeleton class="lab__skeleton-block" />
       <em-skeleton variant="paragraph" :rows="3" />
     </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">AI 流式消息（M2.13：光标 / 终态收敛 / 异常提示）</text>
+      <view class="lab__actions">
+        <button class="lab__btn" @click="startStreamDemo('completed')">开始流式</button>
+        <button class="lab__btn" @click="startStreamDemo('error')">异常中断</button>
+        <button class="lab__btn" @click="stopStreamDemo">停止</button>
+      </view>
+      <text class="lab__stream-meta">分片 {{ streamChunks }} · 状态 {{ streamStatusLabel }} · 合批间隔 {{ config.streamThrottle }}ms</text>
+      <view class="lab__stream-row">
+        <em-avatar name="AI" :size="36" />
+        <view class="lab__stream-bubble">
+          <em-text-message :message="streamMessage" />
+        </view>
+      </view>
+    </view>
   </scroll-view>
 </template>
 
 <script setup lang="ts">
-import { useTheme, useLocale, themeStore, LOCALE, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
+import { computed, ref } from 'vue'
+import { onUnload } from '@dcloudio/uni-app'
+import { useConfig, useLocale, themeStore, CONVERSATION_TYPE, LOCALE, STREAM_MESSAGE_STATUS, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmMessageItem, EmThemePreference, StreamMessageStatusValue } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
+import { useDemoTheme } from '@/common/theme'
+import { AI_STREAM_DEMO_CONTENT, AI_STREAM_ERROR_CONTENT, buildAiMessage, startMockStream } from '@/common/ai-stream-demo'
 
-const { themeClass, setTheme } = useTheme()
+// 与「我的」页共用同一主题偏好：auto 跟随系统 / light / dark
+const { themeClass, setTheme } = useDemoTheme()
 const { t, setLocale } = useLocale()
 
+const THEME_PREFERENCE_ORDER: EmThemePreference[] = [THEME_MODE.AUTO, THEME_MODE.LIGHT, THEME_MODE.DARK]
+const themeLabel = computed(() => {
+  if (themeStore.preference === THEME_MODE.AUTO) {
+    return `跟随系统（当前${themeStore.mode === THEME_MODE.DARK ? '深色' : '浅色'}）`
+  }
+  return themeStore.preference === THEME_MODE.DARK ? '深色' : '浅色'
+})
+
+// ===== AI 流式消息演示（M2.13）=====
+// 不依赖 SDK/会话：用通用分片模拟器驱动 em-text-message 的流式展示，
+// 演示 cursor / 终态收敛 / ERROR 提示三种状态；真实链路见 docs 与 libs/chat/message.ts。
+const { config } = useConfig()
+const initialMessage = buildAiMessage('style-lab', CONVERSATION_TYPE.SINGLE_CHAT, 'me')
+initialMessage.text = '点击「开始流式」查看 AI 流式输出效果。'
+const streamMessage = ref<EmMessageItem>(initialMessage)
+const streamChunks = ref(0)
+const streamStatus = ref<StreamMessageStatusValue | ''>('')
+let stopStream: (() => void) | null = null
+
+const streamStatusLabel = computed(() => {
+  switch (streamStatus.value) {
+    case STREAM_MESSAGE_STATUS.START: return '开始'
+    case STREAM_MESSAGE_STATUS.IN_PROGRESS: return '传输中'
+    case STREAM_MESSAGE_STATUS.START_COMPLETED: return '单分片完成'
+    case STREAM_MESSAGE_STATUS.COMPLETED: return '完成'
+    case STREAM_MESSAGE_STATUS.ERROR: return '异常'
+    default: return '待开始'
+  }
+})
+
+function stopStreamDemo() {
+  stopStream?.()
+  stopStream = null
+}
+
+function startStreamDemo(endStatus: 'completed' | 'error') {
+  stopStreamDemo()
+  const base = buildAiMessage('style-lab', CONVERSATION_TYPE.SINGLE_CHAT, 'me')
+  base.stream = {
+    customType: 'text',
+    seq: 0,
+    status: STREAM_MESSAGE_STATUS.START,
+    deltaText: '',
+    fullText: '',
+    errorType: 0
+  }
+  streamMessage.value = base
+  streamChunks.value = 0
+  streamStatus.value = STREAM_MESSAGE_STATUS.START
+  stopStream = startMockStream(
+    { content: endStatus === 'error' ? AI_STREAM_ERROR_CONTENT : AI_STREAM_DEMO_CONTENT, endStatus },
+    (chunk) => {
+      streamChunks.value += 1
+      streamStatus.value = chunk.stream.status
+      const next: EmMessageItem = { ...streamMessage.value, text: chunk.fullText, stream: chunk.stream }
+      streamMessage.value = next
+      if (chunk.stream.status === STREAM_MESSAGE_STATUS.COMPLETED
+        || chunk.stream.status === STREAM_MESSAGE_STATUS.START_COMPLETED
+        || chunk.stream.status === STREAM_MESSAGE_STATUS.ERROR) {
+        stopStreamDemo()
+      }
+    }
+  )
+}
+
+onUnload(() => {
+  stopStreamDemo()
+})
+
+// 与 vue icons-v2 同名的规范键（非旧版 uni-icons 别名），用于字体走查
 const iconNames: EmIconName[] = [
-  'back', 'search', 'plus', 'mic', 'image', 'camera', 'paperclip', 'paperplane',
-  'sound', 'videocam', 'checkmarkempty', 'info', 'download', 'more', 'trash', 'undo'
+  'chevron-left', 'search', 'plus', 'mic', 'rect-img', 'camera', 'doc', 'plane',
+  'speaker-wave', 'video', 'check-single', 'circle-bang', 'arrow-down-tray', 'circle-ellipsis', 'trash', 'arrow-lft-uturn'
 ]
 
-function toggleTheme() {
-  setTheme(themeStore.mode === THEME_MODE.LIGHT ? THEME_MODE.DARK : THEME_MODE.LIGHT)
+function cycleTheme() {
+  const index = THEME_PREFERENCE_ORDER.indexOf(themeStore.preference)
+  setTheme(THEME_PREFERENCE_ORDER[(index + 1) % THEME_PREFERENCE_ORDER.length])
 }
 
 function toggleLocale() {
@@ -160,6 +253,8 @@ function toggleLocale() {
 .lab__btn {
   height: 32px;
   line-height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
   padding-left: var(--em-spacing-4);
   padding-right: var(--em-spacing-4);
   margin-right: var(--em-spacing-3);
@@ -317,5 +412,24 @@ function toggleLocale() {
 
 .lab__skeleton-block {
   margin-bottom: var(--em-spacing-4);
+}
+
+/* 流式气泡演示：宽度链用 rpx 定宽（蒸汽端多行 text 禁用 % max-width，见坑集 #1） */
+.lab__stream-meta {
+  font-size: var(--em-font-size-11);
+  color: var(--em-text-tertiary);
+  margin-top: var(--em-spacing-3);
+  margin-bottom: var(--em-spacing-3);
+}
+
+.lab__stream-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.lab__stream-bubble {
+  width: 480rpx;
+  margin-left: var(--em-spacing-3);
 }
 </style>

@@ -1,17 +1,176 @@
 <template>
-  <view class="page">
-    <em-chat-page v-if="conversationId !== ''" :conversation-id="conversationId" :chat-type="chatType" @open-info="onOpenInfo" />
+  <view class="page" :class="themeClass">
+    <em-chat-page
+      v-if="conversationId !== ''"
+      :conversation-id="conversationId"
+      :chat-type="chatType"
+      :title="sceneTitle"
+      :show-action="!sceneHideAction"
+      :quick-replies="sceneQuickReplies"
+      :quick-reply-mode="sceneQuickReplyMode"
+      :extra-message-menus="sceneExtraMenus"
+      @open-info="onOpenInfo"
+      @message-menu="onSceneMessageMenu"
+    >
+      <!-- 场景演示：顶部业务横幅（#banner 固定位，不随消息滚动） -->
+      <template #banner>
+        <view v-if="sceneBanner" class="scene-banner">
+          <view class="scene-banner__main">
+            <text class="scene-banner__title">正在咨询 · 九成新公路车</text>
+            <text class="scene-banner__desc">订单 SO-20261020-001 · ¥1,280</text>
+          </view>
+          <view class="scene-banner__action" @click="onBannerTap">
+            <text class="scene-banner__action-text">查看</text>
+          </view>
+        </view>
+      </template>
+
+      <!-- 场景演示：自定义卡片（sendCustom 发送，按 customEvent 渲染） -->
+      <template #custom-message="{ message }">
+        <view v-if="isDemo && message.customEvent === 'productCard'" class="scene-card">
+          <view class="scene-card__cover">
+            <em-icon name="shop" :size="26" color="#FFFFFF" />
+          </view>
+          <view class="scene-card__main">
+            <text class="scene-card__title">{{ String(message.ext.title ?? '') }}</text>
+            <text class="scene-card__price">{{ String(message.ext.price ?? '') }}</text>
+            <text class="scene-card__meta">{{ String(message.ext.orderId ?? '') }}</text>
+          </view>
+        </view>
+        <view v-else class="scene-card scene-card--fallback">
+          <text class="scene-card__fallback-text">{{ isDemo ? (message.customEvent !== '' ? message.customEvent : '自定义消息') : '暂不支持的消息' }}</text>
+        </view>
+      </template>
+    </em-chat-page>
+
+    <!-- Demo 能力入口：向当前会话注入 mock AI 流式回复（真实链路由 SDK onStreamMessage 驱动） -->
+    <view class="ai-demo" @click="onAiDemo">
+      <text class="ai-demo__text">AI 演示</text>
+    </view>
+
+    <!-- 场景演示开关入口（仅 ?scene=1；与 AI 演示浮钮上下错开） -->
+    <view v-if="isDemo && conversationId !== ''" class="scene-fab" @click="panelVisible = true">
+      <text class="scene-fab__text">场景开关</text>
+    </view>
+
+    <em-popup :visible="panelVisible" position="bottom" @update:visible="panelVisible = $event">
+      <view class="scene-panel">
+        <view class="scene-panel__head">
+          <text class="scene-panel__title">场景能力开关（实时生效）</text>
+          <view class="scene-panel__close" @click="panelVisible = false">
+            <em-icon name="xmark-bold" :size="18" color="var(--em-text-secondary)" />
+          </view>
+        </view>
+
+        <view class="scene-panel__stats">
+          <text class="scene-panel__stat">本会话未读 {{ peerUnread }}</text>
+          <text class="scene-panel__stat">总未读 {{ totalUnread }}</text>
+        </view>
+
+        <view
+          v-for="option in sceneOptions"
+          :key="option.key"
+          class="scene-panel__row"
+          @click="toggleSceneFlag(option.key)"
+        >
+          <view class="scene-panel__row-main">
+            <text class="scene-panel__row-label">{{ option.label }}</text>
+            <text class="scene-panel__row-desc">{{ option.desc }}</text>
+          </view>
+          <em-icon
+            :name="sceneFlags[option.key] ? 'circle-checked-filled' : 'circle-empty'"
+            :size="20"
+            :color="sceneFlags[option.key] ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
+          />
+        </view>
+
+        <text class="scene-panel__section">发送演示消息</text>
+        <view class="scene-panel__actions">
+          <view class="scene-panel__btn" @click="sendSceneCard">
+            <text class="scene-panel__btn-text">商品卡片</text>
+          </view>
+          <view class="scene-panel__btn" @click="sendSceneExtText">
+            <text class="scene-panel__btn-text">带 ext 文本</text>
+          </view>
+          <view class="scene-panel__btn" @click="insertSceneNotice">
+            <text class="scene-panel__btn-text">交易提示</text>
+          </view>
+        </view>
+        <text class="scene-panel__hint">「商品卡片」走 sendCustom；长按卡片/气泡可触发业务菜单；「交易提示」只落本地，不发服务端。</text>
+      </view>
+    </em-popup>
   </view>
 </template>
 
 <script setup lang="ts">
-import { onLoad } from '@dcloudio/uni-app'
-import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
-import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
+import { onLoad, onUnload } from '@dcloudio/uni-app'
+import { computed, reactive, ref } from 'vue'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE, MESSAGE_TYPE, useConversationUnreadCount, useUnreadCounts } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { ConversationTypeValue, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+import { AI_STREAM_DEMO_CONTENT, AI_STREAM_ERROR_CONTENT, runMockAiStream } from '@/common/ai-stream-demo'
+
+const { themeClass } = useDemoTheme()
 
 const conversationId = ref('')
 const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)
+
+// ===== 多场景能力演示（?scene=1）=====
+// 演示开关只存在于 demo 层：进入聊天页后点「场景开关」实时改 props，不污染 UIKit 组件默认行为。
+type SceneFlagKey = 'banner' | 'title' | 'hideAction' | 'quickReplies' | 'quickReplySend' | 'extraMenus'
+
+interface SceneOption {
+  key: SceneFlagKey
+  label: string
+  desc: string
+}
+
+const isDemo = ref(false)
+const panelVisible = ref(false)
+
+const sceneFlags = reactive<Record<SceneFlagKey, boolean>>({
+  banner: true,
+  title: true,
+  hideAction: true,
+  quickReplies: true,
+  quickReplySend: false,
+  extraMenus: true
+})
+
+const sceneOptions: SceneOption[] = [
+  { key: 'banner', label: '顶部业务横幅', desc: '#banner 固定位，不随消息滚动' },
+  { key: 'title', label: '客服标题', desc: 'title="在线客服" 覆盖默认昵称' },
+  { key: 'hideAction', label: '隐藏详情入口', desc: 'showAction=false，右上角 more 消失' },
+  { key: 'quickReplies', label: '快捷回复条', desc: '输入栏上方常用语胶囊' },
+  { key: 'quickReplySend', label: '常用语直接发送', desc: 'quickReplyMode="send"（默认 fill 填草稿）' },
+  { key: 'extraMenus', label: '业务长按动作', desc: 'extraMessageMenus：查看订单/查看处方' }
+]
+
+const DEMO_QUICK_REPLIES: EmQuickReply[] = [
+  { label: '期望薪资', text: '我的期望薪资是 15-20K' },
+  { label: '到岗时间', text: '我可以在两周内到岗' },
+  { label: '方便沟通', text: '您好，请问现在方便沟通吗？' }
+]
+
+const DEMO_EXTRA_MENUS: EmMessageMenuExtra[] = [
+  { key: 'demo-order', text: '查看订单', icon: 'doc', types: [MESSAGE_TYPE.CUSTOM, MESSAGE_TYPE.TEXT] },
+  { key: 'demo-prescription', text: '查看处方', icon: 'doc', types: [MESSAGE_TYPE.CUSTOM] }
+]
+
+const sceneTitle = computed(() => (isDemo.value && sceneFlags.title ? '在线客服' : ''))
+const sceneHideAction = computed(() => isDemo.value && sceneFlags.hideAction)
+const sceneBanner = computed(() => isDemo.value && sceneFlags.banner)
+const sceneQuickReplies = computed<EmQuickReply[]>(() => (isDemo.value && sceneFlags.quickReplies ? DEMO_QUICK_REPLIES : []))
+const sceneQuickReplyMode = computed<EmQuickReplyMode>(() => (sceneFlags.quickReplySend ? 'send' : 'fill'))
+const sceneExtraMenus = computed<EmMessageMenuExtra[]>(() => (isDemo.value && sceneFlags.extraMenus ? DEMO_EXTRA_MENUS : []))
+
+// 单会话未读（P1）：传 ref，进会话清零后面板数字实时变化
+const peerUnread = useConversationUnreadCount(conversationId)
+const { conversationUnread: totalUnread } = useUnreadCounts()
+
+function toggleSceneFlag(key: SceneFlagKey): void {
+  sceneFlags[key] = !sceneFlags[key]
+}
 
 onLoad((options) => {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
@@ -21,18 +180,419 @@ onLoad((options) => {
   conversationId.value = (options?.['conversationId'] ?? '') as string
   const type = (options?.['chatType'] ?? '') as string
   chatType.value = type === CONVERSATION_TYPE.GROUP_CHAT ? CONVERSATION_TYPE.GROUP_CHAT : CONVERSATION_TYPE.SINGLE_CHAT
+  isDemo.value = options?.['scene'] === '1'
 })
 
 // 聊天详情入口（em-chat-page 自绘 header 右上角 more 按钮）
 function onOpenInfo(id: string) {
   uni.navigateTo({ url: `/sub-im/pages/chat-info/chat-info?conversationId=${id}&chatType=${chatType.value}` })
 }
+
+// ===== 多场景演示动作 =====
+function onBannerTap(): void {
+  uni.showModal({
+    title: '业务横幅',
+    content: '横幅由宿主渲染，点击可跳订单/职位详情；这里只演示点击回调。',
+    showCancel: false
+  })
+}
+
+// 业务长按动作：extraMessageMenus 命中后由宿主处理（查看订单/查看处方）
+function onSceneMessageMenu(key: string, message: EmMessageItem): void {
+  if (key === 'demo-order') {
+    const orderId = String(message.ext.orderId ?? 'SO-20261020-001')
+    uni.showModal({ title: '业务动作 · 查看订单', content: `订单号：${orderId}`, showCancel: false })
+  } else if (key === 'demo-prescription') {
+    uni.showModal({
+      title: '业务动作 · 查看处方',
+      content: `消息事件：${message.customEvent !== '' ? message.customEvent : '文本消息'}`,
+      showCancel: false
+    })
+  }
+}
+
+// sendCustom：商品卡片（event + params + 结构化 ext）
+async function sendSceneCard(): Promise<void> {
+  try {
+    await EmKit.sendCustom(
+      conversationId.value,
+      chatType.value,
+      'productCard',
+      { productId: 'P-9527' },
+      { title: '九成新公路车', price: '¥1,280', orderId: 'SO-20261020-001', source: 'scenario-demo' }
+    )
+    panelVisible.value = false
+  } catch (e) {
+    uni.showToast({ title: '发送失败（需在线且会话可用）', icon: 'none' })
+  }
+}
+
+// sendText 业务 ext：订单上下文随消息带给对端
+async function sendSceneExtText(): Promise<void> {
+  try {
+    await EmKit.sendText(
+      conversationId.value,
+      chatType.value,
+      '这个订单什么时候发货？',
+      undefined,
+      undefined,
+      { orderId: 'SO-20261020-001', source: 'scenario-demo' }
+    )
+    panelVisible.value = false
+  } catch (e) {
+    uni.showToast({ title: '发送失败（需在线且会话可用）', icon: 'none' })
+  }
+}
+
+// insertLocalNotice：只落本地的系统提示灰条（交易状态/转接提示）
+function insertSceneNotice(): void {
+  EmKit.insertLocalNotice(conversationId.value, chatType.value, '对方已拍下，等待付款')
+  panelVisible.value = false
+}
+
+// ===== AI 流式演示（M2.13）=====
+// 真实接入：业务服务端经环信 RESTful 下发流式消息 → SDK onStreamMessage → UIKit 自动合批渲染。
+// 这里用 mock 分片注入当前会话，演示光标 / 终态 / 异常三种状态。
+let stopStream: (() => void) | null = null
+
+function startAiDemo(endStatus: 'completed' | 'error') {
+  if (conversationId.value === '') return
+  stopStream?.()
+  stopStream = runMockAiStream({
+    conversationId: conversationId.value,
+    chatType: chatType.value,
+    content: endStatus === 'error' ? AI_STREAM_ERROR_CONTENT : AI_STREAM_DEMO_CONTENT,
+    endStatus
+  })
+}
+
+function onAiDemo() {
+  if (conversationId.value === '') return
+  uni.showActionSheet({
+    itemList: ['AI 流式回复（模拟）', '流式异常中断', '停止当前演示'],
+    success: (res) => {
+      if (res.tapIndex === 0) {
+        startAiDemo('completed')
+      } else if (res.tapIndex === 1) {
+        startAiDemo('error')
+      } else {
+        stopStream?.()
+        stopStream = null
+      }
+    }
+  })
+}
+
+onUnload(() => {
+  stopStream?.()
+  stopStream = null
+})
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
 .page {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
+  background-color: var(--em-chat-bg);
+}
+
+/* Demo 能力入口：悬浮在输入栏上方（仅 demo 工程，不进 UIKit 组件） */
+.ai-demo {
+  position: absolute;
+  right: 12px;
+  bottom: 96px;
+  z-index: 20;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background-color: var(--em-primary-color);
+  opacity: 0.92;
+}
+
+.ai-demo__text {
+  font-size: 13px;
+  color: #ffffff;
+  line-height: 32px;
+}
+
+/* ===== 多场景能力演示（仅 demo 工程，不进 UIKit） ===== */
+.scene-fab {
+  position: absolute;
+  right: 12px;
+  bottom: 140px;
+  z-index: 21;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-border-color);
+  background-color: var(--em-bg-elevated);
+}
+
+.scene-fab__text {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 32px;
+  color: var(--em-text-primary);
+}
+
+/* 顶部业务横幅（#banner 宿主内容） */
+.scene-banner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--em-bg-secondary);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+  flex-shrink: 0;
+}
+
+.scene-banner__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scene-banner__title {
+  font-family: var(--em-font-family);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-banner__desc {
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--em-text-tertiary);
+}
+
+.scene-banner__action {
+  flex-shrink: 0;
+  margin-left: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background-color: var(--em-bg-active);
+}
+
+.scene-banner__action-text {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--em-primary-color);
+}
+
+/* 自定义商品卡片（#custom-message 宿主内容） */
+.scene-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 220px;
+  max-width: 100%;
+  padding: 8px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-border-color);
+  border-radius: var(--em-radius);
+  background-color: var(--em-bg-base);
+}
+
+.scene-card__cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: var(--em-primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scene-card__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: 8px;
+}
+
+.scene-card__title {
+  font-family: var(--em-font-family);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-card__price {
+  font-family: var(--em-font-family);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--em-font-weight-semibold);
+  color: var(--em-danger-color);
+}
+
+.scene-card__meta {
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--em-text-tertiary);
+}
+
+.scene-card--fallback {
+  padding: 10px 12px;
+}
+
+.scene-card__fallback-text {
+  font-family: var(--em-font-family);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--em-text-secondary);
+}
+
+/* 场景开关面板 */
+.scene-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px 16px;
+  background-color: var(--em-bg-elevated);
+}
+
+.scene-panel__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.scene-panel__title {
+  font-family: var(--em-font-family);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: var(--em-font-weight-semibold);
+  color: var(--em-text-primary);
+}
+
+.scene-panel__close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scene-panel__stats {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: var(--em-bg-secondary);
+}
+
+.scene-panel__stat {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--em-text-secondary);
+  margin-right: 16px;
+}
+
+.scene-panel__row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.scene-panel__row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-right: 12px;
+}
+
+.scene-panel__row-label {
+  font-family: var(--em-font-family);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--em-text-primary);
+}
+
+.scene-panel__row-desc {
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--em-text-tertiary);
+}
+
+.scene-panel__section {
+  margin-top: 12px;
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-secondary);
+}
+
+.scene-panel__actions {
+  display: flex;
+  flex-direction: row;
+  margin-top: 8px;
+}
+
+.scene-panel__btn {
+  flex: 1;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  border-radius: 8px;
+  background-color: var(--em-bg-secondary);
+}
+
+.scene-panel__btn-text {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--em-text-primary);
+}
+
+.scene-panel__hint {
+  margin-top: 10px;
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--em-text-tertiary);
 }
 </style>
