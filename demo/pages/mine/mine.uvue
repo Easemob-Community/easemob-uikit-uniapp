@@ -53,7 +53,7 @@
 
     <view class="mine__group">
       <view class="mine__cell" @click="onOpen('/sub-im/pages/scenario/scenario')">
-        <text class="mine__cell-label">多场景能力演示</text>
+        <text class="mine__cell-label">IM 场景实验室</text>
         <text class="mine__cell-arrow">›</text>
       </view>
       <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">

@@ -36,7 +36,7 @@
 - `docs/SPIKE-SDK-CONNECTIVITY.md`、`docs/SPIKE-SDK-SUBPACKAGE.md` — 五端连通性与编译器行为实测
 - `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md` — 宿主接入指引（小程序分包）
 - `docs/EVAL-MULTI-SCENARIO.md` — 多场景易用性与扩展能力评估（客服/医疗/招聘/二手交易 + 伪 1v1 伪装群，含 P0/P1 缺口清单与落地路线、§7 落地状态）
-- `docs/GUIDE-MULTI-SCENARIO.md` — 多场景接入指引（直进 1v1、`#banner`/`title`/`showAction`/`sendCustom`/`insertLocalNotice` 用法）
+- `docs/GUIDE-MULTI-SCENARIO.md` — 多场景接入指引（直进 1v1、`#banner`/`title`/`showAction`/`sendCustom`/`insertLocalNotice`、卡片插槽）
 - `docs/HARMONY-REALDEVICE-RUN.md` — 鸿蒙真机运行与签名配置
 
 ## 5. 安全

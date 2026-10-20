@@ -1,43 +1,63 @@
 <template>
-  <scroll-view scroll-y :class="['scene', themeClass]">
-    <view class="scene__body">
-      <view class="scene__hero">
-        <text class="scene__title">多场景能力演示</text>
-        <text class="scene__desc">P0/P1 能力实机演示：业务横幅、客服标题/隐藏详情入口、快捷回复、业务长按动作、自定义卡片、系统提示、单会话未读。</text>
+  <scroll-view scroll-y :class="['gallery', themeClass]">
+    <view class="gallery__body">
+      <view class="gallery__hero">
+        <text class="gallery__title">IM 场景实验室</text>
+        <text class="gallery__desc">同一个 em-chat-page，套进 6 种业务页面：业务上下文、卡片消息、快捷话术、长按动作、群公告与 @ 提及，都由宿主按场景组合。</text>
       </view>
 
-      <view class="scene__card">
-        <text class="scene__label">对端 userId</text>
+      <view class="gallery__preview" @click="openCardPreview">
+        <view class="gallery__preview-main">
+          <text class="gallery__preview-title">自定义卡片预览</text>
+          <text class="gallery__preview-desc">14 种宿主自绘卡片 + 未注册回落，无需登录</text>
+        </view>
+        <text class="gallery__preview-arrow">›</text>
+      </view>
+
+      <view class="gallery__peer">
+        <text class="gallery__label">单聊演示对象 userId</text>
         <input
           v-model="peerId"
-          class="scene__input"
+          class="gallery__input"
           placeholder="输入聊天对象 userId"
-          placeholder-class="scene__placeholder"
+          placeholder-class="gallery__placeholder"
         />
-        <view v-if="recentPeers.length > 0" class="scene__chips">
+        <view v-if="recentPeers.length > 0" class="gallery__chips">
           <view
             v-for="peer in recentPeers"
             :key="peer.conversationId"
-            class="scene__chip"
+            class="gallery__chip"
             @click="peerId = peer.conversationId"
           >
-            <text class="scene__chip-text">{{ peer.name !== '' ? peer.name : peer.conversationId }}</text>
+            <text class="gallery__chip-text">{{ peer.name !== '' ? peer.name : peer.conversationId }}</text>
           </view>
         </view>
-        <text class="scene__hint">默认取最近单聊会话；没有会话时手动输入对端 userId。</text>
+        <text class="gallery__hint">单聊场景使用此 userId；群聊场景（家校/社群）在详情页选择已有群组。</text>
       </view>
 
-      <view class="scene__card">
-        <text class="scene__label">演示步骤</text>
-        <text class="scene__step">1. 进入演示会话后，点右侧「场景开关」按钮打开能力面板。</text>
-        <text class="scene__step">2. 开关实时生效：横幅 / 标题 / 详情入口 / 快捷回复 / 业务长按动作。</text>
-        <text class="scene__step">3. 面板内可发送商品卡片、带 ext 的文本、插入系统状态提示。</text>
-        <text class="scene__step">4. 长按商品卡片或文本气泡，体验「查看订单 / 查看处方」业务动作。</text>
+      <text class="gallery__section">选择场景 · 点卡片查看业务页并进入会话</text>
+
+      <view
+        v-for="item in SCENARIO_LIST"
+        :key="item.key"
+        class="gallery__card"
+        @click="openDetail(item.key)"
+      >
+        <view class="gallery__icon" :style="`background-color: ${item.accent};`">
+          <em-icon :name="item.icon" :size="24" color="#FFFFFF" />
+        </view>
+        <view class="gallery__card-main">
+          <view class="gallery__card-head">
+            <text class="gallery__card-name">{{ item.name }}</text>
+            <text class="gallery__card-type">{{ item.chatType === 'groupChat' ? '群聊' : '单聊' }}</text>
+          </view>
+          <text class="gallery__card-tagline">{{ item.tagline }}</text>
+          <text class="gallery__card-meta">{{ item.fields[0].value }} · {{ item.fields[1].value }}</text>
+        </view>
+        <text class="gallery__card-arrow">›</text>
       </view>
 
-      <view class="scene__btn" @click="openChat">
-        <text class="scene__btn-text">进入演示会话</text>
-      </view>
+      <text class="gallery__footer">扩展位：业务页 →「在线沟通」→ em-chat-page；会话能力不落在业务页里，业务页只负责上下文与路由。</text>
     </view>
   </scroll-view>
 </template>
@@ -47,17 +67,17 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { CONVERSATION_TYPE, EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmConversationItem } from '@/uni_modules/easemob-uikit-uni/libs'
+import { SCENARIO_LIST, type ScenarioKey } from '@/common/scenario-catalog'
 import { useDemoTheme } from '@/common/theme'
 
 const { themeClass } = useDemoTheme()
 
 const peerId = ref('')
 
-// 最近单聊会话：给演示对端提供可点选项（会话列表为空时退回手输）
 const recentPeers = computed<EmConversationItem[]>(() =>
   EmKit.conversations.items
     .filter((item) => item.chatType === CONVERSATION_TYPE.SINGLE_CHAT)
-    .slice(0, 5)
+    .slice(0, 4)
 )
 
 onLoad(() => {
@@ -69,54 +89,54 @@ onLoad(() => {
   }
 })
 
-function openChat(): void {
+function openCardPreview(): void {
+  uni.navigateTo({ url: '/sub-im/pages/scenario/cards' })
+}
+
+function openDetail(key: ScenarioKey): void {
   const id = peerId.value.trim()
-  if (id === '') {
-    uni.showToast({ title: '请输入对端 userId', icon: 'none' })
-    return
+  if (id !== '') {
+    uni.setStorageSync('demo.scene.peer', id)
   }
-  uni.setStorageSync('demo.scene.peer', id)
-  uni.navigateTo({
-    url: `/sub-im/pages/chat/chat?conversationId=${encodeURIComponent(id)}&chatType=singleChat&scene=1`
-  })
+  uni.navigateTo({ url: `/sub-im/pages/scenario/detail?scenario=${key}` })
 }
 </script>
 
 <style>
 @import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
 
-.scene {
+.gallery {
   display: flex;
   flex-direction: column;
   height: 100%;
   background-color: var(--em-bg-secondary);
 }
 
-/* 间距用子项 margin 而非容器 padding：H5 下 scroll-view 内容盒对 padding 的宽度解析会把右侧顶出 16px */
-.scene__body {
+/* 子项 margin 承担间距，避免 scroll-view 内容盒对 padding 的宽度解析问题 */
+.gallery__body {
   display: flex;
   flex-direction: column;
   width: 100%;
 }
 
-.scene__hero {
+.gallery__hero {
   display: flex;
   flex-direction: column;
   margin: var(--em-spacing-4) var(--em-spacing-4) 0;
   padding: var(--em-spacing-4);
-  border-radius: var(--em-radius);
+  border-radius: 12px;
   background-color: var(--em-bg-base);
 }
 
-.scene__title {
+.gallery__title {
   font-family: var(--em-font-family);
-  font-size: 20px;
-  line-height: 28px;
-  font-weight: var(--em-font-weight-medium);
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: var(--em-font-weight-semibold);
   color: var(--em-text-primary);
 }
 
-.scene__desc {
+.gallery__desc {
   margin-top: var(--em-spacing-2);
   font-family: var(--em-font-family);
   font-size: var(--em-font-size-13);
@@ -124,16 +144,61 @@ function openChat(): void {
   color: var(--em-text-secondary);
 }
 
-.scene__card {
+.gallery__peer {
   display: flex;
   flex-direction: column;
   margin: var(--em-spacing-3) var(--em-spacing-4) 0;
   padding: var(--em-spacing-4);
-  border-radius: var(--em-radius);
+  border-radius: 12px;
   background-color: var(--em-bg-base);
 }
 
-.scene__label {
+/* 自定义卡片预览入口：与场景卡同层级的独立入口（免登录查看宿主卡片渲染效果） */
+.gallery__preview {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: var(--em-spacing-3) var(--em-spacing-4) 0;
+  padding: var(--em-spacing-3) var(--em-spacing-4);
+  border-radius: 12px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-border-color);
+  background-color: var(--em-bg-base);
+}
+
+.gallery__preview-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery__preview-title {
+  font-family: var(--em-font-family);
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+}
+
+.gallery__preview-desc {
+  margin-top: 2px;
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--em-text-tertiary);
+}
+
+.gallery__preview-arrow {
+  margin-left: 8px;
+  font-family: var(--em-font-family);
+  font-size: 20px;
+  line-height: 24px;
+  color: var(--em-text-tertiary);
+}
+
+.gallery__label {
   font-family: var(--em-font-family);
   font-size: var(--em-font-size-13);
   line-height: 18px;
@@ -141,7 +206,7 @@ function openChat(): void {
   color: var(--em-text-primary);
 }
 
-.scene__input {
+.gallery__input {
   margin-top: var(--em-spacing-2);
   padding: 0 var(--em-spacing-3);
   height: 40px;
@@ -152,18 +217,18 @@ function openChat(): void {
   color: var(--em-text-primary);
 }
 
-.scene__placeholder {
+.gallery__placeholder {
   color: var(--em-text-tertiary);
 }
 
-.scene__chips {
+.gallery__chips {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   margin-top: var(--em-spacing-2);
 }
 
-.scene__chip {
+.gallery__chip {
   margin-right: var(--em-spacing-2);
   margin-bottom: var(--em-spacing-1);
   padding: var(--em-spacing-1) var(--em-spacing-3);
@@ -171,14 +236,14 @@ function openChat(): void {
   background-color: var(--em-bg-secondary);
 }
 
-.scene__chip-text {
+.gallery__chip-text {
   font-family: var(--em-font-family);
   font-size: var(--em-font-size-12);
   line-height: 16px;
   color: var(--em-text-primary);
 }
 
-.scene__hint {
+.gallery__hint {
   margin-top: var(--em-spacing-2);
   font-family: var(--em-font-family);
   font-size: var(--em-font-size-12);
@@ -186,30 +251,98 @@ function openChat(): void {
   color: var(--em-text-tertiary);
 }
 
-.scene__step {
-  margin-top: var(--em-spacing-2);
+.gallery__section {
+  margin: var(--em-spacing-4) var(--em-spacing-4) 0;
   font-family: var(--em-font-family);
-  font-size: var(--em-font-size-13);
-  line-height: 20px;
+  font-size: var(--em-font-size-12);
+  line-height: 18px;
+  font-weight: var(--em-font-weight-medium);
   color: var(--em-text-secondary);
 }
 
-.scene__btn {
+.gallery__card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: var(--em-spacing-2) var(--em-spacing-4) 0;
+  padding: var(--em-spacing-3);
+  border-radius: 12px;
+  background-color: var(--em-bg-base);
+}
+
+.gallery__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  margin: var(--em-spacing-4) var(--em-spacing-4) 0;
-  height: 48px;
-  border-radius: 8px;
-  background-color: var(--em-primary-color);
+  flex-shrink: 0;
 }
 
-.scene__btn-text {
+.gallery__card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--em-spacing-3);
+}
+
+.gallery__card-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.gallery__card-name {
   font-family: var(--em-font-family);
   font-size: var(--em-font-size-16);
   line-height: 22px;
   font-weight: var(--em-font-weight-medium);
-  color: #FFFFFF;
+  color: var(--em-text-primary);
+}
+
+.gallery__card-type {
+  margin-left: var(--em-spacing-2);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background-color: var(--em-bg-secondary);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-10);
+  line-height: 14px;
+  color: var(--em-text-secondary);
+}
+
+.gallery__card-tagline {
+  margin-top: 2px;
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 17px;
+  color: var(--em-text-secondary);
+}
+
+.gallery__card-meta {
+  margin-top: 4px;
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-11);
+  line-height: 15px;
+  color: var(--em-text-tertiary);
+}
+
+.gallery__card-arrow {
+  margin-left: var(--em-spacing-2);
+  font-family: var(--em-font-family);
+  font-size: 22px;
+  line-height: 22px;
+  color: var(--em-text-tertiary);
+}
+
+.gallery__footer {
+  margin: var(--em-spacing-4) var(--em-spacing-4) var(--em-spacing-5);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-11);
+  line-height: 17px;
+  color: var(--em-text-tertiary);
 }
 </style>

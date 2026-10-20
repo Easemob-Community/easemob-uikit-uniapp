@@ -62,9 +62,9 @@ uni_modules/easemob-uikit-uni/
 
 ## 配置体系（三层混合）
 
-**全局 `EmKitConfig` 行为开关** + **页面组件呈现 props** + **少量具名插槽**（不做 provider/inject、不做 ChatConfig 单对象透传）。15 项全局开关：enableDraft/enableTyping/showTime/recallTimeLimit/typingThrottle/typingTimeout/timeDividerInterval/enableStreamMessage/streamThrottle/inputFeatures{voice,emoji,image,camera,video,file}/messageMenuKeys/conversationMenuKeys/emojiList/primaryColor。组件透出契约见 `em-component-structure`。自定义消息：`EmKit.sendCustom(to, chatType, event, params?, ext?)` 发送，`#custom-message` 插槽按 `EmMessageItem.customEvent` 判别渲染（`customParams`/`ext` 为载荷，`rawType='custom'` 兼容旧判别）。
+**全局 `EmKitConfig` 行为开关** + **页面组件呈现 props** + **少量具名插槽**（不做 provider/inject、不做 ChatConfig 单对象透传）。15 项全局开关：enableDraft/enableTyping/showTime/recallTimeLimit/typingThrottle/typingTimeout/timeDividerInterval/enableStreamMessage/streamThrottle/inputFeatures{voice,emoji,image,camera,video,file}/messageMenuKeys/conversationMenuKeys/emojiList/primaryColor。组件透出契约见 `em-component-structure`。自定义消息：`EmKit.sendCustom(to, chatType, event, params?, ext?)` 发送；`#custom-message` 插槽按 `message.customEvent` 整卡自绘（`customParams`/`ext` 为载荷，`rawType='custom'` 兼容旧判别）。UIKit 不内置卡片组件/schema。
 
-未读：总未读 `totalConversationUnread` + `useUnreadCounts()`；单会话 `conversationUnreadCountOf(id)`（快照）+ `useConversationUnreadCount(id)`（响应式）。多场景扩展（M2.11/M2.12）：`#banner`/`title`/`showAction`/`insertLocalNotice`/`quickReplies`/`extraMessageMenus`，用法见 `docs/GUIDE-MULTI-SCENARIO.md`。
+未读：总未读 `totalConversationUnread` + `useUnreadCounts()`；单会话 `conversationUnreadCountOf(id)`（快照）+ `useConversationUnreadCount(id)`（响应式）。多场景扩展（M2.11/M2.12/M2.14/M2.15）：`#banner`/`#input-toolbar`/`title`/`showAction`/`insertLocalNotice`/`quickReplies`/`extraMessageMenus`/`#custom-message` 卡片插槽，用法见 `docs/GUIDE-MULTI-SCENARIO.md`。
 
 ## 横切机制
 

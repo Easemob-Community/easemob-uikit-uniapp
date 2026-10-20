@@ -80,6 +80,9 @@
 |---|---|---|
 | 多场景 P0 端到端（sendCustom 收发/失败重发、sendText 业务 ext 对端回读、`#banner`/`title`/`showAction`、`insertLocalNotice` 灰条） | H5/mp | 需真实账号双端互发 |
 | 多场景 P1 端到端（`quickReplies` fill/send 与禁言隐藏、`extraMessageMenus` 顺序/`types` 过滤/`message-menu` 回传、单会话未读入口角标与进会话清零） | H5/mp | 需真实账号；键盘弹起时快捷条占位观感一并看 |
+| IM 场景实验室 6 场景（单聊/群聊进会话、详情页群选择、场景开关面板、场景卡片/提示） | H5/mp | 需真实账号；群场景需先有群 |
+| 自定义卡片端到端（14 种宿主卡片双端收发/动作回传、未知 event 回落、手机号脱敏、`#custom-message` 注入） | H5/mp/App | 免登录预览页已验渲染；聊天内收发需真实账号 |
+| 输入栏业务入口端到端（`#input-toolbar` 注入/开关、点胶囊 sendCustom 对端渲染、键盘弹起时跟随与两行占位） | H5/mp/App | 详情页入口条免登录已验渲染；聊天内点击需真实账号 |
 | AI 流式消息端到端（真实 `onStreamMessage`：分片合并/丢片补偿/终态收敛/异常、`enableStreamMessage=false` 完整消息延迟上屏、断连重连） | H5/mp/App | 需业务服务端下发流式消息；H5 demo mock 已验渲染态 |
 | 手动避让时序与高度精度（iOS/鸿蒙扣安全区后贴合度；鸿蒙原「adjustPan 不回弹」是否随手动方案消失） | App 三真机 | 用户已验 Android「顶飞消解」 |
 | 会话页/联系人页搜索聚焦顶飞 nav-bar（同根因，fix 待从 chat-page 铺到 conversation/contact 页） | App | 已立案 |
@@ -367,16 +370,38 @@
 - **文档**：README 增「AI 流式消息」章节（能力、接入代码、配置表、`#stream-message` 用法、Demo 路径、安全提示）；`docs/GUIDE-MULTI-SCENARIO.md` 增 §3.9（AI 客服配方）与场景表 AI 流式项；PLAN 新立 M2.13；changelog/插件 readme/架构 skill 同步。
 - 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 796KB ≤ 1.5MB / 分包合计 1337KB）；H5 产物伺服 200；H5 headless Chrome + CDP 冒烟（样式实验室：点「开始流式」0.9s 后分片 16/状态传输中/光标存在/文本 91 字 → 终态分片 27/状态完成/光标消失/文本 155 字；「异常中断」→ 状态异常 + 尾部「（内容生成异常）」；「我的」运行时开关：描述即时在「已启用」/「已禁用」间切换）；临时 Node 域逻辑用例 13 项全过（首片建气泡/节流窗口不落盘/窗口末端写最新全文/乱序旧片不回退/终态立即落盘且只一条气泡/终态订阅回调/final onMessage 丢片补偿与 localId 保持/关闭开关忽略分片/forgetStreams 丢 pending）。**待验（需真实账号/真机）**：真实 `onStreamMessage` 端到端（H5/mp/App 三端分片合并、丢片补偿、断连重连）；聊天页「AI 演示」悬浮入口与真实会话内的跟随滚动；蒸汽端光标观感（静态降级）与高频流式滚动是否抖动；markdown 插槽宿主接管形态；`enableStreamMessage=false` 时完整消息延迟上屏。
 
-## 2026-10-20 多场景能力 Demo 演示（P0/P1 可交互验收）
+## 2026-10-20 IM 场景实验室（6 场景 Demo，P0/P1 可交互验收）
 
-- **入口页**：新增 `demo/sub-im/pages/scenario/scenario.uvue`（「我的」页入口）：最近单聊选择/手输对端 userId → `chat?conversationId=...&chatType=singleChat&scene=1`；页面含演示步骤说明，主题/原生 chrome 走 `useDemoTheme`。
-- **聊天页演示层**（仅 demo）：`demo/sub-im/pages/chat/chat.uvue` 增 `?scene=1` 分支——
+- **场景目录**：新增 `demo/common/scenario-catalog.ts`——6 个场景（在线客服/医患沟通/二手交易/招聘沟通/家校沟通/兴趣社群）的「业务字段 + 能力点 + 横幅 + 快捷话术 + 业务卡片 event/params/ext + 长按菜单 + 系统提示文案」集中配置；`scenarioOf(key)` 取配置，聊天页/详情页零场景分支。新增场景 = 加一条配置。
+- **场景列表页** `demo/sub-im/pages/scenario/scenario.uvue`（我的页入口「IM 场景实验室」）：单聊演示 userId 输入 + 最近会话 chips + 6 张场景卡（图标/主色/单群标记/业务摘要）。
+- **场景详情页** `demo/sub-im/pages/scenario/detail.uvue`：业务上下文（科室/订单/职位/班级等）、能力点 chips、演示步骤；单聊填 userId、群聊选已有群组（无群时给「去群组列表」入口）；底部主按钮带 `scenario` + `chatType` + `scene=1` 进共享聊天页。
+- **共享聊天页** `demo/sub-im/pages/chat/chat.uvue`：按 `?scenario=` 读目录配置——
   - 右侧「场景开关」浮钮（与既有「AI 演示」浮钮上下错开）打开 `em-popup` 面板；
-  - 六项开关实时改 props：`#banner` / `title="在线客服"` / `showAction=false` / `quickReplies` / `quickReplyMode('fill'|'send')` / `extraMessageMenus`；
-  - 面板动作：发送商品卡片（`EmKit.sendCustom('productCard', params, ext)`）、发送带业务 ext 的文本（`EmKit.sendText(..., ext)`）、插入交易提示（`EmKit.insertLocalNotice`）；
+  - 六项开关实时改 props：`#banner`（场景横幅）/ `title`（场景标题）/ `showAction=false` / `quickReplies` / `quickReplyMode('fill'|'send')` / `extraMessageMenus`；
+  - 面板动作按场景：卡片（`sendCustom`）、带业务 ext 文本（`sendText`）、系统提示（`insertLocalNotice`）；
   - 面板顶部用 `useConversationUnreadCount(conversationId)` + `useUnreadCounts()` 实时显示本会话/总未读；
-  - `#custom-message` 示例商品卡（`customEvent='productCard'`，`ext` 取 title/price/orderId）+ 兜底卡；`#banner` 示例订单条；`extraMessageMenus` 命中后 `showModal` 展示业务载荷。
+  - `#custom-message` 按 `customEvent` 渲染场景卡（`ext.title/subtitle/meta`）+ 兜底卡；长按卡片/气泡命中 `scene-context` 业务动作并展示载荷。
   - 既有 AI 流式演示入口原样保留。
-- 演示样式全部留在 demo 层（`--em-*` token），不进入 UIKit 组件默认行为；`scene` 缺省时聊天页与原有形态一致。
-- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 796KB / 分包 1337KB）；H5 产物伺服 200；H5 headless 500×844 截图走查入口页排版（macOS headless 最小布局宽 500，390 宽截图只是裁切、非页面溢出）。
-- **待验（需真实账号）**：六项开关逐项开关回归；390 宽真机/小程序模拟器下场景面板高度与快捷条占位；发送商品卡在对端/重进会话后的渲染；业务长按菜单在卡片与文本上的命中。
+- 演示样式全部留在 demo 层（`--em-*` token），不进入 UIKit 组件默认行为；无 `scenario` 参数时聊天页与原有形态一致。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 806KB / 分包 1354KB）；H5 产物伺服 200；H5 headless 500×900 截图走查场景列表 + 医患详情 + 家校详情（macOS headless 最小布局宽 500，390 宽截图只是裁切、非页面溢出）。
+- **待验（需真实账号）**：6 场景逐一进会话（单聊/群聊）与六项开关回归；390 宽真机/小程序模拟器下场景面板高度与快捷条占位；发送场景卡片在对端/重进会话后的渲染；群场景 @/公告/昵称行与三人群的交互。
+
+## 2026-10-20 自定义卡片插槽化 + Demo 宿主卡片（M2.14）
+
+- **设计结论（评审后调整）**：卡片不内置到 UIKit。卡片布局/字段/多语言随业务差异大，内置 schema 必然不够；uni-app x 五端也无法动态实例化宿主组件，「注册表 + 固定模板」的灵活性不如整卡自绘。内核只保留 `sendCustom` + `#custom-message` 插槽，呈现完全下沉。
+- **内核**：保持 M2.11 的 `EmKit.sendCustom(to, chatType, event, params?, ext?)`、`MESSAGE_TYPE.CUSTOM`、`EmMessageItem.customEvent/customParams/ext`；`em-chat-page` 的 `#custom-message` 默认占位恢复「[自定义消息]」，插槽作用域 `message`，外层容器继续承接原生 longpress（卡片长按可开消息菜单）。**UIKit 未新增**卡片组件/类型/注册表 API（`demo-card` 位于 demo 层，不计入内核）。
+- **Demo 宿主实现**：新增 `demo/common/demo-card-data.ts`（宿主自己的 event→视觉族映射 + ext 解析 + `phoneExchange` 手机号脱敏）与 `demo/components/demo-card`（独立 `.vue` + `.css`，不引用 UIKit 卡片代码；标题/副标题/角标/字段/主次按钮，`action` emit）；12 种卡片覆盖工单/退款/病例/处方/商品/砍价/邀约/手机号交换/作业/请假/活动/装备。
+- **Demo 接线**：聊天页 `#custom-message` 直接注入 `<demo-card :message fallback-text @action>`；未知 event / 无标题回落 `[自定义消息]`；「场景开关」面板保留 12 种卡片发送 + 「未知事件」按钮（不再有注册表开关）。免登录预览页 `sub-im/pages/scenario/cards` 改为宿主卡片渲染，无注销/重注册。
+- **文档**：`docs/GUIDE-MULTI-SCENARIO.md` §3.2 重写为「sendCustom + #custom-message 插槽 + 宿主卡片示例 + 样式/多语言/动作/兜底」；README、PLAN M2.14、EVAL §7 同步为插槽方案；契约 skill 移除内置卡片组件，保留插槽说明。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 824KB / 分包合计 1365KB）；H5 产物伺服 200；宿主卡片预览页 500×900 截图走查（12 种卡片 + 未知回落，样式与改前一致）。
+- **待验（需真实账号/真机）**：聊天内发送/接收 12 种卡片、宿主 `action` 回传、未知 event 兜底、聊天页插槽在群聊/单聊的布局；宿主自定义样式在 mp-weixin 的生效范围。
+
+## 2026-10-20 输入栏业务入口 + 场景化发卡（M2.15）
+
+- **内核**：`em-chat-page` 新增 `#input-toolbar` 具名插槽——位置在消息列表与输入栏之间（快捷回复条之上），无作用域、随软键盘上移、不参与消息滚动；不注入时不占高度。无新增 props/emits/组件/类型，仍维持「内核薄」。
+- **Demo 宿主实现**：新增 `demo/components/demo-composer-bar`（横向胶囊条，独立 `.vue` + `.css`；场景主色只染图标，容器/胶囊用 `--em-*` token）；聊天页 `#input-toolbar` 注入本场景入口，点击 → `EmKit.sendCustom` 发对应卡片；「场景开关」新增第 7 项「输入栏业务入口」（默认开），可实时关掉验证「不注入即不占位」。
+- **场景目录**：每条卡片补 `entryLabel`（短动词文案）/`entryIcon`；新增 `orderCard`（客服「发订单」，kind=order）与 `resumeCard`（招聘「发简历」，kind=profile），卡片总数 12 → 14；入口清单直接由 `scenario.chat.cards` 生成，新增卡片自动多一个入口。`capabilities/steps` 文案从「注册表」改为「宿主卡片/输入栏发卡」。
+- **详情页**：新增「输入栏业务入口（进入聊天后可见）」免登录预览——直接复用 `demo-composer-bar`，点击弹窗解释「进聊天后 = sendCustom(event) → 对端 #custom-message 渲染」。
+- **文档**：`docs/GUIDE-MULTI-SCENARIO.md` 新增 §3.10（`#input-toolbar` 用法 + 位置/开关/边界/数量建议 + 配图 `assets/scene-lab-composer.png`），§4 增各场景入口清单，§6 七项开关与 14 种卡片；README/PLAN M2.15/EVAL §7/changelog/契约 skill 同步。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 832KB / 分包合计 1367KB）；H5 产物伺服 200；500×1100 截图走查客服/医患/招聘详情页入口条（发订单/发工单/退款审核、发病例/发处方、发简历/发邀约/换手机号），免登录卡片预览 14 种 + 未知回落（长图 500×4114）。
+- **待验（需真实账号）**：聊天页内入口条与键盘联动（弹起/收起时是否跟随）、点击发卡在对端渲染、入口条在群聊/单聊/小程序的布局与滚动；入口条与快捷回复条同时开启时的两行占位是否压消息列表。

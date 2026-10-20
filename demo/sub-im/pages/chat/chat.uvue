@@ -13,11 +13,15 @@
       @message-menu="onSceneMessageMenu"
     >
       <!-- 场景演示：顶部业务横幅（#banner 固定位，不随消息滚动） -->
+      <template #custom-message="{ message }">
+        <demo-card :message="message" fallback-text="[自定义消息]" @action="onCardAction" />
+      </template>
+
       <template #banner>
         <view v-if="sceneBanner" class="scene-banner">
           <view class="scene-banner__main">
-            <text class="scene-banner__title">正在咨询 · 九成新公路车</text>
-            <text class="scene-banner__desc">订单 SO-20261020-001 · ¥1,280</text>
+            <text class="scene-banner__title">{{ scenario.chat.bannerTitle }}</text>
+            <text class="scene-banner__desc">{{ scenario.chat.bannerDesc }}</text>
           </view>
           <view class="scene-banner__action" @click="onBannerTap">
             <text class="scene-banner__action-text">查看</text>
@@ -25,22 +29,18 @@
         </view>
       </template>
 
-      <!-- 场景演示：自定义卡片（sendCustom 发送，按 customEvent 渲染） -->
-      <template #custom-message="{ message }">
-        <view v-if="isDemo && message.customEvent === 'productCard'" class="scene-card">
-          <view class="scene-card__cover">
-            <em-icon name="shop" :size="26" color="#FFFFFF" />
-          </view>
-          <view class="scene-card__main">
-            <text class="scene-card__title">{{ String(message.ext.title ?? '') }}</text>
-            <text class="scene-card__price">{{ String(message.ext.price ?? '') }}</text>
-            <text class="scene-card__meta">{{ String(message.ext.orderId ?? '') }}</text>
-          </view>
-        </view>
-        <view v-else class="scene-card scene-card--fallback">
-          <text class="scene-card__fallback-text">{{ isDemo ? (message.customEvent !== '' ? message.customEvent : '自定义消息') : '暂不支持的消息' }}</text>
-        </view>
+      <!-- 场景演示：输入栏上方业务入口（#input-toolbar 固定位，随键盘上移）；点一下 = sendCustom 一条场景卡 -->
+      <template #input-toolbar>
+        <demo-composer-bar
+          v-if="showComposer"
+          :items="composerItems"
+          :accent="scenario.accent"
+          more-text="更多"
+          @select="onComposerSelect"
+          @more="panelVisible = true"
+        />
       </template>
+
     </em-chat-page>
 
     <!-- Demo 能力入口：向当前会话注入 mock AI 流式回复（真实链路由 SDK onStreamMessage 驱动） -->
@@ -56,7 +56,7 @@
     <em-popup :visible="panelVisible" position="bottom" @update:visible="panelVisible = $event">
       <view class="scene-panel">
         <view class="scene-panel__head">
-          <text class="scene-panel__title">场景能力开关（实时生效）</text>
+          <text class="scene-panel__title">场景能力开关 · {{ scenario.name }}</text>
           <view class="scene-panel__close" @click="panelVisible = false">
             <em-icon name="xmark-bold" :size="18" color="var(--em-text-secondary)" />
           </view>
@@ -84,19 +84,32 @@
           />
         </view>
 
-        <text class="scene-panel__section">发送演示消息</text>
-        <view class="scene-panel__actions">
-          <view class="scene-panel__btn" @click="sendSceneCard">
-            <text class="scene-panel__btn-text">商品卡片</text>
+        <text class="scene-panel__section">发送自定义卡片（宿主 #custom-message 渲染）</text>
+        <scroll-view scroll-x :show-scrollbar="false" class="scene-panel__cards">
+          <view class="scene-panel__cards-track">
+            <view
+              v-for="card in scenario.chat.cards"
+              :key="card.event"
+              class="scene-panel__card"
+              @click="sendSceneCard(card)"
+            >
+              <text class="scene-panel__card-label">{{ card.label }}</text>
+              <text class="scene-panel__card-event">{{ card.event }}</text>
+            </view>
           </view>
+        </scroll-view>
+        <view class="scene-panel__actions">
           <view class="scene-panel__btn" @click="sendSceneExtText">
-            <text class="scene-panel__btn-text">带 ext 文本</text>
+            <text class="scene-panel__btn-text">{{ scenario.chat.textLabel }}</text>
           </view>
           <view class="scene-panel__btn" @click="insertSceneNotice">
-            <text class="scene-panel__btn-text">交易提示</text>
+            <text class="scene-panel__btn-text">{{ scenario.chat.noticeLabel }}</text>
+          </view>
+          <view class="scene-panel__btn" @click="sendUnregisteredCard">
+            <text class="scene-panel__btn-text">未注册事件</text>
           </view>
         </view>
-        <text class="scene-panel__hint">「商品卡片」走 sendCustom；长按卡片/气泡可触发业务菜单；「交易提示」只落本地，不发服务端。</text>
+        <text class="scene-panel__hint">卡片只发 event/params/ext；聊天页把 #custom-message 交给 demo-card（宿主组件）渲染，UIKit 不含卡片样式。输入栏上方的「发订单/发病例/换手机号」等入口同样由宿主经 #input-toolbar 注入，点一下即发。未知事件走宿主兜底。</text>
       </view>
     </em-popup>
   </view>
@@ -105,8 +118,13 @@
 <script setup lang="ts">
 import { onLoad, onUnload } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE, MESSAGE_TYPE, useConversationUnreadCount, useUnreadCounts } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE, useConversationUnreadCount, useUnreadCounts } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode } from '@/uni_modules/easemob-uikit-uni/libs'
+import { scenarioOf, type ScenarioCard, type ScenarioKey } from '@/common/scenario-catalog'
+import { DEMO_UNKNOWN_EVENT, demoCardOf } from '@/common/demo-card-data'
+import DemoCard from '@/components/demo-card/demo-card.vue'
+import DemoComposerBar from '@/components/demo-composer-bar/demo-composer-bar.vue'
+import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
 import { useDemoTheme } from '@/common/theme'
 import { AI_STREAM_DEMO_CONTENT, AI_STREAM_ERROR_CONTENT, runMockAiStream } from '@/common/ai-stream-demo'
 
@@ -114,10 +132,12 @@ const { themeClass } = useDemoTheme()
 
 const conversationId = ref('')
 const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)
+const scenarioKey = ref<ScenarioKey>('trade')
+const scenario = computed(() => scenarioOf(scenarioKey.value))
 
 // ===== 多场景能力演示（?scene=1）=====
 // 演示开关只存在于 demo 层：进入聊天页后点「场景开关」实时改 props，不污染 UIKit 组件默认行为。
-type SceneFlagKey = 'banner' | 'title' | 'hideAction' | 'quickReplies' | 'quickReplySend' | 'extraMenus'
+type SceneFlagKey = 'banner' | 'title' | 'hideAction' | 'quickReplies' | 'quickReplySend' | 'extraMenus' | 'composer'
 
 interface SceneOption {
   key: SceneFlagKey
@@ -134,35 +154,32 @@ const sceneFlags = reactive<Record<SceneFlagKey, boolean>>({
   hideAction: true,
   quickReplies: true,
   quickReplySend: false,
-  extraMenus: true
+  extraMenus: true,
+  composer: true
 })
 
 const sceneOptions: SceneOption[] = [
   { key: 'banner', label: '顶部业务横幅', desc: '#banner 固定位，不随消息滚动' },
-  { key: 'title', label: '客服标题', desc: 'title="在线客服" 覆盖默认昵称' },
+  { key: 'title', label: '场景标题', desc: 'title 按场景覆盖默认昵称' },
   { key: 'hideAction', label: '隐藏详情入口', desc: 'showAction=false，右上角 more 消失' },
   { key: 'quickReplies', label: '快捷回复条', desc: '输入栏上方常用语胶囊' },
   { key: 'quickReplySend', label: '常用语直接发送', desc: 'quickReplyMode="send"（默认 fill 填草稿）' },
-  { key: 'extraMenus', label: '业务长按动作', desc: 'extraMessageMenus：查看订单/查看处方' }
+  { key: 'extraMenus', label: '业务长按动作', desc: 'extraMessageMenus：按场景注入业务动作' },
+  { key: 'composer', label: '输入栏业务入口', desc: '#input-toolbar：一点即发本场景卡片' }
 ]
 
-const DEMO_QUICK_REPLIES: EmQuickReply[] = [
-  { label: '期望薪资', text: '我的期望薪资是 15-20K' },
-  { label: '到岗时间', text: '我可以在两周内到岗' },
-  { label: '方便沟通', text: '您好，请问现在方便沟通吗？' }
-]
-
-const DEMO_EXTRA_MENUS: EmMessageMenuExtra[] = [
-  { key: 'demo-order', text: '查看订单', icon: 'doc', types: [MESSAGE_TYPE.CUSTOM, MESSAGE_TYPE.TEXT] },
-  { key: 'demo-prescription', text: '查看处方', icon: 'doc', types: [MESSAGE_TYPE.CUSTOM] }
-]
-
-const sceneTitle = computed(() => (isDemo.value && sceneFlags.title ? '在线客服' : ''))
+const sceneTitle = computed(() => (isDemo.value && sceneFlags.title ? scenario.value.chat.title : ''))
 const sceneHideAction = computed(() => isDemo.value && sceneFlags.hideAction)
 const sceneBanner = computed(() => isDemo.value && sceneFlags.banner)
-const sceneQuickReplies = computed<EmQuickReply[]>(() => (isDemo.value && sceneFlags.quickReplies ? DEMO_QUICK_REPLIES : []))
+const sceneQuickReplies = computed<EmQuickReply[]>(() => (isDemo.value && sceneFlags.quickReplies ? scenario.value.chat.quickReplies : []))
 const sceneQuickReplyMode = computed<EmQuickReplyMode>(() => (sceneFlags.quickReplySend ? 'send' : 'fill'))
-const sceneExtraMenus = computed<EmMessageMenuExtra[]>(() => (isDemo.value && sceneFlags.extraMenus ? DEMO_EXTRA_MENUS : []))
+const sceneExtraMenus = computed<EmMessageMenuExtra[]>(() => (isDemo.value && sceneFlags.extraMenus ? scenario.value.chat.extraMenus : []))
+
+// 输入栏上方业务入口：直接由本场景卡片目录生成（entryLabel/entryIcon 属于宿主文案）
+const showComposer = computed(() => isDemo.value && sceneFlags.composer)
+const composerItems = computed<{ key: string; label: string; icon: EmIconName }[]>(() =>
+  scenario.value.chat.cards.map((card) => ({ key: card.event, label: card.entryLabel, icon: card.entryIcon }))
+)
 
 // 单会话未读（P1）：传 ref，进会话清零后面板数字实时变化
 const peerUnread = useConversationUnreadCount(conversationId)
@@ -180,7 +197,8 @@ onLoad((options) => {
   conversationId.value = (options?.['conversationId'] ?? '') as string
   const type = (options?.['chatType'] ?? '') as string
   chatType.value = type === CONVERSATION_TYPE.GROUP_CHAT ? CONVERSATION_TYPE.GROUP_CHAT : CONVERSATION_TYPE.SINGLE_CHAT
-  isDemo.value = options?.['scene'] === '1'
+  scenarioKey.value = (options?.['scenario'] ?? 'trade') as ScenarioKey
+  isDemo.value = options?.['scene'] === '1' || (options?.['scenario'] ?? '') !== ''
 })
 
 // 聊天详情入口（em-chat-page 自绘 header 右上角 more 按钮）
@@ -192,34 +210,58 @@ function onOpenInfo(id: string) {
 function onBannerTap(): void {
   uni.showModal({
     title: '业务横幅',
-    content: '横幅由宿主渲染，点击可跳订单/职位详情；这里只演示点击回调。',
+    content: `${scenario.value.name}：横幅由宿主渲染，点击可跳业务详情；这里只演示点击回调。`,
     showCancel: false
   })
 }
 
-// 业务长按动作：extraMessageMenus 命中后由宿主处理（查看订单/查看处方）
+// 业务长按动作：extraMessageMenus 命中后由宿主处理，载荷优先取卡片 ext 摘要
 function onSceneMessageMenu(key: string, message: EmMessageItem): void {
-  if (key === 'demo-order') {
-    const orderId = String(message.ext.orderId ?? 'SO-20261020-001')
-    uni.showModal({ title: '业务动作 · 查看订单', content: `订单号：${orderId}`, showCancel: false })
-  } else if (key === 'demo-prescription') {
-    uni.showModal({
-      title: '业务动作 · 查看处方',
-      content: `消息事件：${message.customEvent !== '' ? message.customEvent : '文本消息'}`,
-      showCancel: false
-    })
+  if (key !== 'scene-context') return
+  const parts: string[] = []
+  const push = (value: unknown): void => {
+    if (typeof value === 'string' && value !== '') parts.push(value)
+  }
+  push(message.ext.title)
+  push(message.ext.subtitle)
+  push(message.ext.meta)
+  const content = parts.length > 0 ? parts.join(' · ') : JSON.stringify(message.ext)
+  uni.showModal({ title: scenario.value.chat.contextDialogTitle, content, showCancel: false })
+}
+
+// sendCustom：场景卡片（event + params + 结构化 ext）；呈现由宿主 #custom-message 决定
+async function sendSceneCard(card: ScenarioCard): Promise<void> {
+  try {
+    await EmKit.sendCustom(conversationId.value, chatType.value, card.event, card.params, card.ext)
+    panelVisible.value = false
+  } catch (e) {
+    uni.showToast({ title: '发送失败（需在线且会话可用）', icon: 'none' })
   }
 }
 
-// sendCustom：商品卡片（event + params + 结构化 ext）
-async function sendSceneCard(): Promise<void> {
+// 输入栏业务入口：key 即卡片 event，点一下发一条（宿主自己的入口 → 宿主自己的 sendCustom）
+function onComposerSelect(key: string): void {
+  const card = scenario.value.chat.cards.find((item) => item.event === key)
+  if (card == null) {
+    uni.showToast({ title: '该入口未配置卡片', icon: 'none' })
+    return
+  }
+  sendSceneCard(card)
+}
+
+// 未知事件：消息照常收发，但宿主卡片不认识它，走宿主兜底 [自定义消息]
+async function sendUnregisteredCard(): Promise<void> {
   try {
     await EmKit.sendCustom(
       conversationId.value,
       chatType.value,
-      'productCard',
-      { productId: 'P-9527' },
-      { title: '九成新公路车', price: '¥1,280', orderId: 'SO-20261020-001', source: 'scenario-demo' }
+      DEMO_UNKNOWN_EVENT,
+      { source: 'scene-lab' },
+      {
+        title: '宿主不认识的卡片',
+        subtitle: '这个 event 没有对应的宿主渲染分支',
+        fields: [{ label: '预期表现', value: '回落 [自定义消息]' }]
+      }
     )
     panelVisible.value = false
   } catch (e) {
@@ -227,16 +269,27 @@ async function sendSceneCard(): Promise<void> {
   }
 }
 
-// sendText 业务 ext：订单上下文随消息带给对端
+// 卡片行动按钮：宿主组件 emit action，业务行为（跳详情/同意/拒绝）由宿主接管
+function onCardAction(key: string, message: EmMessageItem): void {
+  const card = demoCardOf(message)
+  const title = card != null ? card.title : message.customEvent
+  uni.showModal({
+    title: `卡片动作 · ${key}`,
+    content: `${title}\n事件 ${message.customEvent}（数据由宿主 demo-card 解析，行为由宿主接管）`,
+    showCancel: false
+  })
+}
+
+// sendText 业务 ext：业务上下文随消息带给对端
 async function sendSceneExtText(): Promise<void> {
   try {
     await EmKit.sendText(
       conversationId.value,
       chatType.value,
-      '这个订单什么时候发货？',
+      scenario.value.chat.textContent,
       undefined,
       undefined,
-      { orderId: 'SO-20261020-001', source: 'scenario-demo' }
+      scenario.value.chat.extraExt
     )
     panelVisible.value = false
   } catch (e) {
@@ -244,9 +297,9 @@ async function sendSceneExtText(): Promise<void> {
   }
 }
 
-// insertLocalNotice：只落本地的系统提示灰条（交易状态/转接提示）
+// insertLocalNotice：只落本地的系统提示灰条（场景状态/转接提示）
 function insertSceneNotice(): void {
-  EmKit.insertLocalNotice(conversationId.value, chatType.value, '对方已拍下，等待付款')
+  EmKit.insertLocalNotice(conversationId.value, chatType.value, scenario.value.chat.noticeText)
   panelVisible.value = false
 }
 
@@ -402,77 +455,6 @@ onUnload(() => {
   color: var(--em-primary-color);
 }
 
-/* 自定义商品卡片（#custom-message 宿主内容） */
-.scene-card {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  width: 220px;
-  max-width: 100%;
-  padding: 8px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--em-border-color);
-  border-radius: var(--em-radius);
-  background-color: var(--em-bg-base);
-}
-
-.scene-card__cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  background-color: var(--em-primary-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.scene-card__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  margin-left: 8px;
-}
-
-.scene-card__title {
-  font-family: var(--em-font-family);
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: var(--em-font-weight-medium);
-  color: var(--em-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.scene-card__price {
-  font-family: var(--em-font-family);
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: var(--em-font-weight-semibold);
-  color: var(--em-danger-color);
-}
-
-.scene-card__meta {
-  font-family: var(--em-font-family);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--em-text-tertiary);
-}
-
-.scene-card--fallback {
-  padding: 10px 12px;
-}
-
-.scene-card__fallback-text {
-  font-family: var(--em-font-family);
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--em-text-secondary);
-}
-
 /* 场景开关面板 */
 .scene-panel {
   display: flex;
@@ -586,6 +568,45 @@ onUnload(() => {
   font-size: 12px;
   line-height: 16px;
   color: var(--em-text-primary);
+}
+
+.scene-panel__cards {
+  display: flex;
+  flex-direction: row;
+  margin-top: 8px;
+  white-space: nowrap;
+}
+
+.scene-panel__cards-track {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.scene-panel__card {
+  display: flex;
+  flex-direction: column;
+  min-width: 104px;
+  padding: 6px 10px;
+  margin-right: 8px;
+  border-radius: 8px;
+  background-color: var(--em-bg-secondary);
+  flex-shrink: 0;
+}
+
+.scene-panel__card-label {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+}
+
+.scene-panel__card-event {
+  font-family: var(--em-font-family);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--em-text-tertiary);
 }
 
 .scene-panel__hint {

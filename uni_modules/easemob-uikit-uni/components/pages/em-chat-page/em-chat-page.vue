@@ -153,6 +153,10 @@
       <view :id="BOTTOM_ANCHOR_ID" :class="ns.e('bottom-anchor')"></view>
     </scroll-view>
 
+    <!-- 输入栏上方宿主工具条（#input-toolbar）：业务快捷入口固定位，宿主自绘胶囊/按钮
+         （发订单、发病例、换手机号等），点击后自行 sendCustom/sendText；随键盘一起上移，不参与消息滚动 -->
+    <slot name="input-toolbar" />
+
     <em-chat-inputbar
       v-model="draft"
       :quote="quoteInfo"

@@ -111,7 +111,19 @@
         {
           "path": "pages/scenario/scenario",
           "style": {
-            "navigationBarTitleText": "多场景能力演示"
+            "navigationBarTitleText": "IM 场景实验室"
+          }
+        },
+        {
+          "path": "pages/scenario/detail",
+          "style": {
+            "navigationBarTitleText": "场景详情"
+          }
+        },
+        {
+          "path": "pages/scenario/cards",
+          "style": {
+            "navigationBarTitleText": "自定义卡片预览"
           }
         },
         {

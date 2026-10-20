@@ -1,0 +1,211 @@
+<template>
+  <scroll-view scroll-y :class="['cards', themeClass]">
+    <view class="cards__body">
+      <view class="cards__hero">
+        <text class="cards__title">自定义卡片预览（宿主自绘）</text>
+        <text class="cards__desc">UIKit 只提供 #custom-message 插槽；这些卡片全部来自 demo 层组件 demo/components/demo-card，字段、样式、多语言、动作都由「宿主」决定，可整份替换。</text>
+        <text class="cards__status">未知 event / 无标题由宿主兜底为 [自定义消息]；卡片按钮点击回传 action，业务行为由宿主接管。</text>
+      </view>
+
+      <view v-for="group in groups" :key="group.key" class="cards__group">
+        <view class="cards__group-head">
+          <text class="cards__group-name">{{ group.name }}</text>
+          <text class="cards__group-type">{{ group.type }}</text>
+        </view>
+        <view v-for="item in group.items" :key="item.event" class="cards__item">
+          <demo-card :message="item.message" fallback-text="[自定义消息]" @action="onAction" />
+          <text class="cards__event">{{ item.event }}</text>
+        </view>
+      </view>
+
+      <text class="cards__footer">接入方式：EmKit.sendCustom(...) 发消息 → 聊天页 &lt;template #custom-message="{ message }"&gt; 注入自己的卡片组件。发送入口同理：&lt;template #input-toolbar&gt; 注入「发订单/发病例」等胶囊，点一下即发。需要整卡交互/动画/图片/多语言时，直接改宿主组件，无需改 UIKit。</text>
+    </view>
+  </scroll-view>
+</template>
+
+<script setup lang="ts">
+import { CONVERSATION_TYPE, MESSAGE_STATUS, MESSAGE_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
+import { SCENARIO_LIST } from '@/common/scenario-catalog'
+import { DEMO_UNKNOWN_EVENT } from '@/common/demo-card-data'
+import DemoCard from '@/components/demo-card/demo-card.vue'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
+interface PreviewItem {
+  event: string
+  message: EmMessageItem
+}
+
+interface PreviewGroup {
+  key: string
+  name: string
+  type: string
+  items: PreviewItem[]
+}
+
+// 预览用合成消息：只填渲染需要的字段，不连 SDK / store（本页无需登录）
+function previewMessage(event: string, params: Record<string, string>, ext: Record<string, unknown>): EmMessageItem {
+  return {
+    id: `preview-${event}`,
+    localId: `preview-${event}`,
+    conversationId: 'preview',
+    chatType: CONVERSATION_TYPE.SINGLE_CHAT,
+    type: MESSAGE_TYPE.CUSTOM,
+    text: '',
+    url: '',
+    thumbUrl: '',
+    width: 0,
+    height: 0,
+    time: 0,
+    from: 'demo',
+    to: 'preview',
+    self: false,
+    status: MESSAGE_STATUS.SENT,
+    quote: null,
+    duration: 0,
+    fileName: '',
+    fileSize: 0,
+    ext,
+    rawType: MESSAGE_TYPE.CUSTOM,
+    customEvent: event,
+    customParams: params
+  }
+}
+
+const groups: PreviewGroup[] = SCENARIO_LIST.map((scenario) => ({
+  key: scenario.key,
+  name: scenario.name,
+  type: scenario.chatType === 'groupChat' ? '群聊' : '单聊',
+  items: scenario.chat.cards.map((card) => ({
+    event: card.event,
+    message: previewMessage(card.event, card.params, card.ext)
+  }))
+}))
+
+// 未知事件固定放最后：消息照常收发，但宿主组件不认识 → 走宿主兜底
+groups.push({
+  key: 'unknown',
+  name: '未知事件',
+  type: '宿主兜底',
+  items: [
+    {
+      event: DEMO_UNKNOWN_EVENT,
+      message: previewMessage(DEMO_UNKNOWN_EVENT, { source: 'preview' }, {
+        title: '宿主不认识的卡片',
+        subtitle: '这个 event 没有对应的宿主渲染分支',
+        fields: [{ label: '预期表现', value: '回落 [自定义消息]' }]
+      })
+    }
+  ]
+})
+
+function onAction(key: string): void {
+  uni.showModal({ title: '宿主卡片动作', content: `actionKey = ${key}`, showCancel: false })
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.cards {
+  height: 100%;
+  background-color: var(--em-chat-bg);
+}
+
+.cards__body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-bottom: 24px;
+}
+
+.cards__hero {
+  display: flex;
+  flex-direction: column;
+  margin: 16px 16px 0;
+  padding: 16px;
+  border-radius: 12px;
+  background-color: var(--em-bg-base);
+}
+
+.cards__title {
+  font-family: var(--em-font-family);
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: var(--em-font-weight-semibold);
+  color: var(--em-text-primary);
+}
+
+.cards__desc {
+  margin-top: 8px;
+  font-family: var(--em-font-family);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--em-text-secondary);
+}
+
+.cards__status {
+  margin-top: 8px;
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--em-text-tertiary);
+}
+
+.cards__group {
+  display: flex;
+  flex-direction: column;
+  margin: 16px 16px 0;
+}
+
+.cards__group-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cards__group-name {
+  font-family: var(--em-font-family);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+}
+
+.cards__group-type {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--em-bg-secondary);
+  font-family: var(--em-font-family);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--em-text-secondary);
+}
+
+.cards__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.cards__event {
+  margin-top: 4px;
+  font-family: var(--em-font-family);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--em-text-tertiary);
+}
+
+.cards__footer {
+  margin: 8px 16px 0;
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--em-text-tertiary);
+}
+</style>

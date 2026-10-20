@@ -1,7 +1,7 @@
 # GUIDE-MULTI-SCENARIO.md — 多场景接入指引（客服 / 医疗 / 招聘 / 二手交易）
 
 > 适用对象：用 `easemob-uikit-uni` 做「业务页面放入口 → 直进 1v1 聊天页」的宿主（H5 移动端 / 微信小程序 / App）。
-> 评估依据：`docs/EVAL-MULTI-SCENARIO.md`；P0/P1 能力清单与范围见 `PLAN.md` M2.11 / M2.12。
+> 评估依据：`docs/EVAL-MULTI-SCENARIO.md`；P0/P1 能力清单与范围见 `PLAN.md` M2.11 / M2.12，卡片插槽演示见 M2.14。
 > 阅读顺序：§1 接入模型 → §2 聊天页封装 → §3 P0/P1 能力速查 → §4 场景配方 → §5 平台边界 → §6 Demo 演示。
 
 ## 1. 接入模型（三步）
@@ -104,31 +104,77 @@ await EmKit.sendText(
 - `ext` 必须 JSON 可序列化；空对象等价于不挂 ext。
 - `emQuote`（引用）与 `em_at_list`（@提及）是 UIKit 内部保留 key，**业务 ext 不能覆盖**（同时存在时内部 key 优先）。
 
-### 3.2 卡片消息（`sendCustom` + `#custom-message`）
+### 3.2 卡片消息（`sendCustom` + `#custom-message` 插槽）
 
-商品卡、处方单、面试邀约、砍价出价等结构化消息走自定义消息：
+商品卡、病例、处方、面试邀约、手机号交换、砍价等结构化消息走自定义消息。**UIKit 只负责「发得出、收得到、有插槽」，卡片长什么样、字段怎么排、文案用什么语言，全部由宿主决定**。
+
+**发送**：`sendCustom(event, params?, ext?)`，`params` 只放字符串（SDK 协议字段），结构化内容放 `ext`：
 
 ```ts
 await EmKit.sendCustom(
   peerUserId,
   'singleChat',
-  'productCard',                 // event：业务事件名，宿主自有命名空间
-  { productId: 'P-9527' },       // params：SDK 字符串参数表（跨 UIKit / 服务端互通）
-  { title: '九成新公路车', price: '¥1,280', image: 'https://...' } // ext：结构化载荷
+  'productCard',                    // 宿主自定义事件名
+  { productId: 'P-9527' },          // wire params：跨端/服务端互通
+  {                               // ext：结构化业务载荷（JSON 可序列化）
+    title: '九成新公路车',
+    price: '¥1,280',
+    orderId: 'SO-20261020-001'
+  }
 )
 ```
 
-接收侧（含发送侧回显）在 `#custom-message` 里按 `message.customEvent` 分发：
+**渲染**：聊天页 `#custom-message` 插槽（作用域 `message`），宿主注入自己的卡片组件：
+
+```html
+<em-chat-page :conversation-id="id" chat-type="singleChat">
+  <template #custom-message="{ message }">
+    <my-card
+      :message="message"
+      fallback-text="[自定义消息]"
+      @action="onCardAction"
+    />
+  </template>
+</em-chat-page>
+```
+
+宿主卡片组件的最小形态：
+
+```html
+<!-- my-card.vue：完全属于宿主项目，可任意布局/动画/图片/多语言 -->
+<template>
+  <view v-if="card != null" class="my-card">
+    <image v-if="card.image" :src="card.image" class="my-card__cover" />
+    <text class="my-card__title">{{ card.title }}</text>
+    <view class="my-card__actions">
+      <view class="my-card__btn" @click="emit('action', 'open', message)">{{ t('card.open') }}</view>
+    </view>
+  </view>
+  <view v-else class="my-card my-card--fallback">{{ fallbackText }}</view>
+</template>
+```
+
+`message` 上可直接取：
 
 | 字段 | 说明 |
 |---|---|
 | `message.type` | `MESSAGE_TYPE.CUSTOM`（`'custom'`） |
-| `message.customEvent` | 业务事件名（wire `body.event`） |
+| `message.customEvent` | 业务事件名（wire `body.event`），宿主据此分发卡片 |
 | `message.customParams` | 字符串参数表（wire `body.params`） |
-| `message.ext` | 结构化业务载荷（与 vue 版 uikit 及服务端下发的 custom 消息互通） |
-| `message.rawType` | 恒为 `'custom'`；旧宿主用 `rawType` 非空判别自定义消息仍然成立 |
+| `message.ext` | 结构化业务载荷（与 vue 版 UIKit / 服务端下发的 custom 消息互通） |
+| `message.rawType` | 恒为 `'custom'`；未识别 wire 类型时为其原文 |
+| `message.self` | 是否己方发送（宿主可做左右不同样式） |
 
-`params` 只能放字符串值，复杂结构（数组/对象）放 `ext`。自定义消息发送失败后可正常重发（`customEvent/customParams/ext` 会重建）。
+样式、多语言与交互：
+
+- **样式**：卡片组件用宿主自己的 CSS/设计系统；想跟随 UIKit 明暗主题时消费 `--em-*` token（`--em-bg-base`、`--em-text-primary`、`--em-border-color` 等），主题类在页面根节点即可生效。单卡宽度/间距建议在宿主页面用外层 `view` 包裹控制，五端最稳。
+- **多语言**：UIKit 不产生卡片文案，`useLocale()` 在宿主组件里照常可用；跨语言收发时建议 `ext` 存业务 code（如 `status: 'pending'`），由接收端翻译成当前语言，而不是直接存中文句子。
+- **动作**：卡片内部按钮直接走宿主自己的事件/路由；无需 UIKit 参与。
+- **长按**：`#custom-message` 外层容器会把原生 longpress 冒泡给消息菜单，卡片内容长按也能唤起「复制/引用/删除/业务动作」。`MESSAGE_TYPE.CUSTOM` 的复制/引用摘要回落为 i18n `message.custom`。
+- **兜底**：未知 event、解析失败、无标题由宿主决定（Demo 回落 `[自定义消息]` 灰色气泡）；`#custom-message` 也会收到未识别的 wire 类型，可按 `message.rawType` 再做分支。
+- **为什么内核对卡片只留插槽**：卡片布局/字段/多语言随业务差异极大，内置 schema 必然不够；且 uni-app x 五端无法动态实例化宿主组件，「注册表 + 固定模板」的灵活性不如整卡自绘。内核保证通道稳定，呈现完全下沉。
+
+Demo 参考实现：`demo/components/demo-card`（宿主侧组件，14 种卡片、双动作、手机号脱敏、未知回落）与免登录预览页 `sub-im/pages/scenario/cards`。可直接复制到业务项目后改样式。
 
 ### 3.3 顶部业务条（`#banner`）
 
@@ -259,14 +305,53 @@ markdown 等富格式气泡由 `#stream-message` 插槽接管（未接管时纯�
 
 外部 AI 面板需要同步展示生成过程时，订阅 `EmKit.onStreamMessage(handler)`（分片已合批，`msg.stream.fullText/status` 为最新值；页面卸载必须取消订阅）。生产环境不要把模型 API Key 放前端。完整能力说明见仓库 README「AI 流式消息」章节。
 
+### 3.10 输入栏业务入口（`#input-toolbar`）
+
+发送侧的入口不一定要藏在面板里。更贴近业务的做法是在**输入栏上方放一条场景胶囊条**：客服「发订单/发工单」、医生「发病例/发处方」、HR「发简历/发邀约/换手机号」，点一下就把对应自定义消息发出去。UIKit 只给固定位，胶囊长什么样、有哪些、点了发什么，全是宿主代码：
+
+```html
+<em-chat-page :conversation-id="id" chat-type="singleChat">
+  <template #input-toolbar>
+    <my-composer-bar :items="composerItems" @select="onComposerSelect" />
+  </template>
+</em-chat-page>
+```
+
+```ts
+const composerItems = [
+  { key: 'orderCard', label: '发订单', icon: 'cart-filled' },
+  { key: 'serviceTicket', label: '发工单', icon: 'board' }
+]
+
+function onComposerSelect(key: string): void {
+  const card = MY_CARDS.find((item) => item.event === key)
+  if (card == null) return
+  EmKit.sendCustom(peerUserId, 'singleChat', card.event, card.params, card.ext)
+}
+```
+
+要点：
+
+- **位置**：插槽在消息列表与输入栏之间（快捷回复条之上），随软键盘一起上移，不参与消息滚动；不注入就不占高度。
+- **开关**：入口显隐由宿主 `v-if` 控制（如仅坐席端可见、仅特定工单状态出现），`em-chat-page` 不感知入口存在。
+- **边界**：UIKit 不提供胶囊样式、图标语义、入口排序与点击后的发送逻辑；入口文案走宿主自己的 i18n。
+- **发送即卡片**：点一下 = 一次 `sendCustom`，对端仍由 `#custom-message` 渲染（§3.2），两个插槽互不依赖。
+- **数量**：入口多时宿主自备横向 `scroll-view`；移动端建议 2–4 个高频入口，其余收进「更多」。
+
+Demo 参考：`demo/components/demo-composer-bar`（横向胶囊条，独立样式）+ `demo/sub-im/pages/chat/chat.uvue` 的 `#input-toolbar` 接线；入口清单直接来自场景目录每条卡片的 `entryLabel/entryIcon`，新增一种卡片就自动多一个入口。
+
+![输入栏业务入口（宿主注入 #input-toolbar）](assets/scene-lab-composer.png)
+
 ## 4. 四场景配方
 
 | 场景 | 推荐组合 | 多人服务 |
 |---|---|---|
-| 客服 | `title="在线客服"` + `showAction=false` + `sendText` ext 带来源/订单 + `quickReplies` 话术 + `insertLocalNotice` 转接提示 + AI 流式回复（`onStreamMessage` / `#stream-message`） | 路线 A（共享客服账号单聊）今天可用；人格化转接再上路线 B |
-| 医疗 | `#banner` 病情摘要 + 图片/文件（H5）报告 + `sendCustom('prescription')` 处方卡 + 已读回执 + `extraMessageMenus`「查看处方」 | 路线 B（真群，保留昵称行区分主治/助手） |
-| 招聘 | `#banner` 职位条 + 简历文件 + `sendCustom('interviewInvite')` 邀约卡 + `quickReplies` 常用语 | 路线 A 足够 |
-| 二手交易 | `#banner` 商品条 + `sendCustom('productCard'/'bargainOffer')` + `insertLocalNotice` 交易状态 + `extraMessageMenus`「查看订单」 | 买卖单聊路线 A；平台仲裁三人群走路线 B（二期） |
+| 客服 | `title="在线客服"` + `showAction=false` + `sendText` ext 带来源/订单 + `sendCustom('serviceTicket'/'refundReview')` 工单/退款卡 + `quickReplies` 话术 + `insertLocalNotice` 转接提示 + AI 流式回复 | 路线 A（共享客服账号单聊）今天可用；人格化转接再上路线 B |
+| 医疗 | `#banner` 病情摘要 + 图片/文件（H5）报告 + `sendCustom('medicalCase'/'prescription')` 病例/处方卡 + 已读回执 + `extraMessageMenus`「查看处方」 | 路线 B（真群，保留昵称行区分主治/助手） |
+| 招聘 | `#banner` 职位条 + 简历文件 + `sendCustom('interviewInvite'/'phoneExchange')` 邀约/手机号交换卡 + `quickReplies` 常用语 | 路线 A 足够 |
+| 二手交易 | `#banner` 商品条 + `sendCustom('productCard'/'priceOffer')` + `insertLocalNotice` 交易状态 + `extraMessageMenus`「查看订单」 | 买卖单聊路线 A；平台仲裁三人群走路线 B（二期） |
+
+各场景的高频发卡入口建议直接放 `#input-toolbar`：客服（发订单/发工单/退款审核）、医疗（发病例/发处方）、招聘（发简历/发邀约/换手机号）、交易（发商品/发报价）、家校（发作业/请假审批）、社群（发活动/装备清单）。
 
 路线 A/B 的完整对比见 `docs/EVAL-MULTI-SCENARIO.md` §5。
 
@@ -281,17 +366,37 @@ markdown 等富格式气泡由 `#stream-message` 插槽接管（未接管时纯�
 
 P2 边界（H5 录音、位置消息）尚未落地，接入方需自行兜底或等后续里程碑；快捷回复/自定义菜单动作已随 P1 落地（§3.7/§3.8）。
 
-## 6. Demo 演示（本仓库）
+## 6. Demo 演示（本仓库 · IM 场景实验室）
 
-demo 工程内置了可交互的能力演示，用于验收 P0/P1 能力：
+demo 工程内置「IM 场景实验室」，用同一套 `em-chat-page` 组合出 6 种业务页面，验证 UIKit 的改造空间：
 
-1. 「我的」→「多场景能力演示」→ 选择最近单聊会话或手动输入对端 userId；
-2. 进入演示会话（聊天页 URL 带 `scene=1`），点右侧「场景开关」浮钮打开面板；
-3. 六项开关**实时生效**：顶部业务横幅 / 客服标题 / 隐藏详情入口 / 快捷回复条 / 常用语直接发送 / 业务长按动作；
-4. 面板内三个动作：发送商品卡片（`sendCustom`）、发送带 ext 文本（`sendText`）、插入交易提示（`insertLocalNotice`）；长按商品卡片或文本气泡可触发「查看订单 / 查看处方」；
-5. 面板顶部实时显示「本会话未读 / 总未读」（P1-1 API）。
+| 场景 | 会话形态 | 主要演示 |
+|---|---|---|
+| 在线客服 | 单聊 | 业务页直进、来源/工单横幅、工单/退款卡、快捷话术、转接灰条 |
+| 医患沟通 | 单聊 | 病情摘要 `#banner`、报告图片/文件、病例/处方卡片（仅医生可见角标） |
+| 二手交易 | 单聊 | 商品条、商品/砍价卡片、双动作按钮、交易状态灰条 |
+| 招聘沟通 | 单聊 | 职位条、常用语、简历文件、面试邀约 + 手机号交换（宿主组件脱敏） |
+| 家校沟通 | 群聊 | 班级公告、@老师、成员昵称行、作业卡、请假审批卡 |
+| 兴趣社群 | 群聊 | 群公告、@群主、活动卡、装备清单卡 |
 
-源码：`demo/sub-im/pages/scenario/scenario.uvue`（入口页）、`demo/sub-im/pages/chat/chat.uvue`（`?scene=1` 分支与开关面板）。
+![IM 场景实验室 · 场景列表](assets/scene-lab-gallery.png)
+
+![二手交易 · 业务详情页（同一条 catalog 配置驱动）](assets/scene-lab-detail-trade.png)
+
+体验路径：
+
+1. 「我的」→「IM 场景实验室」→ 选一个场景卡片（业务详情页展示业务上下文、能力点、演示对象）；
+2. 单聊场景填对端 userId（或点最近会话），群聊场景选一个已有群组；点底部主按钮进入会话；
+3. 会话页点右侧「场景开关」浮钮，七项能力**实时生效**：业务横幅 / 场景标题 / 隐藏详情入口 / 快捷回复条 / 常用语直接发送 / 业务长按动作 / 输入栏业务入口；
+4. 输入栏上方的场景胶囊（`#input-toolbar`）一点即发对应卡片；也可在面板内发送本场景的 2–3 种卡片（`sendCustom`，聊天页 `#custom-message` 注入宿主 `demo-card`）、带业务 ext 的文本（`sendText`）、系统提示（`insertLocalNotice`）；点卡片按钮由宿主弹窗展示回传动作；「未知事件」演示宿主兜底；长按卡片/气泡触发业务菜单；顶部实时显示本会话/总未读。
+
+免登录看卡片：列表页顶部「自定义卡片预览」→ `sub-im/pages/scenario/cards`，用宿主 `demo-card` 直接渲染 14 种卡片 + 未知事件回落：
+
+![自定义卡片预览（宿主自绘，免登录）](assets/scene-lab-cards.png)
+
+14 种卡片与「未知事件 → [自定义消息]」的完整长图见 [scene-lab-cards-all.png](assets/scene-lab-cards-all.png)（含 5 种视觉族、字段/角标/主次按钮与手机号脱敏）。
+
+架构：场景数据集中在 `demo/common/scenario-catalog.ts`（业务字段、能力点、横幅、话术、入口胶囊文案、每场景 2–3 条卡片 event/params/ext、菜单），卡片解析在 `demo/common/demo-card-data.ts`、呈现组件在 `demo/components/demo-card`（均为宿主侧代码，不进 UIKit），列表页 `scenario.uvue` → 详情页 `detail.uvue` → 共享聊天页 `chat.uvue?scenario=<key>`。**新增场景只需加一条 catalog 配置 + 一条宿主卡片分支，不复制聊天页**——这本身就是「UIKIT 可组合」的演示。
 
 ---
 

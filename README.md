@@ -2,7 +2,7 @@
 
 环信 IM 的 uni-app 版 UIKit（uni-app x 蒸汽模式），面向 DCloud 插件市场社区分发。MIT 开源。
 
-> 当前状态：**一期开发中（M2.9 群基础、M2.11/M2.12 多场景扩展 P0/P1、M2.13 AI 流式消息已落地）**。一期执行依据见 [PLAN.md](./PLAN.md)，逐日进度与各端验证状态见 [docs/STATUS.md](./docs/STATUS.md)。
+> 当前状态：**一期开发中（M2.9 群基础、M2.11/M2.12 多场景扩展 P0/P1、M2.13 AI 流式消息、M2.14 自定义卡片插槽化已落地）**。一期执行依据见 [PLAN.md](./PLAN.md)，逐日进度与各端验证状态见 [docs/STATUS.md](./docs/STATUS.md)。
 
 ## 开发环境（锁定）
 
@@ -72,7 +72,10 @@ const peerUnread = useConversationUnreadCount(peerUserId)
 | 能力 | 用法 |
 |---|---|
 | 业务上下文 ext | `EmKit.sendText(to, chatType, text, quote?, mentions?, ext?)`，对端从 `message.ext` 读取 |
-| 卡片消息 | `EmKit.sendCustom(to, chatType, event, params?, ext?)`；接收侧 `#custom-message` 插槽按 `message.customEvent` 渲染 |
+| 卡片消息 | `EmKit.sendCustom(to, chatType, event, params?, ext?)` 发送；渲染走 `#custom-message` 插槽（作用域 `message`），**UIKit 不内置卡片组件/样式**，整卡由宿主自绘 |
+| 卡片数据 | `message.customEvent` / `customParams` / `ext` 原样透出；宿主按自己的 event 分发，未知 event 自行兜底 |
+| 卡片动作 | 宿主卡片内部按钮自己 `emit`/跳转即可，不经过 UIKit；Demo 的 `demo-card` 是参考实现（14 种卡片 + 双动作 + 脱敏） |
+| 输入栏发卡入口 | `em-chat-page` 的 `#input-toolbar` 插槽（输入栏上方固定位）；宿主自绘「发订单/发病例/换手机号」等胶囊，点击自行 `sendCustom` |
 | 顶部业务条 | `em-chat-page` 的 `#banner` 插槽（固定位，不随消息滚动）；`title` / `showAction` 控制标题与详情入口 |
 | 系统提示灰条 | `EmKit.insertLocalNotice(conversationId, chatType, text)`（只插本地，不发服务端） |
 | 单会话未读 | `useConversationUnreadCount(conversationId)`（响应式）/ `EmKit.conversationUnreadCountOf(id)`（快照） |
@@ -81,7 +84,7 @@ const peerUnread = useConversationUnreadCount(peerUserId)
 
 完整代码示例（easycom、init→login→navigateTo、四场景配方、平台边界）见 [docs/GUIDE-MULTI-SCENARIO.md](./docs/GUIDE-MULTI-SCENARIO.md)。
 
-**demo 体验**：「我的」→「多场景能力演示」→ 选对端进入会话（`?scene=1`），点「场景开关」实时切换横幅/标题/详情入口/快捷回复/业务菜单，并可发送商品卡片、带 ext 文本、交易提示。
+**demo 体验**：「我的」→「IM 场景实验室」→ 6 个场景卡片（在线客服/医患/二手交易/招聘/家校/兴趣社群）→ 业务详情页选对端或群组（页面底部可预览该场景的输入栏发卡入口）→ 进入会话后输入栏上方直接「发订单/发病例/换手机号」，也可用「场景开关」实时切换横幅/标题/详情入口/快捷回复/业务菜单/输入栏入口，并发送 14 种**宿主自绘**卡片、带 ext 文本与系统提示。列表页的「自定义卡片预览」无需登录，可直接看 14 种宿主卡片与「未知事件回落」。
 
 ## AI 流式消息（Stream Message，M2.13）
 
@@ -180,6 +183,8 @@ themeStore.mode             // 解析后的实际主题：'light' | 'dark'
 - **多场景扩展 P0（M2.11）**：`sendText` 业务 ext、`sendCustom` 自定义消息、`#banner` 顶部业务条、`title`/`showAction`、`insertLocalNotice` 系统提示灰条
 - **多场景扩展 P1（M2.12）**：单会话未读 API、`em-quick-reply-bar` 快捷回复条、`extraMessageMenus` 业务长按动作
 - **AI 流式消息（M2.13）**：`onStreamMessage` 分片合并/丢片补偿、纯文本打字机光标与异常提示、`enableStreamMessage`/`streamThrottle` 配置、`EmKit.onStreamMessage` 订阅、`#stream-message` 富格式插槽
+- **自定义卡片插槽化（M2.14）**：内核只保留 `sendCustom` + `#custom-message` 插槽，不内置卡片组件/schema；Demo 提供宿主侧 `demo-card` 参考实现（14 种卡片、字段/角标/主次按钮、手机号脱敏、未知回落）与免登录预览页
+- **输入栏业务入口（M2.15）**：`em-chat-page` 新增 `#input-toolbar` 插槽；Demo 用 `demo-composer-bar` 注入场景化「发订单/发工单/发病例/发简历/换手机号」等入口，点击即发对应自定义卡片，入口开关可实时切换
 
 二期（M4 起，另行立项）：单条转发、联系人详情页/黑名单、文档站等，见 PLAN.md 第 5 节。一期范围外的功能会在发版时逐条冻结公示，避免重复 issue。
 

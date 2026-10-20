@@ -1,0 +1,484 @@
+<template>
+  <scroll-view scroll-y :class="['detail', themeClass]">
+    <view class="detail__body">
+      <view class="detail__hero" :style="`border-top-color: ${scenario.accent};`">
+        <view class="detail__hero-head">
+          <view class="detail__icon" :style="`background-color: ${scenario.accent};`">
+            <em-icon :name="scenario.icon" :size="26" color="#FFFFFF" />
+          </view>
+          <view class="detail__hero-main">
+            <text class="detail__name">{{ scenario.name }}</text>
+            <text class="detail__tagline">{{ scenario.tagline }}</text>
+          </view>
+        </view>
+        <view class="detail__metric">
+          <text class="detail__metric-label">{{ scenario.metricLabel }}</text>
+          <text class="detail__metric-value" :style="`color: ${scenario.accent};`">{{ scenario.metricValue }}</text>
+        </view>
+        <view class="detail__caps">
+          <text v-for="cap in scenario.capabilities" :key="cap" class="detail__cap">{{ cap }}</text>
+        </view>
+      </view>
+
+      <view class="detail__section">
+        <text class="detail__section-title">业务上下文</text>
+        <view class="detail__fields">
+          <view v-for="field in scenario.fields" :key="field.label" class="detail__field">
+            <text class="detail__field-label">{{ field.label }}</text>
+            <text class="detail__field-value">{{ field.value }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="detail__section">
+        <text class="detail__section-title">{{ scenario.chatType === 'groupChat' ? '选择演示群组' : '演示对象' }}</text>
+
+        <template v-if="scenario.chatType === 'groupChat'">
+          <view v-if="groups.length > 0" class="detail__chips">
+            <view
+              v-for="group in groups"
+              :key="group.groupId"
+              :class="['detail__chip', group.groupId === groupId ? 'detail__chip--active' : '']"
+              @click="groupId = group.groupId"
+            >
+              <text :class="['detail__chip-text', group.groupId === groupId ? 'detail__chip-text--active' : '']">{{ group.name !== '' ? group.name : group.groupId }}</text>
+            </view>
+          </view>
+          <view v-else class="detail__empty">
+            <text class="detail__empty-text">当前账号没有可用群组，请先创建或加入一个群。</text>
+            <view class="detail__link" @click="openGroupPage">
+              <text class="detail__link-text">去群组列表 ›</text>
+            </view>
+          </view>
+        </template>
+
+        <template v-else>
+          <input
+            v-model="peerId"
+            class="detail__input"
+            placeholder="输入聊天对象 userId"
+            placeholder-class="detail__placeholder"
+          />
+          <view v-if="recentPeers.length > 0" class="detail__chips">
+            <view
+              v-for="peer in recentPeers"
+              :key="peer.conversationId"
+              :class="['detail__chip', peer.conversationId === peerId ? 'detail__chip--active' : '']"
+              @click="peerId = peer.conversationId"
+            >
+              <text :class="['detail__chip-text', peer.conversationId === peerId ? 'detail__chip-text--active' : '']">{{ peer.name !== '' ? peer.name : peer.conversationId }}</text>
+            </view>
+          </view>
+        </template>
+      </view>
+
+      <view class="detail__section">
+        <text class="detail__section-title">这个场景演示什么</text>
+        <text v-for="(step, index) in scenario.steps" :key="index" class="detail__step">{{ index + 1 }}. {{ step }}</text>
+      </view>
+
+      <view class="detail__section">
+        <text class="detail__section-title">输入栏业务入口（进入聊天后可见）</text>
+        <text class="detail__section-desc">这些胶囊由宿主注入 em-chat-page 的 #input-toolbar 插槽，点一下 = sendCustom 发一条本场景卡片。图标/文案/顺序都由宿主决定，UIKit 不认识这些业务事件。</text>
+        <view class="detail__composer">
+          <demo-composer-bar :items="composerItems" :accent="scenario.accent" @select="onComposerPreview" />
+        </view>
+      </view>
+
+      <view class="detail__cta" :style="`background-color: ${scenario.accent};`" @click="openChat">
+        <text class="detail__cta-text">{{ ctaText }}</text>
+      </view>
+      <text class="detail__hint">进入会话后点右侧「场景开关」，可逐项开关横幅/标题/详情入口/快捷回复/业务长按动作/输入栏入口，并发送本场景的演示卡片。</text>
+    </view>
+  </scroll-view>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { CONVERSATION_TYPE, EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmConversationItem, EmGroup } from '@/uni_modules/easemob-uikit-uni/libs'
+import { scenarioOf, type ScenarioKey } from '@/common/scenario-catalog'
+import DemoComposerBar from '@/components/demo-composer-bar/demo-composer-bar.vue'
+import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
+const scenarioKey = ref<ScenarioKey>('trade')
+const scenario = computed(() => scenarioOf(scenarioKey.value))
+
+// 输入栏入口的宿主侧配置（文案/图标都来自场景目录）
+const composerItems = computed<{ key: string; label: string; icon: EmIconName }[]>(() =>
+  scenario.value.chat.cards.map((card) => ({ key: card.event, label: card.entryLabel, icon: card.entryIcon }))
+)
+
+// 免登录预览：点击只解释「进聊天后会发什么」，真实发送在聊天页
+function onComposerPreview(key: string): void {
+  const card = scenario.value.chat.cards.find((item) => item.event === key)
+  if (card == null) return
+  uni.showModal({
+    title: card.entryLabel,
+    content: `进入聊天后点这个胶囊 → EmKit.sendCustom(..., '${card.event}') → 对端收到一张「${card.label}」。\n入口与卡片样式都属于宿主，UIKit 只提供 #input-toolbar 固定位和 #custom-message 渲染位。`,
+    showCancel: false
+  })
+}
+
+const peerId = ref('')
+const groupId = ref('')
+
+const recentPeers = computed<EmConversationItem[]>(() =>
+  EmKit.conversations.items
+    .filter((item) => item.chatType === CONVERSATION_TYPE.SINGLE_CHAT)
+    .slice(0, 4)
+)
+
+const groups = computed<EmGroup[]>(() => EmKit.groups.items.slice(0, 6))
+
+const ctaText = computed(() => (
+  scenario.value.chatType === 'groupChat'
+    ? `进入「${scenario.value.name}」群聊演示`
+    : `与${scenario.value.peerLabel}在线沟通`
+))
+
+function pickDefaults(): void {
+  const stored = uni.getStorageSync('demo.scene.peer') as string
+  if (stored !== '') {
+    peerId.value = stored
+  } else if (recentPeers.value.length > 0) {
+    peerId.value = recentPeers.value[0].conversationId
+  }
+  if (groupId.value === '' && groups.value.length > 0) {
+    groupId.value = groups.value[0].groupId
+  }
+}
+
+onLoad((options) => {
+  scenarioKey.value = (options?.['scenario'] ?? 'trade') as ScenarioKey
+  uni.setNavigationBarTitle({ title: scenario.value.name })
+  pickDefaults()
+  // 群/会话快照懒刷新：从其它页面直接进入详情时也能拿到最新列表（失败静默）
+  EmKit.getJoinedGroups().then(() => pickDefaults()).catch(() => {})
+  EmKit.syncConversations().then(() => pickDefaults()).catch(() => {})
+})
+
+onShow(() => {
+  pickDefaults()
+})
+
+function openGroupPage(): void {
+  uni.navigateTo({ url: '/sub-im/pages/group/group' })
+}
+
+function openChat(): void {
+  if (scenario.value.chatType === 'groupChat') {
+    if (groupId.value === '') {
+      uni.showToast({ title: '请先选择群组', icon: 'none' })
+      return
+    }
+    uni.navigateTo({
+      url: `/sub-im/pages/chat/chat?conversationId=${groupId.value}&chatType=groupChat&scenario=${scenario.value.key}&scene=1`
+    })
+    return
+  }
+  const id = peerId.value.trim()
+  if (id === '') {
+    uni.showToast({ title: '请输入对端 userId', icon: 'none' })
+    return
+  }
+  uni.setStorageSync('demo.scene.peer', id)
+  uni.navigateTo({
+    url: `/sub-im/pages/chat/chat?conversationId=${encodeURIComponent(id)}&chatType=singleChat&scenario=${scenario.value.key}&scene=1`
+  })
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--em-bg-secondary);
+}
+
+/* 子项 margin 承担间距，避免 scroll-view 内容盒对 padding 的宽度解析问题 */
+.detail__body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.detail__hero {
+  display: flex;
+  flex-direction: column;
+  margin: var(--em-spacing-4) var(--em-spacing-4) 0;
+  padding: var(--em-spacing-4);
+  border-top-width: 4px;
+  border-top-style: solid;
+  border-radius: 12px;
+  background-color: var(--em-bg-base);
+}
+
+.detail__hero-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.detail__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.detail__hero-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--em-spacing-3);
+}
+
+.detail__name {
+  font-family: var(--em-font-family);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: var(--em-font-weight-semibold);
+  color: var(--em-text-primary);
+}
+
+.detail__tagline {
+  margin-top: 2px;
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 19px;
+  color: var(--em-text-secondary);
+}
+
+.detail__metric {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--em-spacing-3);
+  padding: 9px var(--em-spacing-3);
+  border-radius: 10px;
+  background-color: var(--em-bg-secondary);
+}
+
+.detail__metric-label {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 16px;
+  color: var(--em-text-secondary);
+}
+
+.detail__metric-value {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-16);
+  line-height: 22px;
+  font-weight: var(--em-font-weight-semibold);
+}
+
+.detail__caps {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: var(--em-spacing-3);
+}
+
+.detail__cap {
+  margin-right: var(--em-spacing-2);
+  margin-bottom: var(--em-spacing-1);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: var(--em-bg-active);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-11);
+  line-height: 15px;
+  color: var(--em-primary-color);
+}
+
+.detail__section {
+  display: flex;
+  flex-direction: column;
+  margin: var(--em-spacing-3) var(--em-spacing-4) 0;
+  padding: var(--em-spacing-4);
+  border-radius: 12px;
+  background-color: var(--em-bg-base);
+}
+
+.detail__section-title {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 16px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-secondary);
+}
+
+.detail__section-desc {
+  margin-top: var(--em-spacing-2);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 18px;
+  color: var(--em-text-tertiary);
+}
+
+/* 输入栏入口预览：模拟宿主插槽条在聊天页里的形态 */
+.detail__composer {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--em-spacing-3);
+  border-radius: 10px;
+  overflow: hidden;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-border-color);
+}
+
+.detail__fields {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--em-spacing-1);
+}
+
+.detail__field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.detail__field-label {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 18px;
+  color: var(--em-text-tertiary);
+}
+
+.detail__field-value {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-14);
+  line-height: 19px;
+  color: var(--em-text-primary);
+}
+
+.detail__input {
+  margin-top: var(--em-spacing-2);
+  padding: 0 var(--em-spacing-3);
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--em-bg-secondary);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-14);
+  color: var(--em-text-primary);
+}
+
+.detail__placeholder {
+  color: var(--em-text-tertiary);
+}
+
+.detail__chips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: var(--em-spacing-2);
+}
+
+.detail__chip {
+  margin-right: var(--em-spacing-2);
+  margin-bottom: var(--em-spacing-1);
+  padding: var(--em-spacing-1) var(--em-spacing-3);
+  border-radius: 999px;
+  background-color: var(--em-bg-secondary);
+}
+
+.detail__chip--active {
+  background-color: var(--em-bg-active);
+}
+
+.detail__chip-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 16px;
+  color: var(--em-text-primary);
+}
+
+.detail__chip-text--active {
+  color: var(--em-primary-color);
+  font-weight: var(--em-font-weight-medium);
+}
+
+.detail__empty {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--em-spacing-2);
+}
+
+.detail__empty-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 19px;
+  color: var(--em-text-secondary);
+}
+
+.detail__link {
+  margin-top: var(--em-spacing-2);
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background-color: var(--em-bg-secondary);
+}
+
+.detail__link-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-12);
+  line-height: 16px;
+  color: var(--em-text-primary);
+}
+
+.detail__step {
+  margin-top: var(--em-spacing-2);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 19px;
+  color: var(--em-text-secondary);
+}
+
+.detail__cta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin: var(--em-spacing-4) var(--em-spacing-4) 0;
+  height: 48px;
+  border-radius: 10px;
+}
+
+.detail__cta-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-16);
+  line-height: 22px;
+  font-weight: var(--em-font-weight-medium);
+  color: #FFFFFF;
+}
+
+.detail__hint {
+  margin: var(--em-spacing-2) var(--em-spacing-4) var(--em-spacing-5);
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-11);
+  line-height: 17px;
+  color: var(--em-text-tertiary);
+}
+</style>

@@ -1,0 +1,206 @@
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+/* Demo 宿主卡片样式：整份文件属于 demo，业务方可任意改尺寸/颜色/圆角/布局。
+   只消费 UIKit 的 --em-* token，保证暗色模式自动跟随；不依赖 UIKit 内部类名。 */
+.demo-card {
+  display: flex;
+  flex-direction: column;
+  width: 232px;
+  max-width: 100%;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-border-color);
+  border-radius: var(--em-file-card-radius);
+  background-color: var(--em-bg-base);
+  overflow: hidden;
+}
+
+.demo-card__head {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 10px 12px 8px;
+}
+
+.demo-card__icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--em-radius);
+  background-color: var(--em-primary-color);
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.demo-card__icon--order {
+  background-color: var(--em-warning-color);
+}
+
+.demo-card__icon--document {
+  background-color: var(--em-success-color);
+}
+
+.demo-card__icon--profile {
+  background-color: var(--em-primary-color);
+}
+
+.demo-card__icon--action {
+  background-color: var(--em-primary-color);
+}
+
+.demo-card__icon-glyph {
+  color: #ffffff;
+}
+
+.demo-card__head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-card__title {
+  font-family: var(--em-font-family);
+  font-size: 14px;
+  font-weight: var(--em-font-weight-medium);
+  line-height: 20px;
+  color: var(--em-text-primary);
+}
+
+.demo-card__badge {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--em-bg-active);
+}
+
+.demo-card__badge-text {
+  font-family: var(--em-font-family);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--em-primary-color);
+}
+
+.demo-card__subtitle {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--em-text-secondary);
+  margin-top: 1px;
+}
+
+.demo-card__fields {
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 8px;
+}
+
+.demo-card__field {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 3px 0;
+}
+
+.demo-card__field-label-host {
+  width: 66px;
+  flex-shrink: 0;
+}
+
+.demo-card__field-label {
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--em-text-tertiary);
+}
+
+.demo-card__field-value-host {
+  flex: 1;
+  min-width: 0;
+}
+
+.demo-card__field-value {
+  font-family: var(--em-font-family);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--em-text-primary);
+}
+
+.demo-card__foot {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: var(--em-divider-color);
+}
+
+.demo-card__foot-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--em-font-family);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--em-text-tertiary);
+  margin-right: 8px;
+}
+
+.demo-card__actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-left: auto;
+}
+
+.demo-card__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  margin-left: 8px;
+  border-radius: 999px;
+}
+
+.demo-card__btn-primary {
+  background-color: var(--em-primary-color);
+}
+
+.demo-card__btn-secondary {
+  background-color: var(--em-control-bg);
+}
+
+.demo-card__btn-text-primary {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 26px;
+  color: #ffffff;
+}
+
+.demo-card__btn-text-secondary {
+  font-family: var(--em-font-family);
+  font-size: 12px;
+  line-height: 26px;
+  color: var(--em-text-primary);
+}
+
+/* 未知 event / 无标题的宿主兜底：样式完全由宿主决定，这里用灰色气泡对齐聊天占位 */
+.demo-card--fallback {
+  width: auto;
+  max-width: 240px;
+  padding: 9px 12px;
+  border-width: 0;
+  border-radius: var(--em-bubble-radius);
+  background-color: var(--em-bubble-bg-other);
+}
+
+.demo-card__fallback-text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-15);
+  line-height: 21px;
+  color: var(--em-bubble-text-other);
+}

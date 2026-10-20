@@ -22,7 +22,8 @@
 | 主题定制（品牌主色 + CSS 变量） | ✅ | `primaryColor` + `--em-*` tokens |
 | i18n 扩展 | ✅ | `mergeMessages(locale, table)` |
 | 输入栏功能裁剪 | ✅ | `EmKitConfig.inputFeatures` / `emojiList` |
-| 系统侧下发卡片消息渲染 | ✅ | 接收侧 `EmMessageItem.ext` + `#custom-message` 插槽按 `rawType` 渲染（`libs/chat/message.ts`、`em-chat-page.vue`） |
+| 系统侧下发卡片消息渲染 | ✅ | `#custom-message` 插槽整卡自绘（作用域 `message`，含 `customEvent`/`customParams`/`ext`）；卡片样式/字段/多语言/动作由宿主决定，UIKit 不内置卡片组件（M2.14 设计结论） |
+| 输入栏上方业务发卡入口 | ✅ | `#input-toolbar` 插槽（消息列表与输入栏之间，无作用域、不注入不占位）；入口胶囊/图标/排序/发送逻辑归宿主，点击自行 `sendCustom`（M2.15） |
 | SDK 加载/登录就绪门 | ✅ | `EmKit.whenReady()`（含小程序分包异步 SDK） |
 
 **四场景同为 1v1，chatType 未贯通（M2.9 才做群）对直进场景不构成阻碍**（伪装群除外，见 §5）。
@@ -172,6 +173,9 @@ props（`conversationId`/`avatarShape`）、插槽（`#custom-message`/`#empty`�
 | P2-1 H5 录音 / P2-2 位置消息 | — | 按边界项处理（H5 录音入口已隐藏，位置消息一期砍） |
 | M2.9 群基础 | ✅ | 2026-10-16 完成（chatType 贯通/群会话/群形态/@提及/群管理/群系统通知） |
 | M2.11 / M2.12 | ✅ | 2026-10-20 P0 四项 + P1 三项落地（见上表） |
+| M2.14 自定义卡片插槽化 | ✅ | 内核只保留 `sendCustom` + `#custom-message` 插槽；**不内置卡片组件/注册表/schema**。Demo 侧 `demo/components/demo-card` 参考实现（14 种卡片/双动作/手机号脱敏/未知回落）+ 免登录预览页；业务方可整卡替换 |
+| M2.15 输入栏业务入口 | ✅ | `em-chat-page` 新增 `#input-toolbar` 插槽（消息列表与输入栏之间，随键盘上移、不注入不占位）；Demo `demo-composer-bar` 注入客服「发订单/发工单」、医疗「发病例/发处方」、招聘「发简历/发邀约/换手机号」等场景入口，点击即 `sendCustom`；入口开关实时生效 |
+| Demo 演示 | ✅ | IM 场景实验室：6 场景（客服/医患/交易/招聘/家校/社群）由 `demo/common/scenario-catalog.ts` 配置驱动，列表页 → 业务详情页 → 共享聊天页；每场景 2–3 种宿主自绘卡片（共 14 种）+ 输入栏场景入口条，列表页另有免登录「自定义卡片预览」；详见 `docs/GUIDE-MULTI-SCENARIO.md` §6 |
 | 伪装模式（§6-3） | ◐ 预留 | M2.9 已预留群形态独立开关（`showMemberCount`/`senderNameMode`/`showAnnouncement`/`enableMention` + chat-info 三开关），P0-3 `showAction` 可接管 `open-info`；仍缺 `senderNameMode='on-change'` 档、群指示「一键隐藏」组合配置、成员事件渲染策略档位，待伪装批次立项 |
 
 **接入指引**：`docs/GUIDE-MULTI-SCENARIO.md`（四场景 init→login→navigateTo、P0/P1 能力代码示例、平台边界）。

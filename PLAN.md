@@ -30,7 +30,7 @@
 | 页面 | 组件名 | 内容 |
 |---|---|---|
 | 会话列表页 | `em-conversation-page` | 头像+未读徽标、昵称、最后消息摘要、时间、草稿、`@我` 提示、置顶/免打扰标记、会话搜索（本地过滤名称/摘要）、筛选 tab（全部/未读/@我/单聊/群组，对齐 vue conversation-tabs，纯 UI+本地过滤、数据零新增）、滑动删除、点击进入聊天 |
-| 聊天页 | `em-chat-page` | 消息列表（list-view 复用）、5 种气泡、输入栏、长按菜单（支持业务动作追加）、群公告条位、业务横幅位（`#banner`）、下拉加载历史、自定义消息收发（`#custom-message` + `EmKit.sendCustom`）、快捷回复条 |
+| 聊天页 | `em-chat-page` | 消息列表（list-view 复用）、5 种气泡、输入栏、长按菜单（支持业务动作追加）、群公告条位、业务横幅位（`#banner`）、输入栏业务入口位（`#input-toolbar`）、下拉加载历史、自定义消息收发（`#custom-message` 插槽 + `EmKit.sendCustom`）、快捷回复条 |
 | 登录接入 | demo 内置 `pages/login` | appkey + userId + token 登录；demo 提供「测试 token 获取」入口（仅开发用） |
 
 ### 1.2 消息气泡（5 种 + 出口）
@@ -40,7 +40,8 @@
 - 语音（`em-voice-message`）：时长刻度、播放态动画、未读红点
 - 视频（`em-video-message`）：封面 + 原生 `video` 组件播放
 - 文件（`em-file-message`）：图标 + 文件名 + 大小 + 下载进度
-- 自定义消息出口（`em-custom-message`）：插槽接管，给社区用户扩展
+- 自定义消息出口：`#custom-message` 插槽整卡自绘（UIKit 不内置卡片组件，M2.14）
+- 发送侧业务入口：`#input-toolbar` 插槽（输入栏上方固定位，宿主自绘「发订单/发病例/换手机号」等胶囊并自行 `sendCustom`，M2.15）
 - 不支持类型（位置/名片等）统一渲染「暂不支持的消息」占位
 
 ### 1.3 聊天页交互
@@ -227,7 +228,7 @@ easemob-uikit-uniapp/
   - **P1-1 per-conversation 未读**：`conversationUnreadCountOf(conversationId)` 同步快照 + `useConversationUnreadCount(conversationId)` 响应式 computed + `EmKit.conversationUnreadCountOf(id)`；数据源仍为 `conversationStore.items`，不新增轮询。
   - **P1-2 快捷回复条**：新原子组件 `em-quick-reply-bar`（`items: EmQuickReply[]`（label/text）、`select` emit、横向滚动胶囊）；`em-chat-page` 增 `quickReplies` 与 `quickReplyMode('fill'|'send')`（默认 fill = 替换草稿），由输入栏上方内置渲染（禁用态/空列表自动隐藏）。
   - **P1-3 自定义长按菜单动作**：`EmMessageMenuExtra`（继承 `EmActionSheetAction` + `types` 过滤）；`em-chat-page` 增 `extraMessageMenus` prop 与 `message-menu(key, message)` emit；自定义项追加在内置项之后、删除项之前（删除保持末位），内置 key 保留不可覆盖，NOTICE 灰条不显示。
-  - **demo 演示（用户验收要求）**：我的页入口「多场景能力演示」→ 选择对端 → 聊天页 `?scene=1` 显示「场景开关」面板；六项开关实时控制 `#banner`/`title`/`showAction`/`quickReplies`/`quickReplyMode`/`extraMessageMenus`，面板内演示 `sendCustom` 商品卡、`sendText` 业务 ext、`insertLocalNotice` 交易提示与单会话未读。
+  - **demo 演示（用户验收要求）**：新增「IM 场景实验室」入口（`scenario` 场景列表页 + `detail` 业务详情页 + 共享聊天页 `?scenario=`），6 个场景（在线客服/医患沟通/二手交易/招聘沟通/家校沟通/兴趣社群）由 `demo/common/scenario-catalog.ts` 配置驱动；详情页展示业务上下文/能力点/演示对象（单聊 userId 或群组），聊天页「场景开关」实时控制 `#banner`/`title`/`showAction`/`quickReplies`/`quickReplyMode`/`extraMessageMenus`，并演示场景化 `sendCustom`/`sendText` ext/`insertLocalNotice` 与单会话未读。新增场景 = 加一条 catalog 配置，不复制聊天页。
 - **明确不做**：P2 边界（H5 录音、位置消息）；伪装模式批次（`senderNameMode='on-change'`/群指示一键隐藏，另立项）；自定义菜单整菜单接管（vue 的 `#message-action-menu` 全接管，一期只做追加动作）。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200。
 - **产出**：`docs/GUIDE-MULTI-SCENARIO.md` 增 P1 用法；EVAL §7 状态更新；契约 skill 同步。
@@ -243,6 +244,28 @@ easemob-uikit-uniapp/
   - **Demo/文档**：聊天页「AI 演示」悬浮入口（mock 分片注入，完成/异常/停止）；「我的」页流式开关；样式实验室流式气泡演示；README 增接入章节。
 - **明确不做**：markdown 渲染器内置（重依赖不进内核，留插槽）；客户端发送流式消息（SDK 语义只收不发）；AI 模型直连/API Key 管理（生产走业务服务端代理）。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200；真机/真实账号 `onStreamMessage` 端到端待验（见 STATUS.md）。
+
+### M2.14：自定义卡片宿主插槽化 + Demo 参考实现（2026-10-20 立项，设计评审定稿）
+
+- **背景**：订单、病例、手机号交换等卡片业务差异大，样式/字段/文案由业务侧主导；内核若内置卡片组件与 schema，会持续膨胀且难以覆盖真实布局。M2.11 已有 `sendCustom` + `#custom-message` 插槽，本里程碑把「卡片怎么画」明确划给宿主，并用 Demo 给出可复制实现。
+- **决策（设计评审）**：**不在 UIKit 内置卡片组件/注册表**。理由：①卡片布局、字段、多语言随业务变化，内置 schema 必然不够用；②uni-app x 无法动态实例化宿主组件，注册表只能渲染固定模板，灵活性反而受限；③`#custom-message` 已能整卡自绘，样式/交互/文案完全归宿主，内核只保留收发与出口。
+- **范围**：
+  - **内核**：保持 `sendCustom(to, chatType, event, params?, ext?)`、`MESSAGE_TYPE.CUSTOM`、`customEvent/customParams/ext`、`#custom-message` 插槽（作用域 `message`）；插槽外层容器继续承接原生 longpress（卡片长按可打开消息菜单）；补齐文档与宿主实现示例。
+  - **Demo 参考组件**：新增宿主侧 `demo/components/demo-card`（独立样式，不进入 uni_modules）——按 `customEvent` + `ext` 渲染 12 种场景卡片，含字段/角标/主次动作，`action` emit 回宿主；`phoneExchange` 在宿主侧读 `customParams` 并脱敏，演示任意业务逻辑。
+  - **Demo 聊天页**：`#custom-message` 插槽直接注入 `demo-card`；未知 event / 无 ext 标题回落 `[自定义消息]`；场景面板发送 12 种卡片并保留「未知事件」按钮。
+  - **免登录预览**：`sub-im/pages/scenario/cards` 用宿主卡片组件渲染 12 种卡片 + 未知回落，便于业务方/设计直接对照。
+- **明确不做**：UIKit 内置卡片组件/注册表/schema；卡片富文本；宿主组件动态注册（uni-app x 限制）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200；真机/真实账号待验（12 种卡片收发、动作回传、未知回落）。
+
+### M2.15：输入栏业务入口（`#input-toolbar`）+ 场景化发卡（2026-10-20 立项）
+
+- **背景**：M2.14 把卡片呈现下沉后，发送入口仍藏在「长按菜单 / 场景面板」里，离业务动作太远。客服要「发订单」、医生要「发病例」、HR 要「发简历/换手机号」，最自然的位置是输入栏上方。入口的样式、图标语义、排序、点击逻辑都属于业务，内核只需补一个固定位。
+- **范围**：
+  - **内核**：`em-chat-page` 新增 `#input-toolbar` 具名插槽——位置在消息列表与输入栏之间（快捷回复条之上），无作用域、随软键盘上移、不参与消息滚动；不注入时不占高度。不新增 props/emits/组件/类型。
+  - **Demo 宿主实现**：新增 `demo/components/demo-composer-bar`（横向胶囊条，独立 `.vue` + `.css`，场景主色只染图标，不写 UIKit token）；聊天页用 `#input-toolbar` 注入本场景入口，点击 → `sendCustom` 发对应卡片；「场景开关」新增第 7 项「输入栏业务入口」可实时关掉。
+  - **场景目录**：每条卡片补 `entryLabel`（短动词胶囊文案）/`entryIcon`；新增 `orderCard`（客服「发订单」）与 `resumeCard`（招聘「发简历」），卡片总数 12 → 14；详情页增免登录「输入栏业务入口」预览。
+- **明确不做**：内置入口条组件、入口配置 schema、入口图标语义（UIKit 只出插槽）；UIKit 内自动发卡（发送时机与内容由宿主掌控）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200；聊天内入口点击/键盘联动需真实账号，待验（见 STATUS.md）。
 
 ### M3：组件沉淀与发布
 
