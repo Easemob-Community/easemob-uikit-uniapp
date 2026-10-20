@@ -4,6 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>easemob-uikit-uni demo</title>
+    <!-- H5 无 setNavigationBarColor/setTabBarStyle：按主题引擎写到 <html data-em-theme> 的生效主题覆盖 uni 内置 chrome -->
+    <style>
+      html[data-em-theme='dark'] .uni-page-head {
+        background-color: #1e2123 !important;
+        color: #ffffff !important;
+      }
+      html[data-em-theme='light'] .uni-page-head {
+        background-color: #ffffff !important;
+        color: #171a1c !important;
+      }
+      html[data-em-theme='dark'] .uni-tabbar {
+        background-color: #1e2123 !important;
+      }
+      html[data-em-theme='dark'] .uni-tabbar-border {
+        background-color: #333537 !important;
+      }
+      html[data-em-theme='light'] .uni-tabbar {
+        background-color: #ffffff !important;
+      }
+      html[data-em-theme='light'] .uni-tabbar-border {
+        background-color: rgba(0, 0, 0, 0.33) !important;
+      }
+    </style>
     <!--preload-links-->
     <!--app-context-->
   </head>

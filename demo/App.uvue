@@ -1,5 +1,9 @@
 <script setup lang="uts">
+import { initTheme } from '@/uni_modules/easemob-uikit-uni/libs/use/useTheme'
+
 onLaunch(() => {
+  // 主题引擎先于首屏：默认 auto 跟随系统，读取持久化偏好并订阅系统深浅色变化
+  initTheme()
   console.log('App Launch: easemob-uikit-uni demo')
 })
 </script>

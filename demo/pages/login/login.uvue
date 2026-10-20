@@ -1,32 +1,120 @@
 <template>
-  <view class="login">
-    <view class="login__header">
-      <text class="login__title">环信 IM Demo</text>
-      <text class="login__subtitle">easemob-uikit-uni 演示工程</text>
-      <text class="login__sdk">easemob-websdk v{{ SDK_VERSION }}</text>
-    </view>
+  <view class="login" :class="themeClass" :style="{ paddingTop: safeTop + 'px' }">
+    <!-- 背景光晕（复刻 vue3 demo 登录页右上角紫色光晕；两层满屏线性渐变模拟柔光，避免圆形硬边） -->
+    <view class="login__glow login__glow--pink" />
+    <view class="login__glow login__glow--core" />
 
-    <view class="login__form">
-      <input class="login__input" v-model="appkey" placeholder="appkey（环信控制台获取）" />
-      <input class="login__input" v-model="userId" placeholder="userId" />
-      <input class="login__input" v-model="token" placeholder="access token" />
-      <button class="login__btn" :disabled="logging" @click="onLogin">{{ logging ? '登录中…' : '登录' }}</button>
-      <text class="login__error" v-if="errorText !== ''">{{ errorText }}</text>
-    </view>
-
-    <view class="login__dev">
-      <text class="login__dev-title" @click="showDev = !showDev">开发用：密码换 token {{ showDev ? '▲' : '▼' }}</text>
-      <view v-if="showDev" class="login__dev-body">
-        <input class="login__input" v-model="password" placeholder="密码（仅开发调试用）" password />
-        <button class="login__btn login__btn--plain" :disabled="fetchingToken" @click="onFetchToken">
-          {{ fetchingToken ? '获取中…' : '获取测试 token' }}
-        </button>
-        <text class="login__dev-tip">仅限开发调试，凭据不会写入仓库</text>
+    <!-- 左上角品牌字标 -->
+    <view class="login__brand">
+      <text class="login__brand-name">环信</text>
+      <view class="login__brand-lines">
+        <text class="login__brand-slogan">简开发 智连接</text>
+        <text class="login__brand-sub">声网旗下品牌</text>
       </view>
     </view>
 
-    <view class="login__footer">
-      <button class="login__btn login__btn--plain" @click="onOpenSpike">SDK Spike 页 →</button>
+    <view class="login__content">
+      <view class="login__card">
+        <view class="login__shimmer login__shimmer--top" />
+
+        <!-- 开发者模式入口（对齐 vue3 demo 卡片右上角 </>） -->
+        <view
+          class="login__dev-entry"
+          :class="showDev ? 'login__dev-entry login__dev-entry--active' : 'login__dev-entry'"
+          @click="toggleDev"
+        >
+          <text
+            class="login__dev-icon"
+            :class="showDev ? 'login__dev-icon login__dev-icon--active' : 'login__dev-icon'"
+          >{{ DEV_ICON }}</text>
+        </view>
+
+        <view class="login__body">
+          <view class="login__titles">
+            <text class="login__subtitle">欢迎体验</text>
+            <text class="login__title">环信 IM Demo</text>
+            <text class="login__tagline">EASEMOB UIKIT · UNI-APP</text>
+          </view>
+
+          <view class="login__form">
+            <input
+              class="login__input"
+              :class="focused === 'appkey' ? 'login__input login__input--focused' : 'login__input'"
+              v-model="appkey"
+              placeholder="appkey（环信控制台获取）"
+              placeholder-style="color: #b0bec5"
+              cursor-color="#009eff"
+              @focus="onFocus('appkey')"
+              @blur="onBlur"
+            />
+            <input
+              class="login__input"
+              :class="focused === 'userId' ? 'login__input login__input--focused' : 'login__input'"
+              v-model="userId"
+              placeholder="userId"
+              placeholder-style="color: #b0bec5"
+              cursor-color="#009eff"
+              @focus="onFocus('userId')"
+              @blur="onBlur"
+            />
+            <input
+              class="login__input"
+              :class="focused === 'token' ? 'login__input login__input--focused' : 'login__input'"
+              v-model="token"
+              placeholder="access token"
+              placeholder-style="color: #b0bec5"
+              cursor-color="#009eff"
+              @focus="onFocus('token')"
+              @blur="onBlur"
+            />
+
+            <text v-if="errorText !== ''" class="login__error">{{ errorText }}</text>
+
+            <view
+              class="login__submit"
+              :class="logging ? 'login__submit login__submit--busy' : 'login__submit'"
+              @click="onLogin"
+            >
+              <text class="login__submit-text">{{ logging ? '登录中…' : '立即登录' }}</text>
+            </view>
+
+            <view class="login__helper" @click="toggleDev">
+              <text class="login__helper-text">{{ showDev ? '收起开发者配置' : '开发者配置' }}</text>
+            </view>
+
+            <!-- 开发者配置：密码换 token（仅开发用） -->
+            <view v-if="showDev" class="login__dev">
+              <input
+                class="login__input"
+                :class="focused === 'password' ? 'login__input login__input--focused' : 'login__input'"
+                v-model="password"
+                placeholder="密码（仅开发调试用）"
+                placeholder-style="color: #b0bec5"
+                cursor-color="#009eff"
+                password
+                @focus="onFocus('password')"
+                @blur="onBlur"
+              />
+              <view
+                class="login__dev-btn"
+                :class="fetchingToken ? 'login__dev-btn login__dev-btn--busy' : 'login__dev-btn'"
+                @click="onFetchToken"
+              >
+                <text class="login__dev-btn-text">{{ fetchingToken ? '获取中…' : '获取测试 token' }}</text>
+              </view>
+              <text class="login__dev-tip">仅限开发调试，凭据不会写入仓库</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="login__shimmer login__shimmer--bottom" />
+      </view>
+    </view>
+
+    <view class="login__footer" :style="{ paddingBottom: (24 + safeBottom) + 'px' }">
+      <text class="login__footer-text">© 2026 环信</text>
+      <text class="login__footer-text login__footer-text--dim">SDK 版本：{{ SDK_VERSION }} · easemob-uikit-uni</text>
+      <text class="login__footer-link" @click="onOpenSpike">SDK Spike 页 →</text>
     </view>
   </view>
 </template>
@@ -34,7 +122,11 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, getStorage, setStorage } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, getStorage, setStorage, getSafeAreaBottom, getSafeAreaTop, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+
+// 登录页是固定深色品牌页（渐变底 + 光晕，两种主题下都不变），不消费明暗 token；
+// 仅接 themeClass 保持主题引擎初始化一致（自定义导航栏页不做原生 chrome 同步，避免状态栏前景色被覆盖）。
+const { themeClass } = useTheme()
 
 const KEY_APPKEY = 'emkit.appkey'
 const KEY_USERID = 'emkit.userId'
@@ -42,6 +134,12 @@ const KEY_TOKEN = 'emkit.token'
 
 // 与 demo/package.json 的 easemob-websdk 依赖版本保持一致
 const SDK_VERSION = '5.1.3'
+
+// 自定义导航栏：App / 小程序给状态栏让位；H5 为 0
+const safeTop = getSafeAreaTop()
+const safeBottom = getSafeAreaBottom()
+
+const DEV_ICON = '</>'
 
 const appkey = ref('')
 const userId = ref('')
@@ -51,6 +149,7 @@ const logging = ref(false)
 const fetchingToken = ref(false)
 const showDev = ref(false)
 const errorText = ref('')
+const focused = ref('')
 
 onLoad(() => {
   appkey.value = getStorage(KEY_APPKEY)
@@ -58,11 +157,25 @@ onLoad(() => {
   token.value = getStorage(KEY_TOKEN)
 })
 
+function onFocus(field: string) {
+  focused.value = field
+}
+
+function onBlur() {
+  focused.value = ''
+}
+
+function toggleDev() {
+  showDev.value = !showDev.value
+  errorText.value = ''
+}
+
 function errMsg(e: any): string {
   return (e?.message ?? e?.data?.message ?? JSON.stringify(e)) as string
 }
 
 async function onLogin() {
+  if (logging.value) return
   errorText.value = ''
   if (appkey.value === '' || userId.value === '' || token.value === '') {
     errorText.value = '请填写 appkey / userId / token'
@@ -85,6 +198,7 @@ async function onLogin() {
 
 // 环信 REST password grant 换用户 token；仅开发用
 async function onFetchToken() {
+  if (fetchingToken.value) return
   errorText.value = ''
   if (appkey.value === '' || userId.value === '' || password.value === '') {
     errorText.value = '请先填写 appkey / userId，并输入密码'
@@ -130,105 +244,309 @@ function onOpenSpike() {
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+/* 满屏深色渐变 + 右上紫光：对齐 vue3 demo 登录页（H5 窄屏断点）。固定深色品牌页，不随明暗主题切换 */
 .login {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background-color: #f5f5f5;
+  position: relative;
+  /* App 端页面画布是全屏（含手势条区域），vh 只到系统栏以内，会露出页面容器白底；
+     height:100% 占满画布，min-height:100vh 兜底 H5/小程序（百分比高度链不成立时仍撑满视口） */
+  height: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-left: 24px;
+  padding-right: 24px;
+  background-color: #100c35;
+  background-image: linear-gradient(150deg, #100c35 0%, #1e1272 30%, #133080 60%, #0062c0 100%);
 }
 
-.login__header {
+.login__glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.login__glow--pink {
+  background-image: linear-gradient(245deg, rgba(232, 92, 255, 0.52) 0%, rgba(196, 64, 255, 0.3) 12%, rgba(150, 40, 240, 0.1) 28%, rgba(150, 40, 240, 0) 46%);
+}
+
+.login__glow--core {
+  background-image: linear-gradient(225deg, rgba(255, 214, 255, 0.5) 0%, rgba(255, 120, 255, 0.3) 8%, rgba(220, 80, 255, 0.1) 18%, rgba(220, 80, 255, 0) 30%);
+}
+
+.login__brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-top: 24px;
+  padding-left: 8px;
+  z-index: 10;
+}
+
+.login__brand-name {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 2px;
+}
+
+.login__brand-lines {
   display: flex;
   flex-direction: column;
-  padding: 48px 16px 24px;
+  margin-left: 10px;
 }
 
-.login__title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1a1a1a;
+.login__brand-slogan {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 1.5px;
+}
+
+.login__brand-sub {
+  margin-top: 2px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 3px;
+}
+
+.login__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding-top: 24px;
+  padding-bottom: 24px;
+  z-index: 10;
+}
+
+.login__card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  border-radius: 24px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(12, 8, 40, 0.78);
+  overflow: hidden;
+  backdrop-filter: blur(24px);
+}
+
+.login__shimmer {
+  width: 100%;
+  height: 1px;
+}
+
+.login__shimmer--top {
+  background-image: linear-gradient(90deg, rgba(0, 158, 255, 0) 0%, rgba(0, 158, 255, 0.8) 40%, rgba(108, 99, 255, 0.8) 60%, rgba(108, 99, 255, 0) 100%);
+}
+
+.login__shimmer--bottom {
+  background-image: linear-gradient(90deg, rgba(108, 99, 255, 0) 0%, rgba(108, 99, 255, 0.4) 50%, rgba(108, 99, 255, 0) 100%);
+}
+
+.login__dev-entry {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: transparent;
+  z-index: 5;
+}
+
+.login__dev-entry--active {
+  background-color: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+.login__dev-icon {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.12);
+}
+
+.login__dev-icon--active {
+  color: #a78bfa;
+}
+
+.login__body {
+  display: flex;
+  flex-direction: column;
+  padding: 36px 40px;
+}
+
+.login__titles {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 28px;
 }
 
 .login__subtitle {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #999999;
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
 }
 
-.login__sdk {
-  margin-top: 4px;
-  font-size: 11px;
-  color: #bbbbbb;
+.login__title {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #ffffff;
+  text-shadow: 0 0 24px rgba(0, 158, 255, 0.25);
+}
+
+.login__tagline {
+  margin-top: 6px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 3px;
 }
 
 .login__form {
   display: flex;
   flex-direction: column;
-  padding: 12px 16px;
-  background-color: #ffffff;
 }
 
 .login__input {
-  height: 40px;
-  padding: 0 12px;
-  margin-bottom: 10px;
-  border-width: 1px;
+  height: 50px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  border-width: 1.5px;
   border-style: solid;
-  border-color: #dcdcdc;
-  border-radius: 6px;
+  border-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-sizing: border-box;
   font-size: 14px;
-  background-color: #ffffff;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-.login__btn {
-  height: 40px;
-  line-height: 40px;
-  font-size: 15px;
-  color: #ffffff;
-  background-color: #009eff;
-  border-radius: 6px;
-}
-
-.login__btn--plain {
-  color: #009eff;
-  background-color: #ffffff;
-  border-width: 1px;
-  border-style: solid;
-  border-color: #009eff;
+.login__input--focused {
+  border-color: rgba(0, 158, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(0, 158, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .login__error {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #e64545;
+  margin-top: -4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: rgba(239, 100, 100, 0.9);
+}
+
+.login__submit {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  margin-top: 4px;
+  border-radius: 8px;
+  background-color: #009eff;
+}
+
+.login__submit--busy {
+  background-color: rgba(0, 158, 255, 0.5);
+}
+
+.login__submit-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 2px;
+}
+
+.login__helper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.login__helper-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .login__dev {
   display: flex;
   flex-direction: column;
-  margin-top: 8px;
-  padding: 12px 16px;
-  background-color: #ffffff;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 
-.login__dev-title {
-  font-size: 13px;
-  color: #666666;
-}
-
-.login__dev-body {
+.login__dev-btn {
   display: flex;
-  flex-direction: column;
-  margin-top: 10px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border-radius: 8px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.12);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.login__dev-btn--busy {
+  opacity: 0.6;
+}
+
+.login__dev-btn-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #cfe9ff;
 }
 
 .login__dev-tip {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #999999;
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.28);
 }
 
 .login__footer {
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 16px;
+  z-index: 10;
+}
+
+.login__footer-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.login__footer-text--dim {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.login__footer-link {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.32);
 }
 </style>

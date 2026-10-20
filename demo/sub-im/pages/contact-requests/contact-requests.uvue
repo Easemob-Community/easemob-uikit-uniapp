@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page" :class="themeClass">
     <em-contact-requests-page @back="onBack" />
   </view>
 </template>
@@ -7,6 +7,9 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { EmKit, CONNECTION_STATUS } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
 
 onLoad(() => {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
@@ -20,9 +23,12 @@ function onBack(): void {
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
 .page {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background-color: var(--em-conversation-list-bg);
 }
 </style>

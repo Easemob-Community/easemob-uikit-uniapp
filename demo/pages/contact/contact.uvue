@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page" :class="themeClass">
     <em-contact-page @entry-click="onEntryClick" @add="onAdd" />
     <view v-if="showAddContact" class="addcontact">
       <view class="addcontact__panel">
@@ -18,7 +18,13 @@
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONTACT_ENTRY_KEY } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONTACT_ENTRY_KEY, useTabBarBadge } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
+// 与会话页共用同一响应式来源；tab 页常驻，任一页挂载后角标都会持续跟随 store 更新
+const tabBarBadge = useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })
 
 const showAddContact = ref(false)
 const peerId = ref('')
@@ -40,6 +46,7 @@ onLoad(() => {
 })
 
 onShow(() => {
+  tabBarBadge.sync()
   if (!ensureLogin()) return
   EmKit.syncContacts().catch(() => {})
 })
@@ -86,10 +93,13 @@ function onSendInvite() {
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
 .page {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background-color: var(--em-conversation-list-bg);
 }
 
 .addcontact {
@@ -98,7 +108,7 @@ function onSendInvite() {
   top: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--em-mask-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -109,14 +119,14 @@ function onSendInvite() {
   flex-direction: column;
   width: 280px;
   padding: 16px;
-  background-color: #ffffff;
+  background-color: var(--em-bg-elevated);
   border-radius: 12px;
 }
 
 .addcontact__title {
   font-size: 16px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--em-text-primary);
   margin-bottom: 12px;
 }
 
@@ -125,9 +135,11 @@ function onSendInvite() {
   padding: 0 10px;
   border-width: 1px;
   border-style: solid;
-  border-color: #dcdcdc;
+  border-color: var(--em-border-color);
   border-radius: 6px;
   font-size: 14px;
+  color: var(--em-text-primary);
+  background-color: var(--em-bg-base);
   margin-bottom: 12px;
 }
 
@@ -142,14 +154,14 @@ function onSendInvite() {
   line-height: 34px;
   padding: 0 16px;
   font-size: 14px;
-  color: #ffffff;
-  background-color: #009eff;
+  color: var(--em-text-inverse);
+  background-color: var(--em-primary-color);
   border-radius: 6px;
 }
 
 .addcontact__btn--plain {
-  color: #666666;
-  background-color: #f5f5f5;
+  color: var(--em-text-secondary);
+  background-color: var(--em-bg-secondary);
   margin-right: 10px;
 }
 </style>

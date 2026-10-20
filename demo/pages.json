@@ -3,7 +3,14 @@
     {
       "path": "pages/login/login",
       "style": {
-        "navigationBarTitleText": "登录"
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#100c35",
+        "backgroundColorContent": "#100c35",
+        "app-plus": {
+          "titleNView": false
+        }
       }
     },
     {
@@ -102,6 +109,12 @@
           }
         },
         {
+          "path": "pages/scenario/scenario",
+          "style": {
+            "navigationBarTitleText": "多场景能力演示"
+          }
+        },
+        {
           "path": "pages/text-probe/text-probe",
           "style": {
             "navigationBarTitleText": "Text 测量探针"
@@ -137,27 +150,34 @@
   },
   "globalStyle": {
     "navigationBarTitleText": "easemob-uikit-uni",
-    "navigationBarBackgroundColor": "#FFFFFF",
-    "navigationBarTextStyle": "black",
-    "backgroundColor": "#F5F5F5"
+    "navigationBarBackgroundColor": "@navBgColor",
+    "navigationBarTextStyle": "@navTxtStyle",
+    "backgroundColor": "@bgColor",
+    "backgroundTextStyle": "@bgTxtStyle"
   },
   "tabBar": {
-    "color": "#919BA1",
-    "selectedColor": "#009EFF",
-    "backgroundColor": "#FFFFFF",
-    "borderStyle": "white",
+    "color": "@tabFontColor",
+    "selectedColor": "@tabSelectedColor",
+    "backgroundColor": "@tabBgColor",
+    "borderStyle": "@tabBorderStyle",
     "list": [
       {
         "pagePath": "pages/conversation/conversation",
-        "text": "会话"
+        "text": "会话",
+        "iconPath": "static/tabbar/conversation.png",
+        "selectedIconPath": "static/tabbar/conversation-active.png"
       },
       {
         "pagePath": "pages/contact/contact",
-        "text": "联系人"
+        "text": "联系人",
+        "iconPath": "static/tabbar/contact.png",
+        "selectedIconPath": "static/tabbar/contact-active.png"
       },
       {
         "pagePath": "pages/mine/mine",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "static/tabbar/mine.png",
+        "selectedIconPath": "static/tabbar/mine-active.png"
       }
     ]
   }

@@ -12,17 +12,21 @@
   "vueVersion": "3",
   "mp-weixin": {
     "appid": "",
+    "darkmode": true,
     "setting": {
       "urlCheck": false,
       "minified": true
     }
   },
   "app": {
+    "defaultAppTheme": "auto",
     "distribute": {
       "modules": {}
     }
   },
-  "web": {},
+  "web": {
+    "darkmode": true
+  },
   "app-android": {
     "distribute": {
       "modules": {},

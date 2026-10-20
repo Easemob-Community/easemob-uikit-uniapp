@@ -1,13 +1,19 @@
 <template>
-  <view class="page">
+  <view class="page" :class="themeClass">
     <em-conversation-page @select="onSelect" @menu="onMenu" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY, useTabBarBadge } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
+// 底部 tabBar 角标：会话总未读 → index 0，联系人请求未读 → index 1（响应式，SDK 事件驱动）
+const tabBarBadge = useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })
 
 function ensureLogin(): boolean {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
@@ -25,6 +31,8 @@ onLoad(() => {
 })
 
 onShow(() => {
+  // 从聊天页/二级页返回时补同步：非 tab 页里 setTabBarBadge 会被平台拒绝（"not TabBar page"）
+  tabBarBadge.sync()
   if (!ensureLogin()) return
   EmKit.syncConversations().catch((e) => {
     console.error('[demo] syncConversations fail:', e)
@@ -53,9 +61,12 @@ function onMenu(key: string) {
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
 .page {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background-color: var(--em-conversation-list-bg);
 }
 </style>

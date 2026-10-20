@@ -1,5 +1,5 @@
 <template>
-  <scroll-view class="probe" scroll-y>
+  <scroll-view class="probe" :class="themeClass" scroll-y>
     <text class="probe__hint">第 2 轮：聚焦行尾缺字。R1/S1 为上轮对照（R1=百分比链会缺字，S1=定宽正常）。请整页截图反馈。</text>
 
     <text class="probe__group">W 组：百分比链上的候选解法（每行尾是否还缺字）</text>
@@ -145,6 +145,10 @@
 </template>
 
 <script setup lang="ts">
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
 // 与真机被裁消息同款的混合文本（CJK + 空格 + 拉丁），bubble 宽度下稳定折 2 行
 const TEXT_MIXED = '你好，这是一条来自 Vue3 Demo 的单聊测试消息'
 // 4 行以上长文本：检验行尾缺字是否每行都发生
@@ -153,22 +157,24 @@ const TEXT_SHORT = '短消息'
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
 .probe {
   padding: 12px 16px;
-  background-color: #f5f5f5;
+  background-color: var(--em-bg-secondary);
 }
 
 .probe__hint {
   font-size: 12px;
   line-height: 18px;
-  color: #e64545;
+  color: var(--em-danger-color);
   margin-bottom: 12px;
 }
 
 .probe__group {
   font-size: 13px;
   font-weight: 600;
-  color: #333333;
+  color: var(--em-text-primary);
   margin-top: 8px;
   margin-bottom: 8px;
 }
@@ -180,7 +186,7 @@ const TEXT_SHORT = '短消息'
 .probe__label {
   font-size: 12px;
   line-height: 16px;
-  color: #1677ff;
+  color: var(--em-primary-color);
   margin-bottom: 4px;
 }
 
@@ -238,7 +244,7 @@ const TEXT_SHORT = '短消息'
 .probe__bubble {
   padding: 12px 14px;
   max-width: 100%;
-  background-color: #e4e6e7;
+  background-color: var(--em-bubble-bg-other);
   border-radius: 16px;
 }
 
@@ -251,17 +257,17 @@ const TEXT_SHORT = '短消息'
 }
 
 .probe__bubble--self {
-  background-color: #009eff;
+  background-color: var(--em-bubble-bg-self);
 }
 
 .probe__bubble--self .probe__text {
-  color: #ffffff;
+  color: var(--em-bubble-text-self);
 }
 
 .probe__text {
   font-size: 15px;
   line-height: 23px;
-  color: #171a1c;
+  color: var(--em-bubble-text-other);
   word-break: break-all;
 }
 
@@ -280,7 +286,7 @@ const TEXT_SHORT = '短消息'
 .probe__simple {
   max-width: 480rpx;
   padding: 12px 14px;
-  background-color: #e4e6e7;
+  background-color: var(--em-bubble-bg-other);
   border-radius: 16px;
   margin-bottom: 8px;
 }

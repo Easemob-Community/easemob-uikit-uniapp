@@ -1,5 +1,5 @@
 <template>
-  <view class="spike">
+  <view class="spike" :class="themeClass">
     <view class="spike__header">
       <text class="spike__title">环信 SDK 连通性 Spike</text>
       <text class="spike__status">连接状态：{{ statusText }}</text>
@@ -69,6 +69,9 @@
 import { computed, ref } from 'vue'
 import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE, createLogger } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmGroup, EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
 
 const appkey = ref('')
 const userId = ref('')
@@ -404,42 +407,45 @@ async function onSend() {
 </script>
 
 <style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
 .spike {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  background-color: var(--em-bg-secondary);
 }
 
 .spike__header {
   display: flex;
   flex-direction: column;
   padding: 12px 16px;
-  background-color: #ffffff;
+  background-color: var(--em-bg-base);
 }
 
 .spike__title {
   font-size: 17px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--em-text-primary);
 }
 
 .spike__status {
   margin-top: 6px;
   font-size: 13px;
-  color: #666666;
+  color: var(--em-text-secondary);
 }
 
 .spike__error {
   margin-top: 6px;
   font-size: 13px;
-  color: #e64545;
+  color: var(--em-danger-color);
 }
 
 .spike__form {
   display: flex;
   flex-direction: column;
   padding: 12px 16px;
-  background-color: #ffffff;
+  background-color: var(--em-bg-base);
   margin-top: 8px;
 }
 
@@ -449,10 +455,11 @@ async function onSend() {
   margin-bottom: 8px;
   border-width: 1px;
   border-style: solid;
-  border-color: #dcdcdc;
+  border-color: var(--em-border-color);
   border-radius: 6px;
   font-size: 14px;
-  background-color: #ffffff;
+  color: var(--em-text-primary);
+  background-color: var(--em-bg-base);
 }
 
 .spike__row {
@@ -477,17 +484,17 @@ async function onSend() {
   padding: 0 18px;
   margin-right: 10px;
   font-size: 14px;
-  color: #ffffff;
-  background-color: #1677ff;
+  color: var(--em-text-inverse);
+  background-color: var(--em-primary-color);
   border-radius: 6px;
 }
 
 .spike__btn--plain {
-  color: #1677ff;
-  background-color: #ffffff;
+  color: var(--em-primary-color);
+  background-color: var(--em-bg-base);
   border-width: 1px;
   border-style: solid;
-  border-color: #1677ff;
+  border-color: var(--em-primary-color);
 }
 
 .spike__btn--entry {
@@ -499,7 +506,7 @@ async function onSend() {
   display: flex;
   flex-direction: column;
   padding: 12px 16px;
-  background-color: #ffffff;
+  background-color: var(--em-bg-base);
   margin-top: 8px;
 }
 
@@ -510,12 +517,12 @@ async function onSend() {
 .spike__group-title {
   font-size: 15px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--em-text-primary);
 }
 
 .spike__group-toggle {
   font-size: 12px;
-  color: #1677ff;
+  color: var(--em-primary-color);
 }
 
 .spike__group-btns {
@@ -535,13 +542,13 @@ async function onSend() {
   height: 160px;
   margin-top: 4px;
   padding: 8px 10px;
-  background-color: #f5f5f5;
+  background-color: var(--em-bg-secondary);
   border-radius: 6px;
 }
 
 .spike__group-log-line {
   font-size: 12px;
-  color: #333333;
+  color: var(--em-text-secondary);
   margin-bottom: 4px;
 }
 
@@ -549,7 +556,7 @@ async function onSend() {
   flex: 1;
   margin-top: 8px;
   padding: 12px 16px;
-  background-color: #f5f5f5;
+  background-color: var(--em-bg-secondary);
 }
 
 .spike__msg {
@@ -565,14 +572,14 @@ async function onSend() {
 
 .spike__msg-meta {
   font-size: 11px;
-  color: #999999;
+  color: var(--em-text-tertiary);
   margin-bottom: 4px;
 }
 
 .spike__msg-text {
   font-size: 15px;
-  color: #1a1a1a;
-  background-color: #ffffff;
+  color: var(--em-text-primary);
+  background-color: var(--em-bg-base);
   padding: 8px 12px;
   border-radius: 8px;
 }
@@ -585,7 +592,7 @@ async function onSend() {
   display: flex;
   flex-direction: column;
   padding: 10px 16px;
-  background-color: #ffffff;
+  background-color: var(--em-bg-base);
 }
 
 .spike__input--grow {
