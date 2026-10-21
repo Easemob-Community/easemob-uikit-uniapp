@@ -1,0 +1,147 @@
+// Demo 宿主侧的 App 附件能力适配：把 easemob-file-picker 的 chooseFile → prepareFile → removeTempFile
+// 包装成 UIKit 的 EmAttachmentProvider。UIKit 本身不静态依赖该插件，H5/小程序构建不会编译本文件。
+//
+// 接入方式（demo/App.uvue，仅 App 端）：
+//   // #ifdef APP
+//   import { installAttachmentProvider } from '@/common/attachment-provider.uts'
+//   installAttachmentProvider()
+//   // #endif
+
+import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmAttachment, EmAttachmentPickOptions, EmAttachmentProvider } from '@/uni_modules/easemob-uikit-uni/libs'
+import { chooseFile, prepareFile, removeTempFile } from '@/uni_modules/easemob-file-picker'
+
+// 与插件 FileInfo 对齐的本地类型：不直接 import 插件 interface.uts，避免 demo 与插件内部类型耦合
+type PickedFileInfo = {
+  uri: string
+  name: string
+  size: number
+  mimeType: string
+  extension: string
+  path: string | null
+  isTemporary: boolean
+}
+
+type PickedFileResult = {
+  files: PickedFileInfo[]
+  cancelled: boolean
+}
+
+type PickOptions = {
+  mimeTypes?: string[]
+  multiple?: boolean
+}
+
+function chooseFileAsync(options: PickOptions): Promise<PickedFileResult> {
+  return new Promise<PickedFileResult>((resolve, reject) => {
+    chooseFile({
+      mimeTypes: options.mimeTypes,
+      multiple: options.multiple,
+      success: (res) => {
+        const files: PickedFileInfo[] = []
+        for (let i = 0; i < res.files.length; i++) {
+          const f = res.files[i]
+          files.push({
+            uri: f.uri,
+            name: f.name,
+            size: f.size,
+            mimeType: f.mimeType,
+            extension: f.extension,
+            path: f.path,
+            isTemporary: f.isTemporary
+          })
+        }
+        const result: PickedFileResult = { files, cancelled: res.cancelled }
+        resolve(result)
+      },
+      fail: (err) => reject(new Error(err.errMsg))
+    })
+  })
+}
+
+function prepareFileAsync(uri: string): Promise<PickedFileInfo> {
+  return new Promise<PickedFileInfo>((resolve, reject) => {
+    prepareFile({
+      uri,
+      success: (res) => {
+        const file: PickedFileInfo = {
+          uri: res.uri,
+          name: res.name,
+          size: res.size,
+          mimeType: res.mimeType,
+          extension: res.extension,
+          path: res.path,
+          isTemporary: res.isTemporary
+        }
+        resolve(file)
+      },
+      fail: (err) => reject(new Error(err.errMsg))
+    })
+  })
+}
+
+// 插件 prepareFile 已把文件复制到缓存目录；release 只删除该副本（越界路径插件返回 removed:false）
+function attachmentOf(info: PickedFileInfo): EmAttachment | null {
+  if (info.path == null) return null
+  const localPath = info.path as string
+  const attachment: EmAttachment = {
+    path: localPath,
+    name: info.name,
+    size: info.size,
+    mimeType: info.mimeType,
+    temporary: true,
+    release: (path: string): void => {
+      removeTempFile({ path })
+    }
+  }
+  return attachment
+}
+
+async function pickAttachmentsByPlugin(options: EmAttachmentPickOptions): Promise<EmAttachment[]> {
+  const picked = await chooseFileAsync({
+    mimeTypes: options.mimeTypes,
+    // 文件选择默认允许多选；UIKit 会按顺序逐条发送
+    multiple: options.multiple == null ? true : options.multiple
+  })
+  // 用户取消是正常路径：插件走 success + cancelled，UIKit 侧统一按 []
+  if (picked.cancelled || picked.files.length === 0) return []
+
+  const attachments: EmAttachment[] = []
+  uni.showLoading({ title: '正在读取文件…', mask: true })
+  try {
+    // 逐个 prepare：Android/鸿蒙是同步复制，串行避免一次性占满 IO；单个失败不影响其余
+    for (let i = 0; i < picked.files.length; i++) {
+      try {
+        const info = await prepareFileAsync(picked.files[i].uri)
+        const attachment = attachmentOf(info)
+        if (attachment != null) attachments.push(attachment)
+      } catch (e) {
+        console.warn('[demo:attachment] prepareFile failed:', picked.files[i].uri)
+      }
+    }
+    if (attachments.length === 0) {
+      throw new Error('file prepare failed')
+    }
+    return attachments
+  } finally {
+    uni.hideLoading()
+  }
+}
+
+export function installAttachmentProvider(): void {
+  const provider: EmAttachmentProvider = {
+    pick: (options: EmAttachmentPickOptions): Promise<EmAttachment[]> => {
+      return pickAttachmentsByPlugin(options)
+    },
+    resolve: async (uri: string, _options?: EmAttachmentPickOptions): Promise<EmAttachment | null> => {
+      const info = await prepareFileAsync(uri)
+      return attachmentOf(info)
+    }
+  }
+  EmKit.setAttachmentProvider(provider)
+}
+
+/** 可选：宿主登录态/云盘状态变化后刷新输入栏「文件」格显隐 */
+export function refreshAttachmentProvider(): void {
+  EmKit.refreshAttachmentAvailability()
+}

@@ -4,20 +4,22 @@ import type { Ref } from 'vue'
 // 软键盘高度 composable：uni.onKeyboardHeightChange 事件封装，App/小程序统一入口。
 // 每个调用方各自注册/反注册一对监听（inputbar 与 chat-page 各一份，成本可忽略）。
 //
-// 平台口径（鸿蒙已真机实测，改动前务必先读）：
+// 平台口径（鸿蒙/iOS 均已实测，改动前务必先读）：
 // 同一个上报值有两种用法，不能混：
 // - **面板口径**（keyboardHeight）：emoji/媒体面板的对齐高度。iOS/鸿蒙上报值已含底部安全区，
-//   沿用历史口径扣除后交给面板（面板自身还有 safe-bottom padding），该口径本次不改动。
+//   沿用历史口径扣除后交给面板（面板自身还有 safe-bottom padding），该口径不改动。
 // - **上推口径**（keyboardLift）：输入栏 margin-bottom 的「从屏幕底边算起的实际遮挡高度」。
 //   本库页面是边到边布局（页面底边 = 屏幕底边），所以要的是「键盘画到屏幕底的那一段」。
 // - Android / 小程序：两种口径都等于上报值。
-// - iOS：面板口径 = 上报值 - 安全区；上推口径沿用同一值（**未真机验证**，见 STATUS 待验；
-//   若真机复现「输入栏被压一截」，按鸿蒙口径改成直接用上报值）。
+// - iOS / 鸿蒙：上推口径 = 上报值原值（**不要再扣安全区**）。
 // - 鸿蒙（2026-10-21 实测 6.0.1 / API 20，25PVB24711005055，density 3）：
 //   上报 314vp == 屏幕高 804vp - 键盘上沿 490vp，**就是实际遮挡高度**（含手势导航条）；
 //   `hidumper -s WindowManagerService` 里应用窗口 0..2412 全屏、手势导航条窗口 84px(=28vp)。
-//   故上推口径直接用上报值；面板口径仍扣 28vp。
-//   历史坑：原实现把面板口径（已扣安全区）直接当 margin-bottom → 输入栏整体低 28vp，被键盘压住 84px。
+// - iOS（2026-10-21 实测 iPhone 14 Pro 1179×2556 / 3x，第三方九宫格键盘）：
+//   键盘上沿 y=1407px、输入栏 top=1350 + 栏高 159px → 栏底 1509px，被压 102px == 34pt
+//   == `safeAreaInsets.bottom`；上报值同样含安全区，同鸿蒙口径。
+//   历史坑：原实现把面板口径（已扣安全区）直接当 margin-bottom → 输入栏整体低一个安全区，
+//   被键盘压住（鸿蒙 28vp / iOS 34pt）。
 //
 // 因此返回两个值：
 // - keyboardHeight：面板口径（emoji/媒体面板按它对齐，口径与历史一致）
@@ -33,7 +35,7 @@ import type { Ref } from 'vue'
 export interface UseKeyboardHeightResult {
   /** 面板口径：emoji/媒体面板对齐高度（iOS/鸿蒙已扣底部安全区，沿用历史口径） */
   keyboardHeight: Ref<number>
-  /** 上推口径：从屏幕底边算起的实际遮挡高度（鸿蒙 = 上报值，含导航条） */
+  /** 上推口径：从屏幕底边算起的实际遮挡高度（= 上报值原值，App 全端含安全区） */
   keyboardLift: Ref<number>
   /** 收起兜底：键盘高度与上推高度一起清零（blur / hideKeyboard 后调用） */
   resetKeyboardHeight: () => void
@@ -45,13 +47,11 @@ export function useKeyboardHeight(): UseKeyboardHeightResult {
 
   const onChange = (res: { height: number }): void => {
     const reported = res.height > 0 ? res.height : 0
+    // 面板口径：iOS/鸿蒙上报值含底部安全区，面板自身还有 safe-bottom padding，故扣除后再交面板
     let height = reported
-    // 上推口径：App 端页面边到边，上报值即遮挡高度；iOS 沿用旧口径（未真机验证，见文件头）
-    let lift = reported
     // #ifdef APP-IOS
     if (reported > 0) {
       height -= uni.getWindowInfo().safeAreaInsets?.bottom ?? 0
-      lift = height
     }
     // #endif
     // #ifdef APP-HARMONY
@@ -60,7 +60,9 @@ export function useKeyboardHeight(): UseKeyboardHeightResult {
     }
     // #endif
     keyboardHeight.value = height > 0 ? height : 0
-    keyboardLift.value = lift > 0 ? lift : 0
+    // 上推口径：页面边到边，上报值就是键盘画到屏幕底的那一段 = 实际遮挡高度，全端原样使用。
+    // iOS/鸿蒙上报值已含安全区，再扣一次就会少顶一个安全区（历史 bug，见文件头）
+    keyboardLift.value = reported
   }
 
   function resetKeyboardHeight(): void {

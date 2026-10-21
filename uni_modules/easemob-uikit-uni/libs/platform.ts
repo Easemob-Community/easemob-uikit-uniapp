@@ -2,6 +2,7 @@
 // localStorage 在 App 端 js 引擎不可用，一律走 uni.setStorage。
 
 import { createLogger } from './utils/logger'
+import type { EmAttachment } from './types'
 
 const logger = createLogger('platform')
 
@@ -13,7 +14,7 @@ const logger = createLogger('platform')
 export interface EmPlatformCapabilities {
   /** 视频播放/预览：一期仅 H5（window.open）；App/小程序原生播放器待接 */
   videoPreview: boolean
-  /** 发送文件时的文件选择：一期小程序 + H5；App 无通用选择器 */
+  /** 内置文件选择：小程序 + H5；App 无内置选择器（宿主注入附件能力后由 libs/attachment.ts 调起） */
   filePick: boolean
   /** 文件打开/下载：一期全端未接，气泡点击入口先隐藏 */
   fileOpen: boolean
@@ -29,8 +30,8 @@ function detectPlatformCapabilities(): EmPlatformCapabilities {
   caps.videoPreview = true
   // #endif
   // #ifdef APP
-  // App 端没有跨端通用文件选择器（需 uts 插件或原生 intent），入口隐藏；
-  // chooseFile 的 APP 分支保留为后续接入点（当前返回 null 并 warn）
+  // 内置选择器在 App 端不可用；宿主可经 EmKit.setAttachmentProvider 注入平台文件选择能力，
+  // UI 显隐统一读 libs/attachment.ts 的 canPickAttachment()（本开关只表示“内置能力”）
   caps.filePick = false
   // #endif
   return caps
@@ -50,6 +51,37 @@ export function isPageVisible(): boolean {
   // #ifndef WEB
   return true
   // #endif
+}
+
+// ========== 网络状态收口 ==========
+
+/**
+ * 监听网络连通性变化，返回取消函数（`uni.onXxx` 在 x 端返回监听 id，`offXxx` 按 id 反注册）。
+ *
+ * 只用 `uni.onNetworkStatusChange`，**不探测 `uni.getNetworkType`**：两者同属 iOS/Android 的
+ * `uni-getNetworkType` UTS 模块，旧自定义基座若没把该模块编进去，调用会抛
+ * `undefined class: UTSSDKModulesDCloudUniGetNetworkTypeIndexSwift`。websdk 5.1.3 默认 runtime
+ * 适配器在 `onNetworkChange` 里既调 `onNetworkStatusChange` 又同步调 `getNetworkType`，
+ * 而 SDK 在建连（login）阶段就注册网络监听 → 该异常会直接表现为「登录失败」。
+ * 这里再兜一层 try/catch：基座缺模块时降级为不监听（SDK 仍有心跳/重连循环），不让登录被拖死。
+ */
+export function subscribeNetworkStatus(listener: (online: boolean) => void): () => void {
+  try {
+    if (typeof uni.onNetworkStatusChange !== 'function') {
+      return () => {}
+    }
+    const id = uni.onNetworkStatusChange((res) => {
+      listener(res.isConnected)
+    })
+    return () => {
+      try {
+        uni.offNetworkStatusChange(id)
+      } catch (e) {}
+    }
+  } catch (e) {
+    logger.warn('subscribeNetworkStatus: 网络状态监听不可用（基座可能缺 uni-getNetworkType 模块）', e)
+    return () => {}
+  }
 }
 
 export function setStorage(key: string, value: string): void {
@@ -148,11 +180,9 @@ export function chooseVideo(): Promise<EmPickedVideo | null> {
   })
 }
 
-export interface EmPickedFile {
-  path: string              // App/小程序临时路径；H5 恒为 ''
-  name: string
-  size: number              // 字节
-  webFile: unknown | null   // H5 的 File 对象（SDK 上传需要 File），其它端恒 null
+/** 内置选择器产物 / 宿主附件能力的可发送形态；H5 的 File 走 webFile，其它端走本地路径 */
+export interface EmPickedFile extends EmAttachment {
+  webFile?: unknown | null   // H5 的 File 对象（SDK 上传需要 File），其它端为 null
 }
 
 export function chooseFile(): Promise<EmPickedFile | null> {
@@ -185,10 +215,9 @@ export function chooseFile(): Promise<EmPickedFile | null> {
     input.click()
     // #endif
     // #ifdef APP
-    // App 端没有跨端通用文件选择器（需 uts 插件或原生 intent）。
-    // 一期先按平台隐藏「文件」入口（PLATFORM_CAPABILITIES.filePick=false），
-    // 这里保留空实现作为后续接入点；正常 UI 路径不会调到。
-    logger.warn('chooseFile: App 端暂不支持文件选择')
+    // App 端没有内置通用文件选择器：宿主注入附件能力后，UI 走 libs/attachment.ts 的 provider；
+    // 直接调用本函数仍返回 null（保留旧行为，避免宿主误以为内置可用）。
+    logger.warn('chooseFile: App 端无内置文件选择器，请使用 EmKit.setAttachmentProvider')
     resolve(null)
     // #endif
   })
@@ -354,7 +383,12 @@ export function stopAudio(): void {
 }
 
 // 导出文本文件（日志下载用）：H5 走 Blob + a[download]（resolve ''）；
-// 小程序/App 写用户数据目录（resolve 文件路径）；失败 reject 由调用方兜底剪贴板
+// 小程序/App 写用户数据目录（resolve 文件路径）；失败 reject 由调用方兜底剪贴板。
+// App 两个专属口径：
+// 1) encoding 只能是 'utf-8'——App 的 FileSystemManager 只认 ascii/base64/utf-8，
+//    传小程序惯用的 'utf8' 会直接 fail（错误码 1200002）；
+// 2) App 的 USER_DATA_PATH 是应用沙盒（文件管理器不可见），返回路径只用于分享/回传，
+//    不是「下载目录」；要取到文件得靠剪贴板或宿主自行 share/上传。
 export function exportTextFile(filename: string, content: string): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     // #ifdef WEB
@@ -374,12 +408,17 @@ export function exportTextFile(filename: string, content: string): Promise<strin
     // #ifndef WEB
     try {
       const fs = uni.getFileSystemManager()
-      const env = (uni as unknown as { env?: { USER_DATA_PATH?: string } }).env
-      const filePath = `${env?.USER_DATA_PATH ?? ''}/${filename}`
+      // 沙盒根目录缺失（基座缺 uni-fileSystemManager 模块等）时直接失败，别写出 "/xxx.txt" 这种坏路径
+      const base = (uni.env.USER_DATA_PATH ?? '').replace(/\/+$/, '')
+      if (base === '') {
+        reject(new Error('USER_DATA_PATH unavailable'))
+        return
+      }
+      const filePath = `${base}/${filename}`
       fs.writeFile({
         filePath,
         data: content,
-        encoding: 'utf8',
+        encoding: 'utf-8',
         success: () => resolve(filePath),
         fail: (e) => reject(new Error(e?.errMsg ?? 'writeFile fail'))
       })
@@ -390,9 +429,15 @@ export function exportTextFile(filename: string, content: string): Promise<strin
   })
 }
 
-// 剪贴板兜底（日志导出降级、复制类功能共用）；失败静默
+// 剪贴板兜底（日志导出降级、复制类功能共用）；失败不阻塞业务，但要进日志便于排查
+// （App 端超长文本可能超系统剪贴板限制，静默失败会让「已复制」的提示骗人）
 export function copyText(text: string): void {
   try {
-    uni.setClipboardData({ data: text })
-  } catch (e) {}
+    uni.setClipboardData({
+      data: text,
+      fail: (e) => logger.warn('setClipboardData fail:', e?.errMsg ?? e)
+    })
+  } catch (e) {
+    logger.warn('setClipboardData unavailable:', e)
+  }
 }

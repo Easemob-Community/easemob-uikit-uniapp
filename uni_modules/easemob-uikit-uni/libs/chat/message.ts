@@ -22,9 +22,12 @@ import { getMessages, messageStore } from '../store/message'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
 import type { EmMessageHandler, EmMessageItem, EmQuoteInfo, EmStreamInfo } from '../types'
 import { isStreamTerminal } from '../utils/stream'
+import { createLogger } from '../utils/logger'
 import { useLocale } from '../use/useLocale'
 import { displayNameOf } from '../store/user'
 import { ensureUserInfos } from './user-info'
+
+const logger = createLogger('message')
 
 // localId 兜底序号（SDK msgLocalId 为空时保证唯一）
 let localSeq = 0
@@ -171,6 +174,9 @@ export class EmMessageDomain {
   // 失败消息的原始上传文件（H5 File）：SDK web 上传只认 File/Blob，而 EmMessageItem 只持久化 URL/path；
   // 只在内存持有，发送成功 / 删除本地消息 / 登出时释放（重发 H5 图片/视频/文件需要它）。
   private uploadFileByLocalId: Record<string, unknown> = {}
+  // 宿主附件能力提供的临时副本：path → release。发送成功/重发成功/删除消息/登出时清理；
+  // 发送失败保留路径，重发仍能读到文件（与 uploadFileByLocalId 的生命周期一致）。
+  private releaseByPath: Record<string, (path: string) => void> = {}
   // 历史加载飞行中去重（会话页预热 + 聊天页 mount 会并发调用同一会话）
   private historyPromiseByConversationId: Record<string, Promise<void>> = {}
   // 会话代次：登出/换账号时自增，飞行中的历史请求回来后据此丢弃，避免把旧账号消息写进新会话缓存
@@ -194,6 +200,8 @@ export class EmMessageDomain {
     this.typingTimers = {}
     this.typingSentAt = {}
     this.uploadFileByLocalId = {}
+    Object.keys(this.releaseByPath).forEach((path) => this.releaseTemporary(path))
+    this.releaseByPath = {}
     this.historyPromiseByConversationId = {}
     Object.keys(this.streamTimerByKey).forEach((key) => clearTimeout(this.streamTimerByKey[key]))
     this.streamTimerByKey = {}
@@ -202,6 +210,27 @@ export class EmMessageDomain {
     this.activeConversationId = ''
     this.trimmedByConversationId = {}
     this.sessionEpoch += 1
+  }
+
+  // 登记宿主附件临时副本：只有 temporary=true 且带 release 的附件才需要 UIKit 兜底清理
+  private trackTemporary(file: EmPickedFile): void {
+    const release = file.release
+    if (file.temporary == true && release != null && file.path !== '') {
+      this.releaseByPath[file.path] = release
+    }
+  }
+
+  // 清理临时副本：同一路径只回调一次（先删索引再执行，release 抛错不会阻断发送链路）
+  private releaseTemporary(path: string): void {
+    if (path === '') return
+    const release = this.releaseByPath[path]
+    if (release == null) return
+    delete this.releaseByPath[path]
+    try {
+      release(path)
+    } catch (e) {
+      logger.warn('release temporary attachment failed:', path, e)
+    }
   }
 
   /** 会话域进入/离开时同步当前会话：进入后该会话不再被内存上限裁剪 */
@@ -518,9 +547,12 @@ export class EmMessageDomain {
     return quote
   }
 
-  // SDK 5.x createXxxMessage 的 data 不收字符串路径：H5 要 File 对象，小程序/App 要 MiniAppFile { path, name, size }
-  private asCompatibleFile(path: string, name: string, size: number, webFile: unknown | null): CompatibleFile {
-    return (webFile != null ? webFile : { path, name, size }) as CompatibleFile
+  // SDK 5.x createXxxMessage 的 data 不收字符串路径：H5 要 File 对象，小程序/App 要 MiniAppFile { path, name, size, type }
+  private asCompatibleFile(path: string, name: string, size: number, webFile: unknown | null, mimeType = ''): CompatibleFile {
+    if (webFile != null) return webFile as CompatibleFile
+    // 原生端把 MIME 带进 MiniAppFile.type：宿主附件能力能拿到权威 MIME 时服务端 content-type 更准
+    if (mimeType !== '') return { path, name, size, type: mimeType } as CompatibleFile
+    return { path, name, size } as CompatibleFile
   }
 
   // H5 的 chooseVideo 只给 blob URL（不是 File），而 SDK web 上传适配器只接受 File/Blob。
@@ -585,9 +617,11 @@ export class EmMessageDomain {
   }
 
   async sendFile(to: string, chatType: ConversationTypeValue, file: EmPickedFile): Promise<EmMessageItem> {
+    // 先登记再等就绪：即使 SDK 未就绪导致发送未开始，登出/删除时仍能兜底清理临时副本
+    this.trackTemporary(file)
     const chatManager = await this.readyChatManager()
-    // H5 上传需要 File 对象；小程序/App 走 { path, name, size }（MiniAppFile）
-    const data = this.asCompatibleFile(file.path, file.name, file.size, file.webFile)
+    // H5 上传需要 File 对象；小程序/App 走 { path, name, size, type }（MiniAppFile）
+    const data = this.asCompatibleFile(file.path, file.name, file.size, file.webFile ?? null, file.mimeType ?? '')
     const message = chatManager.createFileMessage({
       conversationId: to,
       conversationType: chatType,
@@ -595,7 +629,7 @@ export class EmMessageDomain {
       filename: file.name,
       fileSize: file.size
     })
-    return this.deliver(message, to, '', undefined, file.path, undefined, file.webFile)
+    return this.deliver(message, to, '', undefined, file.path, undefined, file.webFile ?? null)
   }
 
   // 先落本地 sending 态，sendMessage 后回写 sent/failed；失败保留供重发。
@@ -643,6 +677,8 @@ export class EmMessageDomain {
       stored.time = sent.timestamp
       stored.status = MESSAGE_STATUS.SENT
       delete this.uploadFileByLocalId[item.localId]
+      // 临时副本只在发送成功后清理；失败保留，用户点重发仍能读到同一路径
+      this.releaseTemporary(stored.url)
       this.applyMediaBody(stored, sent)
     } catch (e) {
       stored.status = MESSAGE_STATUS.FAILED
@@ -842,6 +878,11 @@ export class EmMessageDomain {
     if (list == null) {
       return
     }
+    // 删除失败/本地消息时顺手清掉宿主附件临时副本（发送成功的已在 deliver 清理，重复调用是 no-op）
+    const target = list.find((m) => m.localId === localId)
+    if (target != null) {
+      this.releaseTemporary(target.url)
+    }
     messageStore.messagesByConversationId[conversationId] = list.filter((m) => m.localId !== localId)
   }
 
@@ -954,6 +995,8 @@ export class EmMessageDomain {
       item.time = sent.timestamp
       item.status = MESSAGE_STATUS.SENT
       delete this.uploadFileByLocalId[localId]
+      // 重发成功同样释放宿主附件临时副本（失败则保留，允许再次重发）
+      this.releaseTemporary(item.url)
       this.applyMediaBody(item, sent)
     } catch (e) {
       item.status = MESSAGE_STATUS.FAILED

@@ -30,6 +30,45 @@ export interface EmInputFeatures {
   file: boolean
 }
 
+/** 附件选择上下文：聊天页调起宿主附件能力时透传；resolve 外部 URI 时可只带 mimeTypes */
+export interface EmAttachmentPickOptions {
+  conversationId?: string
+  chatType?: EmChatType
+  /** 允许的 MIME，空/不传 = 不限（由宿主实现解释） */
+  mimeTypes?: string[]
+  /** 是否多选，默认由宿主实现决定 */
+  multiple?: boolean
+}
+
+/** 可发送附件：path 必须是本地真实路径（App/小程序原生文件选择器复制后的缓存路径） */
+export interface EmAttachment {
+  path: string
+  name: string
+  size: number
+  /** MIME（透传 SDK MiniAppFile.type）；未知留空 */
+  mimeType?: string
+  /** true = 宿主创建的临时副本，发送成功后 UIKit 会回调 release */
+  temporary?: boolean
+  /** 临时文件清理（UIKit 保证同一路径最多调用一次；失败消息保留供重发） */
+  release?: (path: string) => void
+}
+
+/** 宿主附件能力注入契约（App 端文件选择器由宿主提供，UIKit 不静态依赖任何 UTS 插件） */
+export interface EmAttachmentProvider {
+  /** 当前是否可用（如宿主云盘未登录返回 false）；缺省视为可用 */
+  isAvailable?: () => boolean
+  /** UIKit 通知宿主：用户点了附件入口，请选择文件。取消 resolve []，失败 reject */
+  pick: (options: EmAttachmentPickOptions) => Promise<EmAttachment[]>
+  /** 可选：把外部 URI（分享进入/open-with）转换为可发送附件 */
+  resolve?: (uri: string, options?: EmAttachmentPickOptions) => Promise<EmAttachment | null>
+}
+
+/** 附件能力快照（EmKit.attachments） */
+export interface EmAttachmentCapability {
+  available: boolean
+  providerName: string
+}
+
 /** uiConfig 运行时形态：EmKitConfig 的 UI 行为维度解析到全量默认值之后的 store 形态（libs/store/config.ts） */
 export interface EmUiConfig {
   /** 输入栏草稿，默认 true */

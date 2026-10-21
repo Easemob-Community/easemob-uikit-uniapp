@@ -11,11 +11,22 @@ import { groupStore } from './store/group'
 import { clearMessages, messageStore } from './store/message'
 import { clearUsers, userStore } from './store/user'
 import { copyText, exportTextFile } from './platform'
+import {
+  attachmentCapability as getAttachmentCapability,
+  canPickAttachment as canPickAttachmentImpl,
+  pickAttachments as pickAttachmentsImpl,
+  refreshAttachmentAvailability as refreshAttachmentAvailabilityImpl,
+  resolveAttachment as resolveAttachmentImpl,
+  setAttachmentProvider as setAttachmentProviderImpl
+} from './attachment'
 import { clearLogBuffer, createLogger, getLogText } from './utils/logger'
 import { getLocale as getActiveLocale, setLocale as setActiveLocale } from './use/useLocale'
 import type { ConversationTypeValue } from './constants'
 import type {
   CreateGroupParams,
+  EmAttachmentCapability,
+  EmAttachmentPickOptions,
+  EmAttachmentProvider,
   EmContactInvite,
   EmGroup,
   EmGroupMember,
@@ -52,6 +63,15 @@ class EmKitImpl {
   // 单会话未读快照（入口角标）；响应式用 useConversationUnreadCount(id)
   conversationUnreadCountOf(conversationId: string): number {
     return unreadCountOfConversation(conversationId)
+  }
+
+  /** 附件能力快照：available = 当前端可选择文件（内置 H5/小程序 或宿主已注入 App provider） */
+  get attachments(): EmAttachmentCapability {
+    return getAttachmentCapability()
+  }
+
+  get canPickAttachment(): boolean {
+    return canPickAttachmentImpl()
   }
 
   private client = new EmClient()
@@ -161,6 +181,29 @@ class EmKitImpl {
   async sendFile(to: string, chatType: ConversationTypeValue, file: EmPickedFile): Promise<EmMessageItem> {
     await this.client.whenReady()
     return this.chat.sendFile(to, chatType, file)
+  }
+
+  /**
+   * 注册宿主附件能力（App 端文件选择器）；传 null 注销。
+   * UIKit 在用户点输入栏「文件」时经 provider.pick 通知宿主，宿主返回已 prepare 的本地路径。
+   */
+  setAttachmentProvider(provider: EmAttachmentProvider | null): void {
+    setAttachmentProviderImpl(provider)
+  }
+
+  /** 主动刷新 provider 可用性（provider.isAvailable 依赖登录态等外部状态时调用） */
+  refreshAttachmentAvailability(): void {
+    refreshAttachmentAvailabilityImpl()
+  }
+
+  /** 发起附件选择（不发送）：宿主自定义 UI 或分享进入前置流程可直接调用 */
+  async pickAttachments(options: EmAttachmentPickOptions): Promise<EmPickedFile[]> {
+    return pickAttachmentsImpl(options)
+  }
+
+  /** 把外部 URI 交给宿主 provider 转换为可发送附件（未实现 resolve 时返回 null） */
+  async resolveAttachment(uri: string, options?: EmAttachmentPickOptions): Promise<EmPickedFile | null> {
+    return resolveAttachmentImpl(uri, options)
   }
 
   async loadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize?: number): Promise<void> {
@@ -404,6 +447,8 @@ class EmKitImpl {
       copyText(text)
       return path
     } catch (e) {
+      // 不要静默吞：App 端写文件失败的原因（编码/沙盒路径/基座缺模块）必须能从控制台看到
+      kitLogger.warn('exportLogs: 写文件失败，已回退剪贴板', e)
       copyText(text)
       return 'clipboard'
     }
@@ -424,6 +469,15 @@ export * from './types'
 export * from './constants'
 export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio, PLATFORM_CAPABILITIES, isPageVisible } from './platform'
 export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult, EmRecordOptions, EmPlatformCapabilities } from './platform'
+export {
+  setAttachmentProvider,
+  refreshAttachmentAvailability,
+  hasAttachmentProvider,
+  canPickAttachment,
+  attachmentCapability,
+  pickAttachments,
+  resolveAttachment
+} from './attachment'
 export { useNamespace } from './use/useNamespace'
 export {
   useTheme,

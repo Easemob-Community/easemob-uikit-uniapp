@@ -114,7 +114,7 @@
     <view class="login__footer" :style="{ paddingBottom: (24 + safeBottom) + 'px' }">
       <text class="login__footer-text">© 2026 环信</text>
       <text class="login__footer-text login__footer-text--dim">SDK 版本：{{ SDK_VERSION }} · easemob-uikit-uni</text>
-      <text class="login__footer-link" @click="onOpenSpike">SDK Spike 页 →</text>
+      <text class="login__footer-link" @click="onOpenSpike">SDK 自检页 →</text>
     </view>
   </view>
 </template>
@@ -422,6 +422,9 @@ function onOpenSpike() {
   flex-direction: column;
 }
 
+/* 输入框：App(iOS) 蒸汽端把 inset box-shadow 的 alpha 丢了——`inset 0 1px 0 rgba(255,255,255,.04)`
+   会被画成一条实色白线贴住输入框内上沿（H5/Android 正常），所以这里不用任何 box-shadow，
+   聚焦反馈只靠 border-color + 背景色（两者各端表现一致）。 */
 .login__input {
   height: 50px;
   padding: 0 14px;
@@ -431,7 +434,6 @@ function onOpenSpike() {
   border-style: solid;
   border-color: rgba(255, 255, 255, 0.1);
   background-color: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   box-sizing: border-box;
   font-size: 14px;
   font-weight: 500;
@@ -440,7 +442,7 @@ function onOpenSpike() {
 
 .login__input--focused {
   border-color: rgba(0, 158, 255, 0.7);
-  box-shadow: 0 0 0 3px rgba(0, 158, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background-color: rgba(0, 158, 255, 0.08);
 }
 
 .login__error {

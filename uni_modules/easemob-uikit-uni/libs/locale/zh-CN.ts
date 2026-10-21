@@ -20,6 +20,7 @@ export default {
   'error.messageSizeLimit': '消息内容过长，发送失败',
   'error.fileTooLarge': '文件过大，发送失败',
   'error.uploadFailed': '文件上传失败',
+  'error.filePickFailed': '文件读取失败，请重试',
   'error.messageBlockedByRecipient': '消息已被对方拒收',
   'error.unsupported': '当前操作不支持',
 

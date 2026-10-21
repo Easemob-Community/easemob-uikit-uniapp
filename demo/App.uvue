@@ -1,9 +1,18 @@
 <script setup lang="uts">
 import { initTheme } from '@/uni_modules/easemob-uikit-uni/libs/use/useTheme'
+// #ifdef APP
+// App 端文件选择能力由宿主注入（H5/小程序仍走 UIKit 内置选择器）；
+// 该适配器静态 import easemob-file-picker，必须条件编译，避免 H5/小程序构建解析插件。
+import { installAttachmentProvider } from '@/common/attachment-provider.uts'
+// #endif
 
 onLaunch(() => {
   // 主题引擎先于首屏：默认 auto 跟随系统，读取持久化偏好并订阅系统深浅色变化
   initTheme()
+  // #ifdef APP
+  // 注册后输入栏「文件」格自动出现；UIKit 不依赖插件，卸载插件时删掉这两行即可
+  installAttachmentProvider()
+  // #endif
   console.log('App Launch: easemob-uikit-uni demo')
 })
 </script>

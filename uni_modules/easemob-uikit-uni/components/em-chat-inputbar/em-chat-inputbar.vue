@@ -98,7 +98,8 @@ import EmQuickReplyBar from '../em-quick-reply-bar/em-quick-reply-bar.vue'
 import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import { DEFAULT_EMOJI_LIST, MEDIA_PANEL_KEY, PANEL_MIN_HEIGHT } from '../../libs/constants'
-import { PLATFORM_CAPABILITIES, cancelRecord, isRecording, startRecord, stopRecord } from '../../libs/platform'
+import { cancelRecord, isRecording, startRecord, stopRecord } from '../../libs/platform'
+import { canPickAttachment } from '../../libs/attachment'
 import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
 import { useKeyboardHeight } from '../../libs/use/useKeyboardHeight'
 import type { EmInputFeatures, EmQuickReply, EmQuoteInfo } from '../../libs/types'
@@ -249,7 +250,7 @@ function onInputBlur(): void {
 
 // 面板高度 = max(最近键盘本体高度, 280px)：真实键盘高于兜底值时面板跟随键盘（对齐 vue 版 panelHeightVar，
 // 键盘↔面板互切无跳变）；键盘未弹过则恒为 280，对应 css 中 --em-chat-panel-height 一档已被内联覆盖。
-// 注意面板用 keyboardHeight（面板口径）、输入栏上推用 keyboardLift（上推口径：鸿蒙用上报值原值，
+// 注意面板用 keyboardHeight（面板口径）、输入栏上推用 keyboardLift（上推口径：iOS/鸿蒙都用上报值原值，
 // 不扣安全区），两者口径不同，见 useKeyboardHeight 文件头
 const { keyboardHeight, keyboardLift, resetKeyboardHeight } = useKeyboardHeight()
 
@@ -340,8 +341,9 @@ const mediaItems = computed<MediaItem[]>(() => {
   ]
   return candidates.filter((item) => {
     if (!props.features[item.feature]) return false
-    // 平台能力显隐：App 端暂无通用文件选择器，隐藏「文件」入口（能力源见 PLATFORM_CAPABILITIES）
-    if (item.key === MEDIA_PANEL_KEY.FILE && !PLATFORM_CAPABILITIES.filePick) return false
+    // 平台能力显隐：内置选择器（H5/小程序）或宿主注入的 App 附件能力二选一；
+    // canPickAttachment() 读 reactive provider 状态，注册/注销后「文件」格自动出现/隐藏
+    if (item.key === MEDIA_PANEL_KEY.FILE && !canPickAttachment()) return false
     return true
   })
 })

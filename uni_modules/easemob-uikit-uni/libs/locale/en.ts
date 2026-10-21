@@ -20,6 +20,7 @@ export default {
   'error.messageSizeLimit': 'Message too long. Send failed',
   'error.fileTooLarge': 'File too large. Send failed',
   'error.uploadFailed': 'File upload failed',
+  'error.filePickFailed': 'Failed to read the file. Please try again.',
   'error.messageBlockedByRecipient': 'Message blocked by the recipient',
   'error.unsupported': 'This operation is not supported',
 

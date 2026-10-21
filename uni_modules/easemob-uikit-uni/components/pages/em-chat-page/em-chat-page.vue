@@ -262,7 +262,7 @@ import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
-import { EmKit, PLATFORM_CAPABILITIES, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
+import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, pickAttachments, previewImage } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
 import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
@@ -977,18 +977,39 @@ async function onPickVideo(): Promise<void> {
   }
 }
 
+const pickingFile = ref(false)
+
 async function onPickFile(): Promise<void> {
-  // 平台能力门控：App 端无通用文件选择器（入口已在 inputbar 隐藏），这里兜底防旁路调用
-  if (!PLATFORM_CAPABILITIES.filePick) return
-  const file = await chooseFile()
-  if (file == null) return
+  // 能力门控：内置 H5/小程序选择器或宿主注入的 App 附件 provider；pickingFile 防连点并发
+  if (!canPickAttachment() || pickingFile.value) return
+  pickingFile.value = true
   try {
-    const item = await EmKit.sendFile(props.conversationId, props.chatType, file)
-    scrollToBottom()
-    emit('send', item)
+    // 通知宿主选择附件（带会话上下文）；用户取消统一返回 []，不提示
+    const files = await pickAttachments({
+      conversationId: props.conversationId,
+      chatType: props.chatType,
+      multiple: true
+    })
+    if (files.length === 0) return
+    let failed = false
+    // 多选按顺序逐条发送：任一失败只影响该条，其余继续（失败条目保留临时文件供重发）
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const item = await EmKit.sendFile(props.conversationId, props.chatType, files[i])
+        scrollToBottom()
+        emit('send', item)
+      } catch (e) {
+        failed = true
+        logger.error('sendFile fail:', e)
+      }
+    }
+    if (failed) uni.showToast({ title: t('message.send.failed'), icon: 'none' })
   } catch (e) {
-    logger.error('sendFile fail:', e)
-    uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    // provider 选择/读取失败（用户取消不会走这里）
+    logger.error('pick file fail:', e)
+    uni.showToast({ title: t('error.filePickFailed'), icon: 'none' })
+  } finally {
+    pickingFile.value = false
   }
 }
 
