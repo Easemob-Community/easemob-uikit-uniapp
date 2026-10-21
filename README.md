@@ -263,7 +263,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 - **AI 流式消息（M2.13）**：`onStreamMessage` 分片合并/丢片补偿、纯文本打字机光标与异常提示、`enableStreamMessage`/`streamThrottle` 配置、`EmKit.onStreamMessage` 订阅、`#stream-message` 富格式插槽
 - **自定义卡片插槽化（M2.14）**：内核只保留 `sendCustom` + `#custom-message` 插槽，不内置卡片组件/schema；Demo 提供宿主侧 `demo-card` 参考实现（14 种卡片、字段/角标/主次按钮、手机号脱敏、未知回落）与免登录预览页
 - **输入栏业务入口（M2.15）**：`em-chat-page` 新增 `#input-toolbar` 插槽；Demo 用 `demo-composer-bar` 注入场景化「发订单/发工单/发病例/发简历/换手机号」等入口，点击即发对应自定义卡片，入口开关可实时切换
-- **1.0 体验收口**：连接状态条（重连/断开/被踢）、聊天首屏骨架与历史失败重试、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话/好友列表 `autoSync`
+- **1.0 体验收口**：连接状态条（重连/断开/被踢）、聊天首屏骨架与历史失败重试、非当前会话消息内存上限、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话/好友列表 `autoSync`
 
 二期（M4 起，另行立项）：单条转发、联系人详情页/黑名单、文档站等，见 PLAN.md 第 5 节。一期范围外的功能会在发版时逐条冻结公示，避免重复 issue。
 
@@ -280,6 +280,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 - **H5 桌面宽屏（1.0 暂缺）**：H5 按移动端 rpx 布局，未做 PC 宽屏/多栏适配；插件市场兼容矩阵标为不支持宽屏。
 - **录音权限（1.0）**：麦克风权限被拒时只 toast「录音失败，请检查麦克风权限」，不自动跳系统设置（各端设置页差异大）；录音 60s 上限自动停止并按正常语音发送。
 - **日志隐私（1.0）**：原始 payload 默认不写日志；排查时开 `logLevel:'debug'` + `logPayload:true`，导出前自行脱敏。
+- **非当前会话消息上限（1.0）**：非当前会话只保留最近 100 条（`CONVERSATION_MESSAGE_RETAIN_LIMIT`），回会话时重新拉最新页；当前会话单次会话内不裁剪。若业务要求完整本地历史，请自行持久化。
 - 其余平台降级项（蒸汽端 CSS 动画、H5 录音等）见 docs/STATUS.md 各条目「已知降级」。
 
 ### 迁移说明（M2.9 breaking 变更）

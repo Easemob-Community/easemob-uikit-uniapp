@@ -335,6 +335,7 @@
 | P1-6 日志脱敏 | ✅ 代码已修 | `logPayload` 默认 false；仅 debug + 显式开启才序列化；contact/group 原始 dump 全部替换 |
 | P1-8 语言持久化 | ✅ 代码已修 | `initLocale/setLocale/getLocale` + `EmKit.setLocale` + `emkit.locale`；系统语言兜底 |
 | P1-11 列表自同步 | ✅ 代码已修 | `em-conversation-page` / `em-contact-list-page` 增 `autoSync`（默认 true），首次挂载自拉 |
-| 其余 P0/P1 | — | 真机矩阵、H5 联系人、测试/CI、消息内存上限等未动 |
+| P1-10 消息内存上限 | ✅ 代码已修 | 非当前会话保留最近 100 条；离开当前会话裁剪；`trimmed` 标记触发下次重拉最新页，避免游标断层 |
+| 其余 P0/P1 | — | 真机矩阵、H5 联系人、测试/CI 等未动 |
 
-**验证**：`build web` ✓；`build mp-weixin` 11 项全绿；H5 产物伺服 200；headless Chrome 登录页渲染正常；`check-release.mjs` ✓。**待验**：连接条真机文案/布局、录音权限与 60s、语言持久化、`logPayload` 导出、与 vue 版双向引用、`autoBack=false` 拦截、插件市场新矩阵展示、鸿蒙签名本地重配。
+**验证**：`build web` ✓；`build mp-weixin` 11 项全绿（主包 850KB）；H5 产物伺服 200；headless Chrome 登录页渲染正常；`check-release.mjs` ✓。**待验**：多群消息数组 ≤100、被裁剪会话重进不断层、连接条真机文案/布局、录音权限与 60s、语言持久化、`logPayload` 导出、与 vue 版双向引用、`autoBack=false` 拦截、插件市场新矩阵展示、鸿蒙签名本地重配。

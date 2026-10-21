@@ -166,6 +166,7 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue) {
 - H5 为移动端布局，未做桌面宽屏适配。
 - 语音发送仅 App/小程序；录音 60s 上限自动发送，麦克风权限失败只 toast（不自动跳系统设置）。
 - `@` 提及为追加式插入（uni `<input>` 无光标位置 API）；消息列表仍为 `scroll-view` 全量渲染（长会话性能优化在 1.1）。
+- 非当前会话只保留最近 100 条内存消息，回会话时重拉最新页；完整本地历史需宿主自行持久化。
 - 日志原始 payload 默认关闭（`logPayload`），生产排查请临时开启并及时关闭。
 
 ## 更多文档

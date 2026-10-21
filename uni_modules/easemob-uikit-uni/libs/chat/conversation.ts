@@ -60,6 +60,8 @@ export class EmConversationDomain {
   async enterConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     const chatManager = await this.messages.readyChatManager()
     this.currentConversationId = conversationId
+    // 当前会话不参与后台内存裁剪（P1-10）；离开时再按上限裁
+    this.messages.setActiveConversation(conversationId)
     chatManager.setCurrentConversation({ conversationId, conversationType: chatType })
     // 进会话立即清未读（本地 store + 服务端）；当前会话收消息的合批清理见 clearUnread
     this.clearUnread(conversationId, chatType, true)
@@ -76,7 +78,11 @@ export class EmConversationDomain {
   }
 
   leaveConversation(): void {
+    const conversationId = this.currentConversationId
     this.currentConversationId = ''
+    this.messages.setActiveConversation('')
+    // 离开即裁剪：下次进入由 loadHistory 的 trimmed 标记重拉最新页（游标不会指向已丢弃的消息）
+    if (conversationId !== '') this.messages.trimConversation(conversationId)
     this.ctx.client?.chatManager.resetCurrentConversation()
   }
 

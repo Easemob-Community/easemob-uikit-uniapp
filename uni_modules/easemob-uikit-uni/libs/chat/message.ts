@@ -14,7 +14,7 @@ import type {
   VideoMessageBody,
   VoiceMessageBody
 } from 'easemob-websdk'
-import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
+import { CMD_ACTION, CONVERSATION_MESSAGE_RETAIN_LIMIT, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
 import type { ConversationTypeValue, MessageTypeValue, StreamMessageStatusValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { uiConfig } from '../store/config'
@@ -182,6 +182,9 @@ export class EmMessageDomain {
   // 分片合批缓冲：同一消息在一个节流窗口内只落最新全文/状态，窗口结束一次性写 store + 通知
   private pendingStreamByKey: Record<string, { item: EmMessageItem, stream: EmStreamInfo }> = {}
   private streamTimerByKey: Record<string, ReturnType<typeof setTimeout>> = {}
+  // P1-10 内存上限：只对非当前会话裁剪；当前会话离开时再裁，回会话由 trimmed 标记触发重拉最新页
+  private activeConversationId = ''
+  private trimmedByConversationId: Record<string, boolean> = {}
 
   constructor(private ctx: EmChatContext) {}
 
@@ -196,7 +199,22 @@ export class EmMessageDomain {
     this.streamTimerByKey = {}
     this.pendingStreamByKey = {}
     this.streamItemByKey = {}
+    this.activeConversationId = ''
+    this.trimmedByConversationId = {}
     this.sessionEpoch += 1
+  }
+
+  /** 会话域进入/离开时同步当前会话：进入后该会话不再被内存上限裁剪 */
+  setActiveConversation(conversationId: string): void {
+    this.activeConversationId = conversationId
+  }
+
+  /** 非当前会话只保留最近 N 条；被裁过的会话下次 loadHistory 会丢弃旧游标、重拉最新页，避免出现时间断层 */
+  trimConversation(conversationId: string): void {
+    const list = messageStore.messagesByConversationId[conversationId]
+    if (list == null || list.length <= CONVERSATION_MESSAGE_RETAIN_LIMIT) return
+    messageStore.messagesByConversationId[conversationId] = list.slice(list.length - CONVERSATION_MESSAGE_RETAIN_LIMIT)
+    this.trimmedByConversationId[conversationId] = true
   }
 
   // 返回取消函数：宿主（聊天页）卸载时调用，防 handlers 数组只增不减（反复进出聊天页会叠加触发）
@@ -701,12 +719,22 @@ export class EmMessageDomain {
   private async doLoadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize: number): Promise<void> {
     const epoch = this.sessionEpoch
     const chatManager = await this.readyChatManager()
+    // 被内存上限裁过的会话：旧游标指向已丢弃的尾部消息，继续用会跳过被裁段；
+    // 丢弃本地缓存与游标，从最新页重新拉；一次拉满保留上限，回会话仍能看到最近 100 条
+    let requestPageSize = pageSize
+    if (this.trimmedByConversationId[conversationId] === true) {
+      delete this.trimmedByConversationId[conversationId]
+      messageStore.messagesByConversationId[conversationId] = []
+      messageStore.cursorByConversationId[conversationId] = ''
+      messageStore.hasMoreByConversationId[conversationId] = true
+      requestPageSize = Math.max(pageSize, CONVERSATION_MESSAGE_RETAIN_LIMIT)
+    }
     const cursor = messageStore.cursorByConversationId[conversationId] ?? ''
     const page = await chatManager.getHistoryMessages({
       conversationId,
       conversationType: chatType,
       cursor,
-      pageSize,
+      pageSize: requestPageSize,
       searchDirection: 'up'
     })
     // 登出/换账号后回来的旧请求：丢弃，不写游标/消息
@@ -941,6 +969,12 @@ export class EmMessageDomain {
       return null
     }
     list.push(item)
+    // 非当前会话只保留最近 N 条：多群长聊时不会因后台消息无限累积占内存
+    if (item.conversationId !== this.activeConversationId) {
+      this.trimConversation(item.conversationId)
+      const kept = messageStore.messagesByConversationId[item.conversationId]
+      return kept[kept.length - 1]
+    }
     return list[list.length - 1]
   }
 

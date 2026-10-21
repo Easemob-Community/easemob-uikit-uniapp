@@ -148,6 +148,10 @@ export const CONVERSATION_SILENT_MODE_BATCH_SIZE = 20
 /** 当前会话收消息清服务端未读的合批间隔（毫秒）：避免每条消息一次 REST，同时保证离页后未读不复活 */
 export const CONVERSATION_UNREAD_CLEAR_THROTTLE = 2000
 
+/** 非当前会话的内存消息保留上限：进入其他会话时只留最近 N 条，回会话时重新拉最新页，避免多群长聊无限占内存。
+ *  当前会话不设限（单次会话内全量），离开时按此上限裁剪。 */
+export const CONVERSATION_MESSAGE_RETAIN_LIMIT = 100
+
 /** 会话筛选 tab 默认全集与顺序（对齐 vue DEFAULT_CONVERSATION_TABS） */
 export const DEFAULT_CONVERSATION_TABS: ConversationTabKeyValue[] = [
   CONVERSATION_TAB_KEY.ALL,

@@ -18,6 +18,7 @@
 - **引用协议跨 UIKit 互通**：发送同时写入 `ext.msgQuote`（与 vue 版同 key、同结构）与 `ext.emQuote`（0.x uni 兼容）；接收优先解析 `msgQuote`，旧消息回落 `emQuote`。`EmQuoteInfo` 新增可选 `thumbUrl`。
 - **聊天页交互**：输入栏 emoji/媒体面板或软键盘展开时，点消息区即收起（`em-chat-inputbar` 新增 `collapseSignal` 信号 props，聊天页点击消息区递增；开面板前自动收键盘，面板与键盘不再叠加占位）。
 - **首屏骨架与历史重试**：聊天页首次历史请求结束前显示气泡骨架，不再先闪「暂无消息」；500ms 兜底只解透明度；历史加载失败 toast + 「点击重试」（已有缓存消息时顶部重试行，不遮消息）。
+- **消息内存上限**：非当前会话只保留最近 100 条（`CONVERSATION_MESSAGE_RETAIN_LIMIT`），离开当前会话时同样裁剪；被裁剪会话下次进入重拉最新页，避免游标指向已丢弃消息。当前会话单次会话内不设限。
 - **返回事件契约**：`em-chat-page` 新增 `back` emit 与 `autoBack` prop（默认 `true`，保持原行为；`false` 时只发事件，由宿主接管退场）。
 - **发布物料**：插件版本 `1.0.0-rc.1`；平台矩阵按 HBuilderX 4.71+ 新规范更新；补充暗黑模式/多语言/宽屏声明、相机/相册/麦克风权限与数据声明；根目录补 MIT `LICENSE`；demo 清除签名路径与密码。
 

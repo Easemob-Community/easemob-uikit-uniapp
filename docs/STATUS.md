@@ -520,3 +520,11 @@
 - **失败可重试**：首次历史失败 → toast「消息加载失败」+ 空态区「点击重试」（`em-button`，重试中 disabled）；已有缓存消息时失败不遮消息，改为顶部「消息加载失败，点击重试」行。`onLoadMore` 失败也补 toast。
 - **i18n**：新增 `chat.historyFailed` / `chat.historyFailedRetry` / `chat.retry`（中/英）。
 - 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 849KB / 分包 1367KB）；H5 产物伺服 200。**待验**：弱网/断网首次进聊天页的骨架→空态/错误态切换、重试成功回填、已有缓存时失败提示、`#empty` 插槽在错误态下不被误渲染。
+
+## 2026-10-21 1.0 就绪批次 5：消息内存上限（P1-10）
+
+- **背景**：所有会话的 `onMessage` 都 append 到 `messageStore.messagesByConversationId`，多群/久用后内存无界增长。
+- **策略**：新增 `CONVERSATION_MESSAGE_RETAIN_LIMIT = 100`；**非当前会话**每次 append 后只保留最近 100 条；离开当前会话时也按 100 裁剪；当前会话单次会话内不设限（避免正在浏览时被截断）。
+- **游标一致性**：被裁剪的会话记 `trimmedByConversationId`；下次 `loadHistory` 时丢弃旧消息/游标/`hasMore`，从最新页重拉，避免旧游标指向已丢弃消息造成时间断层。
+- **当前会话同步**：`EmConversationDomain.enterConversation/leaveConversation` 调 `messages.setActiveConversation`，消息域据此判断是否裁剪；`EmChat.reset` 清空标记。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 850KB / 分包 1367KB）。**待验**：多群连续收消息后各会话消息数组 ≤100、进入被裁剪会话能重拉最新页且不重复/不断层、当前会话长聊不被裁剪、群/单聊切换正常。
