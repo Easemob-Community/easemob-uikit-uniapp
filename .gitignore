@@ -19,3 +19,5 @@ demo/harmony-configs/build-profile.json5
 .venv-icons/
 # Python 字节码缓存（图标构建脚本运行产物）
 __pycache__/
+# 内部问题报告（开源仓库不入库）
+reports/

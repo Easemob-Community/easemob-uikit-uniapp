@@ -13,6 +13,7 @@
 2. **视觉/交互权威 = 本机 vue 版源码**（只读）：`/Users/neohuang/Desktop/WorkCommonUse/UIKIT/easemob-uikit-vue`——动手做 UI 前先读对应模块（skill: `vue-uikit-design-reference`）。
 3. 编码纪律（纯 ts / ucss 子集 / 零运行时依赖 / 枚举走 constants / 中英 i18n / store 命名约定）：skill `em-coding-discipline`。
 4. **验证门禁**（每次提交前）：`scripts/uni.sh build web` + `build mp-weixin` 全绿（含分包防回归 11 项）+ H5 产物静态伺服 200；小程序主包 ≤1.5MB。命令用法见 skill `hbuilderx-cli-compile`。
+5. **对外文档门禁**：改 `docs/` 公开页或 `changelog.md` 后跑 `node scripts/check-docs.mjs`；新页面必须登记 `docs/docs.manifest.mjs`。写作规范见 skill `em-public-docs`（无 P0/P1/里程碑/待验/规划等内部口径）。
 
 ## 3. 技能索引（按任务选读）
 
@@ -28,18 +29,23 @@
 | 蒸汽工程结构/入口约定/App 端黑屏 | `.agents/skills/uniapp-x-vapor-structure` |
 | CLI 编译/伺服/缓存排错 | `.agents/skills/hbuilderx-cli-compile` |
 | SDK 集成（websdk 5.x 陷阱） | `.agents/skills/easemob-websdk-v5` |
+| 写/更新对外文档、页面/组件/API 参考、manifest 登记、公开边界审计 | `.agents/skills/em-public-docs` |
 
 ## 4. 文档索引
 
 - `docs/STATUS.md` — 进度日志（按时间线）、待验项汇总、已验证基线（**接活前先扫一眼**）
 - `PLAN.md` — 立项计划书（决策表/范围/路线/门禁的唯一权威）
-- `docs/QUICKSTART.md` — 宿主接入 9 步（安装 → pages.json → 初始化 → 登录 → 会话/聊天页 → 五端运行 → 排错）
-- `docs/RELEASE-1.0.md` — 1.0 发布门禁、版本/市场字段、真机矩阵、发布与回滚
-- `docs/SPIKE-SDK-CONNECTIVITY.md`、`docs/SPIKE-SDK-SUBPACKAGE.md` — 五端连通性与编译器行为实测
-- `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md` — 宿主接入指引（小程序分包）
-- `docs/EVAL-MULTI-SCENARIO.md` — 多场景易用性与扩展能力评估（客服/医疗/招聘/二手交易 + 伪 1v1 伪装群，含 P0/P1 缺口清单与落地路线、§7 落地状态）
-- `docs/GUIDE-MULTI-SCENARIO.md` — 多场景接入指引（直进 1v1、`#banner`/`title`/`showAction`/`sendCustom`/`insertLocalNotice`、卡片插槽）
-- `docs/HARMONY-REALDEVICE-RUN.md` — 鸿蒙真机运行与签名配置
+- `skills/` — **宿主接入向** Agent Skills（对外分发，入口 `em-host-integration`；与 `.agents/skills/` 内部开发技能分开维护，改动后跑 `node scripts/check-skills.mjs`）
+- `docs/docs.manifest.mjs` — 独立文档门户公开清单、页面映射、nav/sidebar 与回源编辑链接；站壳在同级仓库 `../easemob-community-docs`，内部规划/验证材料不得加入 entries
+- `scripts/check-docs.mjs` — 对外文档门禁（内部术语/链接/组件/API/配置覆盖/manifest 一致性）
+- **对外页面**（全部登记在 manifest，禁止直接改 `.content`）：
+  - 入门：`docs/QUICKSTART.md`、`docs/CONCEPTS.md`、`docs/HOME.md`
+  - 页面：`docs/PAGES-CONVERSATION.md`、`PAGES-CHAT.md`、`PAGES-CHAT-INFO.md`、`PAGES-CONTACTS.md`、`PAGES-GROUPS.md`
+  - 组件：`docs/COMPONENTS.md`、`COMPONENTS-BASIC.md`、`COMPONENTS-CONVERSATION.md`、`COMPONENTS-CHAT.md`、`COMPONENTS-CONTACT.md`
+  - API/配置：`docs/API-KIT.md`、`API-TYPES.md`、`CONFIG.md`、`MESSAGING.md`
+  - 设计与运行：`docs/THEME-I18N.md`、`DESIGN-TOKENS.md`、`PLATFORM.md`、`FAQ.md`
+  - 进阶：`docs/GUIDE-MULTI-SCENARIO.md`、`AI-STREAM.md`、`GUIDE-WEAPP-SDK-SUBPACKAGE.md`、`HARMONY-REALDEVICE-RUN.md`、`DEMO.md`
+- **内部材料（禁止进入公开 entries）**：`docs/RELEASE-1.0.md`、`docs/SPIKE-SDK-CONNECTIVITY.md`、`docs/SPIKE-SDK-SUBPACKAGE.md`、`docs/EVAL-MULTI-SCENARIO.md`、`docs/REVIEW-1.0-READINESS.md`
 
 ## 5. 安全
 

@@ -84,7 +84,7 @@
 | 自定义卡片端到端（14 种宿主卡片双端收发/动作回传、未知 event 回落、手机号脱敏、`#custom-message` 注入） | H5/mp/App | 免登录预览页已验渲染；聊天内收发需真实账号 |
 | 输入栏业务入口端到端（`#input-toolbar` 注入/开关、点胶囊 sendCustom 对端渲染、键盘弹起时跟随与两行占位） | H5/mp/App | 详情页入口条免登录已验渲染；聊天内点击需真实账号 |
 | AI 流式消息端到端（真实 `onStreamMessage`：分片合并/丢片补偿/终态收敛/异常、`enableStreamMessage=false` 完整消息延迟上屏、断连重连） | H5/mp/App | 需业务服务端下发流式消息；H5 demo mock 已验渲染态 |
-| 手动避让时序与高度精度（iOS/鸿蒙扣安全区后贴合度；鸿蒙原「adjustPan 不回弹」是否随手动方案消失） | App 三真机 | 用户已验 Android「顶飞消解」 |
+| 手动避让时序与高度精度（上推口径 = 上报值原值；鸿蒙已验贴合、iOS 已复现并同因修复，待 iOS 复测贴合度） | App 三真机 | Android「顶飞消解」已由用户验；鸿蒙 2026-10-21 实测贴合；iOS 2026-10-21 截图量化后修复 |
 | 会话页/联系人页搜索聚焦顶飞 nav-bar（同根因，fix 待从 chat-page 铺到 conversation/contact 页） | App | 已立案 |
 | 聊天页「点击消息区收起输入栏」（emoji/媒体面板 + 软键盘；键盘弹起时点击不误触消息操作） | App 三真机 / mp / H5 | 需真实账号；H5 桌面端外部点击已由浏览器 blur 兜底 |
 | mp-weixin `onKeyboardHeightChange` 回调与面板跟随观感 | 小程序 | |
@@ -92,6 +92,8 @@
 | 菜单裁剪/feature 开关/自定义消息插槽冒烟 | H5/mp | |
 | switch `color=var(--em-primary-color)` 与 em-badge mp 真机视觉 | mp | |
 | Android 重连回归（SPIKE 记录）；iOS 端整体待验 | App | |
+| iOS 真机复跑：登录成功（登录链路已不依赖 `uni-getNetworkType` 基座模块）、登录页输入框/聚焦态观感 | iOS | 2026-10-21 首次 iOS 运行暴露，已修（见文末同日条目） |
+| iOS 缺 `uni-getNetworkType` 模块基座下的断网/恢复重连（网络监听降级为心跳重连） | iOS | 同上 |
 | 聊天页进页偶尔「二次置底闪动」（补偿拉取触发的列表二次变化 × 两次 scrollToBottom 时序；已搁置，优化方向见上方 2026-10-15 滚底条目） | App | 功能正常，观感优化项 |
 | 组头 sticky 蒸汽端实测 | App | 不生效则随列表滚动 |
 | 群链路端到端（真实账号：登录 → 建群/群列表 → 群聊收发 → 公告条/@我徽标/成员昵称行） | H5/mp/App | M2.9 各 Phase 共同挂账 |
@@ -491,7 +493,7 @@
   - 结论：上报值(314vp) == 实际遮挡(314vp)，而代码算出的 margin 是 `314 − 28 = 286vp` → 少顶 28vp（84px）。
 - **根因**：一份 `uni.onKeyboardHeightChange` 值被当成两种口径混用。`keyboardHeight` 原本是**面板口径**——iOS/鸿蒙上报值含底部安全区，而 emoji/媒体面板自身还有 safe-bottom padding，所以扣掉安全区再交给面板；`em-chat-inputbar` 又把这个「已扣过的值」直接写进 `margin-bottom`（**上推口径**，要的是「键盘画到屏幕底的那一段」）。面板扣一次没问题，上推也扣就必然少一个安全区。官方 hello-uni-app-x `keyboard-adjust` 示例只用它调悬浮条位置，照搬到 margin-bottom 会复现同一 bug。
 - **修复**：
-  - `libs/use/useKeyboardHeight.ts` 拆两个 ref：`keyboardHeight`（面板口径，行为不变）+ `keyboardLift`（上推口径 = 上报值，App 全端；iOS 暂沿用旧值）；新增 `resetKeyboardHeight()` 两个值一起清零（替换 inputbar 里两处手写 `keyboardHeight.value = 0`）。
+  - `libs/use/useKeyboardHeight.ts` 拆两个 ref：`keyboardHeight`（面板口径，行为不变）+ `keyboardLift`（上推口径 = 上报值原值，App 全端；iOS 随当日下一条一并改正）；新增 `resetKeyboardHeight()` 两个值一起清零（替换 inputbar 里两处手写 `keyboardHeight.value = 0`）。
   - `em-chat-inputbar`：`margin-bottom` 改用 `keyboardLift`，面板 `height` 仍用 `keyboardHeight`，`keyboardMaybeOpen()` 同步改用 lift。
 - **真机验证**（改完源码经 HBuilderX dev watch 重出 `.app-harmony` → `hvigorw assembleHap` 重编签名 HAP → `hdc install -r` 装包实测）：
   - 修复前输入栏根节点 `[0,1395][1084,1554]`，底边比键盘上沿低 84px（截图：输入框/发送键被压掉下半截）；
@@ -499,7 +501,19 @@
   - 点消息区收起后根节点回到 `[0,2169][1084,2412]`（243px，含 28vp 安全区 padding），与改前基线一致；媒体面板 280vp、面板顶 1572 与改前一致（面板行为未动）。
 - **门禁**：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 837KB / 分包合计 1367KB）；H5 产物伺服 200；`check-app-module-graph.mjs` ✓（0 反向 import / 0 循环）。
 - **纪律/口径**：同一份键盘高度不要同时喂给「面板高度」和「margin-bottom」；改 margin 前按 skill `em-crossend-pitfalls` §4d 的三数法（dumpLayout / 截图键盘上沿 / hidumper 窗口 rect）实测一次。已同步 skill §4 要点与新增 §4d。
-- **待验**：iOS 真机（上推口径目前仍是「上报值 − 安全区」，按 §4d 同法量；若也被压一个安全区就改成直接用上报值）；Android 回归（口径未变，预期无感）；键盘 ↔ emoji/媒体面板互切的面板高度观感（面板 280vp vs 键盘 314vp，切换有 28vp 收缩，属历史行为本次未改）；会话页/联系人页搜索框聚焦（仍走系统默认上推，遗留项）。
+- **待验**：Android 回归（口径未变，预期无感）；键盘 ↔ emoji/媒体面板互切的面板高度观感（面板 280vp vs 键盘 314vp，切换有 28vp 收缩，属历史行为本次未改）；会话页/联系人页搜索框聚焦（仍走系统默认上推，遗留项）。
+
+## 2026-10-21 iOS 同样复现输入栏被压一截：同因（上推口径多扣了一个底部安全区 34pt）
+
+- **症状（iOS 真机，用户 16:43 截图）**：iPhone 14 Pro 竖屏 1179×2556（3x）、深色主题、第三方九宫格键盘。键盘弹起后输入栏确实被顶起，但栏底仍压在键盘面板下——发送键只剩上半截可见（键盘面板半透明，能隔着看到被压住的输入栏残留）。
+- **截图量化（未接设备，按用户截图逐像素量，三数一对）**：
+  - 键盘面板上沿 y=1407px → **实际遮挡 = 2556 − 1407 = 1149px = 383pt**；`safeAreaInsets.bottom` = 34pt = 102px（1179×2556 / 3x = 393×852pt，Home 指示条机型）。
+  - 输入栏根节点上沿 y=1350px（顶部 1px 分隔线可认），栏高 159px = 53pt（css：1px 边框 + 8 + 36 输入框 + 8 = 53）；
+  - 故栏底 y=1509px → 实际生效 `margin-bottom = (2556 − 1509) / 3 = 349pt = 383 − 34`：**少顶的 102px 恰好是一个底部安全区**，同时反证上报值 383pt == 实际遮挡（含安全区）。
+- **根因**：与鸿蒙同一个 bug 的遗留面。上一轮把「上推口径」从面板口径拆出来时，iOS 分支仍写成 `lift = reported − safeAreaInsets.bottom`（当时注记「未真机验，沿用旧值」），而 iOS 会话页同样是边到边（页面底 = 屏幕底），上报值本身已含安全区 → 少顶一个安全区。
+- **修复**：`libs/use/useKeyboardHeight.ts` 的 `keyboardLift` 改为**全端 = 上报值原值**（iOS 不再扣安全区），`keyboardHeight`（面板口径）保持「iOS/鸿蒙扣安全区」不变；`em-chat-inputbar` 无需改动（已用 lift 写 `margin-bottom`）。同步 `docs/PLATFORM.md` 键盘避让口径与 `changelog.md` 修复条目；skill `em-crossend-pitfalls` §4 要点/§4d 写入「iOS 已实测同因」。
+- **验证口径**：iOS 真机聚焦输入框，输入栏底边应 == 键盘面板上沿（截图量：栏底 y 与键盘上沿 y 相等）；同时确认 emoji/媒体面板高度与切换观感未被带偏（面板仍用 `keyboardHeight`，口径未变）。
+- **待验**：iOS 真机复测（本次依据截图量化，未接设备实测）；iOS 无 Home 指示条机型（`safeAreaInsets.bottom`=0，口径等价于改前，预期无变化）；Android 回归（口径未变）。
 
 ## 2026-10-21 1.0 就绪批次 3：连接状态条 + 录音兜底 + 日志脱敏 + 语言持久化/列表自同步
 
@@ -535,3 +549,61 @@
 - **移除死配置 `showTime`**：`EmKitConfig`/`EmUiConfig`/`uiConfig`/`applyKitConfig` 全链路删除（此前只存不用，逐条时间仍由时间分隔条承担）；`setConfig({showTime})` 不再生效，1.0 前无正式用户。
 - **stale 注释**：`CONVERSATION_TYPE.GROUP_CHAT` 去掉「一期仅单聊」；会话页 create-group 注释改为「建群已落地，emit 由宿主接群列表页」。
 - 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 850KB / 分包 1367KB）。
+
+## 2026-10-21 独立文档门户接入
+
+- 新增 `docs/docs.manifest.mjs` 与 `docs/HOME.md`：公开文档仍由本仓库维护，VitePress 站壳位于同级 `../easemob-community-docs`；首批接入快速开始、多场景、小程序分包、鸿蒙真机、Design Tokens 与 changelog。
+- 公开内容采用 entries 白名单；`PLAN.md`、`STATUS.md`、SPIKE、REVIEW、RELEASE、EVAL 等内部材料不进入门户。Quick Start 同步移除对内部 STATUS 的公开引用并修正聚合后的指南链接。
+- 验证：门户 `pnpm test` 9/9 通过；`pnpm build` 通过；uniApp 首页版本、产品切换、回源编辑链接、场景图片、搜索、暗色模式与移动端导航均经浏览器实测。此次仅改文档与门户配置，未改组件代码，不重复五端构建。
+
+## 2026-10-21 宿主接入 Agent Skills（skills/）
+
+- 新增对外分发的宿主接入技能包 `skills/`（8 份）：`em-host-integration`（总纲）、`em-host-conversation-chat`、`em-host-contacts-groups`、`em-host-business-extension`、`em-host-ai-stream`、`em-host-theme-i18n`、`em-host-mp-subpackage`、`em-host-troubleshooting`；每份含触发 description、可复制代码、组件契约/事件/插槽、平台边界与验收清单。
+- 与 `.agents/skills/`（UIKit 开发技能）明确分仓：README / 插件 readme / AGENTS 文档索引各加入口；`skills/README.md` 给出复制到宿主 `.claude/skills` / `.agents/skills` 的安装方式与任务路由。
+- 新增 `skills/em-host-mp-subpackage/scripts/prepare-sdk-subpackage.mjs` 宿主版分包后处理（参数化 project/out/sdk/esbuild，支持 `--watch`，含 IIFE 全局名校验、es2017 降级、导出探针、project.config ignore 开关）；新增 `scripts/check-skills.mjs` 校验 frontmatter/目录同名/描述长度/代码围栏/本地链接。
+- 验证：`node scripts/check-skills.mjs` 8/8 通过；宿主分包脚本对 demo 的 websdk 5.1.3 实测生成 1234KB `sub-sdk/im-sdk.js`，导出探针与 `project.config.json` patch 通过（临时目录，未改产物）。
+
+## 2026-10-21 对外文档门户完整装载（页面/组件/API/配置/平台）
+
+- **文档技能**：新增 `.agents/skills/em-public-docs`，定义公开边界、真源映射、页面地图、四套模板、更新流程与发布前清单；AGENTS 增加「对外文档门禁」与技能索引。
+- **公开页面**：guide 从 6 篇扩到 26 篇（加首页共 27 页）——核心概念与架构、5 篇页面指南（会话/聊天/聊天信息/通讯录/群组）、5 篇组件参考（总览/基础/会话/聊天/联系人）、EmKit API、类型与常量、配置参考、消息与扩展协议、主题与国际化、设计变量、平台能力与差异、常见问题、AI 流式消息、示例工程；重写多场景、设计变量、小程序分包、鸿蒙与 changelog，移除 P0/P1、里程碑、一期/二期、待验/规划、内部材料名等内部口径。
+- **manifest**：`docs/docs.manifest.mjs` 改为 `pages` 清单驱动 entries/sidebar/markdownReplacements；editLink 字面量映射由校验脚本比对；nav 增加页面/组件/API 入口。
+- **门禁**：新增 `scripts/check-docs.mjs`（零依赖）——未登记页面、内部术语、相对链接、entries/sidebar/editLink/replacements 一致性、33 个组件目录 + 65 个 EmKit 方法 + 24 个配置字段覆盖；当前全绿。
+- **门户验证**：`easemob-community-docs` 执行 `pnpm build` 全流程通过（68/68 API 生成 → 内容同步 → 公开边界检查 → VitePress 构建 → 产物复查），产物 `uniapp/` 27 个页面；侧边栏 7 组、26 条页面链接。
+- **demo 口径清理**：mine/style-lab/chat 注释、pages.json 标题、spike 页标题移除 M2.13/二期/P1/Spike 等内部字样（仅文案，无行为变更）。
+- 本次改动为文档、文档脚本与 demo 文案，未改组件运行时逻辑，不重复五端构建。
+
+## 2026-10-21 iOS 真机首跑两项修复：登录被 uni-getNetworkType 拖死 + 输入框内上沿白线
+
+- **症状（iOS 真机，1.0.0-rc.1 首跑）**：① 点「立即登录」直接失败，红字 `登录失败：undefined class: UTSSDKModulesDCloudUniGetNetworkTypeIndexSwift, uni-getNetworkType 模块不存在，请重新打自定义基座。`；② 登录页三个输入框的内上沿各有一条**实色白线**（像顶部描了白边），H5 同页无。
+- **根因 ①（不是业务代码调 API）**：`easemob-websdk@5.1.3` 的默认 uni runtime 适配器 `onNetworkChange` 里既注册 `uni.onNetworkStatusChange` 又**同步**调 `uni.getNetworkType` 探测网络类型；而 SDK 在 `login → core 构造` 阶段就 `registerNetworkListeners()`。这两个 API 同属 iOS/Android 的 `uni-getNetworkType` UTS 模块，旧自定义基座没把该模块编进去 → 同步抛 `undefined class`；异常冒泡成 login reject，用户看到的就是「登录失败」（不是网络探测失败——探测本身在 Promise 里且已被 SDK catch）。H5/小程序运行时自带该 API，故不复现。
+- **修复 ①**：`libs/platform.ts` 新增 `subscribeNetworkStatus()`（只注册 `uni.onNetworkStatusChange`，`offNetworkStatusChange(id)` 反注册，整段 try/catch，基座缺模块时降级为不监听）；`libs/client/index.ts` 经 `platformAdapterOptions.overrides` 把 SDK runtime 换成「委托 getPlatform/onAppVisibilityChange + 自管 onNetworkChange」的实现，**不提供可选的 `getNetworkType` 能力**（SDK 缺省即跳过）。这样登录链路不再依赖 `uni-getNetworkType` 模块，宿主无需为一条诊断信息重打基座；基座有该模块时仍能收网络变化，缺模块时由心跳/重连循环兜底。
+- **根因 ②**：iOS 蒸汽端把 `inset` box-shadow 的颜色 alpha 丢了——`box-shadow: inset 0 1px 0 rgba(255,255,255,0.04)` 被画成一条实色白线贴住输入框内上沿（像素实测顶边 lum≈215，而四周边框 lum≈62 正常；H5 同 CSS 无该线）。登录页是全库唯一用 inset 阴影的地方，属 demo 样式不是组件问题。
+- **修复 ②**：`demo/pages/login/login.uvue` 输入框去掉全部 `box-shadow`（聚焦态也去掉外发光），聚焦反馈只靠 `border-color` + `background-color`（两端表现一致）。
+- **验证**：`build web` ✓（产物 CSS 已无 box-shadow，登录页输入框仅 border + 背景）；`build mp-weixin` 11 项防回归全绿（主包 850KB / 分包合计 1367KB）；H5 产物伺服 200；`check-app-module-graph.mjs` ✓（0 反向 import / 0 循环）；HBuilderX dev watch 已重出 `.app-ios`（`app-service.js` 含 `platformAdapterOptions` 覆盖，`GenPagesLoginLoginSharedData.style.bytes` 已更新）。**待验**：iOS 真机复跑（登录成功、输入框观感、聚焦态）；iOS 断网/恢复时重连是否仍及时（缺模块基座降级为无网络监听，靠心跳重连）；其余 App 端页面在 iOS 的样式巡检（本轮只发现登录页这一处 inset 阴影）。
+
+## 2026-10-21 App 附件能力注入（宿主 provider + 临时文件生命周期）
+
+- **能力注入**：新增 `libs/attachment.ts` 与 `EmKit.setAttachmentProvider(provider)` / `refreshAttachmentAvailability()` / `pickAttachments(options)` / `resolveAttachment(uri, options?)` / `attachments` / `canPickAttachment`。UIKit 不静态 import 任何文件选择器 UTS 插件；App 端 provider 注册后输入栏「文件」格响应式出现，注销/`isAvailable() === false` 时隐藏。H5/小程序继续走 `platform.chooseFile` 内置实现。
+- **发送链路**：`em-chat-page.onPickFile` 改为 `pickAttachments`（带 conversationId/chatType/multiple）+ 逐条 `sendFile`，多选任一失败不影响其余；新增 `pickingFile` 防连点与 `error.filePickFailed` 中英文案。`em-chat-inputbar` 的「文件」格改读 `canPickAttachment()`（读 reactive provider 状态），不再直接读 `PLATFORM_CAPABILITIES.filePick`。
+- **临时文件**：`EmPickedFile` 扩展 `mimeType?/temporary?/release?`（继承 `EmAttachment`）；`sendFile` 登记 `path → release`，发送成功/重发成功/删除本地消息/`reset()`（登出）时回调清理，失败保留供重发；`asCompatibleFile` 在原生端把 MIME 透传为 `MiniAppFile.type`。
+- **demo**：新增 `demo/common/attachment-provider.uts`（chooseFile → prepareFile → removeTempFile 包装为 provider，含多选串行 prepare、取消返回 []、失败提示）；`demo/App.uvue` 用 `#ifdef APP` 条件 import + onLaunch 注册，H5/小程序产物不含插件引用（已 grep 校验 0 命中）。
+- **文档**：API-KIT 新增「附件能力注入」章节与导出表；API-TYPES 补 `EmAttachment`/`EmAttachmentProvider`/`EmAttachmentPickOptions`/`EmAttachmentCapability`；PLATFORM 更新 App 文件能力与能力开关语义；MESSAGING 补 sendFile 临时文件说明；changelog/readme 同步。
+- **验证**：`build web` ✓；`build mp-weixin` 防回归全绿（主包 853KB / 分包合计 1367KB）；H5 产物静态伺服 200；`check-docs.mjs` ✓（71 个 EmKit 方法）；`check-app-module-graph.mjs` ✓。**待验**：App 真机（Android/iOS/鸿蒙）三端选文件→发送→对端收文件→失败重发→登出清理；HBuilderX CLI `-p app` 资源构建因 demo 外置 `vue` 解析失败不可用，App 侧类型/编译需在 HBuilderX GUI 或真机基座确认。
+
+## 2026-10-21 App 导出日志失败：encoding 传了小程序口径 `'utf8'`
+
+- **症状**：demo「我的 → 导出调试日志」在 App 上只弹「写文件失败，日志全文已复制到剪贴板」；H5 正常下载，微信小程序正常写文件。
+- **根因 1**：`libs/platform.ts` 的 `exportTextFile` 给 `FileSystemManager.writeFile` 传 `encoding: 'utf8'`。App 端（Android/iOS/鸿蒙）只支持 `ascii` / `base64` / `utf-8`，非法值走 fail 回调（错误码 1200002），Promise reject → 回退剪贴板。`'utf8'` 恰好是微信小程序接受的写法，所以只有 App 复现。DCloud 文档与 `uni-fileSystemManager` 类型声明均只列 `ascii | base64 | utf-8`。
+- **根因 2（观感）**：`uni.env.USER_DATA_PATH` 在 App 是应用沙盒，文件管理器不可见；即便写成功，弹窗里 `file://usr/...` 用户也点不开，容易被当成「导出失败」。
+- **修复**：`encoding` 改 `'utf-8'`；`USER_DATA_PATH` 为空时提前 reject（不再拼 `/xxx.txt`）；`exportLogs` 的 catch 补 `kitLogger.warn`（原因进 `[emkit:kit]` 日志，不再静默吞）；`copyText` 补 fail 日志（超长文本剪贴板失败不再假装成功）；demo 弹窗文案区分「写失败（原因见控制台）」与「沙盒路径不可见」。
+- **文档/纪律**：API-KIT 的 `exportLogs` 补充沙盒路径说明；skill `em-crossend-pitfalls` 新增 §5g + 能力边界两行（writeFile encoding、USER_DATA_PATH）。
+- **验证**：`build web` ✓；`build mp-weixin` 防回归全绿；`check-docs.mjs` ✓；`check-app-module-graph.mjs` ✓。**待验**：App 真机（Android/iOS/鸿蒙）点导出→生成文件且返回沙盒路径、剪贴板可粘贴全文；自定义基座缺 `uni-fileSystemManager` 时回退 `'clipboard'` 且控制台有告警。
+
+## 2026-10-21 App 附件发送失败：SDK md5 读取被 App 文件系统沙盒拦住（`Miniapp file read failed`）
+
+- **症状（App 真机；选文件已成功，发送必失败）**：选完文件后日志停在 `Attachment md5 compute start` → `sendFile fail: UploadError: Miniapp file read failed`，气泡落失败态；`upload.prepare.*` / `upload.precheck.skip(md5-check-disabled)` 都正常，说明问题不在选择器、也不在上传接口。
+- **根因**：`easemob-websdk@5.1.3` 的附件上传在**每次上传前**都会用平台 `imageProcessor.computeMd5` 算 md5（`resolveUploadMetadata`），App 上解析到的是小程序处理器：`uni.getFileSystemManager().readFile`。而 App 的 FileSystemManager 只能读 uni 沙盒路径（`uni.env.CACHE_PATH` / `USER_DATA_PATH` / `SANDBOX_PATH` / `ANDROID_INTERNAL_SANDBOX_PATH`），宿主文件选择器（demo 用 `easemob-file-picker`）把副本放在**系统缓存**（iOS `NSTemporaryDirectory()`、Android/鸿蒙原生 cache），FSM 里路径越界 → fail（1300013/1300002）→ SDK 包装成 `Miniapp file read failed` 抛给业务。SDK 只对「FSM 能力缺失（MISSING_CAPABILITY + capability 含 FileSystem）」做容错，readFile 运行期失败是硬错误。H5 走 web-file 处理器、小程序路径本来就在沙盒内，故只有 App 复现。
+- **修复**：`libs/client/index.ts` 的 `platformAdapterOptions.overrides` 增加 `imageProcessor` 包装——`getImageInfo` / `generateBigImage` 原样委托平台实现；`computeMd5` 读取失败时降级为空 md5 并打一行 `[emkit:client] attachment md5 unavailable, upload continues without md5: <message + details>`，让 `uni.uploadFile`（原生读文件，不受 FSM 沙盒限制）继续完成上传。md5 只用于服务端秒传预检，SDK 自身对缺能力平台也是「不传 md5 继续上传」，因此不改变消息内容与接收端表现。顺带补 `platformErrorDetail()`：SDK 的 `PlatformAdapterError.details`（filePath/errCode/cause）不再被 message 吞掉。
+- **验证**：`build web` ✓（产物含降级 warn，`platformAdapterOptions` 仍传函数单例）；`build mp-weixin` 11 项防回归全绿（主包 854KB / 分包合计 1367KB）；H5 产物静态伺服 200；`check-app-module-graph.mjs` ✓（0 反向 import / 0 循环）；HBuilderX dev watch 已重出 iOS 产物（`demo/unpackage/dist/dev/app-ios/app-service.js`，含 `attachment md5 unavailable` 降级分支，App 编译无新增告警）。**待验**：App 真机复跑选文件→发送→对端收到文件（iOS 优先，Android/鸿蒙随后）；若仍失败，`[emkit:client]` 的 warn 会带 `details.filePath` 与 `errCode`，据此判断是上传阶段问题还是 md5 之外的新问题。
+- **纪律**：App 端凡是依赖 `uni.getFileSystemManager` 读**宿主提供的文件路径**的能力都不可靠（FSM 只认 uni 目录）；选择器/分享进入的副本路径一律视为「上传可用、FSM 不可读」。详见 skill `em-crossend-pitfalls` §5h。
