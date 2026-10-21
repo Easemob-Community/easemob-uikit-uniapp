@@ -29,6 +29,48 @@
   color: var(--em-text-tertiary);
 }
 
+/* 首屏历史骨架：左侧头像 + 两行气泡占位；只在首次请求未回包且无缓存时出现 */
+.em-chat-page__skeleton {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+.em-chat-page__skeleton-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  margin-bottom: var(--em-message-gap);
+}
+
+.em-chat-page__skeleton-avatar {
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.em-chat-page__skeleton-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.em-chat-page__skeleton-line {
+  margin-bottom: 6px;
+}
+
+.em-chat-page__history-error {
+  padding: var(--em-spacing-4) 0;
+}
+
+.em-chat-page__history-retry {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  margin-top: var(--em-spacing-3);
+}
+
 /* 滚底锚点：占位的 1px 空 view，scroll-into-view 定位目标（见组件注释） */
 .em-chat-page__bottom-anchor {
   height: 1px;

@@ -40,17 +40,47 @@
       @scrolltolower="onChatScrollToLower"
       @click="onChatAreaClick"
     >
-      <view v-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
+      <view v-if="historyFailed && list.length > 0" :class="ns.e('history')" @click="retryHistory">
+        <text :class="ns.e('history-text')">{{ t('chat.historyFailedRetry') }}</text>
+      </view>
+      <view v-else-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
         <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
       </view>
       <view v-else-if="list.length > 0" :class="ns.e('history')">
         <text :class="ns.e('history-text')">{{ t('conversation.noMoreHistory') }}</text>
       </view>
 
-      <!-- 消息为空的宿主自定义出口（默认 em-empty 空态，宿主可整体覆盖） -->
-      <slot v-if="list.length === 0" name="empty">
+      <!-- 首屏历史未回包：骨架占位；不显示空态，避免「先闪暂无消息再出消息」 -->
+      <view v-if="showHistorySkeleton" :class="ns.e('skeleton')">
+        <view v-for="index in 4" :key="index" :class="ns.e('skeleton-row')">
+          <em-skeleton variant="avatar" shape="circle" width="36px" height="36px" :class="ns.e('skeleton-avatar')" />
+          <view :class="ns.e('skeleton-body')">
+            <em-skeleton width="62%" height="14px" :class="ns.e('skeleton-line')" />
+            <em-skeleton width="44%" height="14px" />
+          </view>
+        </view>
+      </view>
+
+      <!-- 消息为空的宿主自定义出口（默认 em-empty 空态；必须等首次历史请求成功后才展示） -->
+      <slot v-else-if="list.length === 0 && historySettled && !historyFailed" name="empty">
         <em-empty icon="bubble-rect-2" size="large" :description="t('chat.noMessages')" />
       </slot>
+
+      <!-- 首次历史失败：toast + 点击重试（已缓存消息时改为顶部重试行，不遮消息） -->
+      <view v-else-if="list.length === 0 && historyFailed" :class="ns.e('history-error')">
+        <em-empty icon="circle-bang" size="large" :description="t('chat.historyFailed')">
+          <view :class="ns.e('history-retry')">
+            <em-button
+              type="outline"
+              size="medium"
+              pill
+              :text="t('chat.retry')"
+              :disabled="historyLoading"
+              @click="retryHistory"
+            />
+          </view>
+        </em-empty>
+      </view>
 
       <view
         v-for="m in list"
@@ -214,6 +244,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
+import EmButton from '../../em-button/em-button.vue'
+import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmIcon from '../../em-icon/em-icon.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmChatInputbar from '../../em-chat-inputbar/em-chat-inputbar.vue'
@@ -355,11 +387,17 @@ let unsubscribeMessages: (() => void) | null = null
 // scroll-top 初始预置值保留（首帧底部方向语义，对锚点无干扰）。
 const scrollTopVal = ref(SCROLL_BOTTOM_TOP)
 const BOTTOM_ANCHOR_ID = 'em-chat-bottom-anchor'
-// 首帧隐藏：消息区先透明，首次滚底定位后下一帧再显示，遮蔽「顶部首帧 → 跳底」视觉残留；500ms 兜底防白屏
+// 首帧隐藏：消息区先透明，首次滚底定位后下一帧再显示，遮蔽「顶部首帧 → 跳底」视觉残留；
+// 500ms 兜底只解 opacity，不把「历史未回包」误判成空态（空态必须等首次历史请求结束）
 const ready = ref(false)
+const historySettled = ref(false)
+const historyFailed = ref(false)
+const historyLoading = ref(false)
 
 const list = computed<EmMessageItem[]>(() => messageStore.messagesByConversationId[props.conversationId] ?? [])
 const hasMore = computed(() => messageStore.hasMoreByConversationId[props.conversationId] === true)
+// 首次历史未回包且无缓存时用骨架，不用「暂无消息」占位（避免先闪空态再出消息）
+const showHistorySkeleton = computed(() => !historySettled.value && list.value.length === 0)
 
 // 时间分隔条：首条必显，之后相邻消息间隔超过 uiConfig.timeDividerInterval（默认 5 分钟）在其前插入
 // （对齐 vue 版 shouldShowTimeDivider；间隔可经 EmKitConfig.timeDividerInterval / setConfig 覆盖）
@@ -678,6 +716,34 @@ function onQuoteClick(m: EmMessageItem): void {
   }, 50)
 }
 
+// 首次历史加载 / 失败重试共用：historySettled 是空态的唯一开关；
+// 失败保留已缓存消息并给 toast + 顶部「点击重试」，不再静默只写 logger
+async function loadInitialHistory(): Promise<void> {
+  if (historyLoading.value) return
+  historyLoading.value = true
+  historyFailed.value = false
+  historySettled.value = false
+  try {
+    await EmKit.loadHistory(props.conversationId, props.chatType)
+  } catch (e) {
+    historyFailed.value = true
+    logger.error('loadHistory fail:', e)
+    uni.showToast({ title: t('chat.historyFailed'), icon: 'none' })
+  } finally {
+    historySettled.value = true
+    historyLoading.value = false
+    scrollToBottom()
+    // 请求结束后下一帧解除首帧隐藏
+    nextTick(() => {
+      ready.value = true
+    })
+  }
+}
+
+function retryHistory(): void {
+  loadInitialHistory().catch(() => {})
+}
+
 onMounted(() => {
   // enableDraft 关时不读入历史草稿（写入口同样在 watch 里 gated）
   if (config.enableDraft) {
@@ -700,18 +766,8 @@ onMounted(() => {
       ready.value = true
     })
   }
-  EmKit.loadHistory(props.conversationId, props.chatType)
-    .catch((e) => {
-      logger.error('loadHistory fail:', e)
-    })
-    .finally(() => {
-      scrollToBottom()
-      // 定位指令发出后的下一帧解除首帧隐藏
-      nextTick(() => {
-        ready.value = true
-      })
-    })
-  // 异常路径兜底：强制显示，防白屏
+  loadInitialHistory()
+  // 异常路径兜底：只解除首帧透明度，空态/骨架仍以历史请求结果为准，避免「先闪空态再出消息」
   setTimeout(() => {
     ready.value = true
   }, READY_FALLBACK_MS)
@@ -815,6 +871,7 @@ async function onLoadMore(): Promise<void> {
     }
   } catch (e) {
     logger.error('loadHistory fail:', e)
+    uni.showToast({ title: t('chat.historyFailed'), icon: 'none' })
   } finally {
     loadingMore.value = false
   }

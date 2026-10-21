@@ -512,3 +512,11 @@
 - **列表自同步（P1-11）**：`em-conversation-page` 与 `em-contact-list-page` 新增 `autoSync`（默认 true），首次挂载且已登录时分别调 `syncConversations` / `syncContacts`；demo 去掉会话页重复的 onLoad sync，保留 onShow 补同步。群页原有自举逻辑不动。
 - 文档：README 增「连接状态条 / 语言 i18n / 日志与隐私 / 1.0 体验收口」，Quick Start 更新 autoSync 与排错；changelog 1.0.0-rc.1 同步。
 - 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 845KB / 分包 1367KB）；H5 产物伺服 200；headless Chrome 打开 H5 登录页渲染正常（无 Uncaught/ReferenceError）；`check-release.mjs` ✓。**待验**：真机断网重连/被踢时条幅文案与布局、`showConnectionBanner=false`；App/mp 录音权限拒绝/60s 自动发送；语言切换持久化与系统语言初值；`logPayload=true` 的导出内容。
+
+## 2026-10-21 1.0 就绪批次 4：聊天首屏骨架 + 历史加载失败重试（P1-4）
+
+- **首屏不再闪空态**：`em-chat-page` 新增 `historySettled` / `historyFailed` / `historyLoading`；`showHistorySkeleton = !historySettled && list.length===0`。首次历史请求结束前显示 4 行「头像 + 两行气泡」骨架，不再把「请求未回包」误判成「暂无消息」。
+- **500ms 兜底语义修正**：`READY_FALLBACK_MS` 现在只解除 scroll-view 的 `opacity:0`，不再把 `ready` 当成空态开关；空态必须 `historySettled && !historyFailed && list.length===0` 才展示。
+- **失败可重试**：首次历史失败 → toast「消息加载失败」+ 空态区「点击重试」（`em-button`，重试中 disabled）；已有缓存消息时失败不遮消息，改为顶部「消息加载失败，点击重试」行。`onLoadMore` 失败也补 toast。
+- **i18n**：新增 `chat.historyFailed` / `chat.historyFailedRetry` / `chat.retry`（中/英）。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 849KB / 分包 1367KB）；H5 产物伺服 200。**待验**：弱网/断网首次进聊天页的骨架→空态/错误态切换、重试成功回填、已有缓存时失败提示、`#empty` 插槽在错误态下不被误渲染。

@@ -263,7 +263,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 - **AI 流式消息（M2.13）**：`onStreamMessage` 分片合并/丢片补偿、纯文本打字机光标与异常提示、`enableStreamMessage`/`streamThrottle` 配置、`EmKit.onStreamMessage` 订阅、`#stream-message` 富格式插槽
 - **自定义卡片插槽化（M2.14）**：内核只保留 `sendCustom` + `#custom-message` 插槽，不内置卡片组件/schema；Demo 提供宿主侧 `demo-card` 参考实现（14 种卡片、字段/角标/主次按钮、手机号脱敏、未知回落）与免登录预览页
 - **输入栏业务入口（M2.15）**：`em-chat-page` 新增 `#input-toolbar` 插槽；Demo 用 `demo-composer-bar` 注入场景化「发订单/发工单/发病例/发简历/换手机号」等入口，点击即发对应自定义卡片，入口开关可实时切换
-- **1.0 体验收口**：连接状态条（重连/断开/被踢）、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话页 `autoSync`
+- **1.0 体验收口**：连接状态条（重连/断开/被踢）、聊天首屏骨架与历史失败重试、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话/好友列表 `autoSync`
 
 二期（M4 起，另行立项）：单条转发、联系人详情页/黑名单、文档站等，见 PLAN.md 第 5 节。一期范围外的功能会在发版时逐条冻结公示，避免重复 issue。
 

@@ -326,6 +326,7 @@ App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克�
 | 小程序 `sub-sdk/im-sdk.js` 未定义 | 跑分包 prepare 脚本；检查 `pages.json` 分包与预下载 |
 | 登录后立刻被踢回登录页 | 是否用 `status !== online` 判断；断网重连不应视为未登录 |
 | 发送一直失败 | token 是否过期；实现 `onTokenWillExpire`；查看 `EmKit.state.reason/errorCode` |
+| 聊天页一直骨架 / 历史加载失败 | 看网络与 `loadHistory` 日志；点空态「点击重试」或顶部重试行；确认 `conversationId/chatType` 正确 |
 | 读过的会话又显示未读 | 确认使用 1.0 的未读清零逻辑；宿主自建入口用 `EmKit.clearConversationUnread()` 兜底 |
 | 引用卡不显示 | 业务 ext 是否覆盖了 `msgQuote`；对端是否为 1.0 / vue 版 |
 

@@ -330,10 +330,11 @@
 | P1-1 返回契约 | ✅ 非 breaking | `em-chat-page` 增 `back` emit + `autoBack`（默认 true 保持原行为） |
 | P1-2 引用协议 | ✅ 代码已修 | 主协议 `msgQuote`（vue 同结构）+ 旧 `emQuote` 双写；接收优先 `msgQuote`、回落旧 key；重发排除双 key |
 | P1-3 连接状态 UI | ✅ 代码已接 | 新增 `em-connection-banner`；会话页/聊天页默认内置，`showConnectionBanner=false` 可关 |
+| P1-4 首屏空态/失败重试 | ✅ 代码已修 | 首次历史结束前显示骨架；500ms 兜底只解 opacity；失败 toast + 空态/顶部重试行；`#empty` 只在成功空列表展示 |
 | P1-5 录音兜底 | ✅ 代码已修 | `EmRecordOptions.onError/onAutoStop`；权限失败 toast；60s 自动停止后正常发送；单例监听 |
 | P1-6 日志脱敏 | ✅ 代码已修 | `logPayload` 默认 false；仅 debug + 显式开启才序列化；contact/group 原始 dump 全部替换 |
 | P1-8 语言持久化 | ✅ 代码已修 | `initLocale/setLocale/getLocale` + `EmKit.setLocale` + `emkit.locale`；系统语言兜底 |
 | P1-11 列表自同步 | ✅ 代码已修 | `em-conversation-page` / `em-contact-list-page` 增 `autoSync`（默认 true），首次挂载自拉 |
-| 其余 P0/P1 | — | 真机矩阵、H5 联系人、测试/CI、消息内存上限、空态闪烁等未动 |
+| 其余 P0/P1 | — | 真机矩阵、H5 联系人、测试/CI、消息内存上限等未动 |
 
 **验证**：`build web` ✓；`build mp-weixin` 11 项全绿；H5 产物伺服 200；headless Chrome 登录页渲染正常；`check-release.mjs` ✓。**待验**：连接条真机文案/布局、录音权限与 60s、语言持久化、`logPayload` 导出、与 vue 版双向引用、`autoBack=false` 拦截、插件市场新矩阵展示、鸿蒙签名本地重配。
