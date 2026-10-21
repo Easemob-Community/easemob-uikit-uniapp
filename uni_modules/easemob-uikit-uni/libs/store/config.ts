@@ -17,7 +17,6 @@ import type { EmKitConfig, EmUiConfig } from '../types'
 export const uiConfig = reactive<EmUiConfig>({
   enableDraft: true,
   enableTyping: true,
-  showTime: false,
   recallTimeLimit: RECALL_TIME_LIMIT,
   typingThrottle: TYPING_THROTTLE,
   typingTimeout: TYPING_TIMEOUT,
@@ -62,7 +61,6 @@ export function applyKitConfig(kitConfig: EmKitConfig): void {
   const patch: Partial<EmUiConfig> = {}
   if (kitConfig.enableDraft !== undefined) patch.enableDraft = kitConfig.enableDraft
   if (kitConfig.enableTyping !== undefined) patch.enableTyping = kitConfig.enableTyping
-  if (kitConfig.showTime !== undefined) patch.showTime = kitConfig.showTime
   if (kitConfig.recallTimeLimit !== undefined) patch.recallTimeLimit = kitConfig.recallTimeLimit
   if (kitConfig.typingThrottle !== undefined) patch.typingThrottle = kitConfig.typingThrottle
   if (kitConfig.typingTimeout !== undefined) patch.typingTimeout = kitConfig.typingTimeout

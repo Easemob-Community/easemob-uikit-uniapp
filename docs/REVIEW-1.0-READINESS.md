@@ -218,7 +218,7 @@
 
 ## 5. P2：可以进 1.0 known issues / 1.1
 
-- `EmKitConfig.showTime` 是死配置（只存不用）——删掉或实现逐条时间。
+- `EmKitConfig.showTime` 是死配置（只存不用）——已删除（1.0 前无正式用户），逐条时间仍由时间分隔条承担。
 - `CONVERSATION_TYPE.GROUP_CHAT` 注释仍写“预留，一期仅单聊”；`em-conversation-page` 的 create-group 注释仍写“Phase 4 占位”——发布前清 stale 注释。
 - 添加好友弹窗只在 demo（`demo/pages/contact`），UIKit 无组件；文档需说明宿主自建，或补 `em-add-contact`。
 - 会话/好友列表无下拉刷新；同步失败后只能杀进程/重进。
@@ -336,6 +336,7 @@
 | P1-8 语言持久化 | ✅ 代码已修 | `initLocale/setLocale/getLocale` + `EmKit.setLocale` + `emkit.locale`；系统语言兜底 |
 | P1-11 列表自同步 | ✅ 代码已修 | `em-conversation-page` / `em-contact-list-page` 增 `autoSync`（默认 true），首次挂载自拉 |
 | P1-10 消息内存上限 | ✅ 代码已修 | 非当前会话保留最近 100 条；离开当前会话裁剪；`trimmed` 标记触发下次重拉最新页，避免游标断层 |
+| P1-9 init 生命周期 | ✅ 文档已明确 | README/Quick Start/插件 readme 写明「每进程一次、appkey 固定；换 appkey 重启」，不强推 SDK 无 destroy 的重初始化 |
 | 其余 P0/P1 | — | 真机矩阵、H5 联系人、测试/CI 等未动 |
 
 **验证**：`build web` ✓；`build mp-weixin` 11 项全绿（主包 850KB）；H5 产物伺服 200；headless Chrome 登录页渲染正常；`check-release.mjs` ✓。**待验**：多群消息数组 ≤100、被裁剪会话重进不断层、连接条真机文案/布局、录音权限与 60s、语言持久化、`logPayload` 导出、与 vue 版双向引用、`autoBack=false` 拦截、插件市场新矩阵展示、鸿蒙签名本地重配。

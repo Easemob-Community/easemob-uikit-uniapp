@@ -528,3 +528,10 @@
 - **游标一致性**：被裁剪的会话记 `trimmedByConversationId`；下次 `loadHistory` 时丢弃旧消息/游标/`hasMore`，从最新页重拉，避免旧游标指向已丢弃消息造成时间断层。
 - **当前会话同步**：`EmConversationDomain.enterConversation/leaveConversation` 调 `messages.setActiveConversation`，消息域据此判断是否裁剪；`EmChat.reset` 清空标记。
 - 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 850KB / 分包 1367KB）。**待验**：多群连续收消息后各会话消息数组 ≤100、进入被裁剪会话能重拉最新页且不重复/不断层、当前会话长聊不被裁剪、群/单聊切换正常。
+
+## 2026-10-21 1.0 清理：init 生命周期文档 + 移除死配置 showTime
+
+- **P1-9 收口**：README / Quick Start / 插件 readme 明确「`EmKit.init()` 每进程只生效一次、appkey 固定；logout 后直接 login；换 appkey 需重启进程」——SDK 无 ChatClient destroy，不引入不可靠的重初始化。
+- **移除死配置 `showTime`**：`EmKitConfig`/`EmUiConfig`/`uiConfig`/`applyKitConfig` 全链路删除（此前只存不用，逐条时间仍由时间分隔条承担）；`setConfig({showTime})` 不再生效，1.0 前无正式用户。
+- **stale 注释**：`CONVERSATION_TYPE.GROUP_CHAT` 去掉「一期仅单聊」；会话页 create-group 注释改为「建群已落地，emit 由宿主接群列表页」。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 850KB / 分包 1367KB）。

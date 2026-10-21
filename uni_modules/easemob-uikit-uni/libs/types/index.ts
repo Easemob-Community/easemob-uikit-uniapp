@@ -36,8 +36,6 @@ export interface EmUiConfig {
   enableDraft: boolean
   /** typing 信令（发送节流 + 接收展示），默认 true */
   enableTyping: boolean
-  /** 气泡下逐条时间（对齐 vue 版 showTime，默认 false；uni 一期时间只走分隔条，无逐条时间渲染） */
-  showTime: boolean
   /** 撤回时间窗口（毫秒），默认 120000（2 分钟） */
   recallTimeLimit: number
   /** typing 发送节流间隔（毫秒），默认 5000 */
@@ -83,8 +81,6 @@ export interface EmKitConfig {
   enableDraft?: boolean
   /** typing 信令开关，默认 true */
   enableTyping?: boolean
-  /** 气泡下逐条时间，默认 false（uni 一期无逐条时间渲染，仅入配置面） */
-  showTime?: boolean
   /** 撤回时间窗口（毫秒），默认 120000 */
   recallTimeLimit?: number
   /** typing 发送节流间隔（毫秒），默认 5000 */

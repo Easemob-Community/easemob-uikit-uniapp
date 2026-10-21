@@ -283,7 +283,7 @@ function onOpenCreate(): void {
 }
 
 function onCreateAction(action: EmActionSheetAction): void {
-  // new-chat 内置选人闭环（em-select-contact）；create-group 本阶段直接 emit 由宿主占位（建群 Phase 4）
+  // new-chat 内置选人闭环（em-select-contact）；create-group 直接 emit 由宿主接群列表页（建群已落地）
   if (action.key === CONVERSATION_MENU_KEY.NEW_CHAT) {
     selectContactVisible.value = true
     return

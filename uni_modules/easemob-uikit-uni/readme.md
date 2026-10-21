@@ -79,6 +79,8 @@ onLaunch(() => {
 </script>
 ```
 
+> `EmKit.init()` 每个应用进程只生效一次，`appkey` 固定；`logout()` 后直接重新 `login()`，切换 appkey 需重启应用进程。
+
 ### 4. 登录页
 
 ```ts

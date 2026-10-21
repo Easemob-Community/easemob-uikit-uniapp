@@ -110,6 +110,7 @@ onLaunch(() => {
 
 补充：
 
+- `EmKit.init()` 每个应用进程只生效一次，`appkey` 固定；`logout()` 后直接重新 `login()`，不要再次 `init()`。切换 appkey 需重启应用进程。
 - 自定义小程序 SDK 加载（自管分包/预下载）用 `sdkLoader` 或 `sdkModule`，默认不需要传。
 - 需要展示「加载消息服务…」占位态时，`await EmKit.whenReady()`。
 - `EmKit.state.status` 可能为 `idle / connecting / reconnecting / online / closed`；**不要用 `status !== online` 判断未登录**，断网重连时 `status` 会短暂离开 `online`，应判断 `EmKit.state.userId === ''`。

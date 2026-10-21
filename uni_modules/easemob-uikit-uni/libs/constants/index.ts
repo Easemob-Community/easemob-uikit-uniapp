@@ -55,7 +55,7 @@ export type StreamCustomTypeValue = (typeof STREAM_CUSTOM_TYPE)[keyof typeof STR
 
 export const CONVERSATION_TYPE = {
   SINGLE_CHAT: 'singleChat',
-  GROUP_CHAT: 'groupChat'   // 预留，一期仅单聊
+  GROUP_CHAT: 'groupChat'
 } as const
 
 export type ConversationTypeValue = (typeof CONVERSATION_TYPE)[keyof typeof CONVERSATION_TYPE]
