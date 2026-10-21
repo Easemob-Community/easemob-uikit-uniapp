@@ -102,7 +102,7 @@ await EmKit.sendText(
 接收侧从 `message.ext` 读取。约束：
 
 - `ext` 必须 JSON 可序列化；空对象等价于不挂 ext。
-- `emQuote`（引用）与 `em_at_list`（@提及）是 UIKit 内部保留 key，**业务 ext 不能覆盖**（同时存在时内部 key 优先）。
+- `msgQuote`（引用主协议，与 vue 版互通）、`emQuote`（0.x 兼容，1.0 发送双写）与 `em_at_list`（@提及）是 UIKit 内部保留 key，**业务 ext 不能覆盖**（同时存在时内部 key 优先）。
 
 ### 3.2 卡片消息（`sendCustom` + `#custom-message` 插槽）
 

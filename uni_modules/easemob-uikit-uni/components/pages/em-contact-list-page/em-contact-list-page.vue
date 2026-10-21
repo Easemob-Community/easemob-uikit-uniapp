@@ -71,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import EmAlphabetNav from '../../em-alphabet-nav/em-alphabet-nav.vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
@@ -100,10 +100,13 @@ defineOptions({ styleIsolation: 'app-and-page' })
 interface Props {
   /** 条目长按菜单项与顺序（默认仅删除好友全量）；联系人详情/拉黑仍留二期 */
   menuKeys?: ContactMenuKeyValue[]
+  /** 首次挂载自动读好友快照，默认 true；宿主可关闭后自行控制同步时机 */
+  autoSync?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  menuKeys: () => [CONTACT_MENU_KEY.DELETE]
+  menuKeys: () => [CONTACT_MENU_KEY.DELETE],
+  autoSync: true
 })
 
 // 名称文字内联样式收口 libs/style/textStyles.ts（小程序样式隔离，须走 text-style；详见 em-text 注释）
@@ -122,6 +125,12 @@ const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
 const syncing = computed(() => contactStore.syncing)
 const keyword = ref('')
+
+// 首次挂载自拉好友快照（登录后 SDK 已后台同步，这里读内存；失败静默，事件会继续驱动刷新）
+onMounted(() => {
+  if (!props.autoSync || EmKit.state.userId === '') return
+  EmKit.syncContacts().catch(() => {})
+})
 
 // 好友同步骨架：条数与行宽对齐 vue 版 contact-list（8 条、35%/65% 两行）
 const SKELETON_COUNT = 8

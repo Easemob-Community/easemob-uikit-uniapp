@@ -19,6 +19,7 @@ import type { EmMessageItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLongPressClickGuard } from '../../libs/use/useLongPressClickGuard'
 import { useLocale } from '../../libs/use/useLocale'
+import { PLATFORM_CAPABILITIES } from '../../libs/platform'
 
 interface Props {
   message: EmMessageItem
@@ -91,9 +92,11 @@ const iconName = computed<EmIconName>(() => {
   return 'file-empty'
 })
 
-// 点击行为纯 emit 透传：默认下载/打开逻辑由宿主（em-chat-page 的 download 监听）实现；
-// 一期下载不做，宿主默认 toast 提示
+// 点击行为纯 emit 透传：默认下载/打开逻辑由宿主（em-chat-page 的 download 监听）实现。
+// 一期全端未接文件打开/下载（platform.fileOpen=false）：直接不发事件、不弹「暂不支持」，
+// 文件卡退化为纯展示；后续接入时把 fileOpen 打开并由宿主实现 download 即可。
 function onClick(): void {
+  if (!PLATFORM_CAPABILITIES.fileOpen) return
   if (shouldSkipClick()) return
   emit('download', props.message)
 }

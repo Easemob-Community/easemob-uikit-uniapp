@@ -16,9 +16,13 @@ export const conversationStore = reactive({
  */
 export const totalConversationUnread = computed(() => {
   let total = 0
-  for (const item of conversationStore.items) {
+  // 禁用 for-of：App/鸿蒙编译会把 __values 辅助函数提升到别的 chunk（曾落在
+  // components/pages/em-chat-page），使本 store 反向依赖页面组件，形成
+  // store → page → libs/index → store 的 ESM 循环，鸿蒙首屏抛
+  // "conversationStore is not initialized" 白屏（详见 skill em-crossend-pitfalls）
+  conversationStore.items.forEach((item) => {
     if (item.unreadCount > 0) total += item.unreadCount
-  }
+  })
   return total
 })
 

@@ -28,7 +28,8 @@ export const uiConfig = reactive<EmUiConfig>({
   messageMenuKeys: [MESSAGE_MENU_KEY.COPY, MESSAGE_MENU_KEY.QUOTE, MESSAGE_MENU_KEY.RECALL, MESSAGE_MENU_KEY.DELETE],
   conversationMenuKeys: [CONVERSATION_MENU_KEY.PIN, CONVERSATION_MENU_KEY.MUTE, CONVERSATION_MENU_KEY.DELETE],
   emojiList: DEFAULT_EMOJI_LIST,
-  primaryColor: ''
+  primaryColor: '',
+  logPayload: false
 })
 
 /** 运行时合并（一层深合并：inputFeatures 字段级合并，其余顶层键整体替换） */
@@ -72,6 +73,7 @@ export function applyKitConfig(kitConfig: EmKitConfig): void {
   if (kitConfig.messageMenuKeys != null) patch.messageMenuKeys = [...kitConfig.messageMenuKeys]
   if (kitConfig.conversationMenuKeys != null) patch.conversationMenuKeys = [...kitConfig.conversationMenuKeys]
   if (kitConfig.emojiList != null) patch.emojiList = [...kitConfig.emojiList]
+  if (kitConfig.logPayload !== undefined) patch.logPayload = kitConfig.logPayload
   setConfig(patch)
   if (kitConfig.primaryColor != null && kitConfig.primaryColor !== '') {
     uiConfig.primaryColor = kitConfig.primaryColor

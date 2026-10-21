@@ -163,7 +163,7 @@ props（`conversationId`/`avatarShape`）、插槽（`#custom-message`/`#empty`�
 
 | 编号 | 状态 | 落地内容 |
 |---|---|---|
-| P0-1 发送侧 ext / sendCustom | ✅ | `EmKit.sendText(to, chatType, text, quote?, mentions?, ext?)` 业务 ext 与 `emQuote`/`em_at_list` 合并（内部 key 优先）；`EmKit.sendCustom(to, chatType, event, params?, ext?)`；`MESSAGE_TYPE.CUSTOM` 一等类型 + `EmMessageItem.customEvent/customParams`；失败重发支持 custom；`#custom-message` 默认占位改「[自定义消息]」 |
+| P0-1 发送侧 ext / sendCustom | ✅ | `EmKit.sendText(to, chatType, text, quote?, mentions?, ext?)` 业务 ext 与 `msgQuote`/`emQuote`/`em_at_list` 合并（内部 key 优先；1.0 引用主协议为 `msgQuote`）；`EmKit.sendCustom(to, chatType, event, params?, ext?)`；`MESSAGE_TYPE.CUSTOM` 一等类型 + `EmMessageItem.customEvent/customParams`；失败重发支持 custom；`#custom-message` 默认占位改「[自定义消息]」 |
 | P0-2 `#banner` | ✅ | `em-chat-page` nav-bar 与群公告条之间固定位插槽（不随消息滚动） |
 | P0-3 `title` / `showAction` | ✅ | `title` 覆盖导航标题（空串回落昵称链）；`showAction=false` 隐藏右上角详情入口，宿主接管业务信息页 |
 | P0-4 系统提示消息 | ✅ | `EmKit.insertLocalNotice(conversationId, chatType, text)` 通用入口；`insertGroupNotice(groupId, text)` 保留为群聊别名；复用 `MESSAGE_TYPE.NOTICE` 居中灰条 + 长按菜单禁用 |

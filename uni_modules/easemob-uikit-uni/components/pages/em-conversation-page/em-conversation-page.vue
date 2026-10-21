@@ -8,6 +8,9 @@
       @action="onOpenCreate"
     />
 
+    <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
+    <em-connection-banner :show="showConnectionBanner" />
+
     <!-- 筛选 tab（对齐 vue 版 conversation-tabs：全部/未读/@我/单聊/群组，tabs 传空数组可隐藏） -->
     <em-conversation-tabs v-if="tabs.length > 0" :tabs="tabs" :active="activeTab" @change="onTabChange" />
 
@@ -69,8 +72,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
+import EmConnectionBanner from '../../em-connection-banner/em-connection-banner.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmConversationTabs from '../../em-conversation-tabs/em-conversation-tabs.vue'
@@ -103,12 +107,18 @@ interface Props {
   tabs?: ConversationTabKeyValue[]
   /** 列表空态文案（仅空列表场景，搜索无结果仍走 searchEmpty 文案）；空串走 i18n 默认 */
   emptyText?: string
+  /** 首次挂载自动拉会话快照，默认 true；宿主可关闭后自行控制同步时机 */
+  autoSync?: boolean
+  /** 顶部连接状态条显隐，默认 true */
+  showConnectionBanner?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showSearch: true,
   tabs: () => DEFAULT_CONVERSATION_TABS,
-  emptyText: ''
+  emptyText: '',
+  autoSync: true,
+  showConnectionBanner: true
 })
 
 const emit = defineEmits<{
@@ -120,6 +130,13 @@ const ns = useNamespace('conversation-page')
 const { themeClass } = useTheme()
 const { t } = useLocale()
 const { config } = useConfig()
+
+// 首次挂载自拉一次（P1-11）：宿主漏调 syncConversations 时不再出现空列表；
+// 返回页面后的刷新仍建议宿主在 onShow 再调一次（组件拿不到页面级 onShow）。
+onMounted(() => {
+  if (!props.autoSync || connectionStore.userId === '') return
+  EmKit.syncConversations().catch(() => {})
+})
 
 // 空态文案：搜索无结果 > emptyText prop > 分 tab i18n 默认（#empty 插槽整体优先于三者，见模板）
 const emptyTipText = computed(() => {

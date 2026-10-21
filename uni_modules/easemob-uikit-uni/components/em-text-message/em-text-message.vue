@@ -2,7 +2,10 @@
   <view :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '']" @longpress="onLongpress">
     <!-- 无 @提及（ext.em_at_list 为空/无）走原纯文本渲染；有则按 parseMentions 分片，
          @ 片段套高亮类可点击（对齐 vue 版 text-message 的 msgSegments，链接识别不在一期） -->
-    <text v-if="segments.length === 0" :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">{{ message.text }}<text v-if="isStreaming" :class="[ns.e('stream-cursor'), message.self && ns.m('stream-cursor-self')]">▍</text><text v-else-if="isStreamError" :class="[ns.e('stream-error'), message.self && ns.m('stream-error-self')]">{{ t('message.stream.error') }}</text></text>
+    <!-- 流式光标/异常提示必须是「常驻子 text + 内容切换」，不能 v-if 增删：
+         鸿蒙蒸汽端在 text 内移除子 text 后，父 text 的字形不再绘制（气泡保留整块高度但全空白，
+         M2.13 真机实测）。常驻节点只改文本内容，结构不变，避免触发该渲染缺陷。 -->
+    <text v-if="segments.length === 0" :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">{{ message.text }}<text :class="[ns.e('stream-cursor'), message.self && ns.m('stream-cursor-self')]">{{ streamCursorText }}</text><text :class="[ns.e('stream-error'), message.self && ns.m('stream-error-self')]">{{ streamErrorText }}</text></text>
     <text v-else :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">
       <template v-for="(seg, idx) in segments" :key="idx">
         <text
@@ -18,7 +21,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { MESSAGE_EXT_KEY, STREAM_MESSAGE_STATUS } from '../../libs/constants'
+import { MESSAGE_EXT_KEY, STREAM_CURSOR_CHAR, STREAM_MESSAGE_STATUS } from '../../libs/constants'
 import type { EmMessageItem, MentionContact } from '../../libs/types'
 import { parseMentions } from '../../libs/utils/mention'
 import { isPlainTextStream, isStreamActive } from '../../libs/utils/stream'
@@ -58,6 +61,13 @@ const isPlainStream = computed(() => isPlainTextStream(streamState.value))
 const isStreaming = computed(() => isPlainStream.value && isStreamActive(streamState.value?.status))
 /** 异常结束：保留已生成内容，尾部追加「内容生成异常」提示 */
 const isStreamError = computed(() => isPlainStream.value && streamState.value?.status === STREAM_MESSAGE_STATUS.ERROR)
+/**
+ * 光标/异常提示走「常驻子 text + 内容切换」（模板里没有 v-if）：鸿蒙蒸汽端删除 text 的子 text 后
+ * 父 text 字形整块丢失（气泡高度保留、内容全白），真机实测见 skill em-crossend-pitfalls。
+ * 光标字符与异常文案都收在 computed 里，只改文本内容不改节点结构。
+ */
+const streamCursorText = computed(() => (isStreaming.value ? STREAM_CURSOR_CHAR : ''))
+const streamErrorText = computed(() => (isStreamError.value ? t('message.stream.error') : ''))
 
 interface TextSegment {
   type: 'text' | 'mention'

@@ -61,6 +61,8 @@ export interface EmUiConfig {
   emojiList: string[]
   /** 品牌色覆盖（init 时落 --em-primary-color），空串 = 用 token 默认 */
   primaryColor: string
+  /** 是否把 SDK 原始 payload 写入日志（默认 false；开启后仅 debug 级别采集，仍可能含 userId/昵称等，生产慎用） */
+  logPayload: boolean
 }
 
 export interface EmKitConfig {
@@ -69,6 +71,10 @@ export interface EmKitConfig {
   enableReadReceipt?: boolean
   /** uikit 内置 logger 级别，默认 'info'；'silent' 全关 */
   logLevel?: LogLevelValue
+  /** 是否把 SDK 原始 payload 写入日志，默认 false；需同时 logLevel='debug' 才采集，生产环境慎开 */
+  logPayload?: boolean
+  /** 界面语言（zh-CN/en），默认跟随系统/上次持久化偏好；设置后写入本地并立即生效 */
+  locale?: EmLocaleName
   /** SDK 自身 console 输出开关，默认 true（关闭后 SDK 日志仍经 onLog 转发进 uikit logger） */
   sdkConsoleLog?: boolean
   /** SDK 日志级别（SDK 侧枚举，仅三档），默认 'WARN' */
@@ -101,6 +107,11 @@ export interface EmKitConfig {
   emojiList?: string[]
   /** 品牌色（合法 CSS 颜色值），init 时写 --em-primary-color；不传用 token 默认 */
   primaryColor?: string
+  /** Token 即将过期（约 80% 生命周期）回调：返回新 token，UIKit 自动 `renewToken`。
+   *  不实现时 SDK 会继续用旧 token 直到过期，宿主可随时手动 `EmKit.renewToken(token)` */
+  onTokenWillExpire?: () => string | Promise<string>
+  /** Token 已过期（SDK 已断开）：宿主可在此跳登录页；UIKit 同时把连接状态置 CLOSED */
+  onTokenExpired?: () => void
   /** 小程序端 SDK 异步加载器注入（分包异步化，PLAN.md M2.8）：resolve websdk 根导出（允许 { default } 包装）。
    *  仅 MP-WEIXIN 生效；缺省由 UIKit 经跨分包 require 从 sub-sdk 分包自加载。其它端忽略（静态导入直通） */
   sdkLoader?: () => Promise<unknown>
@@ -111,6 +122,14 @@ export interface EmKitConfig {
 export interface EmLoginOptions {
   userId: string
   token: string
+}
+
+/** Token 续期结果（SDK TokenRenewalResult 的中立子集） */
+export interface EmTokenRenewalResult {
+  /** 已成功应用的新 token */
+  token: string
+  /** 过期时间戳（毫秒） */
+  expireAt: number
 }
 
 export type EmMessageType = MessageTypeValue
@@ -124,6 +143,8 @@ export interface EmQuoteInfo {
   fromName?: string
   text: string   // 引用时刻的快照摘要（文本截断，非文本走 locale 摘要）
   type?: EmMessageType   // 被引用消息类型（非文本用于引用卡类型图标；老数据缺省即无图标）
+  /** 被引用图片/视频的缩略图（vue 版 msgThumbUrl；当前 uni 引用卡未渲染，保留给宿主/后续版本） */
+  thumbUrl?: string
 }
 
 export interface EmMessageItem {

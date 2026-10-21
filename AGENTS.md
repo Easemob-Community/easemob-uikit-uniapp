@@ -5,7 +5,7 @@
 
 ## 1. 项目一句话
 
-环信 IM 的 **uni-app 版 UIKit**（uni-app x 蒸汽优先，Android/iOS/鸿蒙 + H5 + 微信小程序共五端），MIT 开源，DCloud 插件市场分发。组件前缀 `em-`，CSS 变量前缀 `--em-*`，插件 id `easemob-uikit-uni`。当前进度与各端验证状态见 `docs/STATUS.md`（M2.9 已落地，持续开发中）。
+环信 IM 的 **uni-app 版 UIKit**（uni-app x 蒸汽优先，Android/iOS/鸿蒙 + H5 + 微信小程序共五端），MIT 开源，DCloud 插件市场分发。组件前缀 `em-`，CSS 变量前缀 `--em-*`，插件 id `easemob-uikit-uni`。当前版本 `1.0.0-rc.1`；进度与各端验证状态见 `docs/STATUS.md`，接入步骤见 `docs/QUICKSTART.md`。
 
 ## 2. 硬约束（每次必守，违反即返工）
 
@@ -33,6 +33,8 @@
 
 - `docs/STATUS.md` — 进度日志（按时间线）、待验项汇总、已验证基线（**接活前先扫一眼**）
 - `PLAN.md` — 立项计划书（决策表/范围/路线/门禁的唯一权威）
+- `docs/QUICKSTART.md` — 宿主接入 9 步（安装 → pages.json → 初始化 → 登录 → 会话/聊天页 → 五端运行 → 排错）
+- `docs/RELEASE-1.0.md` — 1.0 发布门禁、版本/市场字段、真机矩阵、发布与回滚
 - `docs/SPIKE-SDK-CONNECTIVITY.md`、`docs/SPIKE-SDK-SUBPACKAGE.md` — 五端连通性与编译器行为实测
 - `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md` — 宿主接入指引（小程序分包）
 - `docs/EVAL-MULTI-SCENARIO.md` — 多场景易用性与扩展能力评估（客服/医疗/招聘/二手交易 + 伪 1v1 伪装群，含 P0/P1 缺口清单与落地路线、§7 落地状态）

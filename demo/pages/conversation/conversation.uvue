@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_MENU_KEY, useTabBarBadge } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONVERSATION_MENU_KEY, useTabBarBadge } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
 
@@ -15,8 +15,10 @@ const { themeClass } = useDemoTheme()
 // 底部 tabBar 角标：会话总未读 → index 0，联系人请求未读 → index 1（响应式，SDK 事件驱动）
 const tabBarBadge = useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })
 
+// 只按「是否已登录」判断：断网/自动重连（status=reconnecting/closed）不应把用户踢回登录页，
+// SDK 会自行重连；真正登出/未登录时 userId 才为空。
 function ensureLogin(): boolean {
-  if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
+  if (EmKit.state.userId === '') {
     uni.reLaunch({ url: '/pages/login/login' })
     return false
   }
@@ -25,9 +27,8 @@ function ensureLogin(): boolean {
 
 onLoad(() => {
   if (!ensureLogin()) return
-  EmKit.syncConversations().catch((e) => {
-    console.error('[demo] syncConversations fail:', e)
-  })
+  // em-conversation-page 默认 autoSync=true，首次挂载自拉快照；
+  // onShow 的补同步仍由本页负责（组件拿不到页面级 onShow）
 })
 
 onShow(() => {

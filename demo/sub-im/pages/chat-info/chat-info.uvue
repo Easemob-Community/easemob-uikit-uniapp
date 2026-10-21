@@ -15,7 +15,7 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
 
@@ -25,7 +25,8 @@ const conversationId = ref('')
 const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)
 
 onLoad((options) => {
-  if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {
+  // 只看是否已登录：断网/自动重连不踢回登录页（同会话页口径）
+  if (EmKit.state.userId === '') {
     uni.reLaunch({ url: '/pages/login/login' })
     return
   }

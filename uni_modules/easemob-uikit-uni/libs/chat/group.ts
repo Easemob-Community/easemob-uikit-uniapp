@@ -34,7 +34,7 @@ import {
   updateGroupMemberRole,
   upsertGroup
 } from '../store/group'
-import { createLogger } from '../utils/logger'
+import { createLogger, logPayload } from '../utils/logger'
 import { useLocale } from '../use/useLocale'
 import type { CreateGroupParams, EmContactInvite, EmGroup, EmGroupMember } from '../types'
 import { ensureUserInfos } from './user-info'
@@ -75,7 +75,7 @@ export class EmGroupDomain {
     // 群自动同步由 SDK 后台完成（enableSyncData 'group'），同步完成后重读快照自愈（同 contact 套路）
     client.addEventHandler('emkit-group-sync', {
       onSyncDataFinished: (payload) => {
-        logger.debug('onSyncDataFinished raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onSyncDataFinished:', payload)
         if (payload.status === 'failed') {
           if (payload.dataType === 'group') {
             logger.warn('group sync failed:', payload.error?.stage, payload.error?.message)
@@ -95,7 +95,7 @@ export class EmGroupDomain {
     mgr.addEventHandler('emkit-group', {
       // 成员入群：计数 +n；含己方时确保群在列表内（邀请自动入群等场景）；插系统通知灰条
       onMembersJoined: (payload) => {
-        logger.debug('onMembersJoined raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onMembersJoined:', payload)
         const members = payload.members ?? []
         if (members.some((m) => m.userId === connectionStore.userId)) {
           this.getGroupInfo(payload.groupId).catch(() => {})
@@ -105,14 +105,14 @@ export class EmGroupDomain {
       },
       // 成员退群：计数 -n；插系统通知灰条
       onMembersExited: (payload) => {
-        logger.debug('onMembersExited raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onMembersExited:', payload)
         const members = payload.members ?? []
         incrementMemberCount(payload.groupId, -members.length)
         this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.MEMBERS_EXITED, { members })
       },
       // 群资料变更：写详情缓存；名称变化同步会话名（会话列表/聊天头部展示 conversation.name）+ 插系统通知
       onGroupInfoChanged: (payload) => {
-        logger.debug('onGroupInfoChanged raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onGroupInfoChanged:', payload)
         const prev = groupStore.infoByGroupId[payload.groupId]
         const group = this.toEmGroup(payload.groupInfo)
         upsertGroup(group)
@@ -123,26 +123,26 @@ export class EmGroupDomain {
       },
       // 公告变更：写缓存（空串 = 已拉无公告）+ 插系统通知
       onAnnouncementChanged: (payload) => {
-        logger.debug('onAnnouncementChanged raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onAnnouncementChanged:', payload)
         setGroupAnnouncement(payload.groupId, payload.announcement ?? '')
         this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.ANNOUNCEMENT_CHANGED)
       },
       // 己方被移出群（SDK 5.x 该事件只下发给被移出的当前用户）：清群缓存 + 删会话清消息
       // （不插系统通知：removeConversationLocal 随即清消息缓存，插入即被擦除）
       onUserRemoved: (payload) => {
-        logger.debug('onUserRemoved raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onUserRemoved:', payload)
         removeGroup(payload.groupId)
         this.hooks?.removeConversationLocal(payload.groupId)
       },
       // 群解散：同上
       onGroupDestroyed: (payload) => {
-        logger.debug('onGroupDestroyed raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onGroupDestroyed:', payload)
         removeGroup(payload.groupId)
         this.hooks?.removeConversationLocal(payload.groupId)
       },
       // 收到群邀请（被邀请方）：转 contact invites 记录（group kind，pending）
       onInvitationReceived: (payload) => {
-        logger.debug('onInvitationReceived raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onInvitationReceived:', payload)
         addInvite({
           id: `group:${payload.groupId}:${Date.now()}`,
           kind: CONTACT_INVITE_KIND.GROUP,
@@ -158,7 +158,7 @@ export class EmGroupDomain {
       },
       // 我方邀请被接受（邀请方收）：落 outgoing 通知
       onInvitationAccepted: (payload) => {
-        logger.debug('onInvitationAccepted raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onInvitationAccepted:', payload)
         addInvite({
           id: `group:${payload.groupId}:${Date.now()}`,
           kind: CONTACT_INVITE_KIND.GROUP,
@@ -174,7 +174,7 @@ export class EmGroupDomain {
       },
       // 我方邀请被拒绝（邀请方收）：落 outgoing 通知
       onInvitationDeclined: (payload) => {
-        logger.debug('onInvitationDeclined raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onInvitationDeclined:', payload)
         addInvite({
           id: `group:${payload.groupId}:${Date.now()}`,
           kind: CONTACT_INVITE_KIND.GROUP,
@@ -190,7 +190,7 @@ export class EmGroupDomain {
       },
       // 邀请被自动接受（无需确认直接入群）：刷新群快照 + 落已接受记录
       onAutoAcceptInvitationFromGroup: (payload) => {
-        logger.debug('onAutoAcceptInvitationFromGroup raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onAutoAcceptInvitationFromGroup:', payload)
         this.refresh()
         addInvite({
           id: `group:${payload.groupId}:${Date.now()}`,
@@ -207,7 +207,7 @@ export class EmGroupDomain {
       },
       // 群主变更：owner 为成员角色唯一权威，新旧群主角色同步修正；插系统通知灰条
       onOwnerChanged: (payload) => {
-        logger.debug('onOwnerChanged raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onOwnerChanged:', payload)
         const prevOwner = groupStore.infoByGroupId[payload.groupId]?.owner ?? payload.oldOwner?.userId ?? ''
         const newOwner = payload.newOwner?.userId ?? ''
         if (newOwner !== '') {
@@ -220,21 +220,21 @@ export class EmGroupDomain {
         this.insertGroupNotice(payload.groupId, GROUP_NOTICE_EVENT.OWNER_CHANGED, { name: this.noticeNameOf(payload.newOwner) })
       },
       onAdminAdded: (payload) => {
-        logger.debug('onAdminAdded raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onAdminAdded:', payload)
         const userId = payload.administrator?.userId
         if (userId != null && userId !== '') {
           updateGroupMemberRole(payload.groupId, userId, GROUP_MEMBER_ROLE.ADMIN)
         }
       },
       onAdminRemoved: (payload) => {
-        logger.debug('onAdminRemoved raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onAdminRemoved:', payload)
         const userId = payload.administrator?.userId
         if (userId != null && userId !== '') {
           updateGroupMemberRole(payload.groupId, userId, GROUP_MEMBER_ROLE.MEMBER)
         }
       },
       onAllMemberMuteStateChanged: (payload) => {
-        logger.debug('onAllMemberMuteStateChanged raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onAllMemberMuteStateChanged:', payload)
         updateGroup(payload.groupId, { mute: payload.isMuted })
       }
     })
@@ -482,7 +482,7 @@ export class EmGroupDomain {
       return
     }
     const raw = mgr.getJoinedGroupList()
-    logger.debug('getJoinedGroupList raw snapshot:', JSON.parse(JSON.stringify(raw)))
+    logPayload(logger, 'getJoinedGroupList:', raw)
     logger.info('joined group snapshot refreshed, count:', raw.length)
     setJoinedGroups(raw.map((g) => this.toEmGroup(g)))
   }

@@ -5,6 +5,53 @@ import { createLogger } from './utils/logger'
 
 const logger = createLogger('platform')
 
+/**
+ * 平台能力开关（1.0 功能显隐）：
+ * 不支持的端在 UI 侧直接隐藏入口，避免「点一下只弹暂不支持」的坏体验。
+ * 平台差异只允许出现在本文件（#ifdef），组件消费布尔值，不再散落条件编译。
+ */
+export interface EmPlatformCapabilities {
+  /** 视频播放/预览：一期仅 H5（window.open）；App/小程序原生播放器待接 */
+  videoPreview: boolean
+  /** 发送文件时的文件选择：一期小程序 + H5；App 无通用选择器 */
+  filePick: boolean
+  /** 文件打开/下载：一期全端未接，气泡点击入口先隐藏 */
+  fileOpen: boolean
+}
+
+function detectPlatformCapabilities(): EmPlatformCapabilities {
+  const caps: EmPlatformCapabilities = {
+    videoPreview: false,
+    filePick: true,
+    fileOpen: false
+  }
+  // #ifdef WEB
+  caps.videoPreview = true
+  // #endif
+  // #ifdef APP
+  // App 端没有跨端通用文件选择器（需 uts 插件或原生 intent），入口隐藏；
+  // chooseFile 的 APP 分支保留为后续接入点（当前返回 null 并 warn）
+  caps.filePick = false
+  // #endif
+  return caps
+}
+
+/** 当前端能力快照（组件只读；平台分支集中在 detectPlatformCapabilities） */
+export const PLATFORM_CAPABILITIES: EmPlatformCapabilities = detectPlatformCapabilities()
+
+/**
+ * 页面是否可见：H5 标签页隐藏时，当前会话收到消息不应清未读/发已读回执。
+ * App/小程序没有跨端统一的页面可见 API，默认 true（退化为原行为）。
+ */
+export function isPageVisible(): boolean {
+  // #ifdef WEB
+  return typeof document === 'undefined' || document.visibilityState === 'visible'
+  // #endif
+  // #ifndef WEB
+  return true
+  // #endif
+}
+
 export function setStorage(key: string, value: string): void {
   try {
     uni.setStorageSync(key, value)
@@ -138,7 +185,9 @@ export function chooseFile(): Promise<EmPickedFile | null> {
     input.click()
     // #endif
     // #ifdef APP
-    // App 端没有跨端通用文件选择器（需 uts 插件或原生 intent），一期空实现待真机验证后补齐
+    // App 端没有跨端通用文件选择器（需 uts 插件或原生 intent）。
+    // 一期先按平台隐藏「文件」入口（PLATFORM_CAPABILITIES.filePick=false），
+    // 这里保留空实现作为后续接入点；正常 UI 路径不会调到。
     logger.warn('chooseFile: App 端暂不支持文件选择')
     resolve(null)
     // #endif
@@ -150,37 +199,84 @@ export interface EmRecordResult {
   duration: number  // 秒
 }
 
+/** 录音回调：权限/设备错误与 60s 自动停止（否则自动停止的音频会被静默丢弃） */
+export interface EmRecordOptions {
+  onError?: (err: unknown) => void
+  onAutoStop?: (res: EmRecordResult) => void
+}
+
 let recording = false
 let recordStartAt = 0
 let recordStopResolve: ((res: EmRecordResult) => void) | null = null
 let recordDiscarding = false
+let recordOptions: EmRecordOptions = {}
+
+// #ifndef WEB
+let recorder: ReturnType<typeof uni.getRecorderManager> | null = null
+
+// 单例注册 onStop/onError：每次 start 都 addEventHandler 会累积监听（真机反复录音后回调翻倍）
+function ensureRecorder(): ReturnType<typeof uni.getRecorderManager> {
+  if (recorder == null) {
+    const manager = uni.getRecorderManager()
+    recorder = manager
+    manager.onStop((res) => {
+      recording = false
+      const ms = res.duration > 0 ? res.duration : Date.now() - recordStartAt
+      const result: EmRecordResult = { path: res.tempFilePath, duration: Math.round(ms / 1000) }
+      if (recordDiscarding) {
+        // 取消语义：丢弃本次录音，不回调发送
+        recordDiscarding = false
+        recordStopResolve = null
+        recordOptions = {}
+        return
+      }
+      const resolve = recordStopResolve
+      recordStopResolve = null
+      if (resolve != null) {
+        recordOptions = {}
+        resolve(result)
+        return
+      }
+      // 未主动 stop：只可能是 60s 上限自动停止，交给输入栏按正常语音发送
+      const onAutoStop = recordOptions.onAutoStop
+      recordOptions = {}
+      if (onAutoStop != null) onAutoStop(result)
+    })
+    manager.onError((err) => {
+      recording = false
+      recordStopResolve = null
+      const onError = recordOptions.onError
+      recordOptions = {}
+      if (onError != null) {
+        onError(err)
+      } else {
+        logger.warn('recorder error:', err)
+      }
+    })
+  }
+  return recorder
+}
+// #endif
 
 // 录音：微信/App 走 uni.getRecorderManager；H5 不支持，调用即抛错（组件层 catch 降级）
-export function startRecord(): void {
+export function startRecord(options: EmRecordOptions = {}): void {
   // #ifdef WEB
   logger.warn('startRecord: H5 不支持录音')
   throw new Error('record not supported on web')
   // #endif
   // #ifndef WEB
-  const manager = uni.getRecorderManager()
-  manager.onStop((res) => {
-    recording = false
-    if (recordDiscarding) {
-      // 取消语义：丢弃本次录音，不回调发送
-      recordDiscarding = false
-      recordStopResolve = null
-      return
-    }
-    const ms = res.duration > 0 ? res.duration : Date.now() - recordStartAt
-    const resolve = recordStopResolve
-    recordStopResolve = null
-    if (resolve != null) {
-      resolve({ path: res.tempFilePath, duration: Math.round(ms / 1000) })
-    }
-  })
+  recordOptions = options
   recordStartAt = Date.now()
+  recordDiscarding = false
+  recordStopResolve = null
   recording = true
-  manager.start({ duration: 60000, format: 'aac' })
+  try {
+    ensureRecorder().start({ duration: 60000, format: 'aac' })
+  } catch (e) {
+    recording = false
+    recordOptions = {}
+    throw e
+  }
   // #endif
 }
 
@@ -188,8 +284,9 @@ export function startRecord(): void {
 export function cancelRecord(): void {
   if (!recording) return
   recordDiscarding = true
+  recordOptions = {}
   // #ifndef WEB
-  uni.getRecorderManager().stop()
+  ensureRecorder().stop()
   // #endif
 }
 
@@ -204,7 +301,7 @@ export function stopRecord(): Promise<EmRecordResult> {
       return
     }
     recordStopResolve = resolve
-    uni.getRecorderManager().stop()
+    ensureRecorder().stop()
     // #endif
   })
 }

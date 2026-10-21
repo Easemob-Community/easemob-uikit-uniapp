@@ -11,6 +11,7 @@ description: Use when writing or reviewing ANY code in easemob-uikit-uni（新�
 
 - `<script setup lang="ts">` 纯 TS。**禁 uts 方言**：`UTSJSONObject`、`UniElement`、`.uts` 文件不进组件公共面（`UniElement` 相关隔离在 `#ifdef APP` 与 `platform.ts` 内）。
 - 组件一律 `.vue`；`.uvue` 仅作双文件逃生舱。蒸汽工程结构约定见 skill `uniapp-x-vapor-structure`。
+- **libs 内禁 for-of / for-in**：App/鸿蒙编译会把降级辅助函数（`__values` 等）提升到共享 chunk，曾把 `__values` 放进 `em-chat-page`，形成 `libs/store/conversation → 页面组件 → libs/index → libs/store/conversation` 的 ESM 循环，鸿蒙首屏抛 `conversationStore is not initialized` 白屏。循环改 `forEach` 或索引 `for`；组件脚本也一并不用 for-of（避免 helper 落点漂移再串环）。详见 skill `em-crossend-pitfalls` §5c。
 
 ## 样式（ucss 子集）
 
@@ -41,6 +42,7 @@ description: Use when writing or reviewing ANY code in easemob-uikit-uni（新�
 - 布局 class（flex/min-width）落**组件宿主标签**；**文字样式必须双通道**——`text-class`（H5/App）+ `text-style` 内联（小程序）同时给：小程序样式隔离下 `app-and-page` 编译为 apply-shared，父组件 wxss 够不到 em-text 内部 text（实测：摘要字号全失效落默认 16px），内联 style 不受隔离限制且 var() 可穿透。
 - **单行折叠档（line1）必须带 `white-space: nowrap`**：mp-weixin 的 wxss 不认 uvue 独占的 `lines` 属性，缺 nowrap 时 text 自由换行被父容器固定行高拦腰裁切，视觉像两行重叠。
 - 宿主标签必须补 `min-width: 0` 等约束，否则 flex 约束链断裂横向溢出。
+- **`<text>` 内禁止用 `v-if`/`v-else`/`v-for` 增删子 text**：鸿蒙蒸汽端移除子 text 后父 text 字形整块丢失（气泡空白但高度保留，流式光标终态即踩中）。条件展示改「常驻子 text + 内容切换」，或把分支移到 text 外用 view 承载（见坑集 §5d）。
 
 ## 枚举与字面量
 
@@ -69,4 +71,5 @@ description: Use when writing or reviewing ANY code in easemob-uikit-uni（新�
 5. 事件名避开原生同名（long-press 形态）？
 6. 枚举/字面量收口 constants？store 命名遵守 `By<Key>`/`items` 约定？
 7. 条件编译显式（`#ifdef` 平台/模式标注）？平台差异在 platform.ts/use 层？
-8. 构建门禁：`scripts/uni.sh build web` + `build mp-weixin` 全绿 + H5 伺服 200（用法见 skill `hbuilderx-cli-compile`）；小程序主包 ≤1.5MB（防回归脚本自动断言）。
+8. 无 for-of / for-in（libs 内硬禁，组件脚本建议不用）？App 产物 `libs/` 下无 `from "../../components/` 反向 import？
+9. 构建门禁：`scripts/uni.sh build web` + `build mp-weixin` 全绿 + H5 伺服 200（用法见 skill `hbuilderx-cli-compile`）；小程序主包 ≤1.5MB（防回归脚本自动断言）。

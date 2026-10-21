@@ -2,13 +2,19 @@
 
 环信 IM 的 uni-app 版 UIKit（uni-app x 蒸汽模式），面向 DCloud 插件市场社区分发。MIT 开源。
 
-> 当前状态：**一期开发中（M2.9 群基础、M2.11/M2.12 多场景扩展 P0/P1、M2.13 AI 流式消息、M2.14 自定义卡片插槽化已落地）**。一期执行依据见 [PLAN.md](./PLAN.md)，逐日进度与各端验证状态见 [docs/STATUS.md](./docs/STATUS.md)。
+> 当前版本：**1.0.0-rc.1**（1.0 候选）。单聊、群聊、联系人、多场景扩展与 AI 流式消息已落地；能力边界与已知限制见下文。接入步骤见 [docs/QUICKSTART.md](./docs/QUICKSTART.md)，发布操作见 [docs/RELEASE-1.0.md](./docs/RELEASE-1.0.md)，逐日进度与各端实测状态见 [docs/STATUS.md](./docs/STATUS.md)。
 
-## 开发环境（锁定）
+## 兼容性
 
-- HBuilderX **5.26+**（或 HBuilder V 5.21+，蒸汽模式硬性要求）
-- Node.js 18+（CLI 编译用）
-- 目标平台：Android 6+ / iOS 15+ / 鸿蒙 API20+ / 现代浏览器 / 微信小程序
+| 项 | 要求 |
+|---|---|
+| HBuilderX | **5.21+**（推荐 5.26+；蒸汽模式硬性要求） |
+| uni-app x | HBuilderX 4.71+ |
+| Node.js | 18+（CLI 编译用） |
+| 环信 SDK | `easemob-websdk` **5.1.3**（peer 依赖） |
+| App | Android 6+ / iOS 15+ / 鸿蒙 API20+ |
+| H5 | 现代浏览器（移动端布局；未做 PC 宽屏） |
+| 小程序 | 微信小程序（SDK 需分包接入） |
 
 ## 仓库结构
 
@@ -19,7 +25,23 @@ docs/                            # 文档（含 SDK 五端连通性 spike 记录
 scripts/                         # 编译/发布脚本
 ```
 
-## 快速开始（最小可验证用例）
+## 快速开始（宿主接入）
+
+完整步骤（空工程 → 登录 → 会话列表 → 聊天页 → 五端运行 → 排错）见 **[docs/QUICKSTART.md](./docs/QUICKSTART.md)**。最短路径：
+
+1. `npm install easemob-websdk@5.1.3`，把 `uni_modules/easemob-uikit-uni/` 放入宿主工程；
+2. `pages.json` 补页面组件 easycom 规则，聊天页/详情页设 `navigationStyle: "custom"`；
+3. `App.uvue` 的 `onLaunch` 调 `initTheme()` + `EmKit.init({ appkey, onTokenWillExpire })`；
+4. 宿主服务端签发 token，登录页调 `await EmKit.login({ userId, token })` 后 `reLaunch` 到会话页；
+5. 会话页根节点 `height: 100%`；页面组件默认 `autoSync` 首次自拉，`onShow` 再调 `EmKit.syncConversations()` 补刷新；
+6. 点击会话 `navigateTo` 聊天页，传 `conversationId` 与 `chatType`（`singleChat` / `groupChat`）；
+7. 微信小程序按 [SDK 分包指引](./docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md) 接入 `sub-sdk`；
+8. 真机/开发者工具分别跑 Android、iOS、鸿蒙、H5、微信小程序；
+9. 遇到空白页先检查页面高度链与 `navigationStyle`。
+
+> 常见错误：页面根节点没有确定高度 → 列表/输入栏 0 高；聊天页未关原生导航 → 双导航栏；小程序未接分包 → `module 'sub-sdk/im-sdk.js' is not defined`。
+
+## 最小连通性验证（仓库 demo）
 
 最小用例是 `demo/pages/spike/spike.vue`：手填 appkey/userId/token 登录环信，给指定 peer 发文本消息并显示收发流，用于验证 SDK 各端连通性。
 
@@ -64,6 +86,38 @@ const peerUnread = useConversationUnreadCount(peerUserId)
 - 角标封顶默认 99（显示 `99+`），可通过 `maxCount` 调整；`enabled: false` 可整体关闭。
 - 自定义 tabbar 直接用 `em-icon` + `em-badge` 渲染 computed 值，不依赖 `uni.setTabBarBadge`。
 - 原生 tabBar 的 `iconPath` 只接受图片（平台限制），demo 用 `scripts/build-tabbar-icons.py` 从 `em-icons.ttf` 同源字形生成 81×81 PNG（`demo/static/tabbar/`）；组件内图标仍统一用 `em-icon` 字体。
+- 聊天页内会按会话合批清服务端未读（`tabs` 角标不复活）；宿主自定义入口读完消息可用 `EmKit.clearConversationUnread(conversationId, chatType)` 兜底（本地立即归零 + 服务端异步清）。
+
+## Token 续期与连接状态（1.0）
+
+长连接会经历 Token 到期、断线重连、被踢/设备超限。UIKit 已接 SDK 生命周期事件，宿主只需按需提供续期回调：
+
+```ts
+EmKit.init({
+  appkey: 'your-appkey',
+  // Token 约 80% 生命周期时触发；返回新 token，UIKit 自动 client.renewToken(token)
+  onTokenWillExpire: async () => {
+    const res = await fetch('/api/im/token')       // 宿主服务端签发
+    return (await res.json()).token
+  },
+  // 已过期（SDK 已断开）：通常跳登录页
+  onTokenExpired: () => uni.reLaunch({ url: '/pages/login/login' })
+})
+
+// 也可在任意时刻手动续期：
+await EmKit.renewToken(newToken)
+```
+
+连接状态统一在 `EmKit.state`（响应式）：
+
+| 字段 | 说明 |
+|---|---|
+| `status` | `idle` / `connecting` / `reconnecting` / `online` / `closed`（`CONNECTION_STATUS.RECONNECTING` 为自动重连中） |
+| `reason` | 最近一次连接事件原因（SDK 原值：`login` / `reconnect` / `offline` / `token-expired` / `limit` …） |
+| `errorCode` | 最近一次断开/重连失败错误码，0 = 无 |
+| `reconnecting` / `reconnectAttempt` | 是否重连中 / 当前重连次数 |
+
+UIKit 已在 `em-conversation-page` / `em-chat-page` 顶部内置连接状态条（`em-connection-banner`）：`connecting/reconnecting` 显示「正在连接/重连」，`closed` 按 `reason` 显示网络异常、设备超限或 Token 过期。宿主可用 `:show-connection-banner="false"` 关闭，自行渲染 `EmKit.state`；被踢/设备超限时 `reason` 会透出，建议引导重新登录。
 
 ## 多场景扩展（业务直进会话）
 
@@ -174,6 +228,30 @@ themeStore.mode             // 解析后的实际主题：'light' | 'dark'
 - **H5 限制**：H5 运行时没有 `setNavigationBarColor` / `setTabBarStyle`，内置导航栏/tabBar 由宿主接管（参考 `demo/index.html` 的 `html[data-em-theme] .uni-page-head` / `.uni-tabbar` 规则，以及 `demo/common/theme.ts` 的 `syncH5Chrome()` 选中态同步）。
 - 宿主页面若自己实现主题切换，监听 `themeStore.mode` 后调 `syncNativeThemeUI()` 即可；`demo/common/theme.ts` 的 `useDemoTheme()` 是完整封装示例。
 
+## 语言 / i18n
+
+内置 `zh-CN` / `en`，默认优先读取本地偏好 `emkit.locale`，无偏好时跟随系统语言（英文环境用 `en`，其余 `zh-CN`）。模块加载时会自动 `initLocale()`，宿主也可显式指定：
+
+```ts
+import { EmKit, setLocale, getLocale, mergeMessages } from '@/uni_modules/easemob-uikit-uni/libs'
+
+EmKit.init({ appkey: 'your-appkey', locale: 'en' }) // 初始化时指定并持久化
+setLocale('zh-CN')                                  // 运行时切换（立即生效 + 持久化）
+getLocale()                                         // 'zh-CN' | 'en'
+
+// 注入/覆盖文案（新 locale 也可）
+mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
+```
+
+- 组件内文案统一走 `useLocale().t(key)`，缺 key 回退 `zh-CN`，再回退 key 本身。
+- 语言偏好与主题偏好都存设备本地，不随登出清理。
+
+## 日志与隐私
+
+- `EmKitConfig.logLevel` 默认 `info`；`logPayload` 默认 `false`，**不会**把好友/群同步的原始 payload 写入日志缓冲。
+- 需要排查同步/资料问题时显式开 `logLevel: 'debug', logPayload: true`；开启后日志可能包含 userId、昵称、群名等，导出前请脱敏，生产环境用完即关。
+- `EmKit.exportLogs()` 导出内存环形缓冲（2000 行）；生产包建议不向终端用户暴露导出入口。
+
 ## 路线图与能力边界
 
 已落地（一期，里程碑与验收口径见 [PLAN.md](./PLAN.md)，逐日进度见 [docs/STATUS.md](./docs/STATUS.md)）：
@@ -185,6 +263,7 @@ themeStore.mode             // 解析后的实际主题：'light' | 'dark'
 - **AI 流式消息（M2.13）**：`onStreamMessage` 分片合并/丢片补偿、纯文本打字机光标与异常提示、`enableStreamMessage`/`streamThrottle` 配置、`EmKit.onStreamMessage` 订阅、`#stream-message` 富格式插槽
 - **自定义卡片插槽化（M2.14）**：内核只保留 `sendCustom` + `#custom-message` 插槽，不内置卡片组件/schema；Demo 提供宿主侧 `demo-card` 参考实现（14 种卡片、字段/角标/主次按钮、手机号脱敏、未知回落）与免登录预览页
 - **输入栏业务入口（M2.15）**：`em-chat-page` 新增 `#input-toolbar` 插槽；Demo 用 `demo-composer-bar` 注入场景化「发订单/发工单/发病例/发简历/换手机号」等入口，点击即发对应自定义卡片，入口开关可实时切换
+- **1.0 体验收口**：连接状态条（重连/断开/被踢）、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话页 `autoSync`
 
 二期（M4 起，另行立项）：单条转发、联系人详情页/黑名单、文档站等，见 PLAN.md 第 5 节。一期范围外的功能会在发版时逐条冻结公示，避免重复 issue。
 
@@ -195,6 +274,12 @@ themeStore.mode             // 解析后的实际主题：'light' | 'dark'
 ### 已知限制
 
 - **@ 提及为追加式插入**：选人后追加到草稿尾部，不支持光标处插入——uni `<input>` 无光标位置 API（无 selectionStart），属平台物理上限。
+- **视频播放（1.0 暂缺）**：仅 H5 支持点击播放（新窗口）；App/小程序暂未接原生播放器，播放按钮已按平台隐藏，气泡保留封面与时长。
+- **文件打开/下载（1.0 暂缺）**：全端暂未接下载/预览，文件气泡为纯展示，点击入口已隐藏。
+- **App 端发送文件（1.0 暂缺）**：App 无通用文件选择器，「文件」入口已隐藏；小程序/H5 不受影响。
+- **H5 桌面宽屏（1.0 暂缺）**：H5 按移动端 rpx 布局，未做 PC 宽屏/多栏适配；插件市场兼容矩阵标为不支持宽屏。
+- **录音权限（1.0）**：麦克风权限被拒时只 toast「录音失败，请检查麦克风权限」，不自动跳系统设置（各端设置页差异大）；录音 60s 上限自动停止并按正常语音发送。
+- **日志隐私（1.0）**：原始 payload 默认不写日志；排查时开 `logLevel:'debug'` + `logPayload:true`，导出前自行脱敏。
 - 其余平台降级项（蒸汽端 CSS 动画、H5 录音等）见 docs/STATUS.md 各条目「已知降级」。
 
 ### 迁移说明（M2.9 breaking 变更）
@@ -205,3 +290,10 @@ themeStore.mode             // 解析后的实际主题：'light' | 'dark'
 ### 迁移说明（M2.11 非 breaking）
 
 - `MESSAGE_TYPE` 新增 `CUSTOM`（`'custom'`），`EmMessageItem` 新增 `customEvent` / `customParams` 字段；仅当宿主**手工构造** `EmMessageItem`（如单测/假数据）时需要补 `customEvent: ''`、`customParams: {}`，正常收发链路不受影响。
+
+### 迁移说明（1.0.0-rc.1）
+
+- **引用协议**：发送改为 `ext.msgQuote`（与 vue 版同 key/同结构）为主、`ext.emQuote` 双写兼容 0.x；接收优先 `msgQuote`，旧消息回落 `emQuote`。业务 ext 不要占用这两个 key。
+- **返回事件**：`em-chat-page` 新增 `back` emit 与 `autoBack` prop。默认 `autoBack=true`，组件仍自行 `navigateBack`，旧用法零改动；需要拦截返回时传 `:auto-back="false"` 并监听 `@back`。
+- **平台能力**：新增 `PLATFORM_CAPABILITIES` / `videoPreview` / `filePick` / `fileOpen`；视频播放仅 H5，文件打开全端暂缺（入口已隐藏）。
+- **版本号**：插件 `1.0.0-rc.1`；0.x 未正式发布，无历史用户迁移负担。

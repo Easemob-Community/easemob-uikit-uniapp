@@ -2,7 +2,7 @@
 // 以及 ConversationItem / 摘要的 wire → 中立类型映射（SDK wire 兼容字面量集中在本文件边界）。
 // 门面（./index.ts）负责组合本域与消息域并接线 SDK 事件。
 import type { ConversationItem, PushManager, SessionMessageSnippet } from 'easemob-websdk'
-import { CONVERSATION_SILENT_MODE_BATCH_SIZE, CONVERSATION_TYPE } from '../constants'
+import { CONVERSATION_SILENT_MODE_BATCH_SIZE, CONVERSATION_TYPE, CONVERSATION_UNREAD_CLEAR_THROTTLE } from '../constants'
 import type { ConversationTypeValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { conversationStore } from '../store/conversation'
@@ -27,6 +27,8 @@ export function findConversation(conversationId: string): EmConversationItem | u
 
 export class EmConversationDomain {
   currentConversationId = ''
+  // 当前会话收消息清服务端未读的最近一次时间（按会话合批，见 clearUnread）
+  private lastUnreadClearAtByConversationId: Record<string, number> = {}
 
   constructor(private ctx: EmChatContext, private messages: EmMessageDomain) {}
 
@@ -59,7 +61,8 @@ export class EmConversationDomain {
     const chatManager = await this.messages.readyChatManager()
     this.currentConversationId = conversationId
     chatManager.setCurrentConversation({ conversationId, conversationType: chatType })
-    chatManager.clearConversationUnreadMessageCount({ conversationId, conversationType: chatType }).catch(() => {})
+    // 进会话立即清未读（本地 store + 服务端）；当前会话收消息的合批清理见 clearUnread
+    this.clearUnread(conversationId, chatType, true)
     // 进入会话即回已读回执（对齐 vue 版会话切换 sendChannelAck 的时机；群聊内部短路）
     this.messages.sendReadReceipts(conversationId, chatType).catch(() => {})
     // 确保对端与己方资料已缓存（气泡头像/昵称、导航标题用）；群聊由群数据层供给资料
@@ -77,9 +80,33 @@ export class EmConversationDomain {
     this.ctx.client?.chatManager.resetCurrentConversation()
   }
 
+  /**
+   * 清会话未读（本地 store 立即归零 + 服务端异步清零）。
+   * - 进会话/离开会话：force=true，立即发请求；
+   * - 当前会话收消息：默认按 CONVERSATION_UNREAD_CLEAR_THROTTLE 合批，避免每条消息一次 REST；
+   *   服务端不清的话，下次 refreshSessionList/冷启动会把刚读过的会话又显示成未读。
+   */
+  clearUnread(conversationId: string, chatType: ConversationTypeValue, force = false): void {
+    const item = findConversation(conversationId)
+    if (item != null && item.unreadCount !== 0) {
+      item.unreadCount = 0
+    }
+    const client = this.ctx.client
+    if (client == null) return
+    const now = Date.now()
+    const last = this.lastUnreadClearAtByConversationId[conversationId] ?? 0
+    if (!force && now - last < CONVERSATION_UNREAD_CLEAR_THROTTLE) return
+    this.lastUnreadClearAtByConversationId[conversationId] = now
+    client.chatManager.clearConversationUnreadMessageCount({ conversationId, conversationType: chatType })
+      .catch((e) => {
+        logger.warn('clearConversationUnread fail:', conversationId, e)
+      })
+  }
+
   // 登出/换账号：只重置域内游标，SDK 状态由 client.logout 负责
   reset(): void {
     this.currentConversationId = ''
+    this.lastUnreadClearAtByConversationId = {}
   }
 
   async pinConversation(conversationId: string, chatType: ConversationTypeValue, pinned: boolean): Promise<void> {

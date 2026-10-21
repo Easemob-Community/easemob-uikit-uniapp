@@ -8,7 +8,7 @@
 - **库结构**：`uni_modules/easemob-uikit-uni/` —— `libs/`（EmKit 门面 + client/chat/store（connection/conversation/message/theme）/platform/use/locale/utils 功能拆分）、`components/`（`em-avatar`、`em-popup`（内部弹层基座）、`em-action-sheet`（底部动作菜单）、`em-conversation-page`、`em-chat-page`、`em-chat-info-page`（聊天详情）、`em-nav-bar`（safe-top + 44px 行，title/subtitle/showBack/actionIcon props + back/action 事件，小程序胶囊避让内置）、`em-button`、`em-chat-inputbar`（文本/语音/emoji/媒体面板/引用条）、气泡族 `em-text-message`/`em-image-message`/`em-audio-message`/`em-video-message`/`em-file-message`、`em-text`（lines 折叠 + word-break 收口原子组件））。枚举字符串统一收口 `libs/constants/`。
 - **SDK**：`easemob-websdk 5.1.3` 精确锁定（peer 同声明；demo login 页头展示 `SDK_VERSION`，升级时同步改）。ChatClient + Manager 注册制（已注册 ChatManager/PushManager/UserInfoManager/ContactManager）；`enableSyncData: ['conversation','contact']` 显式选择。
 - **logger 服务**：`libs/utils/logger.ts`（零依赖，`[emkit:<ns>]` 前缀；`EmKitConfig.logLevel/sdkConsoleLog/sdkLogLevel` 三项接线；SDK 结构化日志经 ChatClient 级 `onLog` 转发进 `[emkit:sdk]`）。2000 行内存环形缓冲（与 console 级别解耦），`EmKit.exportLogs()` 分端导出（H5 Blob 下载；小程序/App 写 `USER_DATA_PATH` + 兜底剪贴板），demo mine 页有入口。
-- **聊天链路**：引用（`EmMessageItem.quote` 快照，ext `emQuote` key，toMessageItem 三路径统一解析）、撤回（2 分钟窗口，onMessageRecalled 落 recalled 态）、失败重发（原位红叹号，resendMessage 重建投递）、单聊已读回执（enableReadReceipt，≤50 条批量回执，仅最新己方消息显示对勾/空心圆）、typing（cmd 消息 action `TypingBegin`，5s 节流 + 5s 超时，cmd 在 onMessage/loadHistory 边界拦截不落列表）、语音/视频/文件收发（platform.ts 收口媒体选择/录音/播放，录音仅小程序+App、chooseFile 仅小程序+H5、视频预览仅 H5）。
+- **聊天链路**：引用（`EmMessageItem.quote` 快照，1.0 主协议 ext `msgQuote` 与 vue 版互通 + 旧 `emQuote` 兼容双写，toMessageItem 三路径统一解析）、撤回（2 分钟窗口，onMessageRecalled 落 recalled 态）、失败重发（原位红叹号，resendMessage 重建投递）、单聊已读回执（enableReadReceipt，≤50 条批量回执，仅最新己方消息显示对勾/空心圆）、typing（cmd 消息 action `TypingBegin`，5s 节流 + 5s 超时，cmd 在 onMessage/loadHistory 边界拦截不落列表）、语音/视频/文件收发（platform.ts 收口媒体选择/录音/播放，录音仅小程序+App、chooseFile 仅小程序+H5、视频预览仅 H5）。
 - **输入栏**（`em-chat-inputbar` 原子）：面板状态机 `none|emoji|media` 三态互斥（与键盘互斥、占键盘位）；emoji 96 字符集网格；媒体面板 56×56 瓷贴四格；按住说话（上滑 60px 取消）；引用条（发送成功/手动关闭/切会话清除）。
 - **用户属性**：`libs/store/user.ts`（infoByUserId 缓存 + 防重拉，回落链 nickname > conversation.name > userId）+ `libs/chat/user-info.ts`（ensureUserInfos 微任务合批，wire avatarurl 边界归一；登录/会话同步/收消息/拉历史/进会话自动补拉）。
 - **时间**：会话列表五档（今天 HH:mm / 昨天 / 周X / MM/DD / YYYY/MM/DD）+ 聊天页时间分隔条（`TIME_DIVIDER_INTERVAL` 默认 5 分钟，`formatDividerTime` 四档）。
@@ -86,6 +86,7 @@
 | AI 流式消息端到端（真实 `onStreamMessage`：分片合并/丢片补偿/终态收敛/异常、`enableStreamMessage=false` 完整消息延迟上屏、断连重连） | H5/mp/App | 需业务服务端下发流式消息；H5 demo mock 已验渲染态 |
 | 手动避让时序与高度精度（iOS/鸿蒙扣安全区后贴合度；鸿蒙原「adjustPan 不回弹」是否随手动方案消失） | App 三真机 | 用户已验 Android「顶飞消解」 |
 | 会话页/联系人页搜索聚焦顶飞 nav-bar（同根因，fix 待从 chat-page 铺到 conversation/contact 页） | App | 已立案 |
+| 聊天页「点击消息区收起输入栏」（emoji/媒体面板 + 软键盘；键盘弹起时点击不误触消息操作） | App 三真机 / mp / H5 | 需真实账号；H5 桌面端外部点击已由浏览器 blur 兜底 |
 | mp-weixin `onKeyboardHeightChange` 回调与面板跟随观感 | 小程序 | |
 | iOS/Android 真机 SDK 分包语法兼容与收发回归、双端互发 | App + 小程序 | |
 | 菜单裁剪/feature 开关/自定义消息插槽冒烟 | H5/mp | |
@@ -405,3 +406,109 @@
 - **文档**：`docs/GUIDE-MULTI-SCENARIO.md` 新增 §3.10（`#input-toolbar` 用法 + 位置/开关/边界/数量建议 + 配图 `assets/scene-lab-composer.png`），§4 增各场景入口清单，§6 七项开关与 14 种卡片；README/PLAN M2.15/EVAL §7/changelog/契约 skill 同步。
 - 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 832KB / 分包合计 1367KB）；H5 产物伺服 200；500×1100 截图走查客服/医患/招聘详情页入口条（发订单/发工单/退款审核、发病例/发处方、发简历/发邀约/换手机号），免登录卡片预览 14 种 + 未知回落（长图 500×4114）。
 - **待验（需真实账号）**：聊天页内入口条与键盘联动（弹起/收起时是否跟随）、点击发卡在对端渲染、入口条在群聊/单聊/小程序的布局与滚动；入口条与快捷回复条同时开启时的两行占位是否压消息列表。
+
+## 2026-10-20 三大 tab 入口页纵向滚动排查（demo「我的」修复，Android 真机）
+
+- **症状**：Android 真机 tabBar 页面内容超过一屏时上下滑不动，底部像被 hidden（「我的」页「退出登录」不可达）。
+- **真机排查**（adb + uiautomator + `wm size` 强制缩短屏幕制造溢出）：
+  - 会话页：列表 scroll-view `[0,474][1080,1018]`，底边止于 tabBar 上沿，`scrollable=true`，滑动正常；列表滚到底最后一条完整可见。
+  - 联系人页：同为 scroll-view（内容短通常无溢出；500px 高强制溢出时 scroll-view `scrollable=true`），底边同样止于 tabBar 上沿。
+  - 我的页：根节点 `.mine { height:100% }` 且**没有 scroll-view**；超出的子内容被根节点裁掉，页面原生滚动容器只量到根节点高度（恰好一屏）→ `scrollable=false`，所以「能滚却不滚」。tabBar 并非遮挡元凶（App 页面可视区已扣除 tabBar）。
+- **解法**：`demo/pages/mine/mine.uvue` 全页内容包进 `<scroll-view class="mine__scroll" scroll-y>`，根 flex column + `.mine__scroll { flex:1; height:0 }`，与 `em-conversation-page` / `em-contact-page` 同口径。
+- **复验**：真机新 scroll-view `[0,201][1080,2158]`、`scrollable=true`，底边止于 tabBar 上沿；滑到最底「退出登录」完整可见。会话/联系人页回归无变化。
+- **验证门禁**：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 833KB ≤ 1.5MB / 分包合计 1367KB）；H5 产物伺服 200。
+- 坑与纪律已写入 skill `em-crossend-pitfalls` §4c + 蒸汽端能力边界表。
+
+## 2026-10-21 1.0 就绪批次 1：视频/文件平台显隐 + 未读清零 + Token/连接生命周期
+
+承 `docs/REVIEW-1.0-READINESS.md` 的 P0-2 / P0-3 / P0-7，先做「不支持的平台隐藏入口 + 核心状态修复」，不新增播放器/下载器实现。
+
+- **平台能力开关**：`libs/platform.ts` 新增 `EmPlatformCapabilities` + `PLATFORM_CAPABILITIES`（`videoPreview`/`filePick`/`fileOpen`），条件编译只出现在该文件；门面透出快照供宿主判端。
+  - 视频：`videoPreview` 仅 WEB=true；`em-video-message` 非支持端不渲染播放按钮、不发 `preview`；`em-chat-page` 的 `onVideoPreview` 门控并删除「暂不支持」toast。
+  - 文件发送：`filePick` APP=false；`em-chat-inputbar` 媒体面板隐藏「文件」格，`onPickFile` 兜底门控；`chooseFile` APP 分支保留为后续接入点。
+  - 文件打开：`fileOpen` 全端 false；`em-file-message` 点击不发 `download`，`onFileDownload` 门控并删除 toast，文件卡退化为纯展示。
+  - 文档：README「已知限制」补三条；插件 readme 增「平台能力（1.0）」矩阵。
+- **未读清零（P0-7）**：`EmConversationDomain.clearUnread`（本地 store 归零 + 服务端异步清，按会话 `CONVERSATION_UNREAD_CLEAR_THROTTLE=2000ms` 合批）；三处调用——进会话 force、当前会话收消息、聊天页 `onUnmounted` force；`EmKit.clearConversationUnread` 透出。修复「读完返回列表/冷启动/重同步后未读复活」。
+- **Token/连接生命周期（P0-2）**：`EmKitConfig` 增 `onTokenWillExpire`（返回新 token，UIKit 自动 `client.renewToken`）/`onTokenExpired`；`EmKit.renewToken` + `EmClient.renewToken`；连接事件补齐 `onConnecting`/`onReconnectFailed`/`onTokenWillExpire`/`onTokenExpired`，`onDisconnected` 消费 `reason/errorCode`；`connectionStore` 增 `reason/errorCode/reconnecting/reconnectAttempt`；`CONNECTION_STATUS` 增 `RECONNECTING`。demo 登录守卫统一改按 `state.userId`（断网/重连不再误踢登录页），mine/spike 状态文案补「重连中」。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 836KB ≤ 1.5MB / 分包合计 1367KB）。
+- **待验**：App/mp 收视频（无播放按钮、点击无 toast）与收文件（点击无 toast）；H5 视频仍可播；当前会话收消息角标不复活、离页后列表未读 0、冷启仍 0；Token 过期（控制台强制）自动续期成功/失败、被踢 reason 透出；iOS/鸿蒙未真机。
+
+## 2026-10-21 1.0 就绪批次 2：发布物料 + Quick Start + 契约收口
+
+承 `docs/REVIEW-1.0-READINESS.md` 的 P0-1 / P0-4 / P0-6，并提前收口 P1-1 / P1-2。
+
+- **发布物料（P0-1）**：
+  - 插件 `package.json` version → `1.0.0-rc.1`；关键词收敛到 5 个；`engines` 增加 `uni-app-x`。
+  - 平台矩阵按 HBuilderX 4.71+ 新规范重写：`uni-app` 全 `x`，`uni-app-x` 的 Android/iOS/鸿蒙/H5/微信小程序为 `√`；移除旧 `u` 值。
+  - `dcloudext` 补 `darkmode=√` / `i18n=√` / `widescreen=x`；权限声明补相机/相册/麦克风，数据声明明确「经宿主集成的环信 SDK 传输」。
+  - `changelog.md` 新增 `1.0.0-rc.1` 人话版（新增/修复、0.x→1.0 升级说明、已知限制）；根目录补 MIT `LICENSE`。
+- **Quick Start（P0-4）**：新增 `docs/QUICKSTART.md`（9 节：前置条件、安装、pages.json/easycom/自定义导航/高度、App 初始化与 Token 回调、登录、会话页、聊天页与引用协议、五端运行、排错+验收清单）；根 README 顶部改为 1.0 状态 + 兼容矩阵 + 5 分钟接入最短路径 + 迁移说明；插件 readme 重写为自包含接入文档。
+- **公开仓安全（P0-6）**：`demo/manifest.json` 删除鸿蒙 `signingConfigs`（绝对路径、key/store 密码）与版本号更新；`.gitignore` 增签名材料（`*.p12/*.cer/*.p7b/*.jks/*.keystore`、`manifest.local.json`、`build-profile.json5`）；`docs/HARMONY-REALDEVICE-RUN.md` 增「本地重配、提交前还原」提示。
+- **引用协议（P1-2）**：`MESSAGE_EXT_KEY.QUOTE` 改为 `msgQuote`，新增 `QUOTE_LEGACY='emQuote'`；`buildTextExt` 双写 vue 结构（`msgID/msgPreview/msgSender/msgType/msgThumbUrl`）与旧 uni 结构；`parseQuote` 优先 `msgQuote`、回落 `emQuote`，`voice→audio` 映射，`EmQuoteInfo` 增 `thumbUrl`；重发排除两个内部 key。
+- **返回契约（P1-1）**：`em-chat-page` 增 `back` emit + `autoBack` prop（默认 true，保持 `navigateBack` 行为；false 时只发事件由宿主接管）。
+- **发布自检脚本**：新增 `scripts/check-release.mjs`（零依赖）——校验插件版本=changelog 首节、README 无「开发中」且含当前版本、平台矩阵无旧 `u` 值、根 LICENSE、demo manifest 无签名/绝对路径、公开文档无 `/Users/`；命中历史签名密码时只 WARN 并提示轮换/重写历史。
+- 验证：`scripts/check-release.mjs` ✓（1 条 WARN：历史提交仍含 keyPassword）；`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 837KB / 分包 1367KB）；H5 产物伺服 200。**待验**：与 vue 版互发引用（双向）、`autoBack=false` 的返回拦截、插件市场新平台矩阵展示、鸿蒙签名本地重配后真机运行。
+
+## 2026-10-21 鸿蒙真机首屏白屏修复：store 反向依赖页面 chunk（ESM 循环 / `conversationStore is not initialized`）
+
+- **症状**：鸿蒙真机启动即白屏，日志 `conversationStore is not initialized`，栈 `at EmKitImpl entry (libs/index.js:22:26)` / `at func_main_0 (libs/index.js:342:15)`；报错行正是编译后的 `this.conversations = conversationStore`。
+- **根因**：不是 store 初始化逻辑缺失，而是 App 编译产物出现 **ESM 循环依赖**。App/鸿蒙编译把 for-of 的降级辅助 `__values` 提升到共享 chunk，落点被选在 `components/pages/em-chat-page/em-chat-page.js`，于是 `libs/store/conversation.js` 多出一条 `import { __values } from "../../components/pages/em-chat-page/em-chat-page.js"`。循环：`libs/index → chat/index → store/conversation → em-chat-page → libs/index`。首屏页面（demo 首页 `pages/login`，经 `common/theme` 先摸到 store/conversation）求值时绕回 `libs/index` 执行 `new EmKitImpl()`，此时 `conversationStore` 仍处 TDZ → 抛错中断页面挂载 → 白屏。H5/小程序不复现（helper 落点不同、H5 是另一条 Vite 管线）。
+- **排查**：把 App 产物当 ESM 图静态查——① `libs/` 下是否出现 `from "../../components/`；② 按 ESM 求值语义（state 1=求值中 / 2=完成）从各页面入口模拟，检测 `libs/index.js` body 执行时 store 是否仍在求值。修复前实测：1 条循环，`pages/login`、`pages/contact`、`sub-im/pages/chat`、`scenario/*`、`style-lab`、`text-probe` 共 8 个入口必现。
+- **修复**：`libs/store/conversation.ts` 的 `totalConversationUnread` 由 for-of 改 `forEach`（产物不再 import 组件）；`em-chat-page.vue` 公告宽度估算的字符串 for-of 改索引 `for` + 代理对跳过（CJK 1 字宽 / 其余 0.55，行为不变）。全库现无 for-of / for-in。
+- **新增自检**：`scripts/check-app-module-graph.mjs`（零依赖，默认扫 `demo/unpackage/dist/dev/.app-harmony/assets`）——命中 `libs → components` 反向 import 或 libs/index 参与的循环即 exit 1；用注入反向 import 的合成产物验证可复现报错。
+- **验证**：`app-harmony` 重编译（dev + prod 两轮）后 module graph ✓（0 反向 import、0 循环、`__values` 0 处）；HBuilderX GUI 的 app-harmony dev watch 已按新源码重出 `.app-harmony` 产物；`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 837KB / 分包 1367KB）；H5 伺服 200。
+- **纪律**：libs 内禁 for-of / for-in（改 `forEach` / 索引 `for`）；新增语法后复查 App 产物无 `libs → components/pages` 反向 import。已写入 skill `em-crossend-pitfalls` §5c、能力边界表与 `em-coding-discipline`（自查清单 8）。
+- **待验**：鸿蒙真机重新「运行到鸿蒙」（HBuilderX 会重建并推送新的 JS 产物）确认首屏渲染与登录/会话链路；Android/iOS 同管线回归。
+
+## 2026-10-21 聊天页点击消息区收起输入栏（emoji/媒体面板 + 软键盘）
+
+- **需求**：输入栏展开 emoji/媒体面板、或软键盘弹起时，点击聊天消息区应收起（对齐 vue 版 `chat.vue` 的 `onChatContentClick` → `messageInput.blur()`）。
+- **落点**：
+  - `em-chat-inputbar` 新增 `collapseSignal?: number`（默认 0）：数值变化即 `panel → 'none'` + 收键盘。面板状态仍归组件内部、父级不持有，故用递增信号传达一次性命令，不用 `$refs` 调子组件实例方法（蒸汽端/小程序/H5 行为一致）。
+  - 收键盘走 `uni.hideKeyboard()`（App 三端 + H5 + 微信小程序均实现，H5 是 blur 当前 input）。收前按 `focused || keyboardHeight > 0` 判定（H5 不监听键盘高度，靠输入框 focus/blur 兜底），避免每次点击空调一次 API；收后主动清零键盘高度（部分端不补发 0 高度事件，口径同 `onInputBlur`）。
+  - `em-chat-page` 的消息 scroll-view 增 `@click="onChatAreaClick"`：点消息气泡/空白区冒泡上来即收，递增 `inputbarCollapseSignal` 传入输入栏；无展开态时子组件内为空操作。
+  - 顺带对齐 vue：开 emoji/媒体面板前先收键盘（此前键盘弹起时点表情会「键盘 + 面板」叠加占位）。
+- **验证**：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 837KB ≤ 1.5MB / 分包合计 1367KB）；产物核对——H5 编译到真实运行时 API（`defineAsyncApi('hideKeyboard')`，blur activeElement），mp 编译为 `index.hideKeyboard()` 且 scroll-view 挂 `bindtap`，inputbar props 含 `collapse-signal`。`build app` CLI 路径不支持（`main.uts` 无法解析 vue，属工具链限制，非本次改动）。
+- **待验**：App 三真机（键盘弹起点消息区能收起且不连带触发气泡操作）、微信小程序（面板/键盘收起观感）、H5（面板展开点消息区收起）。
+
+## 2026-10-21 鸿蒙流式气泡终态空白修复：`<text>` 内 v-if 增删子 text 导致字形丢失
+
+- **症状（鸿蒙真机复现）**：聊天页「AI 演示」的流式回复分片增长完全正常（末尾带 `▍` 光标），**终态瞬间整条气泡变空白**——底色与高度都在（高度按全文撑开），但一个字也不绘制；该条消息之后一直空白，日志无 JS 异常。
+- **根因**：蒸汽端 `<text>` 内用 `v-if` 增删子 `<text>`，**移除子节点后父 text 的字形不再绘制**（布局层高度保留、绘制层丢字）。`em-text-message` 的光标 `v-if="isStreaming"`、异常提示 `v-else-if="isStreamError"` 在终态翻 false → 子 text 被移除 → 父 text 全白。与数据层无关：`message.text` 始终是全文，store 侧 `stored.text`/`stored.stream` 写入顺序也正确。
+- **修复**：光标/异常提示改「**常驻子 text + 内容切换**」——子节点永远挂载，只写 computed 文本（`streamCursorText` = `'▍'`/`''`，`streamErrorText` = i18n 文案/`''`）；光标字符收口 constants `STREAM_CURSOR_CHAR`，模板里不再有 text 内的条件增删。
+- **真机复现/验证**（鸿蒙 25PVB24711005055，安装重编 HAP 后操作）：修复前完成态气泡空白（截图对照）；修复后完成态全文保留、等待 13s 复截仍稳定，异常态尾部「…（内容生成异常）」正常内联；光标传输中出现、终态消失。
+- **门禁**：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 837KB / 分包 1367KB）；H5 伺服 200；`check-app-module-graph.mjs` ✓（0 反向 import / 0 循环）。
+- **纪律**：`<text>` 内禁止 `v-if`/`v-else`/`v-for` 增删子 text（改常驻节点换内容，或把分支移到 text 外用 view 承载）。已写入 skill `em-crossend-pitfalls` §5d + 能力边界表、`em-coding-discipline` 文本章节。
+- **待验**：H5/微信小程序的流式观感（光标位置、常驻空 text 无副作用）；@提及气泡的 `segments` 分支同样是 text 内 `v-for`（静态消息暂未触发，若后续做动态 @/流式 @ 需按同口径改造）。
+
+## 2026-10-21 鸿蒙软键盘遮挡输入栏修复：面板口径被当成上推口径（少顶 28vp）
+
+- **症状（鸿蒙真机）**：聊天页输入框聚焦，键盘弹起后输入栏确实上移了，但底部仍被键盘压住一截——输入框只露出上半截、发送键下半截被压，看起来像「避让没做干净」。
+- **定位（真机量出来，不是猜）**：设备 25PVB24711005055 / HarmonyOS 6.0.1（API 20）/ density 3 / 1084×2412px（361×804vp）。
+  - `uitest dumpLayout`：输入栏根节点 top=1395、去掉安全区 padding 后的高度 159px（1+52×3 边框/栏高）→ `margin-bottom = 2412 − 1554 = 858px(286vp)`；
+  - `snapshot_display`：键盘面板上沿 y=1470 → **实际遮挡 942px(314vp)**；
+  - `hidumper -s WindowManagerService -a '-a'`：应用窗口 0..2412 全屏（边到边）、手势导航条窗口 `[0,2328,1084,84]`（84px = 28vp = `safeAreaInsets.bottom`）。
+  - 结论：上报值(314vp) == 实际遮挡(314vp)，而代码算出的 margin 是 `314 − 28 = 286vp` → 少顶 28vp（84px）。
+- **根因**：一份 `uni.onKeyboardHeightChange` 值被当成两种口径混用。`keyboardHeight` 原本是**面板口径**——iOS/鸿蒙上报值含底部安全区，而 emoji/媒体面板自身还有 safe-bottom padding，所以扣掉安全区再交给面板；`em-chat-inputbar` 又把这个「已扣过的值」直接写进 `margin-bottom`（**上推口径**，要的是「键盘画到屏幕底的那一段」）。面板扣一次没问题，上推也扣就必然少一个安全区。官方 hello-uni-app-x `keyboard-adjust` 示例只用它调悬浮条位置，照搬到 margin-bottom 会复现同一 bug。
+- **修复**：
+  - `libs/use/useKeyboardHeight.ts` 拆两个 ref：`keyboardHeight`（面板口径，行为不变）+ `keyboardLift`（上推口径 = 上报值，App 全端；iOS 暂沿用旧值）；新增 `resetKeyboardHeight()` 两个值一起清零（替换 inputbar 里两处手写 `keyboardHeight.value = 0`）。
+  - `em-chat-inputbar`：`margin-bottom` 改用 `keyboardLift`，面板 `height` 仍用 `keyboardHeight`，`keyboardMaybeOpen()` 同步改用 lift。
+- **真机验证**（改完源码经 HBuilderX dev watch 重出 `.app-harmony` → `hvigorw assembleHap` 重编签名 HAP → `hdc install -r` 装包实测）：
+  - 修复前输入栏根节点 `[0,1395][1084,1554]`，底边比键盘上沿低 84px（截图：输入框/发送键被压掉下半截）；
+  - 修复后 `[0,1311][1084,1470]`（高 159px），底边 1470 == 键盘上沿，输入框与发送键完整可见、与键盘无缝隙；
+  - 点消息区收起后根节点回到 `[0,2169][1084,2412]`（243px，含 28vp 安全区 padding），与改前基线一致；媒体面板 280vp、面板顶 1572 与改前一致（面板行为未动）。
+- **门禁**：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 837KB / 分包合计 1367KB）；H5 产物伺服 200；`check-app-module-graph.mjs` ✓（0 反向 import / 0 循环）。
+- **纪律/口径**：同一份键盘高度不要同时喂给「面板高度」和「margin-bottom」；改 margin 前按 skill `em-crossend-pitfalls` §4d 的三数法（dumpLayout / 截图键盘上沿 / hidumper 窗口 rect）实测一次。已同步 skill §4 要点与新增 §4d。
+- **待验**：iOS 真机（上推口径目前仍是「上报值 − 安全区」，按 §4d 同法量；若也被压一个安全区就改成直接用上报值）；Android 回归（口径未变，预期无感）；键盘 ↔ emoji/媒体面板互切的面板高度观感（面板 280vp vs 键盘 314vp，切换有 28vp 收缩，属历史行为本次未改）；会话页/联系人页搜索框聚焦（仍走系统默认上推，遗留项）。
+
+## 2026-10-21 1.0 就绪批次 3：连接状态条 + 录音兜底 + 日志脱敏 + 语言持久化/列表自同步
+
+承批次 2 之后的 P1-3 / P1-5 / P1-6 / P1-8 / P1-11。
+
+- **连接状态条（P1-3）**：新增原子组件 `em-connection-banner`（消费 `connectionStore`，不新增宿主接线）——`connecting/reconnecting` 显示连接中/重连中；`closed` 按 `reason` 分流 `token-expired` / `limit` / 普通网络异常；`em-conversation-page`（nav 下、tabs 上）与 `em-chat-page`（nav 下、业务 banner 上）默认内置，新增 `showConnectionBanner` prop（默认 true）可关闭。新增 i18n `status.tokenExpired`（中/英）。
+- **录音兜底（P1-5）**：`libs/platform.ts` 录音改为单例 `RecorderManager` 监听（避免每次 start 累积 onStop），新增 `EmRecordOptions.onError/onAutoStop`；麦克风权限/设备错误回调输入栏 toast「录音失败，请检查麦克风权限」并退出语音模式；60s 上限自动停止后按正常语音发送，不再静默丢弃；`stopRecord` 手动路径与自动路径共用同一结果出口。新增 i18n `chat.voice.recordFailed`。
+- **日志隐私（P1-6）**：`EmKitConfig.logPayload` 默认 false；新增 `logPayload(logger,label,payload)`，仅当 `logPayload=true` 且 `logLevel=debug` 才 `JSON.parse(JSON.stringify())` 入缓冲。contact/group 的 24 处 `logger.debug(..., JSON.parse(JSON.stringify(...)))` 全部替换；生产默认日志不再含好友/群原始快照与用户资料。
+- **语言持久化（P1-8）**：`useLocale` 新增 `initLocale`（优先 `emkit.locale`，否则系统语言）/`setLocale`（持久化）/`getLocale`；模块加载自动初始化；`EmKitConfig.locale`、`EmKit.setLocale/getLocale` 与门面导出补齐。新增 `LOCALE_STORAGE_KEY`。
+- **列表自同步（P1-11）**：`em-conversation-page` 与 `em-contact-list-page` 新增 `autoSync`（默认 true），首次挂载且已登录时分别调 `syncConversations` / `syncContacts`；demo 去掉会话页重复的 onLoad sync，保留 onShow 补同步。群页原有自举逻辑不动。
+- 文档：README 增「连接状态条 / 语言 i18n / 日志与隐私 / 1.0 体验收口」，Quick Start 更新 autoSync 与排错；changelog 1.0.0-rc.1 同步。
+- 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 845KB / 分包 1367KB）；H5 产物伺服 200；headless Chrome 打开 H5 登录页渲染正常（无 Uncaught/ReferenceError）；`check-release.mjs` ✓。**待验**：真机断网重连/被踢时条幅文案与布局、`showConnectionBanner=false`；App/mp 录音权限拒绝/60s 自动发送；语言切换持久化与系统语言初值；`logPayload=true` 的导出内容。

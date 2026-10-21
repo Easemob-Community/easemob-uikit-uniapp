@@ -15,7 +15,7 @@ import type {
   VoiceMessageBody
 } from 'easemob-websdk'
 import { CMD_ACTION, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
-import type { ConversationTypeValue, StreamMessageStatusValue } from '../constants'
+import type { ConversationTypeValue, MessageTypeValue, StreamMessageStatusValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { uiConfig } from '../store/config'
 import { getMessages, messageStore } from '../store/message'
@@ -33,13 +33,110 @@ function nextLocalSeq(): number {
   return localSeq
 }
 
-// 文本消息 ext 组装：业务 ext（多场景上下文，如订单/商品/来源页）+ 引用（emQuote 自定义 key）
+// 引用 wire 类型映射：内部 MESSAGE_TYPE（audio）↔ vue 引用协议（voice）；
+// notice/other 在 vue 协议里没有对应值，回落 custom（只影响引用卡图标）
+function quoteTypeToWire(type: MessageTypeValue | undefined): string {
+  if (type === MESSAGE_TYPE.AUDIO) return 'voice'
+  if (type === MESSAGE_TYPE.NOTICE || type === MESSAGE_TYPE.OTHER) return 'custom'
+  return type != null ? type : MESSAGE_TYPE.TEXT
+}
+
+function quoteTypeFromWire(type: unknown): MessageTypeValue | null {
+  if (type === MESSAGE_TYPE.TEXT || type === MESSAGE_TYPE.IMAGE || type === MESSAGE_TYPE.VIDEO || type === MESSAGE_TYPE.FILE || type === MESSAGE_TYPE.CUSTOM) {
+    return type
+  }
+  if (type === 'voice' || type === MESSAGE_TYPE.AUDIO) return MESSAGE_TYPE.AUDIO
+  return null
+}
+
+// 引用主协议（1.0）：ext.msgQuote，与 vue 版 buildQuoteExt 同结构——
+// { msgID, msgPreview, msgSender, msgType, msgThumbUrl? }
+function buildVueQuote(quote: EmQuoteInfo): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    msgID: quote.msgId,
+    msgPreview: quote.text,
+    msgSender: quote.fromName != null && quote.fromName !== '' ? quote.fromName : quote.from,
+    msgType: quoteTypeToWire(quote.type)
+  }
+  if (quote.thumbUrl != null && quote.thumbUrl !== '') payload['msgThumbUrl'] = quote.thumbUrl
+  return payload
+}
+
+// 引用旧协议（0.x uni 版）：ext.emQuote，双写以兼容尚未升级的 uni 客户端
+function buildLegacyQuote(quote: EmQuoteInfo): Record<string, unknown> {
+  const payload: Record<string, unknown> = { msgId: quote.msgId, from: quote.from, fromName: quote.fromName ?? '', text: quote.text, type: quote.type }
+  if (quote.thumbUrl != null && quote.thumbUrl !== '') payload['thumbUrl'] = quote.thumbUrl
+  return payload
+}
+
+// 旧协议解析：0.x uni 版 ext.emQuote
+function parseLegacyQuote(ext: Record<string, unknown>): EmQuoteInfo | null {
+  const legacy = ext[MESSAGE_EXT_KEY.QUOTE_LEGACY]
+  if (legacy == null || typeof legacy !== 'object') return null
+  const q = legacy as Record<string, unknown>
+  const msgId = q['msgId']
+  const from = q['from']
+  const text = q['text']
+  if (typeof msgId !== 'string' || typeof from !== 'string' || typeof text !== 'string') return null
+  const quote: EmQuoteInfo = { msgId, from, text }
+  const fromName = q['fromName']
+  if (typeof fromName === 'string' && fromName !== '') quote.fromName = fromName
+  const type = quoteTypeFromWire(q['type'])
+  if (type != null) quote.type = type
+  const thumbUrl = q['thumbUrl']
+  if (typeof thumbUrl === 'string' && thumbUrl !== '') quote.thumbUrl = thumbUrl
+  return quote
+}
+
+// 主协议解析：1.0 起 ext.msgQuote（与 vue 版同结构）
+function parseVueQuote(ext: Record<string, unknown>): EmQuoteInfo | null {
+  const raw = ext[MESSAGE_EXT_KEY.QUOTE]
+  if (raw == null || typeof raw !== 'object') return null
+  const q = raw as Record<string, unknown>
+  const msgPreview = q['msgPreview']
+  const msgID = q['msgID']
+  if (typeof msgPreview !== 'string' || msgPreview === '' || typeof msgID !== 'string') return null
+  const msgSender = typeof q['msgSender'] === 'string' ? q['msgSender'] : ''
+  const quote: EmQuoteInfo = { msgId: msgID, from: msgSender, text: msgPreview }
+  if (msgSender !== '') {
+    // vue 协议只带一个「发送人显示名/ID」字段，两处都填保证引用卡与老数据回落链一致
+    quote.fromName = msgSender
+  }
+  const type = quoteTypeFromWire(q['msgType'])
+  if (type != null) quote.type = type
+  const thumbUrl = q['msgThumbUrl']
+  if (typeof thumbUrl === 'string' && thumbUrl !== '') quote.thumbUrl = thumbUrl
+  return quote
+}
+
+// 引用解析（收/发/历史三路径共用）：优先主协议 msgQuote，缺失时回落旧 emQuote；
+// 本端双写消息用旧 payload 回填 from/fromName（vue 协议只有 msgSender 一个字段，无法区分 ID 与昵称）。
+function parseQuote(ext: Record<string, unknown> | null | undefined): EmQuoteInfo | null {
+  if (ext == null) return null
+  const legacy = parseLegacyQuote(ext)
+  const quote = parseVueQuote(ext)
+  if (quote == null) return legacy
+  if (legacy != null) {
+    quote.from = legacy.from
+    if (legacy.fromName != null && legacy.fromName !== '') quote.fromName = legacy.fromName
+    if (quote.type == null && legacy.type != null) quote.type = legacy.type
+    if (quote.thumbUrl == null && legacy.thumbUrl != null) quote.thumbUrl = legacy.thumbUrl
+  }
+  return quote
+}
+
+// 文本消息 ext 组装：业务 ext（多场景上下文，如订单/商品/来源页）+ 引用（主 msgQuote + 旧 emQuote 双写）
 // + @提及（em_at_list userId 数组，与 vue 版互认）；内部 key 后写，业务 ext 不可覆盖它们；
 // 全空返回 undefined（不挂 ext，保持现状行为）
 function buildTextExt(quote?: EmQuoteInfo, mentions?: string[], extraExt?: Record<string, unknown>): Record<string, unknown> | undefined {
   const ext: Record<string, unknown> = extraExt != null ? { ...extraExt } : {}
+  // 内部 key 一律由 UIKit 写入：即使本次没有引用/@提及，也不能让业务 ext 伪造
+  delete ext[MESSAGE_EXT_KEY.QUOTE]
+  delete ext[MESSAGE_EXT_KEY.QUOTE_LEGACY]
+  delete ext[MESSAGE_EXT_KEY.MENTION]
   if (quote != null) {
-    ext[MESSAGE_EXT_KEY.QUOTE] = { msgId: quote.msgId, from: quote.from, fromName: quote.fromName ?? '', text: quote.text, type: quote.type }
+    ext[MESSAGE_EXT_KEY.QUOTE] = buildVueQuote(quote)
+    ext[MESSAGE_EXT_KEY.QUOTE_LEGACY] = buildLegacyQuote(quote)
   }
   if (mentions != null && mentions.length > 0) {
     ext[MESSAGE_EXT_KEY.MENTION] = mentions
@@ -355,7 +452,7 @@ export class EmMessageDomain {
       conversationId: to,
       conversationType: chatType,
       content: text,
-      // 引用挂在消息 ext 上（emQuote 自定义 key），接收方/历史消息解析还原
+      // 引用挂在消息 ext 上（主 msgQuote + 旧 emQuote 双写），接收方/历史消息解析还原
       ext: buildTextExt(quote, mentions, ext)
     })
     return this.deliver(message, to, text, quote, '', mentions, undefined, ext)
@@ -396,7 +493,11 @@ export class EmMessageDomain {
     } else if (item.type !== MESSAGE_TYPE.TEXT) {
       text = t('message.unsupported')
     }
-    return { msgId: item.id, from: item.from, fromName: displayNameOf(item.from), text: text.slice(0, 50), type: item.type }
+    const quote: EmQuoteInfo = { msgId: item.id, from: item.from, fromName: displayNameOf(item.from), text: text.slice(0, 50), type: item.type }
+    if ((item.type === MESSAGE_TYPE.IMAGE || item.type === MESSAGE_TYPE.VIDEO) && item.thumbUrl !== '') {
+      quote.thumbUrl = item.thumbUrl
+    }
+    return quote
   }
 
   // SDK 5.x createXxxMessage 的 data 不收字符串路径：H5 要 File 对象，小程序/App 要 MiniAppFile { path, name, size }
@@ -799,12 +900,12 @@ export class EmMessageDomain {
     } else if (item.type === MESSAGE_TYPE.TEXT) {
       const quote = item.quote
       // 重发保留 @提及 ext（item.ext 在发送时已兜底写入）与业务 ext（订单/商品/来源页）；
-      // 引用/提及两个内部 key 由 buildTextExt 按快照重建，其余 key 原样透传
+      // 引用（msgQuote/emQuote 双写）与提及内部 key 由 buildTextExt 按快照重建，其余 key 原样透传
       const rawMentions = item.ext[MESSAGE_EXT_KEY.MENTION]
       const mentions = Array.isArray(rawMentions) ? rawMentions.filter((x): x is string => typeof x === 'string') : undefined
       const extraExt: Record<string, unknown> = {}
       Object.keys(item.ext).forEach((key) => {
-        if (key !== MESSAGE_EXT_KEY.QUOTE && key !== MESSAGE_EXT_KEY.MENTION) {
+        if (key !== MESSAGE_EXT_KEY.QUOTE && key !== MESSAGE_EXT_KEY.QUOTE_LEGACY && key !== MESSAGE_EXT_KEY.MENTION) {
           extraExt[key] = item.ext[key]
         }
       })
@@ -907,29 +1008,11 @@ export class EmMessageDomain {
       customEvent: '',
       customParams: {}
     }
-    // SDK ext 透传给宿主（自定义消息业务载荷的唯一通道；引用 emQuote 等内部 key 原样可见）
+    // SDK ext 透传给宿主（自定义消息业务载荷的唯一通道；引用 msgQuote/emQuote 等内部 key 原样可见）
     if (message.ext != null && typeof message.ext === 'object') {
       item.ext = { ...(message.ext as Record<string, unknown>) }
     }
-    const rawQuote = message.ext?.[MESSAGE_EXT_KEY.QUOTE]
-    if (rawQuote != null && typeof rawQuote === 'object') {
-      const q = rawQuote as Record<string, unknown>
-      const msgId = q['msgId']
-      const from = q['from']
-      const text = q['text']
-      if (typeof msgId === 'string' && typeof from === 'string' && typeof text === 'string') {
-        const quote: EmQuoteInfo = { msgId, from, text }
-        const fromName = q['fromName']
-        if (typeof fromName === 'string' && fromName !== '') {
-          quote.fromName = fromName
-        }
-        const type = q['type']
-        if (type === MESSAGE_TYPE.TEXT || type === MESSAGE_TYPE.IMAGE || type === MESSAGE_TYPE.AUDIO || type === MESSAGE_TYPE.VIDEO || type === MESSAGE_TYPE.FILE || type === MESSAGE_TYPE.CUSTOM || type === MESSAGE_TYPE.OTHER) {
-          quote.type = type
-        }
-        item.quote = quote
-      }
-    }
+    item.quote = parseQuote(message.ext as Record<string, unknown> | null | undefined)
     // SDK wire 协议边界：5.x type 为 'image'/'voice'，4.x 遗风为 'img'/'audio'，
     // 此处是唯一的双兼容映射点，wire 字段保留字面量（规范允许的例外），出口全部落到 MESSAGE_TYPE
     const mtype = message.type as string

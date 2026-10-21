@@ -9,6 +9,9 @@
       @action="onOpenInfo"
     />
 
+    <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
+    <em-connection-banner :show="showConnectionBanner" />
+
     <!-- 业务横幅（#banner）：nav-bar 与群公告条之间的固定区，不随消息滚动；
          医疗病情摘要条/招聘职位条/交易商品条等由宿主渲染（样式与间距宿主自管） -->
     <slot name="banner" />
@@ -35,6 +38,7 @@
       :style="ready ? '' : 'opacity: 0;'"
       @scroll="onChatScroll"
       @scrolltolower="onChatScrollToLower"
+      @click="onChatAreaClick"
     >
       <view v-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
         <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
@@ -163,6 +167,7 @@
       :features="config.inputFeatures"
       :emojis="config.emojiList"
       :quick-replies="quickReplies"
+      :collapse-signal="inputbarCollapseSignal"
       :disabled="isMutedAll"
       :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
       @send="onSend"
@@ -219,12 +224,13 @@ import EmAudioMessage from '../../em-audio-message/em-audio-message.vue'
 import EmVideoMessage from '../../em-video-message/em-video-message.vue'
 import EmFileMessage from '../../em-file-message/em-file-message.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
+import EmConnectionBanner from '../../em-connection-banner/em-connection-banner.vue'
 import EmPopup from '../../em-popup/em-popup.vue'
 import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
-import { EmKit, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
+import { EmKit, PLATFORM_CAPABILITIES, chooseFile, chooseImage, chooseVideo, previewImage } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
 import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
@@ -275,6 +281,11 @@ interface Props {
   title?: string
   /** 右上角详情入口显隐（默认 true）；false 时宿主完全接管业务信息页（伪装模式/客服场景） */
   showAction?: boolean
+  /** 点击返回时是否由组件执行 `uni.navigateBack`（默认 true）。
+   *  false 时只 emit `back`，由宿主决定退场/拦截（表单未保存、业务路由栈等） */
+  autoBack?: boolean
+  /** 顶部连接状态条显隐，默认 true */
+  showConnectionBanner?: boolean
   /** 快捷回复常用语（M2.12）：输入栏上方胶囊条，点击按 quickReplyMode 填草稿或直接发送 */
   quickReplies?: EmQuickReply[]
   /** 快捷回复点击行为，默认 'fill'（替换草稿，用户可编辑后再发）；'send' 直接发送 */
@@ -291,12 +302,16 @@ const props = withDefaults(defineProps<Props>(), {
   enableMention: true,
   title: '',
   showAction: true,
+  autoBack: true,
+  showConnectionBanner: true,
   quickReplies: () => [],
   quickReplyMode: 'fill',
   extraMessageMenus: () => []
 })
 
 const emit = defineEmits<{
+  // 返回上一页：默认组件自行 navigateBack；autoBack=false 时由宿主接管
+  (e: 'back'): void
   // 聊天详情入口（路由跳转由宿主页面接线）
   (e: 'open-info', conversationId: string): void
   // 业务事件透出：行为仍内部调 EmKit 完成，事件仅通知宿主（payload 为发送/操作后的消息项）
@@ -315,7 +330,10 @@ const { t } = useLocale()
 const { config } = useConfig()
 
 function onBack(): void {
-  uni.navigateBack({ delta: 1 })
+  emit('back')
+  if (props.autoBack) {
+    uni.navigateBack({ delta: 1 })
+  }
 }
 
 function onOpenInfo(): void {
@@ -411,9 +429,14 @@ const announcementCanExpand = computed(() => {
   if (text.includes('\n')) return true
   const windowWidth = uni.getWindowInfo().windowWidth
   const available = windowWidth - 32 - 14 - 8 - 24 - 12
+  // 按码点近似：CJK 1 字宽、其余 0.55；代理对（emoji 等）跳过低位、只计一次。
+  // 不用 for-of：App/鸿蒙编译会生成 __values 辅助函数并提升到共享 chunk，
+  // 与 store 反向引用形成 ESM 循环（鸿蒙首屏白屏 P0，见 skill em-crossend-pitfalls）
   let units = 0
-  for (const ch of text) {
-    units += (ch.charCodeAt(0) > 0xff ? 1 : 0.55)
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) i++
+    units += (code > 0xff ? 1 : 0.55)
   }
   return units * 12 > available
 })
@@ -584,6 +607,16 @@ watch(keyboardHeight, (h, prev) => {
   }
 })
 
+// ========== 点击聊天区收起输入栏（emoji/媒体面板 + 软键盘） ==========
+// 面板状态归 em-chat-inputbar 内部，父级不持有，故用递增信号 props 传达一次性「收起」命令
+// （不用 $refs 调子组件方法：蒸汽端/小程序/H5 行为一致）。点消息区任意位置即收，对齐 vue 版
+// chat__content 的 onChatContentClick → messageInput.blur()；无展开态时子组件内为空操作。
+const inputbarCollapseSignal = ref(0)
+
+function onChatAreaClick(): void {
+  inputbarCollapseSignal.value += 1
+}
+
 // 引用定位：消息行锚点 id + 点击引用卡滚动到原消息并整行闪烁高亮（对齐 vue 版 message-row-flash）；
 // 原消息未加载（历史未拉到）或已删除时提示
 const highlightId = ref('')
@@ -722,6 +755,8 @@ watch(() => {
 onUnmounted(() => {
   unsubscribeMessages?.()
   unsubscribeMessages = null
+  // 离页兜底清未读：会话内收到的消息服务端未读可能已累加，不清会随下一次 refreshSessionList 复活
+  EmKit.clearConversationUnread(props.conversationId, props.chatType, true)
   EmKit.leaveConversation()
   quoteInfo.value = null
   mentionVisible.value = false
@@ -886,6 +921,8 @@ async function onPickVideo(): Promise<void> {
 }
 
 async function onPickFile(): Promise<void> {
+  // 平台能力门控：App 端无通用文件选择器（入口已在 inputbar 隐藏），这里兜底防旁路调用
+  if (!PLATFORM_CAPABILITIES.filePick) return
   const file = await chooseFile()
   if (file == null) return
   try {
@@ -917,22 +954,20 @@ function onPreview(m: EmMessageItem): void {
 }
 
 // 视频消息点击默认行为（从 em-video-message 上移，组件本身纯 emit 透传，与 em-image-message 对齐）：
-// H5 直接新窗口打开流地址；小程序/App 暂无全屏视频预览收口，toast 降级
+// 一期仅 H5 接了 window.open；App/小程序播放器待接，气泡侧已隐藏播放入口，这里再兜底一次。
 function onVideoPreview(m: EmMessageItem): void {
+  if (!PLATFORM_CAPABILITIES.videoPreview) return
   const url = m.url
   if (url === '') return
   // #ifdef WEB
   window.open(url, '_blank')
   // #endif
-  // #ifndef WEB
-  uni.showToast({ title: t('message.preview.unsupported'), icon: 'none' })
-  // #endif
 }
 
 // 文件消息点击默认行为（从 em-file-message 上移，组件本身纯 emit 透传）：
-// 文件下载/打开一期不做（需要分端落地），点击仅提示
+// 文件打开/下载一期全端未接（platform.fileOpen=false），气泡侧不发事件；接入后在此实现下载/打开。
 function onFileDownload(m: EmMessageItem): void {
-  uni.showToast({ title: t('error.unsupported'), icon: 'none' })
+  if (!PLATFORM_CAPABILITIES.fileOpen) return
 }
 
 // 消息长按菜单（项与顺序经 uiConfig.messageMenuKeys 配置）：复制（仅文本）/ 引用 / 撤回（窗口内）/ 删除（本地）

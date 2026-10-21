@@ -6,6 +6,14 @@ dist/
 .DS_Store
 # 本地凭据（严禁提交真实 appkey/token）
 local.credentials.*
+# 本地签名材料（鸿蒙/Android/iOS；manifest 中不提交 signingConfigs）
+*.p12
+*.cer
+*.p7b
+*.jks
+*.keystore
+demo/manifest.local.json
+demo/harmony-configs/build-profile.json5
 .superpowers/
 # 本地 Python 虚拟环境（patch-icons 用）
 .venv-icons/

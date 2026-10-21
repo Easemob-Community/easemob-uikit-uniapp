@@ -14,7 +14,7 @@ import {
   updateInviteStatus
 } from '../store/contact'
 import { mergeUserInfo } from '../store/user'
-import { createLogger } from '../utils/logger'
+import { createLogger, logPayload } from '../utils/logger'
 import type { EmContactInvite } from '../types'
 
 const logger = createLogger('contact')
@@ -37,7 +37,7 @@ export class EmContact {
     // 必须挂 ChatClient 级统一同步事件，contact 同步完成后重读快照自愈
     client.addEventHandler('emkit-contact-sync', {
       onSyncDataFinished: (payload) => {
-        logger.debug('onSyncDataFinished raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onSyncDataFinished:', payload)
         // 对齐 vue 版 D124：失败轮次不能用不完整内存回填；contact 无主动重同步接口，
         // 只能告警 + 等下次连接/登录自动同步
         if (payload.status === 'failed') {
@@ -57,7 +57,7 @@ export class EmContact {
     mgr.addEventHandler('emkit-contact', {
       // 收到好友申请（被邀请方）：落一条 pending 申请
       onContactInvited: (p: ContactRosterEventPayload) => {
-        logger.debug('onContactInvited raw payload:', JSON.parse(JSON.stringify(p)))
+        logPayload(logger, 'onContactInvited:', p)
         addInvite({
           id: `${p.from}:${Date.now()}`,
           kind: CONTACT_INVITE_KIND.CONTACT,
@@ -71,20 +71,20 @@ export class EmContact {
       },
       // 好友关系建立（双方收）：刷新快照；已是好友的申请不再保留 pending
       onContactAdded: (p: ContactRosterEventPayload) => {
-        logger.debug('onContactAdded raw payload:', JSON.parse(JSON.stringify(p)))
+        logPayload(logger, 'onContactAdded:', p)
         this.refresh()
         this.mergeProfile(p.from, p.userInfo)
       },
       // 被对方删除：刷新快照并清掉与其相关的 contact kind 申请记录（群邀请与好友关系无关，保留）
       onContactDeleted: (p: ContactRosterEventPayload) => {
-        logger.debug('onContactDeleted raw payload:', JSON.parse(JSON.stringify(p)))
+        logPayload(logger, 'onContactDeleted:', p)
         this.refresh()
         removeInviteByFrom(p.from)
       },
       // 我方申请被接受（发起方收）：刷新快照；若本地有其 pending 好友申请则置 accepted
       //（kind 过滤必须：同一用户的 pending 群邀请不能被好友事件误置）
       onContactAgreed: (p: ContactRosterEventPayload) => {
-        logger.debug('onContactAgreed raw payload:', JSON.parse(JSON.stringify(p)))
+        logPayload(logger, 'onContactAgreed:', p)
         this.refresh()
         const pending = contactStore.invites.find((i) => i.kind === CONTACT_INVITE_KIND.CONTACT && i.from === p.from && i.status === CONTACT_INVITE_STATUS.PENDING)
         if (pending != null) {
@@ -93,7 +93,7 @@ export class EmContact {
       },
       // 我方申请被拒绝（发起方收）：落一条 outgoing 已拒绝通知
       onContactRefuse: (p: ContactRosterEventPayload) => {
-        logger.debug('onContactRefuse raw payload:', JSON.parse(JSON.stringify(p)))
+        logPayload(logger, 'onContactRefuse:', p)
         addInvite({
           id: `${p.from}:${Date.now()}`,
           kind: CONTACT_INVITE_KIND.CONTACT,
@@ -106,7 +106,7 @@ export class EmContact {
       },
       // 好友资料/备注变更（含跨端备注同步）：刷新快照 + 用户资料缓存
       onContactInfoUpdated: (payload) => {
-        logger.debug('onContactInfoUpdated raw payload:', JSON.parse(JSON.stringify(payload)))
+        logPayload(logger, 'onContactInfoUpdated:', payload)
         this.mergeProfile(payload.userInfo.userId, payload.userInfo)
         this.refresh()
       }
@@ -165,7 +165,7 @@ export class EmContact {
       return
     }
     const raw = mgr.getContacts()
-    logger.debug('getContacts raw snapshot:', JSON.parse(JSON.stringify(raw)))
+    logPayload(logger, 'getContacts:', raw)
     logger.info('contact snapshot refreshed, count:', raw.length)
     const items = raw.map((c) => this.toContactItem(c))
     contactStore.items = items

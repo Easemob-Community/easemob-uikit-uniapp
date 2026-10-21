@@ -51,7 +51,7 @@
 - 撤回：2 分钟窗口、撤回提示条、（编辑入口**不做**）
 - 失败重发：气泡红色感叹号 + 点击重发
 - 单聊已读状态（`enableReadReceipt` 开关控制，群已读详情**不做**）
-- 输入栏：文本/语音切换（按住说话）、表情入口（一期仅 emoji 字符面板，**不做表情包**）、相册/拍摄/文件 三个扩展动作
+- 输入栏：文本/语音切换（按住说话）、表情入口（一期仅 emoji 字符面板，**不做表情包**）、相册/拍摄/文件 三个扩展动作；emoji/媒体面板与软键盘展开时，点击消息区收起（对齐 vue 版 `chat__content` 点击 blur）
 - typing 提示：默认开，不配开关
 - 草稿：默认开，不配开关
 - 流式消息：默认开（`EmKitConfig.enableStreamMessage` 可关），分片合批、底部跟随、`#stream-message` 富格式插槽（M2.13）
@@ -272,8 +272,9 @@ easemob-uikit-uniapp/
 - 原子组件沉淀（em-*-message 气泡族、输入栏等从页面级组件解耦）；pages_init.json 页面模板注册
 - `variables.css` token 体系定稿（值平移自 Web 版 DESIGN-TOKEN-MAPPING）
 - README（含分包接入模板：聊天页进 subpackage 的 pages.json 示例）、changelog、license
+- `docs/QUICKSTART.md` 宿主接入 9 步 + 排错/验收清单（2026-10-21 已补）
 - uni-automator 核心链路用例（登录/收发/撤回/重发）
-- 插件市场首发 0.1.0 + GitHub 开源 + uni-im 交流群
+- 插件市场首发 **1.0.0-rc.1**（rc 阶段先验证真机矩阵，GA 前不宣称 1.0.0）+ GitHub 开源 + uni-im 交流群
 
 ### M4（二期，另行立项）：单条转发、联系人详情页/黑名单、文档站（群基础已提前至 M2.9）
 

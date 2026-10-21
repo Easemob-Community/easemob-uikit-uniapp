@@ -1,23 +1,36 @@
 # easemob-uikit-uni
 
-环信 IM 的 uni-app 版 UIKit（uni-app x 蒸汽模式）。
+环信 IM 的 uni-app x 版 UIKit（蒸汽模式），一套代码覆盖 Android / iOS / 鸿蒙 / H5 / 微信小程序。
 
-> 开发中。已包含登录接入、会话列表页、聊天页（5 种气泡 + 长按菜单/引用/撤回/重发/已读回执 + AI 流式消息）、聊天详情页、联系人页（通讯录 + 好友申请）与日志导出；逻辑层在 `libs/`，组件层在 `components/`。
+> 当前版本：**1.0.0-rc.1**。已包含登录接入、会话列表、聊天页（文本/图片/语音/视频/文件 + 引用/撤回/重发/已读回执 + AI 流式消息）、群聊、联系人/好友申请、聊天详情、连接状态条与日志导出；语言偏好持久化（中/英）。逻辑层在 `libs/`，组件层在 `components/`。
 >
-> 多场景入口（M2.15）：`em-chat-page` 的 `#input-toolbar` 插槽可注入「发订单/发病例/换手机号」等业务胶囊（宿主自绘、自行 `sendCustom`）；`#custom-message` 负责整卡渲染。
->
-> AI 流式消息（M2.13）：`onStreamMessage` 分片合并 + 纯文本打字机光标/异常提示，`EmKitConfig.enableStreamMessage`/`streamThrottle` 可配置，`#stream-message` 插槽接管 markdown；接入示例见仓库 README「AI 流式消息」章节。
+> 完整接入步骤、常见问题与平台边界见仓库 `docs/QUICKSTART.md`；本文给出最短可运行路径。
 
-## 使用方式（目标形态）
+## 兼容性
 
-```ts
-import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+| 项 | 要求 |
+|---|---|
+| HBuilderX | 5.21+（蒸汽模式；推荐 5.26+） |
+| uni-app x | HBuilderX 4.71+ |
+| Vue | Vue 3 组合式 API（不支持 Vue2） |
+| 环信 SDK | `easemob-websdk` **5.1.3**（peer 依赖，需宿主安装） |
+| App | Android 6+ / iOS 15+ / 鸿蒙 API20+ |
+| 小程序 | 微信小程序（SDK 需按下方「分包」接入） |
+| H5 | 现代浏览器移动端；未做桌面宽屏布局 |
 
-EmKit.init({ appkey: 'your-appkey' })
-await EmKit.login({ userId, token })
+## 快速开始（宿主工程）
+
+### 1. 安装依赖
+
+```bash
+npm install easemob-websdk@5.1.3
 ```
 
-页面级组件（`em-conversation-page` / `em-chat-page` / `em-chat-info-page` / `em-contact-page` / `em-contact-list-page` / `em-contact-requests-page` / `em-group-page`）位于 `components/pages/`，需在宿主工程 `pages.json` 配置 easycom custom 规则自动导入（原子组件走内置规则，零配置）：
+把 `uni_modules/easemob-uikit-uni/` 放入宿主工程（插件市场导入或直接拷贝）。
+
+### 2. pages.json：页面组件 easycom
+
+页面级组件位于 `components/pages/`，不在默认 easycom 扫描规则内，需要补一条 custom 规则：
 
 ```json
 {
@@ -30,35 +43,139 @@ await EmKit.login({ userId, token })
 }
 ```
 
-peer 依赖：`easemob-websdk`（npm 安装）。
-
-## 微信小程序主包体积优化（SDK 分包异步化）
-
-小程序主包 2MB 限制下，websdk（IIFE ~873KB）静态导入会占满主包。UIKit 已内置**分包异步化注入口**（`libs/client/sdk.ts`，MP-WEIXIN 条件编译）：小程序端不静态依赖 websdk，运行时经微信原生跨分包 `require(path, cb, fail)` 从普通分包加载；其它端保持静态导入直通，零行为变更。
-
-宿主接入三步：
-
-1. **构建期把 SDK IIFE 放进普通分包**：把 `node_modules/easemob-websdk/bundle/im-sdk-web.iife.js` 尾部追加 `module.exports = IMSDK;`，做 ES2017 语法降级（IIFE 内含 `?.`/`??`，旧基础库真机会 SyntaxError），输出为分包内 `sub-sdk/im-sdk.js`（参考本仓库 `scripts/prepare-sdk-subpackage.mjs`，零依赖、可整段拷贝；每个分包至少配一个占位页）。
-2. **pages.json 声明分包 + 预下载**：
+聊天页/详情页使用自绘导航栏，页面 style 必须关闭原生导航：
 
 ```json
 {
-  "subPackages": [{ "root": "sub-sdk", "independent": false, "pages": ["pages/placeholder/placeholder"] }],
-  "preloadRule": { "pages/login/login": { "network": "all", "packages": ["sub-sdk"] } }
+  "path": "pages/chat/chat",
+  "style": {
+    "navigationStyle": "custom",
+    "app-plus": { "titleNView": false }
+  }
 }
 ```
 
-3. **代码无需改动**：`EmKit.init()` / `login()` 会自动等待 SDK 分包就绪（`EmKit.whenReady()` 可向宿主暴露「加载消息服务…」占位态）。如需自管理加载（如自行预下载、自定义分包路径），注入：
+### 3. App.uvue：初始化主题与 EmKit
 
-```ts
-EmKit.init({
-  appkey: 'your-appkey',
-  // 二选一：sdkModule 优先；返回 websdk 根导出（允许 { default } 包装）
-  sdkLoader: () => myLoadSdk(),
-  sdkModule: preloadedSdk
+```vue
+<script setup lang="uts">
+import { onLaunch } from '@dcloudio/uni-app'
+import { EmKit, initTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+
+onLaunch(() => {
+  initTheme()
+  EmKit.init({
+    appkey: 'your-appkey',
+    // 可选：Token 约 80% 生命周期时回调，返回新 token 后 UIKit 自动续期
+    onTokenWillExpire: async () => {
+      const res = await uni.request({ url: 'https://your-api/im/token' })
+      return (res.data as Record<string, string>).token
+    },
+    onTokenExpired: () => {
+      uni.reLaunch({ url: '/pages/login/login' })
+    }
+  })
 })
+</script>
 ```
 
-约束：默认分包路径为产物根下 `sub-sdk/im-sdk.js`（相对于 `uni_modules/easemob-uikit-uni/libs/client/sdk.js` 的 `../../../../sub-sdk/im-sdk.js`），自定义路径请走 `sdkLoader` 注入。完整实施指引（关键步骤、分包成功验证方法、报错排查表、SDK 升级与回滚流程）见仓库 `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md`；编译器行为实测记录见 `docs/SPIKE-SDK-SUBPACKAGE.md`。
+### 4. 登录页
 
-详见仓库根 README 与 PLAN.md。
+```ts
+import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+
+// token 必须由宿主服务端签发；不要在前端硬编码 appkey/token
+await EmKit.login({ userId: 'user-id', token: 'access-token' })
+uni.reLaunch({ url: '/pages/conversation/conversation' })
+```
+
+### 5. 会话页与聊天页
+
+```vue
+<template>
+  <view class="page" :class="themeClass">
+    <em-conversation-page @select="onSelect" />
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { EmKit, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
+
+const { themeClass } = useTheme()
+
+onLoad(() => { EmKit.syncConversations().catch(() => {}) })
+onShow(() => { EmKit.syncConversations().catch(() => {}) })
+
+function onSelect(conversationId: string, chatType: ConversationTypeValue) {
+  uni.navigateTo({ url: `/pages/chat/chat?conversationId=${conversationId}&chatType=${chatType}` })
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+</style>
+```
+
+```vue
+<template>
+  <em-chat-page
+    :conversation-id="conversationId"
+    :chat-type="chatType"
+    @open-info="onOpenInfo"
+  />
+</template>
+```
+
+> **关键**：页面根节点必须有确定高度（`height: 100%` 且父级 flex 链完整），否则列表/输入栏会被压成 0 高，表现为白屏。
+
+### 6. 微信小程序 SDK 分包
+
+小程序主包 2MB 限制下，websdk 不能静态进主包。UIKit 已内置跨分包异步加载入口，宿主只需：
+
+1. 用 `scripts/prepare-sdk-subpackage.mjs` 把 SDK IIFE 处理为 `sub-sdk/im-sdk.js`；
+2. `pages.json` 声明 `sub-sdk` 分包与 `preloadRule`；
+3. 无需改业务代码，`EmKit.init()` / `login()` 会自动等待 SDK 就绪。
+
+完整步骤、体积阈值与排错见仓库 `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md`。
+
+## 平台能力（1.0）
+
+不支持的端已直接隐藏入口（能力源 `libs/platform.ts` 的 `PLATFORM_CAPABILITIES`），不会出现「点一下只弹暂不支持」：
+
+| 能力 | H5 | 微信小程序 | App（Android/iOS/鸿蒙） |
+|---|---|---|---|
+| 视频消息：发送 | ✅ | ✅ | ✅ |
+| 视频消息：播放 | ✅ 新窗口 | ⏳ 仅展示封面/时长 | ⏳ 仅展示封面/时长 |
+| 文件消息：发送 | ✅ | ✅ | ⏳ 入口隐藏 |
+| 文件消息：打开/下载 | ⏳ 仅展示 | ⏳ 仅展示 | ⏳ 仅展示 |
+| 语音消息：发送 | ⏳ 入口隐藏 | ✅ | ✅ |
+
+## 已知限制（1.0）
+
+- 视频播放仅 H5；App/小程序隐藏播放入口。
+- 文件打开/下载全端未接入，文件气泡为纯展示。
+- App 端暂不支持发送文件。
+- H5 为移动端布局，未做桌面宽屏适配。
+- 语音发送仅 App/小程序；录音 60s 上限自动发送，麦克风权限失败只 toast（不自动跳系统设置）。
+- `@` 提及为追加式插入（uni `<input>` 无光标位置 API）；消息列表仍为 `scroll-view` 全量渲染（长会话性能优化在 1.1）。
+- 日志原始 payload 默认关闭（`logPayload`），生产排查请临时开启并及时关闭。
+
+## 更多文档
+
+- 仓库根 `README.md`：能力全景、未读/tabBar、Token 续期、多场景扩展、AI 流式消息、深色模式
+- `docs/QUICKSTART.md`：从空工程到收发消息的完整步骤与排错
+- `docs/GUIDE-MULTI-SCENARIO.md`：客服/医疗/招聘/交易等业务直进会话
+- `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md`：小程序 SDK 分包接入
+- `docs/HARMONY-REALDEVICE-RUN.md`：鸿蒙真机与签名
+
+## License
+
+MIT，见 `license.md` 或仓库根 `LICENSE`。

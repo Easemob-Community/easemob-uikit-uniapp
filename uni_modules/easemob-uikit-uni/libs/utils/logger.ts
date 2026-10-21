@@ -1,5 +1,6 @@
 import { LOG_LEVEL } from '../constants'
 import type { LogLevelValue } from '../constants'
+import { uiConfig } from '../store/config'
 
 // EmKit 内置日志服务：分级 + 命名空间前缀 + 内存环形缓冲导出，零依赖纯 ts。
 // 用法：模块顶部 `const logger = createLogger('chat')`，输出形如 `[emkit:chat] ...`，
@@ -37,6 +38,21 @@ export function setLogLevel(level: LogLevelValue): void {
 
 export function getLogLevel(): LogLevelValue {
   return currentLevel
+}
+
+/**
+ * SDK 原始 payload 日志（默认关闭）：只有宿主显式 `logPayload: true` 且日志级别为 debug 时才序列化。
+ * 避免 debug 关闭时仍对同步快照/好友资料做 eager JSON clone，也避免生产导出日志包含 userId/昵称。
+ */
+export function logPayload(logger: EmLogger, label: string, payload: unknown): void {
+  if (!uiConfig.logPayload || ORDER[currentLevel] > ORDER[LOG_LEVEL.DEBUG]) return
+  let clone: unknown = payload
+  try {
+    clone = JSON.parse(JSON.stringify(payload))
+  } catch (e) {
+    clone = String(payload)
+  }
+  logger.debug(label, clone)
 }
 
 // 缓冲行序列化：Error 取 message+stack，对象走 JSON（循环引用兜底 String）

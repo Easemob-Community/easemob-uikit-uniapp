@@ -98,7 +98,7 @@ import EmQuickReplyBar from '../em-quick-reply-bar/em-quick-reply-bar.vue'
 import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import { DEFAULT_EMOJI_LIST, MEDIA_PANEL_KEY, PANEL_MIN_HEIGHT } from '../../libs/constants'
-import { cancelRecord, isRecording, startRecord, stopRecord } from '../../libs/platform'
+import { PLATFORM_CAPABILITIES, cancelRecord, isRecording, startRecord, stopRecord } from '../../libs/platform'
 import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
 import { useKeyboardHeight } from '../../libs/use/useKeyboardHeight'
 import type { EmInputFeatures, EmQuickReply, EmQuoteInfo } from '../../libs/types'
@@ -119,6 +119,9 @@ interface Props {
   placeholder?: string
   /** 快捷回复常用语（M2.12；空数组不渲染，禁用态隐藏）；点击仅 emit，填草稿/发送由父组件决定 */
   quickReplies?: EmQuickReply[]
+  /** 外部收起信号：数值变化即收起 emoji/媒体面板并隐藏软键盘（聊天页点击消息区时递增）。
+   *  面板状态归组件内部，父级不持有，故用递增信号而非 $refs 调组件实例方法——蒸汽端/小程序/H5 行为一致 */
+  collapseSignal?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -127,7 +130,8 @@ const props = withDefaults(defineProps<Props>(), {
   emojis: () => DEFAULT_EMOJI_LIST,
   disabled: false,
   placeholder: '',
-  quickReplies: () => []
+  quickReplies: () => [],
+  collapseSignal: 0
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })
@@ -192,6 +196,9 @@ const quoteIcon = computed<EmIconName>(() => quoteIconNameOf(props.quote?.type))
 
 const inputFocus = ref(false)
 const panel = ref<'none' | 'emoji' | 'media'>('none')
+// 输入框真实聚焦态：H5 没有键盘高度监听（useKeyboardHeight 在 WEB 不注册），
+// 且部分端键盘已弹起但高度事件未回，收起键盘时需靠它判定是否真要收（见 closeKeyboardIfVisible）
+const focused = ref(false)
 
 // 禁言翻转瞬间复位面板/语音/焦点（禁用态 guard 只拦新操作，已开的面板/语音模式需主动收）
 watch(() => props.disabled, (v) => {
@@ -219,25 +226,32 @@ function onQuickReply(item: EmQuickReply): void {
 
 function onToggleEmoji(): void {
   if (guardDisabled()) return
-  panel.value = panel.value === 'emoji' ? 'none' : 'emoji'
-  if (panel.value !== 'none') {
+  const open = panel.value !== 'emoji'
+  // 开面板前先收键盘（对齐 vue 版 h5-input：togglePanel 先 blur textarea 再开面板，键盘位与面板位不叠加）
+  if (open) closeKeyboardIfVisible()
+  panel.value = open ? 'emoji' : 'none'
+  if (open) {
     inputFocus.value = false
   }
 }
 
 function onInputFocus(): void {
+  focused.value = true
   panel.value = 'none'
 }
 
 // 手动避让（对齐 hello-uni-app-x keyboard-adjust 示例）：adjust-position 关系统默认上推后，
-// 输入栏以 margin-bottom = 键盘有效高度顶到键盘上方；blur 清零兜底部分端收起不补发 0 高度事件
+// 输入栏以 margin-bottom = 键盘实际上推高度顶到键盘上方；blur 清零兜底部分端收起不补发 0 高度事件
 function onInputBlur(): void {
-  keyboardHeight.value = 0
+  focused.value = false
+  resetKeyboardHeight()
 }
 
-// 面板高度 = max(最近键盘高度, 280px)：真实键盘高于兜底值时面板跟随键盘（对齐 vue 版 panelHeightVar，
-// 键盘↔面板互切无跳变）；键盘未弹过则恒为 280，对应 css 中 --em-chat-panel-height 一档已被内联覆盖
-const { keyboardHeight } = useKeyboardHeight()
+// 面板高度 = max(最近键盘本体高度, 280px)：真实键盘高于兜底值时面板跟随键盘（对齐 vue 版 panelHeightVar，
+// 键盘↔面板互切无跳变）；键盘未弹过则恒为 280，对应 css 中 --em-chat-panel-height 一档已被内联覆盖。
+// 注意面板用 keyboardHeight（面板口径）、输入栏上推用 keyboardLift（上推口径：鸿蒙用上报值原值，
+// 不扣安全区），两者口径不同，见 useKeyboardHeight 文件头
+const { keyboardHeight, keyboardLift, resetKeyboardHeight } = useKeyboardHeight()
 
 // 面板底部安全区（对齐 vue 版 panel 的 safe-bottom padding）
 const panelStyle = computed(() => {
@@ -247,12 +261,46 @@ const panelStyle = computed(() => {
 })
 
 // 无面板时输入栏自身贴底，需让出 Home 指示条安全区；面板打开时安全区由面板承担，避免双重间距。
-// 键盘弹起时：以键盘有效高度顶起（键盘区已覆盖安全区，不再叠加安全区 padding）
+// 键盘弹起时：以键盘实际上推高度顶起（键盘区已覆盖安全区，不再叠加安全区 padding；
+// 面板口径与上推口径的差异收口在 useKeyboardHeight 的 keyboardHeight / keyboardLift）
 const rootStyle = computed(() => {
-  if (keyboardHeight.value > 0) return `margin-bottom: ${keyboardHeight.value}px;`
+  if (keyboardLift.value > 0) return `margin-bottom: ${keyboardLift.value}px;`
   if (panel.value !== 'none') return ''
   const bottom = getSafeAreaBottom()
   return bottom > 0 ? `padding-bottom: ${bottom}px;` : ''
+})
+
+// ========== 收起键盘 / 面板 ==========
+
+// 键盘是否可能弹起：上推高度 > 0 是直接证据；H5 不监听键盘高度（见 useKeyboardHeight），靠 focused 兜底
+function keyboardMaybeOpen(): boolean {
+  return focused.value || keyboardLift.value > 0
+}
+
+// 收键盘：先主动清零键盘高度（部分端收起后不补发 0 高度事件，口径同 onInputBlur），再调原生收起。
+// uni.hideKeyboard 在 App（含鸿蒙）/H5/微信小程序均实现；H5 实现为 blur 当前 input/DOM 焦点
+function closeKeyboard(): void {
+  inputFocus.value = false
+  focused.value = false
+  resetKeyboardHeight()
+  uni.hideKeyboard()
+}
+
+// 仅在键盘可能弹起时收：面板展开态点工具按钮切换时调用，避免每次开面板都空调一次 hideKeyboard
+function closeKeyboardIfVisible(): void {
+  if (!keyboardMaybeOpen()) return
+  closeKeyboard()
+}
+
+// 外部收起（聊天页点击消息区，对齐 vue 版 chat__content 的点击 blur 输入框）：
+// 面板 + 键盘一起收；面板本就收起且键盘未弹起时为空操作
+function collapseInput(): void {
+  panel.value = 'none'
+  closeKeyboardIfVisible()
+}
+
+watch(() => props.collapseSignal, () => {
+  collapseInput()
 })
 
 // ========== 发送 ==========
@@ -290,7 +338,12 @@ const mediaItems = computed<MediaItem[]>(() => {
     { key: MEDIA_PANEL_KEY.VIDEO, text: t('chat.media.video'), icon: 'video', feature: 'video' },
     { key: MEDIA_PANEL_KEY.FILE, text: t('chat.media.file'), icon: 'folder', feature: 'file' }
   ]
-  return candidates.filter((item) => props.features[item.feature])
+  return candidates.filter((item) => {
+    if (!props.features[item.feature]) return false
+    // 平台能力显隐：App 端暂无通用文件选择器，隐藏「文件」入口（能力源见 PLATFORM_CAPABILITIES）
+    if (item.key === MEDIA_PANEL_KEY.FILE && !PLATFORM_CAPABILITIES.filePick) return false
+    return true
+  })
 })
 
 // 四个媒体项全关时「+」入口整体隐藏
@@ -298,8 +351,11 @@ const hasMediaFeatures = computed(() => mediaItems.value.length > 0)
 
 function onToggleMedia(): void {
   if (guardDisabled()) return
-  panel.value = panel.value === 'media' ? 'none' : 'media'
-  if (panel.value !== 'none') {
+  const open = panel.value !== 'media'
+  // 开面板前先收键盘（同 onToggleEmoji 口径）
+  if (open) closeKeyboardIfVisible()
+  panel.value = open ? 'media' : 'none'
+  if (open) {
     inputFocus.value = false
   }
 }
@@ -337,14 +393,37 @@ function exitVoiceMode(): void {
   voiceMode.value = false
 }
 
+// 录音结果统一出口：手动松开与 60s 自动停止共用（自动停止不再静默丢音频）
+function onRecordResult(res: { path: string, duration: number }): void {
+  if (res.path === '' || res.duration < 1) {
+    uni.showToast({ title: t('chat.voice.tooShort'), icon: 'none' })
+    return
+  }
+  emit('voice-send', res.path, res.duration)
+}
+
+function onRecordError(): void {
+  recording.value = false
+  willCancel.value = false
+  voiceMode.value = false
+  uni.showToast({ title: t('chat.voice.recordFailed'), icon: 'none' })
+}
+
 function onRecordTouchStart(e: TouchEvent): void {
   if (guardDisabled()) return
   if (recording.value) return
   try {
-    startRecord()
+    startRecord({
+      onError: onRecordError,
+      onAutoStop: (res) => {
+        // 到达 60s 上限由 SDK 自动停：复位手势态并按正常语音发送
+        recording.value = false
+        willCancel.value = false
+        onRecordResult(res)
+      }
+    })
   } catch (err) {
-    uni.showToast({ title: t('chat.voice.unsupported'), icon: 'none' })
-    voiceMode.value = false
+    onRecordError()
     return
   }
   recordStartY = e.touches[0].clientY
@@ -365,13 +444,7 @@ function onRecordTouchEnd(): void {
     cancelRecord()
     return
   }
-  stopRecord().then((res) => {
-    if (res.path === '' || res.duration < 1) {
-      uni.showToast({ title: t('chat.voice.tooShort'), icon: 'none' })
-      return
-    }
-    emit('voice-send', res.path, res.duration)
-  }).catch(() => {})
+  stopRecord().then(onRecordResult).catch(onRecordError)
 }
 
 function onRecordTouchCancel(): void {

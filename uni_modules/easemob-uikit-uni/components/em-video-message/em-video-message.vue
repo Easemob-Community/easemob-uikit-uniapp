@@ -7,7 +7,9 @@
       mode="aspectFill"
     />
     <view v-else :class="ns.e('placeholder')"></view>
-    <view :class="ns.e('overlay')">
+    <!-- 播放入口按平台显隐：一期仅 H5 接了 window.open；App/小程序播放器待接，
+         先隐藏播放按钮与点击行为，只保留封面/时长（能力源见 PLATFORM_CAPABILITIES） -->
+    <view v-if="canPreview" :class="ns.e('overlay')">
       <view :class="ns.e('play')">
         <!-- 播放三角逐项对齐 vue video-message：Icon triangle 20 / 白色（不再用 border 手绘 / videocam 占位） -->
         <EmIcon name="triangle" :size="20" color="#ffffff" />
@@ -25,6 +27,7 @@ import EmIcon from '../em-icon/em-icon.vue'
 import type { EmMessageItem } from '../../libs/types'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLongPressClickGuard } from '../../libs/use/useLongPressClickGuard'
+import { PLATFORM_CAPABILITIES } from '../../libs/platform'
 import { formatVideoDuration } from '../../libs/utils/time'
 
 interface Props {
@@ -62,8 +65,12 @@ const sizeStyle = computed(() => {
 
 const durationText = computed(() => formatVideoDuration(props.message.duration))
 
+// 播放能力按平台显隐（见 platform.ts）：不支持的端不渲染播放按钮、不发 preview，避免点击无反馈
+const canPreview = PLATFORM_CAPABILITIES.videoPreview
+
 // 点击行为纯 emit 透传（与 em-image-message 对齐）：默认播放/预览逻辑由宿主（em-chat-page 的 preview 监听）实现
 function onPlay(): void {
+  if (!canPreview) return
   if (shouldSkipClick()) return
   emit('preview', props.message)
 }

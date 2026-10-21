@@ -32,13 +32,14 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **症状**：输入框聚焦后整个页面上移，顶部自绘导航栏被推出屏幕。
 - **根因**：**uni-app x 没有经典 uni-app 的 adjustResize/adjustPan 体系，`pages.json` 的 `app-plus.softinputMode` 在 x 端无效**（配了也从未生效）。x 端上推由 input 组件 `adjust-position`（默认 true）控制：输入框在 scroll-view 之外时 transform 上移**整个页面**（输入框在 scroll-view 内才只滚动容器）。
 - **解法**（对齐 hello-uni-app-x `keyboard-adjust` 官方示例）：input 置 `:adjust-position="false"` 关系统上推 → 用键盘高度手动顶起底部输入栏（flex column 下消息区自动压缩，nav-bar 不动）。本库已封装 `libs/use/useKeyboardHeight.ts` + `em-chat-inputbar` 落地。
-- **要点**：iOS/鸿蒙上报键盘高度**已含底部安全区，须扣除**（composable 内已处理，Android/小程序不扣）；`@blur` 清零兜底部分端收起不补发 0 高度事件；H5 端 `adjust-position` 无效（浏览器自管 resize，行为不变）。
+- **要点**：iOS/鸿蒙上报键盘高度**已含底部安全区**，但「面板高度」与「上推 margin」要用不同口径——面板扣安全区、上推直接用上报值（鸿蒙已实测踩坑，见 4d）；`@blur` 清零兜底部分端收起不补发 0 高度事件；H5 端 `adjust-position` 无效（浏览器自管 resize，行为不变）。
 - **遗留**：会话页/联系人页搜索聚焦同因顶飞，fix 待铺。
 
 ### 4a. H5 运行时没有 `uni.onKeyboardHeightChange`（聊天页白屏 P0，2026-10-20 修复）
 - **症状**：H5 登录后点会话，聊天页空白；控制台 `TypeError: uni.onKeyboardHeightChange is not a function`。App/小程序正常。
 - **根因**：uni-app x 的 H5 运行时未实现该 API，且编译器只重写它认识的 API，不认识的 `uni.*` 会原样留成裸全局；H5 的 `window.uni` 只有统计 `report`。该调用在 `useKeyboardHeight` 顶层、又被 `em-chat-page`/`em-chat-inputbar` 的 setup 立即执行，异常直接打断整页挂载。
 - **解法**：`useKeyboardHeight` 用 `#ifndef WEB` 包住 on/off 注册；H5 分支不监听（浏览器 visualViewport 自管）。验证口径：H5 产物所有 chunk 中 `onKeyboardHeightChange` 出现次数必须为 0，并用未登录 mock 页把聊天页挂起来做运行时冒烟。
+- **对照**：同一文件内 `uni.hideKeyboard()` 在 H5 运行时**有**实现（`defineAsyncApi("hideKeyboard")` = blur 当前 input），App（含鸿蒙 4.23+）/微信小程序亦支持，可放心用于「点击聊天区收键盘」这类场景；但**不要据此推断其它键盘 API 也在 H5 有**（`onKeyboardHeightChange` 就是反例）。
 - **纪律**：H5 新增 uni API 前先确认运行时是否实现；不确认就条件编译 + 可选调用，禁止裸调。
 
 ### 4b. H5 长按后仍派发 click（菜单与点击同时触发）
@@ -46,6 +47,26 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **根因**：uni-app 的 longpress 只是 350ms 定时器派发的自定义事件，没有 preventDefault，也不会抑制 touchend 后的原生 click；`@longpress` + `@click` 同元素必然双触发（Chrome 实测点击序列 `touchstart → longpress → touchend → click`）。
 - **解法**：`libs/use/useLongPressClickGuard.ts`——touchstart 记时，click 时按住 ≥350ms 视为长按抬手并吞掉；桌面鼠标/键盘 click 无 touchstart 不受影响。已接入会话条目、好友列表行、图片/语音/视频/文件气泡。
 - **纪律**：任何同时有 `@longpress` 与 `@click` 的元素都套该守卫，不要用“longpress 标记位 + 超时”方案（长按持有时长不定，会误伤或漏放）。
+
+### 4c. 长页面只给根节点 `height: 100%` → 内容被裁、页面「能滚却不滚」（Android 实测，2026-10-20）
+- **症状**：tabBar 页面（demo「我的」）内容明显超过一屏，上下滑完全不动；最后一行/底部按钮像被 hidden，tabBar 正好压在内容上。`uiautomator` 里页面原生 ScrollView `scrollable=false`。
+- **根因**：页面根节点写死 `height: 100%`（= 可视区高度）且没有 scroll-view。超出根节点的子内容被裁掉，App 原生页面滚动容器只量到根节点高度（恰好一屏），判定「无溢出」所以不滚。H5 由浏览器滚动兜底，因此只有 App 暴露；tabBar 只是减少可视高度、让问题更早出现，**不是 tabBar 遮挡**（App 页面可视区已扣除 tabBar，实测 scroll-view 底边正好止于 tabBar 上沿）。
+- **解法**：长页面必须显式用 scroll-view 承载内容——根 `display:flex; flex-direction:column; height:100%` + `.xxx__scroll { flex:1; height:0 }`（会话/联系人页本来就是这套，正常）。demo「我的」已按此修复。备选：根节点改 `min-height:100%`，让页面容器能量到真实内容高度（依赖页面级滚动，不如 scroll-view 可控）。
+- **纪律**：App 页面内容可能超过一屏时，禁止只给根节点 `height:100%` 就结束；必须给 scroll-view 明确高度（`flex:1` + `height:0`）。排查时先看根节点是否固定 100% + 有没有 scroll-view，再看 scroll-view 底边是否止于 tabBar 上沿。
+
+### 4d. 鸿蒙键盘「面板口径」被当成「上推口径」→ 输入栏顶起了但仍被键盘压住一截（鸿蒙实测，2026-10-21）
+- **症状**：聊天页输入框聚焦，输入栏确实上移了，但底部仍被键盘盖住一截（实测 84px / 28vp：输入框只露出上半部分，发送键下半截被压），H5/Android 不复现。
+- **根因**：键盘上报值有**两种口径**，原实现只算了一种就复用：
+  - **面板口径** = 面板对齐用的高度（历史口径：iOS/鸿蒙上报值含底部安全区、面板自身还有 safe-bottom padding，故扣掉安全区后交给 `height`；本次只复用该口径，不改面板看感）。
+  - **上推口径** = 从屏幕底边算起的实际遮挡高度。App 端页面边到边（页面底 = 屏幕底），要的是键盘画到屏幕底的那一段。
+  - 鸿蒙实测（6.0.1 / API 20，25PVB24711005055，density 3）：上报 314vp == 屏幕高 804vp − 键盘上沿 490vp，**就是实际遮挡高度（含手势导航条 28vp）**。原代码把面板口径（314−28=286vp）直接写进 `margin-bottom` → 输入栏底边落在键盘上沿下方 84px。
+- **判定方法（可复用，三个数一对）**：
+  - `hdc shell "uitest dumpLayout -p /data/local/tmp/l.json"` 取输入栏根节点 bounds（bottom 会被键盘裁到键盘上沿，top 是真实值）→ `margin-bottom = 屏幕高 − (root.top + root.height)`；
+  - `hdc shell snapshot_display -f /data/local/tmp/s.jpeg` 截图找键盘面板上沿 → `实际遮挡 = 屏幕高 − 键盘上沿`；
+  - `hdc shell "hidumper -s WindowManagerService -a '-a'"` 看应用窗口 rect（0..screenHeight 即边到边）与手势导航条窗口 rect（本机 84px）；`hidumper -s DisplayManagerService` 看 Density。
+  - 判据：`margin == 实际遮挡` 才对；`margin == 实际遮挡 − 安全区` 就是把面板口径当上推口径。
+- **解法**：`useKeyboardHeight` 拆两个 ref——`keyboardHeight`（面板口径 = 上报值 − 安全区，iOS/鸿蒙）与 `keyboardLift`（上推口径 = 上报值，App 全端）；`em-chat-inputbar` 的 `margin-bottom` 用 `keyboardLift`、面板 `height` 仍用 `keyboardHeight`；blur / `hideKeyboard` 统一 `resetKeyboardHeight()` 一起清零。iOS 的上推口径暂沿用旧值（未真机验，见 STATUS 待验）。
+- **纪律**：同一份 `uni.onKeyboardHeightChange` 值不要同时喂给「面板高度」和「margin-bottom」——两者语义不同；改用 `margin-bottom` 前先按上面的判定方法量一次。OS 大版本升级后复测。
 
 ### 5. `uni.onXxx` 反注册签名不同（监听泄漏）
 - **症状**：按经典 uni-app 写法 `uni.offXxx(callback)` 编译告警，运行时不解绑，反复进出页面回调 N 次。
@@ -64,6 +85,20 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **解法**：凡给原生 button 写了 `height` + `line-height`，必须同时 `padding-top: 0; padding-bottom: 0`（官方推荐写法；`padding: 0 12px` 这类简写已含竖直 0，天然正常）。
 - **现状**：本库组件一律用 `em-button`（view + text + flex `align-items:center`，不走原生 button）→ 免疫；demo 原生 button 已按上述修完（login / mine / style-lab），contact / spike 原本就是 `padding: 0 xx` 故无此 bug。
 - **纪律**：ucss 只有 class 选择器、App 端样式不继承，写不出全局 `button {}` 复位——约束只能落在每个 button 的 class 上；新写原生 button（仅 mp 开放能力才需要）必自查 height / line-height / padding 三件套。
+
+### 5c. App 端首屏白屏：store 反向依赖页面 chunk → ESM 循环（`Xxx is not initialized`，鸿蒙实测 2026-10-21）
+- **症状**：鸿蒙真机启动白屏，控制台 `conversationStore is not initialized`，栈为 `at EmKitImpl entry (libs/index.js:22:26)` + `at func_main_0 (libs/index.js:342:15)`；报错行恰是 `this.conversations = conversationStore`。H5/小程序常不复现，Android/iOS 属于同一编译管线，同样有风险。
+- **根因**（不是 store 写法错）：App/鸿蒙编译把 TS 降级辅助函数（`__values` 等）**提升到共享 chunk**。`libs/store/conversation.ts` 里一句 `for (const item of conversationStore.items)` 让 `__values` 落进 `components/pages/em-chat-page/em-chat-page.js`，产物因此多出一条反向 import：`libs/store/conversation.js → components/pages/em-chat-page/em-chat-page.js`。完整循环：`libs/index → chat/index → store/conversation → em-chat-page → libs/index`。首屏页面（demo 是 `pages/login`，经 `common/theme` 先摸到 store/conversation）进入后，循环回到 `libs/index` 执行 `new EmKitImpl()` 时 `conversationStore` 仍是 TDZ 未初始化 → 抛错 → 整页挂载失败 → 白屏。
+- **判定方法**（产物就是 ESM，可静态查）：直接跑 `node scripts/check-app-module-graph.mjs`（零依赖，默认扫 `demo/unpackage/dist/dev/.app-harmony/assets`，也可传 App 产物目录）——命中 `libs → components` 反向 import 或 libs/index 参与的循环即 exit 1 并打印链路。手工口径：① 在 App 产物 `assets/uni_modules/easemob-uikit-uni/libs/` 里 grep `from "../../components/`；② 从各页面/App 入口模拟 ESM 求值（模块 state 1=求值中 / 2=完成），看 `libs/index.js` body 执行时 `store/conversation.js` 是否仍在求值中。本机修复前只有 1 条循环，`pages/login/login.js` 等 8 个入口必现。
+- **解法**：**libs 内禁用 for-of / for-in**（改 `forEach` 或索引 `for`），消除 `__values` 这类被提升的 helper；`em-chat-page` 里唯一的 for-of（字符串按码点计宽）也一并改索引 + 代理对跳过。改后重跑同一检查：循环 0 条、所有入口模拟 ok。
+- **纪律**：libs 模块（尤其 store）必须保持「零反向依赖组件」；新增 for-of 或其它会触发 helper 提升的语法前，先确认产物里没有 `libs → components/pages` 的 import。`components/` 下的 `.vue/.uvue` 也建议不用 for-of，避免 helper 落点随编译批次漂移再次串成环。
+
+### 5d. `<text>` 内 v-if 增删子 text → 整条气泡空白（鸿蒙实测 2026-10-21，M2.13 流式光标）
+- **症状**：AI 流式气泡分片增长正常（末尾带 `▍` 光标），**流结束瞬间整条气泡变空白**：气泡底色与高度都在（甚至按全文撑开），但一个字也不绘制；该条消息后续一直空白。
+- **根因**：蒸汽端 `<text>` 内用 `v-if` 增删子 `<text>`，**移除子节点后父 text 的字形不再绘制**（布局高度保留、绘制层丢字）。流式光标 `v-if="isStreaming"` 在终态翻 false → 子 text 被移除 → 父 text 全白。不是数据层问题（`message.text` 始终是全文）。
+- **解法**：`text` 内的光标/异常提示改「**常驻子 text + 内容切换**」——节点永远挂载，只把 `'▍'` / i18n 文案 / `''` 作为 computed 文本写进去（`em-text-message` 的 `streamCursorText`/`streamErrorText`，`STREAM_CURSOR_CHAR` 在 constants）。改后真机完成态全文保留、异常态尾部提示正常。
+- **纪律**：`<text>` 内禁止用 `v-if`/`v-else`/`v-for` 增删子 text；需要条件展示就改成常驻节点换内容，或把分支移到 text 外、用 view 承载。
+- **验证口径**：鸿蒙真机装 HAP 后跑聊天页「AI 演示」的完成态 + 异常态，各自等 10s 以上确认文本不消失。
 
 ## 小程序（mp-weixin）
 
@@ -108,6 +143,9 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 | scroll-view scroll-top 超出钳位 | ⚠️ 只钳赋值瞬间，不重钳（禁用大值技巧，用 scroll-into-view 锚点） |
 | 多行 text 倍数行高 | ⚠️ 测量不可靠，一律 px |
 | 含多行 text 的 % max-width 宽度链 | ⚠️ 行尾缺字，改 rpx 定宽 |
+| 长页面根节点 `height: 100%` | ⚠️ 溢出内容被裁、页面不滚；必须 scroll-view（`flex:1` + `height:0`） |
 | `adjust-position` 手动键盘避让 | ✅ 官方支持（App 三端） |
 | `getAndroidView`/`getIOSView` | ⚠️ 蒸汽模式 js 拿不到原生 view，须 uts 插件 |
 | 发送中 spinner 动画 | ⚠️ 降级为静态图标 |
+| for-of / for-in（App 编译降级） | ⚠️ 生成 `__values` 等 helper 并提升到任意 chunk；**libs 内禁用**（会造成 `libs → components/pages` 循环依赖，首屏 `Xxx is not initialized` 白屏） |
+| `<text>` 内 v-if 增删子 text | ❌ 移除子节点后父 text 字形丢失（气泡空白但高度保留）；改常驻子节点换内容 |

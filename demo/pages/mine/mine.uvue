@@ -1,78 +1,83 @@
 <template>
+  <!-- 必须用 scroll-view 承载整页内容：App 端页面根节点高度 = 可视区，内容超出会被根节点裁掉，
+       原生页面滚动容器测不到溢出（tabBar 页面尤其明显），表现为「能滚却不滚、底部像被 hidden」。
+       与 em-conversation-page / em-contact-page 同口径：根 flex column + scroll-view flex:1/height:0 -->
   <view class="mine" :class="themeClass">
-    <view class="mine__header">
-      <em-avatar :src="avatar" :name="nick" :size="56" />
-      <view class="mine__profile">
-        <text class="mine__name">{{ nick }}</text>
-        <text class="mine__status">{{ statusText }}</text>
-      </view>
-    </view>
-
-    <view class="mine__group">
-      <view class="mine__group-head">
-        <text class="mine__group-title">深色模式</text>
-      </view>
-      <view
-        class="mine__cell mine__cell--theme"
-        v-for="option in themeOptions"
-        :key="option.value"
-        @click="onPickTheme(option.value)"
-      >
-        <view class="mine__cell-main">
-          <text class="mine__cell-label">{{ option.label }}</text>
-          <text class="mine__cell-desc">{{ option.description }}</text>
+    <scroll-view class="mine__scroll" scroll-y>
+      <view class="mine__header">
+        <em-avatar :src="avatar" :name="nick" :size="56" />
+        <view class="mine__profile">
+          <text class="mine__name">{{ nick }}</text>
+          <text class="mine__status">{{ statusText }}</text>
         </view>
-        <em-icon
-          :name="themeStore.preference === option.value ? 'circle-checked-filled' : 'circle-empty'"
-          :size="20"
-          :color="themeStore.preference === option.value ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
-        />
       </view>
-    </view>
 
-    <view class="mine__group">
-      <view class="mine__group-head">
-        <text class="mine__group-title">AI 流式消息（M2.13）</text>
-      </view>
-      <view class="mine__cell mine__cell--theme" @click="onToggleStream">
-        <view class="mine__cell-main">
-          <text class="mine__cell-label">流式输出开关</text>
-          <text class="mine__cell-desc">{{ config.enableStreamMessage ? '已启用：分片逐字上屏 + 打字机光标（默认）' : '已禁用：等待完整消息一次性上屏' }}</text>
+      <view class="mine__group">
+        <view class="mine__group-head">
+          <text class="mine__group-title">深色模式</text>
         </view>
-        <em-icon
-          :name="config.enableStreamMessage ? 'circle-checked-filled' : 'circle-empty'"
-          :size="20"
-          :color="config.enableStreamMessage ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
-        />
+        <view
+          class="mine__cell mine__cell--theme"
+          v-for="option in themeOptions"
+          :key="option.value"
+          @click="onPickTheme(option.value)"
+        >
+          <view class="mine__cell-main">
+            <text class="mine__cell-label">{{ option.label }}</text>
+            <text class="mine__cell-desc">{{ option.description }}</text>
+          </view>
+          <em-icon
+            :name="themeStore.preference === option.value ? 'circle-checked-filled' : 'circle-empty'"
+            :size="20"
+            :color="themeStore.preference === option.value ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
+          />
+        </view>
       </view>
-      <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
-        <text class="mine__cell-label">流式气泡演示（样式实验室）</text>
-        <text class="mine__cell-arrow">›</text>
-      </view>
-    </view>
 
-    <view class="mine__group">
-      <view class="mine__cell" @click="onOpen('/sub-im/pages/scenario/scenario')">
-        <text class="mine__cell-label">IM 场景实验室</text>
-        <text class="mine__cell-arrow">›</text>
+      <view class="mine__group">
+        <view class="mine__group-head">
+          <text class="mine__group-title">AI 流式消息（M2.13）</text>
+        </view>
+        <view class="mine__cell mine__cell--theme" @click="onToggleStream">
+          <view class="mine__cell-main">
+            <text class="mine__cell-label">流式输出开关</text>
+            <text class="mine__cell-desc">{{ config.enableStreamMessage ? '已启用：分片逐字上屏 + 打字机光标（默认）' : '已禁用：等待完整消息一次性上屏' }}</text>
+          </view>
+          <em-icon
+            :name="config.enableStreamMessage ? 'circle-checked-filled' : 'circle-empty'"
+            :size="20"
+            :color="config.enableStreamMessage ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
+          />
+        </view>
+        <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
+          <text class="mine__cell-label">流式气泡演示（样式实验室）</text>
+          <text class="mine__cell-arrow">›</text>
+        </view>
       </view>
-      <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
-        <text class="mine__cell-label">样式实验室</text>
-        <text class="mine__cell-arrow">›</text>
-      </view>
-      <view class="mine__cell" @click="onOpen('/sub-im/pages/spike/spike')">
-        <text class="mine__cell-label">SDK 连通性 Spike</text>
-        <text class="mine__cell-arrow">›</text>
-      </view>
-      <view class="mine__cell" @click="onExportLogs">
-        <text class="mine__cell-label">导出调试日志</text>
-        <text class="mine__cell-arrow">›</text>
-      </view>
-    </view>
 
-    <view class="mine__footer">
-      <button class="mine__logout" @click="onLogout">退出登录</button>
-    </view>
+      <view class="mine__group">
+        <view class="mine__cell" @click="onOpen('/sub-im/pages/scenario/scenario')">
+          <text class="mine__cell-label">IM 场景实验室</text>
+          <text class="mine__cell-arrow">›</text>
+        </view>
+        <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
+          <text class="mine__cell-label">样式实验室</text>
+          <text class="mine__cell-arrow">›</text>
+        </view>
+        <view class="mine__cell" @click="onOpen('/sub-im/pages/spike/spike')">
+          <text class="mine__cell-label">SDK 连通性 Spike</text>
+          <text class="mine__cell-arrow">›</text>
+        </view>
+        <view class="mine__cell" @click="onExportLogs">
+          <text class="mine__cell-label">导出调试日志</text>
+          <text class="mine__cell-arrow">›</text>
+        </view>
+      </view>
+
+      <view class="mine__footer">
+        <button class="mine__logout" @click="onLogout">退出登录</button>
+      </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -108,6 +113,7 @@ const statusText = computed(() => {
   switch (EmKit.state.status) {
     case CONNECTION_STATUS.ONLINE: return '已连接'
     case CONNECTION_STATUS.CONNECTING: return '连接中…'
+    case CONNECTION_STATUS.RECONNECTING: return '重连中…'
     default: return '未连接'
   }
 })
@@ -149,6 +155,13 @@ async function onLogout() {
   flex-direction: column;
   height: 100%;
   background-color: var(--em-bg-secondary);
+}
+
+/* flex:1 + height:0 是蒸汽端 scroll-view 的可滚动高度来源（同 em-*-page__scroll 口径）；
+   只写 flex:1 不给明确高度，真机会按内容撑开而不滚动 */
+.mine__scroll {
+  flex: 1;
+  height: 0;
 }
 
 .mine__header {

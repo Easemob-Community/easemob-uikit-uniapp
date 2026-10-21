@@ -1,5 +1,40 @@
 # changelog
 
+## 1.0.0-rc.1（2026-10-21）
+
+首个 1.0 候选版本。功能范围冻结为「单聊 + 群聊 + 联系人 + 多场景扩展 + AI 流式消息」，五端为 uni-app x（Android / iOS / 鸿蒙）、H5、微信小程序。
+
+### 新增与修复
+
+- **鸿蒙软键盘遮挡输入栏**：修复鸿蒙上输入栏顶起后底部仍被键盘压住一截（实测少顶 28vp / 84px）。`useKeyboardHeight` 拆分「面板口径」（`keyboardHeight`）与「上推口径」（`keyboardLift`），输入栏 `margin-bottom` 改用后者、面板高度仍用前者，新增 `resetKeyboardHeight()` 统一清零；iOS 口径未动（待真机验证）。
+- **平台能力显隐**：新增 `PLATFORM_CAPABILITIES`（`videoPreview` / `filePick` / `fileOpen`）。视频播放仅 H5 可用，小程序/App 隐藏播放按钮；文件发送在 App 隐藏入口；文件打开/下载全端暂未接入，文件气泡改为纯展示，不再弹「暂不支持」。
+- **未读清零**：进会话、当前会话收消息、离开聊天页三处清理服务端未读（按会话 2s 合批）；修复「读完回列表/冷启动后未读复活」。新增 `EmKit.clearConversationUnread(conversationId, chatType)` 供宿主自建入口兜底。
+- **Token / 连接生命周期**：`EmKitConfig` 新增 `onTokenWillExpire`（返回新 token 自动续期）与 `onTokenExpired`；新增 `EmKit.renewToken(token)`；`EmKit.state` 新增 `reason` / `errorCode` / `reconnecting` / `reconnectAttempt`，`CONNECTION_STATUS` 新增 `reconnecting`。
+- **连接状态条**：`em-conversation-page` / `em-chat-page` 顶部内置 `em-connection-banner`，按 `status/reason` 显示连接中、重连中、网络异常、设备超限、Token 过期；新增 `showConnectionBanner` prop 可关闭。
+- **录音兜底**：录音改为单例监听，新增 `onError` 回调（麦克风权限失败 toast）；达到 60s 上限自动停止后按正常语音发送，不再静默丢弃。`startRecord()` 新增可选 `EmRecordOptions`。
+- **日志隐私**：新增 `EmKitConfig.logPayload`（默认 false），好友/群同步原始 payload 仅在 `logLevel='debug'` 且显式开启时序列化入日志；生产默认不再包含 userId/昵称等原始数据。
+- **语言持久化**：新增 `initLocale` / `setLocale` / `getLocale` 与 `EmKit.setLocale`，偏好存 `emkit.locale`；未设置时跟随系统语言（英文环境用 en）。`EmKitConfig.locale` 支持初始化时指定。
+- **列表自同步**：`em-conversation-page` 新增 `autoSync`（默认 true）首次挂载拉会话快照，宿主漏调 `syncConversations` 不再空列表。
+- **引用协议跨 UIKit 互通**：发送同时写入 `ext.msgQuote`（与 vue 版同 key、同结构）与 `ext.emQuote`（0.x uni 兼容）；接收优先解析 `msgQuote`，旧消息回落 `emQuote`。`EmQuoteInfo` 新增可选 `thumbUrl`。
+- **聊天页交互**：输入栏 emoji/媒体面板或软键盘展开时，点消息区即收起（`em-chat-inputbar` 新增 `collapseSignal` 信号 props，聊天页点击消息区递增；开面板前自动收键盘，面板与键盘不再叠加占位）。
+- **返回事件契约**：`em-chat-page` 新增 `back` emit 与 `autoBack` prop（默认 `true`，保持原行为；`false` 时只发事件，由宿主接管退场）。
+- **发布物料**：插件版本 `1.0.0-rc.1`；平台矩阵按 HBuilderX 4.71+ 新规范更新；补充暗黑模式/多语言/宽屏声明、相机/相册/麦克风权限与数据声明；根目录补 MIT `LICENSE`；demo 清除签名路径与密码。
+
+### 升级说明（0.x → 1.0）
+
+- 0.x 未正式发布，按 1.0 文档直接接入即可。
+- 若从仓库旧提交升级：引用消息会双写 `msgQuote` + `emQuote`，新旧客户端可互读；业务 ext 不要占用这两个 key。
+- `em-chat-page` 默认返回行为不变；如需拦截返回（未保存表单等），传 `:auto-back="false"` 并监听 `@back`。
+- `demo/manifest.json` 不再包含鸿蒙签名配置，本地真机运行需在 HBuilderX 中重新配置（见 `docs/HARMONY-REALDEVICE-RUN.md`），签名材料禁止提交。
+
+### 已知限制（1.0）
+
+- 视频播放仅 H5；App/小程序隐藏播放入口，仅展示封面与时长。
+- 文件打开/下载全端未接入，文件气泡为纯展示。
+- App 端暂不支持发送文件（无通用文件选择器），入口已隐藏。
+- 语音发送仅 App/小程序；H5 入口隐藏。
+- H5 为移动端布局，未做桌面宽屏适配。
+
 ## 0.0.1（未发布）
 
 - 仓库立项，见 PLAN.md

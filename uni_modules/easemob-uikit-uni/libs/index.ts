@@ -12,6 +12,7 @@ import { clearMessages, messageStore } from './store/message'
 import { clearUsers, userStore } from './store/user'
 import { copyText, exportTextFile } from './platform'
 import { clearLogBuffer, createLogger, getLogText } from './utils/logger'
+import { getLocale as getActiveLocale, setLocale as setActiveLocale } from './use/useLocale'
 import type { ConversationTypeValue } from './constants'
 import type {
   CreateGroupParams,
@@ -20,9 +21,11 @@ import type {
   EmGroupMember,
   EmKitConfig,
   EmLoginOptions,
+  EmLocaleName,
   EmMessageHandler,
   EmMessageItem,
-  EmQuoteInfo
+  EmQuoteInfo,
+  EmTokenRenewalResult
 } from './types'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from './platform'
 
@@ -80,6 +83,15 @@ class EmKitImpl {
     return this.client.whenReady()
   }
 
+  /** 切换界面语言（持久化；运行时立即生效） */
+  setLocale(locale: EmLocaleName): void {
+    setActiveLocale(locale)
+  }
+
+  getLocale(): EmLocaleName {
+    return getActiveLocale()
+  }
+
   async login(options: EmLoginOptions): Promise<void> {
     await this.client.whenReady()
     await this.client.login(options)
@@ -89,6 +101,11 @@ class EmKitImpl {
     this.contact.syncContacts().catch(() => {})
     // 群快照读内存（SDK 后台同步），失败不阻塞登录链路
     this.group.getJoinedGroups().catch(() => {})
+  }
+
+  /** Token 续期：宿主从服务端换到新 token 后调用；配置 onTokenWillExpire 时可由 UIKit 自动续 */
+  async renewToken(token: string): Promise<EmTokenRenewalResult> {
+    return this.client.renewToken(token)
   }
 
   // 登出：先退出当前会话，再断开 SDK，最后清空所有账号私有状态。
@@ -159,6 +176,11 @@ class EmKitImpl {
   async enterConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     await this.client.whenReady()
     return this.chat.enterConversation(conversationId, chatType)
+  }
+
+  /** 清会话未读（本地立即归零 + 服务端异步清零）；聊天页离页兜底与宿主自定义入口复用 */
+  clearConversationUnread(conversationId: string, chatType: ConversationTypeValue, force = false): void {
+    this.chat.clearConversationUnread(conversationId, chatType, force)
   }
 
   async pinConversation(conversationId: string, chatType: ConversationTypeValue, pinned: boolean): Promise<void> {
@@ -400,8 +422,8 @@ export const EmKit = new EmKitImpl()
 
 export * from './types'
 export * from './constants'
-export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio } from './platform'
-export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult } from './platform'
+export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio, PLATFORM_CAPABILITIES, isPageVisible } from './platform'
+export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult, EmRecordOptions, EmPlatformCapabilities } from './platform'
 export { useNamespace } from './use/useNamespace'
 export {
   useTheme,
@@ -412,7 +434,7 @@ export {
   THEME_STORAGE_KEY
 } from './use/useTheme'
 export type { EmThemeInitOptions, EmThemeSyncOptions } from './use/useTheme'
-export { useLocale, mergeMessages } from './use/useLocale'
+export { useLocale, mergeMessages, initLocale, setLocale, getLocale, LOCALE_STORAGE_KEY } from './use/useLocale'
 export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
 export { nextZIndex } from './use/usePopup'
 export { useConfig, setConfig } from './store/config'
@@ -433,5 +455,5 @@ export type { EmMentionSegment } from './utils/mention'
 export { isStreamActive, isStreamTerminal, isPlainTextStream, isRichStream } from './utils/stream'
 export { ensureSdkModule, setSdkLoader, setSdkModule } from './client/sdk'
 export type { EmSdkModule } from './client/sdk'
-export { createLogger, setLogLevel, getLogLevel, getLogText, clearLogBuffer, getLogBufferSize } from './utils/logger'
+export { createLogger, setLogLevel, getLogLevel, getLogText, clearLogBuffer, getLogBufferSize, logPayload } from './utils/logger'
 export type { EmLogger } from './utils/logger'

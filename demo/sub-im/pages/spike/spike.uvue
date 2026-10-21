@@ -93,6 +93,7 @@ runtimeMode = ref('蒸汽模式（VUE3-VAPOR）')
 const statusText = computed(() => {
   switch (EmKit.state.status) {
     case CONNECTION_STATUS.CONNECTING: return '连接中…'
+    case CONNECTION_STATUS.RECONNECTING: return '重连中…'
     case CONNECTION_STATUS.ONLINE: return `已连接（${EmKit.state.userId}）`
     case CONNECTION_STATUS.CLOSED: return '已断开'
     default: return '未登录'

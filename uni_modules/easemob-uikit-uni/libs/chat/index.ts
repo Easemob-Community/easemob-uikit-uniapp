@@ -12,6 +12,7 @@ import { connectionStore } from '../store/connection'
 import { conversationStore } from '../store/conversation'
 import { createLogger } from '../utils/logger'
 import type { EmKitConfig, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
+import { isPageVisible } from '../platform'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
 import { bindUserInfo, ensureUserInfos } from './user-info'
 import { EmConversationDomain } from './conversation'
@@ -54,8 +55,11 @@ export class EmChat {
             conversationStore.atMeByConversationId[item.conversationId] = true
           }
         }
-        // 在当前会话收到对方消息：即时回已读回执（群聊在 sendReadReceipts 内部短路）
-        if (!item.self && item.conversationId === this.conversations.currentConversationId) {
+        // 在当前会话收到对方消息：清服务端未读（按会话合批）+ 即时回已读回执（群聊在 sendReadReceipts 内部短路）。
+        // 不清未读的话，离开会话后 refreshSessionList/冷启动会把刚读过的会话又显示成未读（见 clearUnread 注释）
+        // H5 标签页隐藏时用户并未看到，保持未读、不发回执（App/小程序 isPageVisible 恒 true，行为不变）
+        if (!item.self && item.conversationId === this.conversations.currentConversationId && isPageVisible()) {
+          this.conversations.clearUnread(item.conversationId, item.chatType)
           this.messages.sendReadReceipts(item.conversationId, item.chatType).catch(() => {})
         }
       },
@@ -152,6 +156,11 @@ export class EmChat {
 
   leaveConversation(): void {
     this.conversations.leaveConversation()
+  }
+
+  /** 清会话未读：本地 store 立即归零 + 服务端异步清零（宿主/聊天页离页兜底用） */
+  clearConversationUnread(conversationId: string, chatType: ConversationTypeValue, force = false): void {
+    this.conversations.clearUnread(conversationId, chatType, force)
   }
 
   // 登出/换账号：清域内计时器、失败消息的本地 File 缓存与当前会话游标

@@ -41,6 +41,9 @@ export const STREAM_MESSAGE_STATUS = {
 
 export type StreamMessageStatusValue = (typeof STREAM_MESSAGE_STATUS)[keyof typeof STREAM_MESSAGE_STATUS]
 
+/** 流式打字机光标字符（em-text-message 消费）：蒸汽端不支持 CSS 动画，静态常亮降级 */
+export const STREAM_CURSOR_CHAR = '▍'
+
 /** 流式消息业务自定义类型（stream.customType）：内核只内置纯文本渲染，
  *  markdown 等富格式由宿主经 em-chat-page 的 #stream-message 插槽接管 */
 export const STREAM_CUSTOM_TYPE = {
@@ -59,7 +62,10 @@ export type ConversationTypeValue = (typeof CONVERSATION_TYPE)[keyof typeof CONV
 
 /** 消息 ext 自定义 key */
 export const MESSAGE_EXT_KEY = {
-  QUOTE: 'emQuote',
+  /** 引用（1.0 起主协议）：与 vue 版 `ext.msgQuote` 同 key、同结构，跨 UIKit 互认 */
+  QUOTE: 'msgQuote',
+  /** 引用（0.x 兼容）：仅用于接收旧 uni 版消息 / 发送时双写，新代码不要直接读写 */
+  QUOTE_LEGACY: 'emQuote',
   // @提及列表（userId 数组）：与 vue 版同 key，跨 UIKit 互认
   MENTION: 'em_at_list'
 } as const
@@ -76,6 +82,8 @@ export type CmdActionValue = (typeof CMD_ACTION)[keyof typeof CMD_ACTION]
 export const CONNECTION_STATUS = {
   IDLE: 'idle',
   CONNECTING: 'connecting',
+  /** 已登录后的自动重连中（SDK onConnecting attempt>0）；与首次连接区分，宿主可据此显示「重连中」 */
+  RECONNECTING: 'reconnecting',
   ONLINE: 'online',
   CLOSED: 'closed'
 } as const
@@ -136,6 +144,9 @@ export type ConversationTabKeyValue = (typeof CONVERSATION_TAB_KEY)[keyof typeof
 
 /** PushManager 批量查询会话免打扰（getConversationSilentModes）单次上限，SDK 硬限制 20 */
 export const CONVERSATION_SILENT_MODE_BATCH_SIZE = 20
+
+/** 当前会话收消息清服务端未读的合批间隔（毫秒）：避免每条消息一次 REST，同时保证离页后未读不复活 */
+export const CONVERSATION_UNREAD_CLEAR_THROTTLE = 2000
 
 /** 会话筛选 tab 默认全集与顺序（对齐 vue DEFAULT_CONVERSATION_TABS） */
 export const DEFAULT_CONVERSATION_TABS: ConversationTabKeyValue[] = [
