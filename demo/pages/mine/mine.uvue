@@ -36,7 +36,7 @@
 
       <view class="mine__group">
         <view class="mine__group-head">
-          <text class="mine__group-title">AI 流式消息（M2.13）</text>
+          <text class="mine__group-title">AI 流式消息</text>
         </view>
         <view class="mine__cell mine__cell--theme" @click="onToggleStream">
           <view class="mine__cell-main">
@@ -65,7 +65,7 @@
           <text class="mine__cell-arrow">›</text>
         </view>
         <view class="mine__cell" @click="onOpen('/sub-im/pages/spike/spike')">
-          <text class="mine__cell-label">SDK 连通性 Spike</text>
+          <text class="mine__cell-label">SDK 连通性自检</text>
           <text class="mine__cell-arrow">›</text>
         </view>
         <view class="mine__cell" @click="onExportLogs">
@@ -132,9 +132,9 @@ async function onExportLogs() {
   if (result === 'download') {
     content = '日志文件已开始下载，请到浏览器下载目录查看'
   } else if (result === 'clipboard') {
-    content = '写文件失败，日志全文已复制到剪贴板，粘贴到任意文本编辑器查看'
+    content = '写文件失败（原因已记入控制台 emkit 日志），日志全文已复制到剪贴板，粘贴到任意文本编辑器查看'
   } else {
-    content = `日志已写入用户数据目录：\n${result}\n\n全文已同时复制到剪贴板，可直接粘贴导出`
+    content = `日志已写入应用沙盒（文件管理器不可见）：\n${result}\n\n全文已同时复制到剪贴板，可直接粘贴导出`
   }
   uni.showModal({ title: '导出调试日志', content, showCancel: false })
 }

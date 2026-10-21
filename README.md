@@ -28,6 +28,7 @@
 uni_modules/easemob-uikit-uni/   # UIKit 插件本体（组件前缀 em-）
 demo/                            # 演示工程（uni-app x，manifest.json 开启 vapor）
 docs/                            # 文档（含 SDK 五端连通性 spike 记录）
+skills/                          # 宿主接入 Agent Skills（分发给接入方 AI）
 scripts/                         # 编译/发布脚本
 ```
 
@@ -46,6 +47,20 @@ scripts/                         # 编译/发布脚本
 9. 遇到空白页先检查页面高度链与 `navigationStyle`。
 
 > 常见错误：页面根节点没有确定高度 → 列表/输入栏 0 高；聊天页未关原生导航 → 双导航栏；小程序未接分包 → `module 'sub-sdk/im-sdk.js' is not defined`。
+
+## AI 接入（Agent Skills）
+
+仓库 [`skills/`](./skills/README.md) 提供 8 份**面向宿主接入方**的 Agent Skills：总纲、会话/聊天页、通讯录/群组、业务卡片扩展、AI 流式、主题/i18n、小程序 SDK 分包、排错。每份 `SKILL.md` 含触发条件、可复制代码、组件契约与验收清单。
+
+```bash
+# 复制到宿主工程（Claude Code / 通用 Agent Skills 约定）
+cp -R skills/em-host-* your-app/.claude/skills/
+cp -R skills/em-host-* your-app/.agents/skills/
+```
+
+也可以不复制，直接把目录指给 AI：**「按 `skills/em-host-integration/SKILL.md` 接入环信 IM」**。技能地图与推荐用法见 [`skills/README.md`](./skills/README.md)；技能结构可跑 `node scripts/check-skills.mjs` 校验。
+
+> `skills/` 是给**接入方**的；`.agents/skills/` 是给 **UIKit 贡献者**的开发技能，两者不要混用。
 
 ## 最小连通性验证（仓库 demo）
 
@@ -84,7 +99,7 @@ const { conversationUnread, contactRequestUnread } = useUnreadCounts()
 const tabBarBadge = useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })
 onShow(() => tabBarBadge.sync()) // 从聊天页返回 tab 页时补同步（平台要求当前页必须是 tabBar 页）
 
-// 3) 单会话未读（业务入口角标，P1）：
+// 3) 单会话未读（业务入口角标）：
 const peerUnread = useConversationUnreadCount(peerUserId)
 ```
 
@@ -127,7 +142,7 @@ UIKit 已在 `em-conversation-page` / `em-chat-page` 顶部内置连接状态条
 
 ## 多场景扩展（业务直进会话）
 
-客服 / 医疗 / 招聘 / 二手交易共享「业务页面放入口 → 直进 1v1 聊天页」模型，无需会话列表。P0/P1 扩展点：
+客服 / 医疗 / 招聘 / 二手交易共享「业务页面放入口 → 直进 1v1 聊天页」模型，无需会话列表。可用扩展能力：
 
 | 能力 | 用法 |
 |---|---|
@@ -146,7 +161,7 @@ UIKit 已在 `em-conversation-page` / `em-chat-page` 顶部内置连接状态条
 
 **demo 体验**：「我的」→「IM 场景实验室」→ 6 个场景卡片（在线客服/医患/二手交易/招聘/家校/兴趣社群）→ 业务详情页选对端或群组（页面底部可预览该场景的输入栏发卡入口）→ 进入会话后输入栏上方直接「发订单/发病例/换手机号」，也可用「场景开关」实时切换横幅/标题/详情入口/快捷回复/业务菜单/输入栏入口，并发送 14 种**宿主自绘**卡片、带 ext 文本与系统提示。列表页的「自定义卡片预览」无需登录，可直接看 14 种宿主卡片与「未知事件回落」。
 
-## AI 流式消息（Stream Message，M2.13）
+## AI 流式消息（Stream Message）
 
 对齐 vue 版「内核薄、插件厚」：**数据链路与纯文本流式渲染内置、零配置可用**；markdown 等富格式由宿主插槽接管。
 典型场景：AI 客服 / IM 内 AI 对话 / 分段生成内容。流式内容由**业务服务端**经环信 RESTful 下发，客户端只收不发。
@@ -258,43 +273,43 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 - 需要排查同步/资料问题时显式开 `logLevel: 'debug', logPayload: true`；开启后日志可能包含 userId、昵称、群名等，导出前请脱敏，生产环境用完即关。
 - `EmKit.exportLogs()` 导出内存环形缓冲（2000 行）；生产包建议不向终端用户暴露导出入口。
 
-## 路线图与能力边界
+## 能力与边界
 
-已落地（一期，里程碑与验收口径见 [PLAN.md](./PLAN.md)，逐日进度见 [docs/STATUS.md](./docs/STATUS.md)）：
+当前版本已提供：
 
 - 单聊全链路：会话列表（置顶/免打扰/未读/草稿）、聊天页（文本/图片/语音/视频/文件、引用/撤回/失败重发/已读回执/typing）、聊天详情、通讯录（好友列表/好友申请）
-- **群基础（M2.9）**：群列表、建群、群聊（公告条 / @ 提及 / 成员昵称行）、群详情管理（公告编辑 / 改名 / 管理员 / 转让 / 退群解散 / 全员禁言 / 成员管理 / 邀请入群）、联系人页入口化（新请求 / 群组 / 好友列表三入口）
-- **多场景扩展 P0（M2.11）**：`sendText` 业务 ext、`sendCustom` 自定义消息、`#banner` 顶部业务条、`title`/`showAction`、`insertLocalNotice` 系统提示灰条
-- **多场景扩展 P1（M2.12）**：单会话未读 API、`em-quick-reply-bar` 快捷回复条、`extraMessageMenus` 业务长按动作
-- **AI 流式消息（M2.13）**：`onStreamMessage` 分片合并/丢片补偿、纯文本打字机光标与异常提示、`enableStreamMessage`/`streamThrottle` 配置、`EmKit.onStreamMessage` 订阅、`#stream-message` 富格式插槽
-- **自定义卡片插槽化（M2.14）**：内核只保留 `sendCustom` + `#custom-message` 插槽，不内置卡片组件/schema；Demo 提供宿主侧 `demo-card` 参考实现（14 种卡片、字段/角标/主次按钮、手机号脱敏、未知回落）与免登录预览页
-- **输入栏业务入口（M2.15）**：`em-chat-page` 新增 `#input-toolbar` 插槽；Demo 用 `demo-composer-bar` 注入场景化「发订单/发工单/发病例/发简历/换手机号」等入口，点击即发对应自定义卡片，入口开关可实时切换
-- **1.0 体验收口**：连接状态条（重连/断开/被踢）、聊天首屏骨架与历史失败重试、非当前会话消息内存上限、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话/好友列表 `autoSync`
+- **群组**：群列表、建群、群聊（公告条 / @ 提及 / 成员昵称行）、群详情管理（公告编辑 / 改名 / 管理员 / 转让 / 退群解散 / 全员禁言 / 成员管理 / 邀请入群）、联系人页入口化（新请求 / 群组 / 好友列表三入口）
+- **多场景扩展**：`sendText` 业务 ext、`sendCustom` 自定义消息、`#banner` 顶部业务条、`title`/`showAction`、`insertLocalNotice` 系统提示灰条
+- **多场景增强**：单会话未读 API、`em-quick-reply-bar` 快捷回复条、`extraMessageMenus` 业务长按动作
+- **AI 流式消息**：`onStreamMessage` 分片合并/丢片补偿、纯文本打字机光标与异常提示、`enableStreamMessage`/`streamThrottle` 配置、`EmKit.onStreamMessage` 订阅、`#stream-message` 富格式插槽
+- **自定义卡片**：内核只保留 `sendCustom` + `#custom-message` 插槽，不内置卡片组件/schema；Demo 提供宿主侧 `demo-card` 参考实现（14 种卡片、字段/角标/主次按钮、手机号脱敏、未知回落）与免登录预览页
+- **输入栏业务入口**：`em-chat-page` 新增 `#input-toolbar` 插槽；Demo 用 `demo-composer-bar` 注入场景化「发订单/发工单/发病例/发简历/换手机号」等入口，点击即发对应自定义卡片，入口开关可实时切换
+- **连接与体验**：连接状态条（重连/断开/被踢）、聊天首屏骨架与历史失败重试、非当前会话消息内存上限、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话/好友列表 `autoSync`
 
-二期（M4 起，另行立项）：单条转发、联系人详情页/黑名单、文档站等，见 PLAN.md 第 5 节。一期范围外的功能会在发版时逐条冻结公示，避免重复 issue。
+当前版本不包含：单条转发、联系人详情页/黑名单、群共享文件、公开群入群申请审批、群名片、群已读回执详情、群聊消息搜索、群公告富文本、presence 在线状态。这些能力需要在宿主侧扩展。
 
-### 不做什么（一期，群侧裁剪）
+### 当前版本不包含的群能力
 
-黑名单/白名单管理页、群共享文件、公开群入群申请审批、群名片、群已读回执详情、群聊消息搜索、群公告富文本、presence 在线状态。完整裁剪清单见 PLAN.md 第 2 节与各里程碑「明确不做」。
+黑名单/白名单管理页、群共享文件、公开群入群申请审批、群名片、群已读回执详情、群聊消息搜索、群公告富文本、presence 在线状态。
 
 ### 已知限制
 
 - **@ 提及为追加式插入**：选人后追加到草稿尾部，不支持光标处插入——uni `<input>` 无光标位置 API（无 selectionStart），属平台物理上限。
-- **视频播放（1.0 暂缺）**：仅 H5 支持点击播放（新窗口）；App/小程序暂未接原生播放器，播放按钮已按平台隐藏，气泡保留封面与时长。
-- **文件打开/下载（1.0 暂缺）**：全端暂未接下载/预览，文件气泡为纯展示，点击入口已隐藏。
-- **App 端发送文件（1.0 暂缺）**：App 无通用文件选择器，「文件」入口已隐藏；小程序/H5 不受影响。
-- **H5 桌面宽屏（1.0 暂缺）**：H5 按移动端 rpx 布局，未做 PC 宽屏/多栏适配；插件市场兼容矩阵标为不支持宽屏。
+- **视频播放**：当前版本仅 H5 支持点击播放（新窗口）；App/小程序未接原生播放器，播放按钮已按平台隐藏，气泡保留封面与时长。
+- **文件打开/下载**：当前版本全端未接下载/预览，文件气泡为纯展示，点击入口已隐藏。
+- **App 端发送文件**：App 无通用文件选择器，「文件」入口已隐藏；小程序/H5 不受影响。
+- **H5 桌面宽屏**：H5 按移动端 rpx 布局，未做 PC 宽屏/多栏适配；插件市场兼容矩阵标为不支持宽屏。
 - **录音权限（1.0）**：麦克风权限被拒时只 toast「录音失败，请检查麦克风权限」，不自动跳系统设置（各端设置页差异大）；录音 60s 上限自动停止并按正常语音发送。
 - **日志隐私（1.0）**：原始 payload 默认不写日志；排查时开 `logLevel:'debug'` + `logPayload:true`，导出前自行脱敏。
 - **非当前会话消息上限（1.0）**：非当前会话只保留最近 100 条（`CONVERSATION_MESSAGE_RETAIN_LIMIT`），回会话时重新拉最新页；当前会话单次会话内不裁剪。若业务要求完整本地历史，请自行持久化。
-- 其余平台降级项（蒸汽端 CSS 动画、H5 录音等）见 docs/STATUS.md 各条目「已知降级」。
+- 其余平台差异（蒸汽端 CSS 动画、H5 录音等）见 [docs/PLATFORM.md](./docs/PLATFORM.md)。
 
-### 迁移说明（M2.9 breaking 变更）
+### 迁移说明（chatType 必传）
 
 - `em-contact-page` 由「好友主页」重构为「入口页」（新请求/群组/好友列表三入口，emits `entry-click` + `add`）；原好友列表零回归平移至新页面级组件 `em-contact-list-page`（emits `select`/`back`），宿主按入口 key 接线路由。
 - `em-chat-page` / `em-chat-info-page` 新增**必传** `chatType` prop（`'singleChat' | 'groupChat'`）；消息/会话域 API 同步增必传 `chatType` 参数，`EmMessageItem`/`EmConversationItem` 增 `chatType` 字段。
 
-### 迁移说明（M2.11 非 breaking）
+### 迁移说明（自定义消息字段）
 
 - `MESSAGE_TYPE` 新增 `CUSTOM`（`'custom'`），`EmMessageItem` 新增 `customEvent` / `customParams` 字段；仅当宿主**手工构造** `EmMessageItem`（如单测/假数据）时需要补 `customEvent: ''`、`customParams: {}`，正常收发链路不受影响。
 

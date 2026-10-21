@@ -1,11 +1,11 @@
-# 鸿蒙真机运行与签名配置（实测沉淀）
+# 鸿蒙真机运行与签名配置
 
-> 本文记录 demo 工程跑通鸿蒙真机的完整操作步骤与踩坑，2026-10 实测通过（HBuilderX 5.26 + DevEco Studio + 鸿蒙真机 USB 连接）。
+> 本文是示例工程在鸿蒙真机上跑通的完整操作步骤与常见报错处理，2026-10 实测（HBuilderX 5.26 + DevEco Studio + 鸿蒙真机 USB 连接）。
 > 官方权威来源：[uni-app 鸿蒙运行和发行](https://uniapp.dcloud.net.cn/tutorial/harmony/runbuild.html)（签名报错处理以该文档「证书签名配置指南」一节为准）。
 
 ## 1. 环境要求
 
-| 项 | 要求 | 本机实测 |
+| 项 | 要求 | 实测环境 |
 |---|---|---|
 | HBuilderX | 4.61+（支持交互式配置/自动申请调试证书） | 5.26 ✓ |
 | DevEco Studio | 5.1.0.849+（HBuilderX 4.81+ 要求） | 已安装 ✓ |
@@ -24,7 +24,12 @@ HBuilderX 中设置 DevEco Studio 路径：工具 → 设置 → 运行配置 �
 
 本项目 demo 的包名为 `uni.app.UNI08EF252`，来源规则：DCloud appid `__UNI__08EF252` 去掉下划线 → 加 `uni.app.` 前缀。HBuilderX 的签名对话框默认按此规则推导。
 
-**踩坑实录**：首次运行时构建产物里 bundleName 仍是模板默认值 `io.dcloud.uniappx`（见 `demo/unpackage/dist/dev/app-harmony/AppScope/app.json5`），与 AGC 注册名不一致。修复方法：在 `manifest.json` 可视化编辑的【鸿蒙 App 配置】中显式填包名（对应 `app-harmony.distribute.bundleName`，HX 4.31+ 起优先于 `harmony-configs/AppScope/app.json5`），然后**删除 `demo/unpackage/dist/dev/app-harmony` 重新运行**让工程重建。
+**包名不一致的典型表现**：构建产物里的 bundleName 仍是模板默认值 `io.dcloud.uniappx`（见 `demo/unpackage/dist/dev/app-harmony/AppScope/app.json5`），与 AGC 注册名不一致，签名时报「未找到包名为 xx 的应用」。
+
+处理方式：
+
+1. 在 `manifest.json` 可视化编辑的【鸿蒙 App 配置】中显式填包名（对应 `app-harmony.distribute.bundleName`，HX 4.31+ 起优先于 `harmony-configs/AppScope/app.json5`）；
+2. 删除 `demo/unpackage/dist/dev/app-harmony` 后重新运行，让工程按新包名重建。
 
 改名后记得重新签名（Profile 与包名绑定）。
 
@@ -47,7 +52,7 @@ HBuilderX 中设置 DevEco Studio 路径：工具 → 设置 → 运行配置 �
 | **未找到包名为 xx 的应用** | HBuilderX 查的是 AGC【证书、APP ID 和 Profile】→【APP ID】注册表，不是「我的应用」列表。确认该包名在 APP ID 列表中**精确存在**（大小写敏感、无空格）；再核对授权账号与建应用账号一致；AGC 改动偶有数分钟同步延迟，稍候重试 |
 | 没查到运行设备的注册信息 | 调试 Profile 需包含真机 UDID。保持真机连接重试（HX 会尝试自动注册）；失败则手动在 AGC【设备】中添加 UDID（获取方式见 4.2 节） |
 
-## 4. 手动签名流程（自动申请走不通时的兜底）
+## 4. 手动签名流程（自动申请走不通时）
 
 ### 4.1 生成私钥（.p12）与证书请求文件（.csr）
 
@@ -60,12 +65,17 @@ DevEco Studio 打开任意工程 → **Build → Generate Key and CSR**：
 ### 4.2 注册真机 UDID
 
 ```bash
-# hdc 在 DevEco Studio 内置 SDK 中（macOS 路径）：
-/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc list targets
-/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc shell bm get --udid
+# hdc 在 DevEco Studio 内置 SDK 里，macOS 下位于
+# <DevEco Studio>/Contents/sdk/default/openharmony/toolchains
+<DevEco Studio>/Contents/sdk/default/openharmony/toolchains/hdc list targets
+<DevEco Studio>/Contents/sdk/default/openharmony/toolchains/hdc shell bm get --udid
 ```
 
-可将 toolchains 目录加入 PATH：`export PATH="$PATH:/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains"`。
+可把 toolchains 目录加入 PATH，后续直接敲 `hdc`：
+
+```bash
+export PATH="$PATH:<DevEco Studio>/Contents/sdk/default/openharmony/toolchains"
+```
 
 拿到 UDID 后：AGC →【证书、APP ID 和 Profile】→【设备】→【添加设备】。
 
@@ -103,4 +113,4 @@ DevEco Studio 打开任意工程 → **Build → Generate Key and CSR**：
 
 - 调试证书有效期 365 天，到期重新申请；调试 Profile 与设备绑定，换新手机需重新注册 UDID 并更新 Profile。
 - 发布上架需另配**发布证书 + 发布 Profile**，流程相同（证书类型选发布），本文不展开。
-- 受 AGC API 限制，自动申请拿不到含 ACL 权限的调试证书；一期范围不涉及 ACL 权限，如未来用到需走手动流程。
+- 受 AGC API 限制，自动申请拿不到含 ACL 权限的调试证书；需要 ACL 权限的应用请走第 4 节的手动签名流程。

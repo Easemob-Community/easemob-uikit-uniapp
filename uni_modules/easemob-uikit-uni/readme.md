@@ -5,6 +5,7 @@
 > 当前版本：**1.0.0-rc.1**。已包含登录接入、会话列表、聊天页（文本/图片/语音/视频/文件 + 引用/撤回/重发/已读回执 + AI 流式消息）、群聊、联系人/好友申请、聊天详情、连接状态条与日志导出；语言偏好持久化（中/英）。逻辑层在 `libs/`，组件层在 `components/`。
 >
 > 完整接入步骤、常见问题与平台边界见仓库 `docs/QUICKSTART.md`；本文给出最短可运行路径。
+> 用 AI 接入时，可直接加载仓库 `skills/` 下的宿主接入 Agent Skills（入口 `em-host-integration`）。
 
 ## 兼容性
 
@@ -156,15 +157,33 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue) {
 |---|---|---|---|
 | 视频消息：发送 | ✅ | ✅ | ✅ |
 | 视频消息：播放 | ✅ 新窗口 | ⏳ 仅展示封面/时长 | ⏳ 仅展示封面/时长 |
-| 文件消息：发送 | ✅ | ✅ | ⏳ 入口隐藏 |
+| 文件消息：发送 | ✅ | ✅ | ✅ 需注册附件能力 |
 | 文件消息：打开/下载 | ⏳ 仅展示 | ⏳ 仅展示 | ⏳ 仅展示 |
 | 语音消息：发送 | ⏳ 入口隐藏 | ✅ | ✅ |
+
+## App 端文件发送（宿主注入）
+
+App 端没有跨端内置的系统文件选择器。UIKit 不静态依赖任何 UTS 插件；宿主安装文件选择器插件后，用 `EmKit.setAttachmentProvider()` 注册 `pick`（返回已复制到本地的附件路径）即可，输入栏「文件」格自动出现，发送成功后的临时文件清理由 UIKit 负责。
+
+```ts
+import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+
+EmKit.setAttachmentProvider({
+  pick: async (ctx) => {
+    // 调起宿主文件选择器（如 easemob-file-picker 的 chooseFile → prepareFile），
+    // 返回 { path, name, size, mimeType, temporary: true, release(path) }[]
+    return []
+  }
+})
+```
+
+完整契约、清理时机与 `resolve(uri)` 用法见仓库 `docs/API-KIT.md`；demo 工程的 `common/attachment-provider.uts` 是一份可直接照抄的适配器。
 
 ## 已知限制（1.0）
 
 - 视频播放仅 H5；App/小程序隐藏播放入口。
 - 文件打开/下载全端未接入，文件气泡为纯展示。
-- App 端暂不支持发送文件。
+- App 端发送文件需宿主注册附件能力（见上节）；未注册时「文件」入口保持隐藏。
 - H5 为移动端布局，未做桌面宽屏适配。
 - 语音发送仅 App/小程序；录音 60s 上限自动发送，麦克风权限失败只 toast（不自动跳系统设置）。
 - `@` 提及为追加式插入（uni `<input>` 无光标位置 API）；消息列表仍为 `scroll-view` 全量渲染（长会话性能优化在 1.1）。
@@ -174,6 +193,7 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue) {
 ## 更多文档
 
 - 仓库根 `README.md`：能力全景、未读/tabBar、Token 续期、多场景扩展、AI 流式消息、深色模式
+- 仓库 `skills/`：宿主接入 Agent Skills（总纲/会话聊天/通讯录群组/业务卡片/AI 流式/主题 i18n/小程序分包/排错）
 - `docs/QUICKSTART.md`：从空工程到收发消息的完整步骤与排错
 - `docs/GUIDE-MULTI-SCENARIO.md`：客服/医疗/招聘/交易等业务直进会话
 - `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md`：小程序 SDK 分包接入

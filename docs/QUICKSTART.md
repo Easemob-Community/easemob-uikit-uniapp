@@ -1,7 +1,7 @@
 # Quick Start：从空工程到收发消息
 
 > 适用版本：**1.0.0-rc.1**。目标读者是已有一个 uni-app x（Vue3、蒸汽模式）工程的宿主开发者。
-> 本文只覆盖「最小可用链路」；会话/群/联系人/多场景/AI 流式的完整能力见 [多场景指引](./GUIDE-MULTI-SCENARIO.md)。
+> 本文只覆盖「最小可用链路」。完整页面契约见 [页面指南](./PAGES-CONVERSATION.md)，组件与 API 见 [组件参考](./COMPONENTS.md)、[EmKit API](./API-KIT.md)，业务扩展见 [多场景接入](./GUIDE-MULTI-SCENARIO.md) 与 [AI 流式消息](./AI-STREAM.md)。
 
 ## 1. 前置条件
 
@@ -81,7 +81,7 @@ npm install easemob-websdk@5.1.3
 `initTheme()` 要早于首屏；`EmKit.init()` 是同步的，内部会异步加载 SDK / 注册 Manager。业务调用（`login` / `syncConversations`）会自动走 `whenReady()` 就绪门。
 
 ```vue
-<script setup lang="uts">
+<script setup lang="ts">
 import { onLaunch } from '@dcloudio/uni-app'
 import { EmKit, initTheme } from '@/uni_modules/easemob-uikit-uni/libs'
 
@@ -323,13 +323,13 @@ App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克�
 | 页面白屏 / 输入栏不见 | 根节点 `height: 100%`、父级 flex 链、`scroll-view` 是否 `flex:1;height:0` |
 | 双导航栏 | 聊天页/详情页是否 `navigationStyle: "custom"` |
 | 会话列表空 | 是否已登录（`state.userId`）；`autoSync` 是否被关闭、`onShow` 是否补调 `EmKit.syncConversations()` |
-| 好友列表空 | SDK 同步未完成（等待 `onSyncDataFinished`）；H5 清缓存后重试；检查 `enableSyncData` 是否被宿主覆盖 |
+| 好友列表空 | SDK 同步未完成（等待 `onSyncDataFinished`）；H5 清缓存后重试 |
 | 小程序 `sub-sdk/im-sdk.js` 未定义 | 跑分包 prepare 脚本；检查 `pages.json` 分包与预下载 |
 | 登录后立刻被踢回登录页 | 是否用 `status !== online` 判断；断网重连不应视为未登录 |
 | 发送一直失败 | token 是否过期；实现 `onTokenWillExpire`；查看 `EmKit.state.reason/errorCode` |
 | 聊天页一直骨架 / 历史加载失败 | 看网络与 `loadHistory` 日志；点空态「点击重试」或顶部重试行；确认 `conversationId/chatType` 正确 |
 | 读过的会话又显示未读 | 确认使用 1.0 的未读清零逻辑；宿主自建入口用 `EmKit.clearConversationUnread()` 兜底 |
-| 引用卡不显示 | 业务 ext 是否覆盖了 `msgQuote`；对端是否为 1.0 / vue 版 |
+| 引用卡不显示 | 业务 ext 是否覆盖了 `msgQuote`；对端是否支持引用协议 |
 
 ### 最小验收清单
 
@@ -342,3 +342,11 @@ App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克�
 - [ ] Token 过期自动续期（或跳登录）
 - [ ] 群聊：公告、@ 提及、成员昵称
 - [ ] 五端各跑一遍构建 + 一次真机/开发者工具冒烟
+
+## 下一步
+
+- [核心概念与架构](./CONCEPTS.md)：理解分层、生命周期与数据流。
+- [页面指南](./PAGES-CONVERSATION.md)：会话、聊天、聊天信息、通讯录、群组的完整契约。
+- [组件参考](./COMPONENTS.md)：原子组件的 props / events / slots。
+- [消息与扩展协议](./MESSAGING.md)：引用、@ 提及、自定义消息、本地提示、流式消息。
+- [常见问题](./FAQ.md)：按症状排查白屏、空列表、分包、媒体能力等问题。

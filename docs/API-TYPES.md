@@ -1,0 +1,345 @@
+# 类型与常量
+
+所有公开类型和常量都从 `@/uni_modules/easemob-uikit-uni/libs` 导出：
+
+```ts
+import {
+  MESSAGE_TYPE,
+  MESSAGE_STATUS,
+  CONVERSATION_TYPE,
+  type EmMessageItem,
+  type EmConversationItem
+} from '@/uni_modules/easemob-uikit-uni/libs'
+```
+
+类型定义在 `libs/types/index.ts`，枚举/常量在 `libs/constants/index.ts`。业务代码应使用常量而不是硬编码字符串。
+
+## 1. 消息
+
+### `EmMessageItem`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | `string` | 服务端消息 ID（发送前可能为空） |
+| `localId` | `string` | 本地唯一 ID，列表 key 与重发/引用定位使用 |
+| `conversationId` | `string` | 所属会话 ID（单聊为对端 userId，群聊为 groupId） |
+| `chatType` | `EmChatType` | `singleChat` / `groupChat` |
+| `type` | `EmMessageType` | 见 `MESSAGE_TYPE` |
+| `text` | `string` | 文本内容；流式消息为当前累计全文 |
+| `url` | `string` | 图片/语音/视频/文件地址 |
+| `thumbUrl` | `string` | 缩略图/封面地址 |
+| `width` / `height` | `number` | 图片/视频尺寸（未知为 0） |
+| `time` | `number` | 消息时间戳（毫秒） |
+| `from` / `to` | `string` | 发送方 / 接收方 |
+| `self` | `boolean` | 是否本人发送 |
+| `status` | `EmMessageStatus` | `sending` / `sent` / `failed` / `recalled` |
+| `quote` | `EmQuoteInfo \| null` | 引用快照 |
+| `duration` | `number` | 语音/视频时长（秒） |
+| `fileName` | `string` | 文件消息文件名 |
+| `fileSize` | `number` | 文件大小（字节） |
+| `ext` | `Record<string, unknown>` | SDK ext 透传；自定义消息业务载荷也在这里 |
+| `rawType` | `string` | 未识别 wire 类型原文；`custom` 消息为 `'custom'` |
+| `customEvent` | `string` | 自定义消息事件名，`#custom-message` 按它分发 |
+| `customParams` | `Record<string, string>` | 自定义消息字符串参数 |
+| `stream` | `EmStreamInfo \| undefined` | 流式消息元信息，普通消息为 `undefined` |
+
+### `EmQuoteInfo`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `msgId` | `string` | 被引用消息 ID |
+| `from` | `string` | 被引用消息发送人 userId |
+| `fromName` | `string` | 引用时刻的展示名快照；缺省时消费方回落 `from` |
+| `text` | `string` | 引用摘要 |
+| `type` | `EmMessageType` | 被引用消息类型（用于引用卡类型图标） |
+| `thumbUrl` | `string` | 图片/视频缩略图（可选） |
+
+### `EmStreamInfo`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `customType` | `string` | 业务流类型，如 `text` / `markdown` |
+| `seq` | `number` | 分片序号（服务端排序后） |
+| `status` | `EmStreamStatus` | 见 `STREAM_MESSAGE_STATUS` |
+| `deltaText` | `string` | 当前分片新增文本 |
+| `fullText` | `string` | 截至当前分片的累计全文，与 `message.text` 同值 |
+| `errorType` | `number` | 流式错误码，0 表示无 |
+| `finishReason` | `number` | 服务端结束原因（可选） |
+
+### `MESSAGE_TYPE`
+
+| 常量 | 值 | 说明 |
+|---|---|---|
+| `MESSAGE_TYPE.TEXT` | `text` | 文本 |
+| `MESSAGE_TYPE.IMAGE` | `image` | 图片 |
+| `MESSAGE_TYPE.AUDIO` | `audio` | 语音 |
+| `MESSAGE_TYPE.VIDEO` | `video` | 视频 |
+| `MESSAGE_TYPE.FILE` | `file` | 文件 |
+| `MESSAGE_TYPE.CUSTOM` | `custom` | 自定义消息 |
+| `MESSAGE_TYPE.NOTICE` | `notice` | 本地系统提示（不发送服务端） |
+| `MESSAGE_TYPE.OTHER` | `other` | 未识别类型 |
+
+### `MESSAGE_STATUS`
+
+`SENDING` / `SENT` / `FAILED` / `RECALLED`。
+
+### `STREAM_MESSAGE_STATUS`
+
+| 常量 | 说明 |
+|---|---|
+| `STREAM_MESSAGE_STATUS.START` | 流开始 |
+| `STREAM_MESSAGE_STATUS.IN_PROGRESS` | 传输中 |
+| `STREAM_MESSAGE_STATUS.START_COMPLETED` | 单分片完成（终态） |
+| `STREAM_MESSAGE_STATUS.COMPLETED` | 完成（终态） |
+| `STREAM_MESSAGE_STATUS.ERROR` | 异常结束（终态） |
+
+`STREAM_CUSTOM_TYPE.TEXT` / `STREAM_CUSTOM_TYPE.MARKDOWN` 是内置的流式业务类型常量。
+
+### `MESSAGE_EXT_KEY`
+
+| 常量 | 值 | 说明 |
+|---|---|---|
+| `QUOTE` | `msgQuote` | 引用协议主 key，与 vue 版 UIKit 互通 |
+| `QUOTE_LEGACY` | `emQuote` | 旧版兼容 key，仅接收旧消息/发送时双写 |
+| `MENTION` | `em_at_list` | @ 提及 userId 数组 |
+
+业务 ext 不要占用以上 key；发送时 UIKit 会覆盖。
+
+## 2. 会话
+
+### `EmConversationItem`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `conversationId` | `string` | 会话 ID |
+| `chatType` | `EmChatType` | 单聊/群聊 |
+| `name` | `string` | 会话名称快照 |
+| `avatar` | `string` | 会话头像快照 |
+| `unreadCount` | `number` | 未读数 |
+| `lastMessageText` | `string` | 最后一条消息摘要 |
+| `lastMessageTime` | `number` | 最后消息时间戳 |
+| `isPinned` | `boolean` | 是否置顶 |
+| `pinnedTime` | `number` | 置顶时间戳，未置顶为 0 |
+| `isMuted` | `boolean` | 是否免打扰 |
+
+### `CONVERSATION_TYPE`
+
+`SINGLE_CHAT='singleChat'`、`GROUP_CHAT='groupChat'`。类型别名 `ConversationTypeValue` / `EmChatType`。
+
+### `CONVERSATION_TAB_KEY`
+
+`ALL='all'`、`UNREAD='unread'`、`AT_ME='atMe'`、`SINGLE='single'`、`GROUP='group'`；默认顺序见 `DEFAULT_CONVERSATION_TABS`。
+
+### `CONVERSATION_MENU_KEY`
+
+`NEW_CHAT='new-chat'`、`CREATE_GROUP='create-group'`、`PIN='pin'`、`MUTE='mute'`、`DELETE='delete'`。
+
+### `MESSAGE_MENU_KEY`
+
+`COPY='copy'`、`QUOTE='quote'`、`RECALL='recall'`、`DELETE='delete'`。
+
+## 3. 用户、联系人与群
+
+### `EmUserInfo`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `userId` | `string` | 用户 ID |
+| `nickname` | `string` | 昵称 |
+| `avatarUrl` | `string` | 头像 URL |
+
+### `EmContactItem`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `userId` | `string` | 好友 userId |
+| `remark` | `string` | 备注，空串表示未设置 |
+| `nickname` | `string` | 昵称快照 |
+| `avatarUrl` | `string` | 头像 |
+| `addTs` | `number` | 好友关系建立时间 |
+
+### `EmContactInvite`
+
+好友申请与群邀请共用：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | `string` | 本地生成 ID，幂等合并用 |
+| `kind` | `'contact' \| 'group'` | 申请类型 |
+| `from` | `string` | 申请发起方 userId |
+| `message` | `string` | 附言 |
+| `status` | `'pending' \| 'accepted' \| 'declined'` | 处理状态 |
+| `outgoing` | `boolean` | 是否我方发出后被处理的通知 |
+| `ts` | `number` | 时间戳 |
+| `groupId` | `string` | 群邀请的群 ID |
+| `groupName` | `string` | 群名快照 |
+
+### `EmContactNavEntry`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `key` | `string` | 入口 key，见 `CONTACT_ENTRY_KEY` |
+| `label` | `string` | 展示标题 |
+| `count` | `number` | 计数，>0 才展示 |
+| `hot` | `boolean` | 红点（仅 count>0 生效） |
+| `icon` | `string` | 可选图标名 |
+
+### `EmGroup`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `groupId` | `string` | 群 ID |
+| `name` | `string` | 群名称 |
+| `description` | `string` | 群描述 |
+| `owner` | `string` | 群主 userId |
+| `memberCount` | `number` | 成员数 |
+| `maxUsers` | `number` | 人数上限 |
+| `avatar` | `string` | 群头像（可选） |
+| `public` | `boolean` | 是否公开群 |
+| `approval` | `boolean` | 入群是否需要审批 |
+| `allowInvites` | `boolean` | 是否允许成员邀请 |
+| `inviteNeedConfirm` | `boolean` | 邀请是否需要确认 |
+| `mute` | `boolean` | 是否全员禁言 |
+| `disabled` | `boolean` | 群是否被禁用 |
+
+### `EmGroupMember`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `userId` | `string` | 成员 userId |
+| `role` | `'owner' \| 'admin' \| 'member'` | 角色 |
+| `joinedAt` | `number` | 入群时间戳，缺失为 0 |
+| `nick` | `string` | 群昵称（可选） |
+| `avatar` | `string` | 头像（可选） |
+
+### `CreateGroupParams`
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `name` | `string` | 是 | 群名称 |
+| `description` | `string` | 否 | 群描述 |
+| `members` | `string[]` | 否 | 初始成员（不含创建者） |
+| `public` | `boolean` | 否 | 是否公开群 |
+| `approval` | `boolean` | 否 | 入群是否需要审批 |
+| `allowInvites` | `boolean` | 否 | 是否允许成员邀请 |
+| `inviteNeedConfirm` | `boolean` | 否 | 邀请是否需要确认 |
+| `maxMembers` | `number` | 否 | 人数上限 |
+
+### 群相关常量
+
+- `GROUP_MEMBER_ROLE`：`OWNER='owner'`、`ADMIN='admin'`、`MEMBER='member'`。
+- `GROUP_MEMBER_ACTION`：`CHAT`、`SET_ADMIN`、`REMOVE_ADMIN`、`TRANSFER_OWNER`、`REMOVE`。
+- `GROUP_NOTICE_EVENT`：建群、成员进出、改名、公告、转让、被移出、解散、管理员变更、全员禁言。
+- `GROUP_MEMBER_PAGE_SIZE=20`、`GROUP_MEMBER_GRID_COUNT=8`、`GROUP_ANNOUNCEMENT_MAX_LENGTH=512`、`GROUP_NAME_MAX_LENGTH=255`。
+
+### 联系人常量
+
+- `CONTACT_ENTRY_KEY`：`NOTICE='notice'`、`GROUP='group'`、`CONTACT='contact'`。
+- `CONTACT_INVITE_STATUS`：`PENDING` / `ACCEPTED` / `DECLINED`。
+- `CONTACT_INVITE_KIND`：`CONTACT='contact'`、`GROUP='group'`。
+- `CONTACT_MENU_KEY`：`DELETE='delete'`。
+- `ALPHABET_KEYS`：`A`–`Z` + `#`。
+
+## 4. 组件公共类型
+
+### `EmActionSheetAction`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `key` | `string` | 动作 key |
+| `text` | `string` | 展示文案 |
+| `icon` | `string` | 图标名（可选） |
+| `danger` | `boolean` | 危险态（红字） |
+| `disabled` | `boolean` | 禁用 |
+
+### `EmMessageMenuExtra`
+
+继承 `EmActionSheetAction`，新增 `types?: EmMessageType[]`：只在指定消息类型上显示；`NOTICE` 恒不显示。
+
+### `EmQuickReply`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `label` | `string` | 芯片文案 |
+| `text` | `string` | 填入/发送的文本，缺省用 `label` |
+
+`EmQuickReplyMode = 'fill' | 'send'`。
+
+### `EmSelectContactItem`
+
+`userId` / `name` / `avatar`，供 `em-select-contact` 使用。
+
+### `MentionContact`
+
+`userId` / `name` / `avatar?`，供 `em-mention-picker` 与 @ 高亮解析使用。
+
+### `EmContactGroup` / `EmPinyinResult`
+
+拼音分组结果：`key`（A-Z/#）、`contacts`；`setPinyinAdapter` 见 [EmKit API](./API-KIT.md) 之外的导出列表。
+
+## 5. 主题与语言
+
+### `THEME_MODE`
+
+`AUTO='auto'`、`LIGHT='light'`、`DARK='dark'`；实际生效主题类型 `EmThemeMode = 'light' | 'dark'`。
+
+### `LOCALE`
+
+`ZH_CN='zh-CN'`、`EN='en'`；类型 `EmLocaleName`。
+
+### `LOG_LEVEL`
+
+`DEBUG` / `INFO` / `WARN` / `ERROR` / `SILENT`。
+
+### `CONNECTION_STATUS`
+
+`IDLE` / `CONNECTING` / `RECONNECTING` / `ONLINE` / `CLOSED`。
+
+## 6. 平台与媒体类型
+
+### `EmPickedImage`
+
+`path` / `name` / `size` / `webFile`（H5 的 `File` 对象，其他端为 `null`）。
+
+### `EmPickedVideo`
+
+`path` / `name` / `duration` / `width` / `height` / `size`。
+
+### `EmPickedFile`
+
+`path` / `name` / `size` / `webFile`，并扩展 `EmAttachment` 的 `mimeType?` / `temporary?` / `release?`。
+
+### `EmAttachment`
+
+宿主附件能力返回的可发送附件：`path`（本地真实路径）/ `name` / `size` / `mimeType?` / `temporary?` / `release?(path)`。
+
+### `EmAttachmentPickOptions`
+
+`conversationId?` / `chatType?` / `mimeTypes?` / `multiple?`。
+
+### `EmAttachmentProvider`
+
+`isAvailable?()` / `pick(options): Promise<EmAttachment[]>` / `resolve?(uri, options?): Promise<EmAttachment | null>`。经 `EmKit.setAttachmentProvider()` 注册，用于 App 端文件选择。
+
+### `EmAttachmentCapability`
+
+`available` / `providerName`；`EmKit.attachments` 返回该快照。
+
+### `EmRecordResult` / `EmRecordOptions`
+
+`EmRecordResult = { path, duration }`；`EmRecordOptions = { onError?, onAutoStop? }`。
+
+### `EmPlatformCapabilities`
+
+`videoPreview` / `filePick` / `fileOpen` 三个布尔值；运行时 `PLATFORM_CAPABILITIES` 是只读快照。`filePick` 只表示“有内置选择器”（小程序/H5），App 端注册附件能力后判断入口请用 `EmKit.canPickAttachment`。
+
+## 7. 其他
+
+- `EmAvatarShape = 'circle' | 'square'`。
+- `EmSenderNameMode = 'always' | 'hidden'`。
+- `EmTokenRenewalResult = { token, expireAt }`。
+- `EmUnreadCounts = { conversationUnread, contactRequestUnread }`（均为 `ComputedRef<number>`）。
+- `EmTabBarBadgeOptions` / `EmTabBarBadgeController`：见 [页面指南 · 会话列表](./PAGES-CONVERSATION.md)。
+- `EmKitConfig` / `EmUiConfig` / `EmInputFeatures`：见 [配置参考](./CONFIG.md)。
+
+完整字段以 `libs/types/index.ts` 为准；新增类型会同步导出到门面。

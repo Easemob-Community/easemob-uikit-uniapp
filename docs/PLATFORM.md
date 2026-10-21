@@ -1,0 +1,204 @@
+# 平台能力与差异
+
+一套 `em-*` 组件要同时跑在 Android、iOS、鸿蒙、H5 与微信小程序上，平台差异必须收口在库内。这页给出环境要求、逐项能力矩阵、各端注意事项、权限、构建命令与已知约束，帮你在立项阶段就判断「这个功能在我的端上能不能用」。
+
+> 相关页面：[快速开始](./QUICKSTART.md) · [设计变量](./DESIGN-TOKENS.md) · [主题与国际化](./THEME-I18N.md) · [聊天与消息组件](./COMPONENTS-CHAT.md) · [示例工程](./DEMO.md) · [常见问题](./FAQ.md)
+
+## 环境要求
+
+| 项 | 要求 | 说明 |
+|---|---|---|
+| HBuilderX | 5.21+（建议 5.26+） | 蒸汽模式（Vapor）的编译与真机运行依赖较新版本 |
+| uni-app x | HBuilderX 4.71+，Vue 3 组合式 API | 仅支持 uni-app x；经典 uni-app（vue2 / vue3）不在支持范围 |
+| Node.js | 18+ | 仅在 CLI 编译、分包后处理、体积校验时需要 |
+| 环信 SDK | `easemob-websdk` 5.1.3（peer 依赖） | 精确锁版；升级前先看更新日志 |
+| 渲染模式 | uni-app x 蒸汽模式（`manifest.json` 开 `vapor`） | `.uvue` 页面 + `main.uts` 入口 |
+| Android | 6.0+ | 真机与模拟器均可 |
+| iOS | 15.0+ | 真机运行需开发者证书 |
+| 鸿蒙 | API 20+ | 真机运行需 DevEco Studio 与签名配置，见[鸿蒙真机运行与签名](./HARMONY-REALDEVICE-RUN.md) |
+| H5 | 现代浏览器（Chrome / Safari） | 移动端布局，未做 PC 宽屏适配 |
+| 微信小程序 | 基础库 2.11.2+ | 跨分包 `require` 依赖该基础库；SDK 需分包接入，见[微信小程序 SDK 分包](./GUIDE-WEAPP-SDK-SUBPACKAGE.md) |
+
+## 能力矩阵
+
+### 消息能力
+
+| 能力 | App（Android / iOS / 鸿蒙） | H5 | 微信小程序 |
+|---|---|---|---|
+| 文本消息收发 | 支持 | 支持 | 支持 |
+| 图片：选择与发送 | 支持（相册 / 拍摄） | 支持（浏览器文件选择；「拍摄」退化为选文件） | 支持（相册 / 拍摄） |
+| 图片：预览 | 支持（`uni.previewImage`） | 支持 | 支持 |
+| 语音：录制与发送 | 支持（最长 60 秒，超时自动结束并按正常语音发送） | 不支持（语音入口隐藏） | 支持 |
+| 语音：播放 | 支持（全局互斥，播新停旧） | 支持 | 支持 |
+| 视频：选择与发送 | 支持（相册） | 支持（浏览器文件选择，宽高/时长依赖浏览器解析） | 支持（相册） |
+| 视频：播放/预览 | 不支持（气泡只显示封面与时长，无播放入口） | 支持（新窗口打开视频 URL） | 不支持（气泡只显示封面与时长） |
+| 文件：选择与发送 | 支持（需宿主注册附件能力；未注册时「文件」入口隐藏） | 支持（浏览器文件选择） | 支持（从会话选择文件） |
+| 文件：打开/下载 | 不支持（文件卡为纯展示） | 不支持（文件卡为纯展示） | 不支持（文件卡为纯展示） |
+| 自定义消息收发 | 支持 | 支持 | 支持 |
+| 本地系统提示灰条 | 支持 | 支持 | 支持 |
+
+### 端能力
+
+| 能力 | App | H5 | 微信小程序 |
+|---|---|---|---|
+| 主题跟随系统 | 支持（读系统深浅色并监听变化） | 支持（`prefers-color-scheme`） | 支持（宿主主题 `hostTheme`） |
+| 软键盘避让 | 支持（监听键盘高度，输入栏按实际遮挡高度上推） | 由浏览器自行处理（不注册键盘高度监听） | 支持（同上推口径） |
+| 顶部安全区 | 支持（`safeAreaInsets.top`，自绘导航栏） | 支持（`safeAreaInsets` 可能缺失，按 0 处理） | 支持 + 右上角胶囊避让 |
+| 底部安全区 | 支持（Home 指示条） | 支持（移动浏览器） | 支持 |
+| 页面可见性判定 | 恒为可见 | 读 `document.visibilityState`，切后台不自动清未读/发已读回执 | 恒为可见 |
+| SDK 引入方式 | 静态打包 | 静态打包 | 独立分包 + 运行时跨分包加载 |
+| 小程序胶囊避让 | 不适用 | 不适用 | 内置（按胶囊矩形预留右侧空间） |
+| 图片长按/预览手势 | 支持 | 支持 | 支持 |
+
+### 能力开关 `PLATFORM_CAPABILITIES`
+
+库内对外暴露一个只读能力快照，宿主可据此隐藏或改写自己的入口，避免「点一下只弹不支持」：
+
+```ts
+import { PLATFORM_CAPABILITIES } from '@/uni_modules/easemob-uikit-uni/libs'
+
+const canPreviewVideo = PLATFORM_CAPABILITIES.videoPreview // 仅 H5 为 true
+const canPickFile = PLATFORM_CAPABILITIES.filePick         // 表示“内置选择器”：小程序与 H5 为 true，App 为 false
+const canOpenFile = PLATFORM_CAPABILITIES.fileOpen         // 全端为 false
+```
+
+| 字段 | 类型 | 取值 | 说明 |
+|---|---|---|---|
+| `videoPreview` | `boolean` | 仅 H5 `true` | 视频播放入口与点击预览 |
+| `filePick` | `boolean` | 小程序、H5 `true`；App `false` | 是否有内置文件选择器；App 端注册附件能力后入口由 `EmKit.canPickAttachment` 变为 `true` |
+| `fileOpen` | `boolean` | 全端 `false` | 文件打开/下载（当前版本不提供） |
+
+App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应式的 `canPickAttachment()`），不要只看 `PLATFORM_CAPABILITIES.filePick`。宿主注册方式见 [EmKit API · 附件能力注入](./API-KIT.md)。
+
+其余差异（键盘、安全区、主题跟随、分包加载）不是布尔开关，而是平台分支内置行为，宿主无需判断。
+
+## 各端注意事项
+
+### Android / iOS（蒸汽 App 端）
+
+- **自绘导航栏**：聊天页、会话页、详情页统一用 `em-nav-bar`（安全区 + 44px 内容行），页面需在 `pages.json` 配 `navigationStyle: "custom"`，否则会出现双标题栏。
+- **键盘避让**：`em-chat-inputbar` 关闭系统默认上推（`adjust-position="false"`），按键盘高度自行设置 `margin-bottom`；iOS、鸿蒙与 Android 的上报值口径不同（iOS/鸿蒙含底部安全区），库内已分别换算——输入栏上推直接用上报值（即从屏幕底边算起的实际遮挡高度），emoji/媒体面板高度按扣除安全区后的值对齐，宿主不需要再叠加偏移。
+- **CSS 是子集**：App 端只支持 class 选择器、不支持伪元素与 CSS 动画（`@keyframes` 不执行），库内动画改用 JS 定时器。见文末「已知平台约束」。
+- **宽度链用 rpx**：多行文本气泡在 App 端使用固定 `rpx` 宽度，避免百分比 `max-width` 造成的行尾裁字。
+- **原生 `<button>` 垂直居中**：App 端按钮靠默认上下 `padding` 居中，不要用固定 `height` + `line-height` 对齐，否则文字贴底。
+- **iOS 15+ / Android 6+**：低于该版本的系统不在支持范围。
+- **文件发送**：App 端没有跨端内置的系统文件选择器。宿主安装文件选择器插件后，用 `EmKit.setAttachmentProvider()` 注册选择/复制/清理能力，输入栏「文件」格才会出现；UIKit 不静态依赖插件，未注册时入口保持隐藏。接入示例见 [EmKit API · 附件能力注入](./API-KIT.md)。附件上传由 `uni.uploadFile` 以原生方式读取本地路径；SDK 的 md5 预检在路径不在 uni 文件系统可读范围时会自动跳过，不影响发送。
+
+### 鸿蒙（HarmonyOS）
+
+- **签名三处一致**：AGC 注册包名、HBuilderX 签名配置、构建产物 `bundleName` 必须完全一致，否则签名失败。完整步骤见[鸿蒙真机运行与签名](./HARMONY-REALDEVICE-RUN.md)。
+- **安全区**：导航栏顶部安全区读取 `safeAreaInsets.top`（HBuilderX 4.25+ 返回状态栏高度）；全屏弹层同样需要自己补顶部安全区。
+- **动画与光标**：CSS 动画不执行；流式打字机光标是静态字符，语音播放波形由 JS 定时器驱动。
+- **真机联调**：需要 DevEco Studio 与鸿蒙开发者账号；模拟器有额外系统版本要求，以官方文档为准。
+
+### H5
+
+- **不要用 dev 模式验证**：`scripts/uni.sh dev web` 不会转换 `.uts` 入口，浏览器必白屏。H5 验证固定走「`build web` + 静态伺服」。
+- **没有键盘高度 API**：uni-app x 的 H5 运行时未实现 `uni.onKeyboardHeightChange`，UIKit 在 H5 不注册该监听，键盘避让交给浏览器。
+- **没有原生导航栏/tabBar 样式 API**：H5 无 `setNavigationBarColor` / `setTabBarStyle`，内置导航栏与 tabBar 是普通 DOM，需要宿主用 CSS 同步主题（示例工程在 `index.html` 与 `common/theme.ts` 里做了这件事）。
+- **不录音**：`startRecord` 在 H5 直接抛错，输入栏因此隐藏语音入口；语音消息可以播放。
+- **视频播放入口**：点击视频气泡用新窗口打开视频 URL，不内置播放器 UI。
+- **拍摄退化为选文件**：浏览器没有相机概念，`chooseImage` 的 `camera` 来源退化为文件选择器。
+- **页面可见性**：H5 标签页隐藏时不把当前会话的新消息清未读、不发已读回执，避免用户不在页面上时被误清。
+
+### 微信小程序
+
+- **SDK 必须在分包**：`easemob-websdk` 不进主包，UIKit 通过跨分包 `require` 异步加载；`pages.json` 需要 `sub-sdk` 分包与 `preloadRule` 预下载。完整做法见[微信小程序 SDK 分包](./GUIDE-WEAPP-SDK-SUBPACKAGE.md)。
+- **基础库 2.11.2+**：更老的基础库不支持跨分包 `require`，表现为加载失败。宿主应做特性检测与提示，不要静默失败。
+- **主包体积**：平台限制 2MB；本仓库的构建门禁按 **1.5MB** 校验主包（`scripts/check-mp-size.mjs`），为业务页面留余量。
+- **文件发送**：从微信会话选择文件（`chooseMessageFile`），不能直接读系统文件管理器。
+- **胶囊避让**：`em-nav-bar` 按右上角胶囊矩形预留空间，右侧动作按钮落在胶囊左侧。
+- **原生 tabBar 图标**：`iconPath` 只接受图片，不能使用字体图标；示例工程用脚本从同一套字形生成 PNG。
+
+## 权限
+
+| 端 | 涉及的权限 | 触发时机 | 拒绝后的表现 |
+|---|---|---|---|
+| Android / iOS / 鸿蒙 | 相机、相册、麦克风 | 用户主动拍摄/选图、录制语音时由系统弹窗申请 | 对应入口不可用；文本收发、图片预览等其余能力不受影响 |
+| 微信小程序 | 相机、相册、录音 | 用户主动使用对应入口时由微信授权弹窗申请 | 同上 |
+| H5 | 浏览器文件选择授权；不涉及摄像头/麦克风（不录音） | 点击「图片/视频/文件」入口时 | 不选文件即不上传 |
+
+App 端发布前需要在打包配置中声明相机、录音与相册用途（Android 权限声明、iOS 用途描述）；未声明时系统会直接拒绝，表现为「点选图没反应」。插件市场声明中已注明：相机、相册、麦克风仅在用户主动发送图片/视频/语音时调用，拒绝后对应功能不可用，不影响文本收发。
+
+## 构建与运行
+
+### HBuilderX（图形界面）
+
+1. 用 HBuilderX 打开仓库根目录下的 `demo/`。
+2. 运行 → 运行到浏览器（H5）、运行到小程序模拟器 → 微信开发者工具、运行到手机或模拟器（Android / iOS / 鸿蒙）。
+3. 首次运行 App 前安装 `easemob-websdk`：在 `demo/` 下执行 `npm install`。
+
+### 命令行（HBuilderX 内置编译器）
+
+```bash
+# 1) 安装 peer 依赖
+cd demo && npm install && cd ..
+
+# 2) H5：构建后用静态服务器预览（dev web 会在浏览器白屏，不要用）
+bash scripts/uni.sh build web
+bash scripts/uni.sh serve 5180
+
+# 3) 微信小程序：构建 + 自动注入 SDK 分包 + 体积门禁
+bash scripts/uni.sh build mp-weixin
+# 用微信开发者工具导入 demo/unpackage/dist/build/mp-weixin
+
+# 4) 小程序 dev（带分包伴随 watch，改代码后重编译）
+bash scripts/uni.sh dev mp-weixin
+```
+
+补充：
+
+- HBuilderX 不在默认路径时用 `HBUILDERX_PATH` 指向安装目录。
+- `serve` 默认端口 5180，可传第二个参数改端口。
+- 小程序构建结束后自动跑 `scripts/check-mp-size.mjs`：校验 SDK 精确锁版、分包文件存在、主包无 SDK 残留、主包体积与产物语法。
+- H5 产物需要以 HTTP 静态伺服访问（`file://` 直接打开会因模块加载策略失败）。
+
+## 已知平台约束
+
+### App 端样式子集（ucss）
+
+| 约束 | 表现 | 规避方式 |
+|---|---|---|
+| 只有 class 选择器 | 标签选择器、`*`、复杂组合选择器不可用 | 所有样式挂在 class 上 |
+| 无 CSS 继承 | 父节点 `color` / `font-size` 不会下传 | 逐 class 显式声明 |
+| 不支持伪元素与 CSS 动画 | `::before` / `::after`、`@keyframes` 不生效 | 用真实节点 + JS 定时器（语音播放波形、引用定位高亮均如此） |
+| `calc()` 与 CSS 变量组合受限 | `calc(Npx * var(--x))` 类写法不可靠 | 直接写死 px 值或拆成多个 class |
+| 不支持 `color-mix()` | 半透明派生色不可用 | 明暗各写一份字面量 |
+| 字体族无效 | webfont 栈不生效 | 使用系统字体 |
+
+### 其他约束
+
+- **H5 不录音**：语音消息可播放，但不能录制；语音入口自动隐藏，不需要宿主判断。
+- **视频播放仅在 H5**：App 与小程序只展示封面与时长，不提供播放入口。
+- **文件打开/下载当前版本不提供**：文件卡在各端都是纯展示，宿主需要下载能力时自行用 `message.url` 实现并在自己的卡片里接入。
+- **小程序主包体积**：平台 2MB，仓库门禁 1.5MB；新增业务页面优先放分包。
+- **H5 未做 PC 宽屏**：布局按移动端设计，桌面浏览器建议限制视口宽度。
+- **主题必须绑根节点**：App 端没有 `:root`，页面根节点要绑定 `themeClass`，否则明暗变量不下行。
+
+## 平台差异在库内的位置
+
+| 关注点 | 实现位置 |
+|---|---|
+| 能力开关、媒体选择、录音、播放 | `libs/platform.ts` |
+| 键盘高度与上推口径 | `libs/use/useKeyboardHeight.ts` |
+| 顶部/底部安全区 | `libs/use/useSafeArea.ts` |
+| 输入栏语音入口与文件入口显隐 | `components/em-chat-inputbar/em-chat-inputbar.vue` |
+| 视频播放入口 | `components/em-video-message/em-video-message.vue` |
+| 文件卡点击行为 | `components/em-file-message/em-file-message.vue` |
+| 导航栏安全区与小程序胶囊避让 | `components/em-nav-bar/em-nav-bar.vue` |
+| 小程序 SDK 分包加载 | `libs/client/sdk.ts` |
+
+宿主侧不需要写平台条件编译，按能力布尔值与文档给出的平台范围组织入口即可；确有自定义需求时，推荐同样把平台分支收口到一个文件。
+
+## 相关命令速查
+
+| 命令 | 作用 |
+|---|---|
+| `bash scripts/uni.sh build web` | 构建 H5 产物到 `demo/unpackage/dist/build/web` |
+| `bash scripts/uni.sh serve 5180` | 静态伺服 H5 产物 |
+| `bash scripts/uni.sh build mp-weixin` | 构建微信小程序、注入 SDK 分包、跑体积门禁 |
+| `bash scripts/uni.sh dev mp-weixin` | 小程序 dev 编译（带分包伴随 watch） |
+| `node scripts/prepare-sdk-subpackage.mjs <产物目录>` | 手动注入 SDK 分包（HBuilderX 图形界面 dev 时使用） |
+| `node scripts/check-mp-size.mjs` | 校验小程序产物与主包体积 |
+
+构建细节与排错见[快速开始](./QUICKSTART.md)、[微信小程序 SDK 分包](./GUIDE-WEAPP-SDK-SUBPACKAGE.md)与[常见问题](./FAQ.md)。

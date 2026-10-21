@@ -99,7 +99,7 @@
         {
           "path": "pages/spike/spike",
           "style": {
-            "navigationBarTitleText": "SDK 连通性 Spike"
+            "navigationBarTitleText": "SDK 连通性自检"
           }
         },
         {

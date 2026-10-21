@@ -91,7 +91,7 @@
     </view>
 
     <view class="lab__section">
-      <text class="lab__section-title">em-skeleton（骨架屏：静态灰块，shimmer 动画留二期）</text>
+      <text class="lab__section-title">em-skeleton（骨架屏：静态灰块）</text>
       <view class="lab__skeleton-item">
         <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
         <view class="lab__skeleton-lines">
@@ -104,7 +104,7 @@
     </view>
 
     <view class="lab__section">
-      <text class="lab__section-title">AI 流式消息（M2.13：光标 / 终态收敛 / 异常提示）</text>
+      <text class="lab__section-title">AI 流式消息（光标 / 终态收敛 / 异常提示）</text>
       <view class="lab__actions">
         <button class="lab__btn" @click="startStreamDemo('completed')">开始流式</button>
         <button class="lab__btn" @click="startStreamDemo('error')">异常中断</button>
@@ -142,7 +142,7 @@ const themeLabel = computed(() => {
   return themeStore.preference === THEME_MODE.DARK ? '深色' : '浅色'
 })
 
-// ===== AI 流式消息演示（M2.13）=====
+// ===== AI 流式消息演示 =====
 // 不依赖 SDK/会话：用通用分片模拟器驱动 em-text-message 的流式展示，
 // 演示 cursor / 终态收敛 / ERROR 提示三种状态；真实链路见 docs 与 libs/chat/message.ts。
 const { config } = useConfig()

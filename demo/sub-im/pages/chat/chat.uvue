@@ -181,7 +181,7 @@ const composerItems = computed<{ key: string; label: string; icon: EmIconName }[
   scenario.value.chat.cards.map((card) => ({ key: card.event, label: card.entryLabel, icon: card.entryIcon }))
 )
 
-// 单会话未读（P1）：传 ref，进会话清零后面板数字实时变化
+// 单会话未读：传 ref，进会话清零后面板数字实时变化
 const peerUnread = useConversationUnreadCount(conversationId)
 const { conversationUnread: totalUnread } = useUnreadCounts()
 
@@ -304,7 +304,7 @@ function insertSceneNotice(): void {
   panelVisible.value = false
 }
 
-// ===== AI 流式演示（M2.13）=====
+// ===== AI 流式演示 =====
 // 真实接入：业务服务端经环信 RESTful 下发流式消息 → SDK onStreamMessage → UIKit 自动合批渲染。
 // 这里用 mock 分片注入当前会话，演示光标 / 终态 / 异常三种状态。
 let stopStream: (() => void) | null = null

@@ -1,8 +1,8 @@
 # 微信小程序 SDK 分包异步化实施指引
 
-> 适用对象：接入 easemob-uikit-uni（或自行接入 easemob-websdk）的 uni-app x / 原生 / Taro 微信小程序工程。
-> 本指引基于本仓库 M2.8 落地实践沉淀（2026-10-15），所有路径、脚本、体积数字均为实测值。
-> 配套材料：`docs/SPIKE-SDK-SUBPACKAGE.md`（编译器行为 spike 记录）、`scripts/prepare-sdk-subpackage.mjs`（可直接拷贝的构建脚本）、`scripts/check-mp-size.mjs`（防回归检查）。
+> 适用对象：接入 easemob-uikit-uni（或自行接入 easemob-websdk）的 uni-app x / uni-app / 原生 / Taro 微信小程序工程。
+> 本文基于示例工程的实测整理（2026-10-15），所有路径、脚本、体积数字均为实测值；微信基础库或开发者工具升级后请重新量一次。
+> 配套脚本：`scripts/prepare-sdk-subpackage.mjs`（构建后处理，可整段拷到宿主工程）、`scripts/check-mp-size.mjs`（体积与产物检查）。工程初始化与五端运行见 [快速开始](./QUICKSTART.md)。
 
 ---
 
@@ -21,7 +21,7 @@
 └────────────────┘         └───────────────────────────────┘
 ```
 
-而 IM 的业务场景里**消息列表页通常是 tabBar 页、无法移入分包**，静态导入意味着 SDK 永远进主包。Tree Shaking 在这一层基本无效（`ChatClient` 从根入口导入、Manager 注册制、SDK 内部模块组织不利于静态裁剪）。
+而 IM 的业务场景里**消息列表页通常是 tabBar 页、无法移入分包**，静态导入意味着 SDK 永远进主包。Tree Shaking 在这一层基本无效（`ChatClient` 从根入口导入、Manager 注册制、SDK 的模块组织方式不利于静态裁剪）。
 
 ### 1.2 核心思路
 
@@ -48,15 +48,15 @@
 **① 首次进入 IM 有真实的加载等待。** SDK 分包 1.2MB（压缩后约 1MB），首次使用 IM 功能前必须下载 + 解析 + 执行：
 - 正常网络 + `preloadRule` 预下载命中：等待被藏进登录页停留时间里，用户**无感知**；
 - 预下载未完成就点了登录/进入会话：等待显式暴露，表现为登录按钮长时间「登录中…」，弱网下可能 2~5 秒；
-- 下载失败（弱网、超包）：IM 直接不可用，**静态打包没有这种失败模式**——必须做失败重试与兜底文案（§4.7）。
+- 下载失败（弱网、超包）：IM 直接不可用，**静态打包没有这种失败模式**——必须做失败重试与失败提示（§4.7）。
 
-**② 整包体积不减反略增。** SDK 从主包 vendor 里移出时带走的是压缩后的体积，进入分包的是 es2017 降级产物（`?.` 展开后比 IIFE 源大 40%，本仓实测 873KB→1234KB）。整包上传口径：改造前 1336KB → 改造后 1621KB（多出来的约 300KB 是降级膨胀 + 产物未压缩所致）。**判断收益永远看主包那一行，不看总包。**
+**② 整包体积不减反略增。** SDK 从主包 vendor 里移出时带走的是压缩后的体积，进入分包的是 es2017 降级产物（`?.` 展开后比 IIFE 源大 40%，实测 873KB→1234KB）。整包上传口径：改造前 1336KB → 改造后 1621KB（多出来的约 300KB 是降级膨胀 + 产物未压缩所致）。**判断收益永远看主包那一行，不看总包。**
 
-**③ 构建链路多了一个产物后处理环节。** IIFE 拷贝降级、project.config.json patch 都挂在构建后，意味着：HBuilderX GUI 起的 dev 编译**不会**自动执行这些钩子（本仓实测踩坑）；CLI dev（`uni.sh dev mp-weixin`）已自动伴随 `prepare-sdk-subpackage.mjs --watch`（轮询产物 app.json，全量重发抹掉 im-sdk.js 后自动重拷），GUI dev 需手动挂一次 `--watch`；SDK 升级必须过 §8 检查清单，不能像普通 npm 依赖一样升完即走。
+**③ 构建链路多了一个产物后处理环节。** IIFE 拷贝降级、project.config.json patch 都挂在构建后，意味着：HBuilderX GUI 起的 dev 编译**不会**自动执行这些钩子（实测）；CLI dev（`uni.sh dev mp-weixin`）已自动伴随 `prepare-sdk-subpackage.mjs --watch`（轮询产物 app.json，全量重发抹掉 im-sdk.js 后自动重拷），GUI dev 需手动挂一次 `--watch`；SDK 升级必须过 §8 检查清单，不能像普通 npm 依赖一样升完即走。
 
 **④ 调试与报错模型变了。** SDK 代码不再出现在主包依赖图里：微信开发者工具的代码依赖分析、上传时的 unused 检查都会「看不到」它（所以要关 ignore 开关，§4.4）；断点要打进分包文件；报错从「启动即暴露」变成「首次用 IM 才暴露」（且表现形式是 `module is not defined` 这类模块系统错误，不直观）。
 
-**⑤ 代码约束多了一条硬规则。** 全工程运行时（非 `import type`）SDK 导入只能出现在加载器一个文件里；异步 `require` 的路径**相对编译产物**写死，移动调用文件必须同步改路径，无任何编译期校验（错了真机才炸）。新人改这块代码时需要文档护航。
+**⑤ 代码约束多了一条硬规则。** 全工程运行时（非 `import type`）SDK 导入只能出现在加载器一个文件里；异步 `require` 的路径**相对编译产物**写死，移动调用文件必须同步改路径，无任何编译期校验（错了真机才炸）。改动这块代码前请先读本节。
 
 **⑥ 运行时多一次大文件 JS 求值。** 分包下载完成后，微信要把 1.2MB 的 im-sdk.js 当 CJS 模块求值一次，首进 IM 有百毫秒级的解析执行开销（之后模块常驻内存，后续进入零成本）。低端机上如果用户在分包还没下载完就反复点按，注意入口要做幂等（Promise 缓存即为此设，§4.5）。
 
@@ -86,7 +86,7 @@
 小程序启动
   → 进入登录页（preloadRule 触发 sub-sdk 预下载，后台进行）
   → EmKit.init()（同步部分立即生效；SDK 依赖部分挂就绪门）
-  → await EmKit.login()（内部先等 SDK 分包加载 + ChatClient.init）
+  → await EmKit.login()（先等 SDK 分包加载 + ChatClient.init）
   → 登录成功，跳会话列表
 ```
 
@@ -156,14 +156,15 @@ module.exports = IMSDK;
 
 ```bash
 # 等价命令（实际脚本见 scripts/prepare-sdk-subpackage.mjs，可直接拷贝）
+# <HBuilderX> 换成你的 HBuilderX 安装目录；esbuild 是 HBuilderX 内置的，无需新装
 cat im-sdk-web.iife.js <(echo 'module.exports=IMSDK;') | \
-  /Applications/HBuilderX.app/Contents/HBuilderX/plugins/uniapp-cli-vite/node_modules/.bin/esbuild \
+  <HBuilderX>/plugins/uniapp-cli-vite/node_modules/.bin/esbuild \
   --loader=js --target=es2017 --format=cjs > sub-sdk/im-sdk.js
 ```
 
 降级后产物约 1234KB（比 IIFE 源大是正常的——`?.` 展开成三元表达式会变长，不影响运行）。
 
-### 4.4 关闭「未使用文件忽略」（**头号踩坑**）
+### 4.4 关闭「未使用文件忽略」（**最常见的问题**）
 
 `sub-sdk/im-sdk.js` 只被异步 `require` 引用，**不在微信开发者工具的静态依赖图里**。工具默认开启「未使用文件忽略」（依赖分析），会把这个文件从包内剔除，模拟器/真机报：
 
@@ -182,11 +183,11 @@ module 'sub-sdk/im-sdk.js' is not defined, require args is 'sub-sdk/im-sdk.js'
 }
 ```
 
-> 排查此类报错的第一件事：**确认开发者工具打开的产物目录里这个文件真的存在**。本仓实测踩过「工具开着 `dist/dev` 而构建后处理只挂在 build 模式」的坑——dev 编译不触发后处理，SDK 文件根本没被拷进去，报错一模一样。CLI dev 现走 `uni.sh dev mp-weixin` 会自动伴随 `--watch` 重拷（增量重发不抹文件、全量重发自动补）；GUI dev 或手动跑 watch 的场景，确认产物里 `sub-sdk/im-sdk.js` 存在且非 0 字节。
+> 排查此类报错的第一件事：**确认开发者工具打开的产物目录里这个文件真的存在**。实测遇到过「工具开着 `dist/dev` 而构建后处理只挂在 build 模式」的情况——dev 编译不触发后处理，SDK 文件根本没被拷进去，报错一模一样。CLI dev 现走 `uni.sh dev mp-weixin` 会自动伴随 `--watch` 重拷（增量重发不抹文件、全量重发自动补）；GUI dev 或手动跑 watch 的场景，确认产物里 `sub-sdk/im-sdk.js` 存在且非 0 字节。
 
 ### 4.5 库/业务侧的 SDK 异步加载器
 
-全工程**只允许一个文件**出现 `easemob-websdk` 的运行时（非 `import type`）导入。uni-app x 下用条件编译做双实现（本仓 `libs/client/sdk.ts`）：
+全工程**只允许一个文件**出现 `easemob-websdk` 的运行时（非 `import type`）导入。uni-app x 下用条件编译做双实现（仓库内 `libs/client/sdk.ts`）：
 
 ```ts
 // #ifndef MP-WEIXIN
@@ -226,11 +227,11 @@ export function ensureSdkModule(): Promise<any> {
 3. **Promise 缓存 + 失败重置**：防并发重复加载；失败后清缓存让下次调用重试。
 4. **导出校验**：拿到模块后检查 `ChatClient/ChatManager/ContactManager/UserInfoManager/PushManager/setConsoleLogEnabled/setLogLevel` 是否齐全，缺了立刻抛错（升级 SDK 改了导出结构时，构建期/运行期快速失败，而不是等到 `ChatClient.init` 才报 undefined）。
 
-> 宿主想自管理加载（自定义分包路径、自行 `wx.loadSubpackage` 预下载等），给 `ensureSdkModule` 留一个注入口（本仓为 `EmKitConfig.sdkLoader / sdkModule`，`sdkModule` 优先），**不要**让宿主去改默认路径常量。
+> 宿主想自管理加载（自定义分包路径、自行 `wx.loadSubpackage` 预下载等），给 `ensureSdkModule` 留一个注入口（仓库内为 `EmKitConfig.sdkLoader / sdkModule`，`sdkModule` 优先），**不要**让宿主去改默认路径常量。
 
 ### 4.6 初始化三阶段就绪门
 
-SDK 加载、ChatClient 初始化、登录是三个阶段，各自的 Promise 分开缓存（本仓 `libs/client/index.ts` 模式）：
+SDK 加载、ChatClient 初始化、登录是三个阶段，各自的 Promise 分开缓存（仓库内 `libs/client/index.ts` 的做法）：
 
 ```ts
 init(config) {
@@ -281,7 +282,7 @@ async login(options) {
 
 ### 5.1 产物静态检查（防回归脚本，最便宜）
 
-本仓 `scripts/check-mp-size.mjs`（挂构建后自动跑），11 项断言全绿：
+仓库内 `scripts/check-mp-size.mjs`（构建后自动执行），11 项断言全绿：
 
 ```text
 ✓ websdk 精确锁版（demo/package.json = "5.1.3"）
@@ -299,13 +300,13 @@ async login(options) {
 
 ### 5.2 开发者工具面板确认
 
-1. **项目配置 → 基本信息**：「路径/大小」列表应把每个分包单独列出来（本仓实测：主包 861KB、/sub-im/ 42.4KB、/sub-sdk/ 1234.7KB，合计与「本地代码」对得上账）。只显示一行「主包 N MB」而没有分包行 = 分包没声明成功。
-2. **预览 → 代码包明细**：弹窗里逐包列出**压缩后**上传体积（本仓实测：主包 520.6KB、/sub-sdk/ 1070.4KB、/sub-im/ 30.2KB）。判断标准：主包 ≪ 2MB，SDK 那 1MB 在分包行里。
+1. **项目配置 → 基本信息**：「路径/大小」列表应把每个分包单独列出来（实测：主包 861KB、/sub-im/ 42.4KB、/sub-sdk/ 1234.7KB，合计与「本地代码」对得上账）。只显示一行「主包 N MB」而没有分包行 = 分包没声明成功。
+2. **预览 → 代码包明细**：弹窗里逐包列出**压缩后**上传体积（实测：主包 520.6KB、/sub-sdk/ 1070.4KB、/sub-im/ 30.2KB）。判断标准：主包 ≪ 2MB，SDK 那 1MB 在分包行里。
 3. **Console 启动日志**：出现 `preloadSubpackages: sub-sdk` + `preloadSubpackages: success` 说明预下载生效；`No. of subpackages: 2` 说明声明被识别。
 
 ### 5.3 运行时冒烟（模拟器即可）
 
-放一个免登录的探针（本仓 demo spike 页「加载 SDK 分包探针」按钮）：
+放一个免登录的探针（示例工程的连通性自检页有「加载 SDK 分包探针」按钮）：
 
 ```ts
 // @ts-ignore
@@ -338,7 +339,7 @@ require('../../sub-sdk/im-sdk.js', (mod) => {
 
 ---
 
-## 7. 体积参考基线（本仓 demo 实测，2026-10-15）
+## 7. 体积参考基线（示例工程实测，2026-10-15）
 
 | 指标 | dev 产物（未压缩） | build 产物（压缩） | 预览上传（压缩） |
 |---|---|---|---|
@@ -357,7 +358,7 @@ require('../../sub-sdk/im-sdk.js', (mod) => {
 
 1. 精确版本安装（`--save-exact`），核对 lockfile；
 2. **确认 IIFE 文件路径**（`bundle/im-sdk-web.iife.js` 可能改名）；
-3. **确认 IIFE 全局名仍为 `IMSDK`**——本仓 prepare 脚本会校验前缀，变了会在构建期直接抛错（防回归第一关）；
+3. **确认 IIFE 全局名仍为 `IMSDK`**——仓库内的 prepare 脚本会校验前缀，变了会在构建期直接抛错（防回归第一关）；
 4. 确认所需 Manager 导出齐全（prepare 脚本的 require 探针会替你验）；
 5. 重新构建，跑防回归检查（§5.1）；
 6. 模拟器 + 双端真机回归：登录、会话/联系人同步、消息收发、断网重连、token 过期。
@@ -371,7 +372,7 @@ require('../../sub-sdk/im-sdk.js', (mod) => {
 
 ---
 
-## 10. 本仓落地物索引
+## 10. 落地物索引
 
 | 资产 | 位置 | 作用 |
 |---|---|---|
@@ -380,6 +381,5 @@ require('../../sub-sdk/im-sdk.js', (mod) => {
 | 构建钩子 | `scripts/uni.sh` | build mp-weixin 成功后依次执行上述两脚本 |
 | 库侧 SDK 加载器 | `uni_modules/easemob-uikit-uni/libs/client/sdk.ts` | 条件编译双实现 + 默认跨分包 require + 导出校验 |
 | 三阶段就绪门 | `uni_modules/easemob-uikit-uni/libs/client/index.ts` | load→init→login Promise 缓存、失败重试 |
-| 宿主注入口 | `EmKitConfig.sdkLoader / sdkModule`、`EmKit.whenReady()` | 自管理加载 / 加载态占位 |
+| 宿主注入口 | `EmKitConfig.sdkLoader / sdkModule`、`EmKit.whenReady()` | 自管理加载 / 加载态提示 |
 | demo 接线样例 | `demo/pages.json`（subPackages + preloadRule）、`demo/sub-im/`、`demo/sub-sdk/` | 可直接照抄的配置 |
-| 编译器行为记录 | `docs/SPIKE-SDK-SUBPACKAGE.md` | 6 条实测事实 + 2 条运行时踩坑 |

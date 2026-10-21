@@ -1,13 +1,13 @@
 <template>
   <view class="spike" :class="themeClass">
     <view class="spike__header">
-      <text class="spike__title">环信 SDK 连通性 Spike</text>
+      <text class="spike__title">环信 SDK 连通性自检</text>
       <text class="spike__status">连接状态：{{ statusText }}</text>
       <text class="spike__status">运行模式：{{ runtimeMode }}（条件编译探针）</text>
       <text class="spike__error" v-if="errorText !== ''">{{ errorText }}</text>
       <!-- #ifdef MP-WEIXIN -->
       <view class="spike__row spike__row--probe">
-        <button class="spike__btn spike__btn--plain" @click="onLoadSdkProbe">加载 SDK 分包探针</button>
+        <button class="spike__btn spike__btn--plain" @click="onLoadSdkProbe">加载 SDK 分包自检</button>
         <text class="spike__status spike__status--probe">{{ sdkProbeText }}</text>
       </view>
       <!-- #endif -->
