@@ -1,8 +1,8 @@
 <template>
   <view
     v-if="rendered"
-    :class="[ns.b(), themeClass, position === 'center' ? 'em-popup--center' : '']"
-    :style="`z-index: ${zIndex};`"
+    :class="[ns.b(), themeClass, position === 'center' ? 'em-popup--center' : '', customClass]"
+    :style="`z-index: ${zIndex};` + customStyle"
   >
     <view :class="[ns.e('overlay'), shown ? 'em-popup__overlay--show' : '']" @click="onMaskClick"></view>
     <view
@@ -17,7 +17,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { holdTabBar, nextZIndex, releaseTabBar } from '../../libs/use/usePopup'
-import { getSafeAreaBottom, getSafeAreaTop } from '../../libs/use/useSafeArea'
+import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useTheme } from '../../libs/use/useTheme'
 
@@ -28,13 +28,17 @@ interface Props {
   safeArea?: boolean
   /** 全屏形态（bottom 专用）：面板去顶部圆角，由内容方配 100% 高（对齐 vue mobileFullscreen） */
   fullscreen?: boolean
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   position: 'bottom',
   maskClosable: true,
   safeArea: true,
-  fullscreen: false
+  fullscreen: false,
+  customClass: '',
+  customStyle: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })
@@ -90,13 +94,6 @@ onUnmounted(() => {
 const panelStyle = computed(() => {
   if (props.position !== 'bottom') return ''
   let style = ''
-  // 全屏面板贴屏顶：刘海/状态栏避让（Android/iOS 内容渲染到状态栏下，对齐 em-nav-bar 口径）
-  if (props.fullscreen) {
-    const top = getSafeAreaTop()
-    if (top > 0) {
-      style += `padding-top: ${top}px;`
-    }
-  }
   if (props.safeArea) {
     const bottom = getSafeAreaBottom()
     if (bottom > 0) {

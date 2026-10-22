@@ -1,5 +1,5 @@
 <template>
-  <em-popup :visible="show" :fullscreen="isMultiple" @update:visible="onPopupVisible">
+  <em-popup :visible="show" :fullscreen="isMultiple" :mask-closable="!submitting" :custom-class="customClass" :custom-style="customStyle" @update:visible="onPopupVisible">
     <view :class="[ns.e('sheet'), isMultiple ? 'em-select-contact__sheet--full' : '']" :style="sheetStyle">
       <!-- 头部：标题 + 关闭（multiple 为全屏形态，对齐 vue mobileFullscreen；小程序端关闭键避让胶囊） -->
       <view :class="ns.e('header')">
@@ -92,7 +92,7 @@
 
       <!-- multiple：通栏确认按钮（计数 + 空选禁用，对齐 vue 移动端 transfer footer） -->
       <view v-if="isMultiple" :class="ns.e('footer')">
-        <em-button type="primary" pill block :disabled="selectedIds.length === 0" :text="confirmText" @click="onConfirm" />
+        <em-button type="primary" pill block :disabled="selectedIds.length === 0" :loading="submitting" :text="confirmText" @click="onConfirm" />
       </view>
     </view>
   </em-popup>
@@ -121,19 +121,25 @@ import { groupContacts } from '../../libs/utils/pinyin'
 // single（默认，对齐 vue new-chat-modal）：平铺直点、无字母导航；
 // multiple（对齐 vue contact-transfer-modal 移动端）：字母分组 + 索引条 + 自绘 checkbox +
 // 已选头像条 + 通栏确认按钮；#panel-top 插槽可在已选条与列表之间注入表单（建群弹层用）。
-// confirm 仅透出选中 id 列表，不自动关闭（异步提交成败由父组件决定关窗时机）
+// confirm 仅透出选中 id 列表，不自动关闭（异步提交成败由父组件决定关窗时机）；submitting 拦截重复提交与选择/关闭操作
 interface Props {
   items: EmSelectContactItem[]   // 候选联系人（userId/展示名/avatar 由父组件装配好传入）
   show: boolean                  // 弹层显隐（v-model:show）
   selectMode?: SelectContactModeValue  // 默认 single（Phase 2 行为不变）
   disabledIds?: string[]         // 置灰不可选（如邀请入群时禁用已在群成员）
   title?: string                 // 空串按模式回落 i18n 默认（single=发起单聊 / multiple=选择成员）
+  submitting?: boolean           // 异步提交中：禁确认、选择、关闭按钮与遮罩关闭
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   selectMode: SELECT_CONTACT_MODE.SINGLE,
   disabledIds: () => [],
-  title: ''
+  title: '',
+  submitting: false,
+  customClass: '',
+  customStyle: ''
 })
 
 const emit = defineEmits<{
@@ -156,10 +162,12 @@ const nameTextStyle = TEXT_STYLE_NAME
 
 // 面板高度：single 保持 0.6 半屏（对齐 vue new-chat-modal）；multiple 内容多（已选条 + 表单 + 列表 + footer），
 // 对齐 vue contact-transfer-modal 的 mobileFullscreen 取窗口全高（读取时刻快照，弹层存续期内不响应旋转，同 useSafeArea 口径）；
-// multiple 高度须扣除顶部安全区——em-popup 全屏形态会注入 padding-top 避让刘海，不扣则底部确认键被顶出屏
+// multiple 顶部 padding 必须落在本 sheet：iOS 蒸汽端 em-popup panel 的 padding 不参与布局；
+// 高度同步扣除同一 inset，padding + 内容高度合计仍为 windowHeight，底部确认键不被顶出屏
 const sheetStyle = computed(() => {
   if (isMultiple.value) {
-    return `height: ${uni.getWindowInfo().windowHeight - getSafeAreaTop()}px;`
+    const top = getSafeAreaTop()
+    return `height: ${uni.getWindowInfo().windowHeight - top}px; padding-top: ${top}px;`
   }
   return `height: ${Math.round(uni.getWindowInfo().windowHeight * 0.6)}px;`
 })
@@ -245,6 +253,7 @@ function rowClass(entry: EmSelectContactItem): string {
 }
 
 function onToggle(entry: EmSelectContactItem): void {
+  if (props.submitting) return
   const index = selectedIds.value.indexOf(entry.userId)
   // 已选后变 disabled 的项允许从已选区移除（如邀请入群时对方已被拉入群），只拦截新增选中
   if (index >= 0) {
@@ -256,15 +265,18 @@ function onToggle(entry: EmSelectContactItem): void {
 }
 
 function onConfirm(): void {
+  if (props.submitting) return
   if (selectedIds.value.length === 0) return
   emit('confirm', [...selectedIds.value])
 }
 
 function onSelect(userId: string): void {
+  if (props.submitting) return
   emit('select', userId)
 }
 
 function onClose(): void {
+  if (props.submitting) return
   emit('update:show', false)
 }
 
@@ -280,6 +292,7 @@ watch(() => props.show, (visible) => {
 })
 
 function onPopupVisible(value: boolean): void {
+  if (props.submitting && !value) return
   emit('update:show', value)
 }
 </script>

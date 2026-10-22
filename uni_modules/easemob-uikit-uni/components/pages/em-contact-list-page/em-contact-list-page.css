@@ -98,3 +98,11 @@
   line-height: 20px;
   color: var(--em-text-primary);
 }
+
+/* 品牌色内联变量作用域层：接替根的 flex 容器角色（flex:1 + height:0 保持滚动约束链） */
+.em-contact-list-page__brand-scope {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 0;
+}

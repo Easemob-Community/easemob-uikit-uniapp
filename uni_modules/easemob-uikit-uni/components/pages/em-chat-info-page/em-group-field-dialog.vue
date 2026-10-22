@@ -1,7 +1,7 @@
 <template>
   <view :class="ns.b()">
-    <!-- 群名称编辑弹层（乐观更新，失败回滚） -->
-    <em-popup :visible="nameEditShow" position="center" @update:visible="emit('update:nameEditShow', $event)">
+    <!-- 群名称编辑弹层（乐观更新，失败回滚；保存中禁止关闭） -->
+    <em-popup :visible="nameEditShow" position="center" @update:visible="onNameVisibleChange">
       <view :class="ns.e('dialog')">
         <text :class="ns.e('dialog-title')">{{ t('group.name') }}</text>
         <input
@@ -12,7 +12,7 @@
           :disabled="savingName"
         />
         <view :class="ns.e('dialog-actions')">
-          <view :class="[ns.e('dialog-btn'), ns.m('dialog-btn-divider')]" @click="emit('update:nameEditShow', false)">
+          <view :class="[ns.e('dialog-btn'), ns.m('dialog-btn-divider')]" @click="onCancelName">
             <text :class="ns.e('dialog-btn-text')">{{ t('button.cancel') }}</text>
           </view>
           <view :class="ns.e('dialog-btn')" @click="onSaveName">
@@ -23,7 +23,7 @@
     </em-popup>
 
     <!-- 群公告弹层：查看态（owner/admin 可切编辑态）/ 编辑态（textarea + 字数计数 x/512） -->
-    <em-popup :visible="announcementShow" position="center" @update:visible="emit('update:announcementShow', $event)">
+    <em-popup :visible="announcementShow" position="center" @update:visible="onAnnouncementVisibleChange">
       <view :class="ns.e('dialog')">
         <text :class="ns.e('dialog-title')">{{ t('group.announcement') }}</text>
         <template v-if="!announcementEditing">
@@ -31,7 +31,7 @@
             <text :class="[ns.e('dialog-text'), announcement === '' && ns.m('dialog-text-placeholder')]">{{ announcement !== '' ? announcement : t('group.announcementEmpty') }}</text>
           </scroll-view>
           <view :class="ns.e('dialog-actions')">
-            <view :class="[ns.e('dialog-btn'), canEditAnnouncement && ns.m('dialog-btn-divider')]" @click="emit('update:announcementShow', false)">
+            <view :class="[ns.e('dialog-btn'), canEditAnnouncement && ns.m('dialog-btn-divider')]" @click="onCloseAnnouncement">
               <text :class="ns.e('dialog-btn-text')">{{ t('button.close') }}</text>
             </view>
             <view v-if="canEditAnnouncement" :class="ns.e('dialog-btn')" @click="startAnnouncementEdit">
@@ -50,7 +50,7 @@
             <text :class="ns.e('dialog-count')">{{ announcementInput.length }}/{{ GROUP_ANNOUNCEMENT_MAX_LENGTH }}</text>
           </view>
           <view :class="ns.e('dialog-actions')">
-            <view :class="[ns.e('dialog-btn'), ns.m('dialog-btn-divider')]" @click="announcementEditing = false">
+            <view :class="[ns.e('dialog-btn'), ns.m('dialog-btn-divider')]" @click="onCancelAnnouncementEdit">
               <text :class="ns.e('dialog-btn-text')">{{ t('button.cancel') }}</text>
             </view>
             <view :class="ns.e('dialog-btn')" @click="onSaveAnnouncement">
@@ -109,6 +109,15 @@ watch(() => props.nameEditShow, (show) => {
   }
 })
 
+function onNameVisibleChange(value: boolean): void {
+  if (!value && savingName.value) return
+  emit('update:nameEditShow', value)
+}
+
+function onCancelName(): void {
+  onNameVisibleChange(false)
+}
+
 // 乐观更新：先写 store，失败回滚（domain updateGroupInfo 成功路径也会写 store，幂等）
 async function onSaveName(): Promise<void> {
   if (savingName.value) return
@@ -151,6 +160,20 @@ watch(() => props.announcementShow, (show) => {
     announcementEditing.value = false
   }
 })
+
+function onAnnouncementVisibleChange(value: boolean): void {
+  if (!value && savingAnnouncement.value) return
+  emit('update:announcementShow', value)
+}
+
+function onCloseAnnouncement(): void {
+  onAnnouncementVisibleChange(false)
+}
+
+function onCancelAnnouncementEdit(): void {
+  if (savingAnnouncement.value) return
+  announcementEditing.value = false
+}
 
 function startAnnouncementEdit(): void {
   announcementInput.value = announcement.value

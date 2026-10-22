@@ -1,73 +1,81 @@
 <template>
-  <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
-    <!-- 自绘导航栏（系统栏右上角被小程序胶囊独占，且与页内标题重复）：返回隐藏，右侧「+」发起单聊 -->
-    <em-nav-bar
-      :title="t('conversation.title')"
-      :show-back="false"
-      action-icon="circle-plus"
-      @action="onOpenCreate"
-    />
+  <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
+    <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
+    <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
+      <!-- 自绘导航栏（系统栏右上角被小程序胶囊独占，且与页内标题重复）：返回隐藏，右侧「+」发起单聊 -->
+      <em-nav-bar
+        :title="t('conversation.title')"
+        :show-back="false"
+        action-icon="circle-plus"
+        @action="onOpenCreate"
+      />
 
-    <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
-    <em-connection-banner :show="showConnectionBanner" />
+      <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
+      <em-connection-banner :show="showConnectionBanner" />
 
-    <!-- 筛选 tab（对齐 vue 版 conversation-tabs：全部/未读/@我/单聊/群组，tabs 传空数组可隐藏） -->
-    <em-conversation-tabs v-if="tabs.length > 0" :tabs="tabs" :active="activeTab" @change="onTabChange" />
+      <!-- 筛选 tab（对齐 vue 版 conversation-tabs：全部/未读/@我/单聊/群组；showTabs=false 或 tabs 传空数组可隐藏） -->
+      <em-conversation-tabs v-if="showTabs && tabs.length > 0" :tabs="tabs" :active="activeTab" @change="onTabChange" />
 
-    <em-search-bar v-if="showSearch" v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
+      <em-search-bar v-if="showSearch" v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
 
-    <scroll-view :class="ns.e('scroll')" scroll-y>
-      <!-- 首次同步骨架（对齐 vue 版 conversation-list：替代转圈，6 条会话条目占位） -->
-      <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
-        <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
-          <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
-          <view :class="ns.e('skeleton-lines')">
-            <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
-            <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+      <scroll-view :class="ns.e('scroll')" scroll-y>
+        <!-- 首次同步骨架（对齐 vue 版 conversation-list：替代转圈，6 条会话条目占位） -->
+        <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
+          <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
+            <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
+            <view :class="ns.e('skeleton-lines')">
+              <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
+              <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+            </view>
           </view>
         </view>
-      </view>
-      <view v-else-if="items.length === 0">
-        <slot name="empty">
-          <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText" />
-        </slot>
-      </view>
+        <view v-else-if="syncFailed && conversationStore.items.length === 0">
+          <em-empty icon="circle-bang" :description="t('common.syncFailed')">
+            <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
+          </em-empty>
+        </view>
+        <view v-else-if="items.length === 0">
+          <slot name="empty">
+            <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText" />
+          </slot>
+        </view>
 
-      <em-conversation-item
-        v-for="entry in items"
-        :key="entry.item.conversationId"
-        :item="entry.item"
-        :name="entry.name"
-        :avatar="entry.avatar"
-        :time-text="entry.timeText"
-        :draft="entry.draft"
-        :has-at-me="entry.hasAtMe"
-        @click="onSelect"
-        @long-press="onLongPress"
+        <em-conversation-item
+          v-for="entry in items"
+          :key="entry.item.conversationId"
+          :item="entry.item"
+          :name="entry.name"
+          :avatar="entry.avatar"
+          :time-text="entry.timeText"
+          :draft="entry.draft"
+          :has-at-me="entry.hasAtMe"
+          @click="onSelect"
+          @long-press="onLongPress"
+        />
+      </scroll-view>
+
+      <em-action-sheet
+        :visible="createSheetVisible"
+        :actions="createActions"
+        @select="onCreateAction"
+        @update:visible="createSheetVisible = $event"
       />
-    </scroll-view>
+      <em-action-sheet
+        :visible="itemSheetVisible"
+        :actions="itemActions"
+        :title="activeItem != null ? sheetTitleOf(activeItem) : ''"
+        @select="onItemAction"
+        @update:visible="itemSheetVisible = $event"
+      />
 
-    <em-action-sheet
-      :visible="createSheetVisible"
-      :actions="createActions"
-      @select="onCreateAction"
-      @update:visible="createSheetVisible = $event"
-    />
-    <em-action-sheet
-      :visible="itemSheetVisible"
-      :actions="itemActions"
-      :title="activeItem != null ? sheetTitleOf(activeItem) : ''"
-      @select="onItemAction"
-      @update:visible="itemSheetVisible = $event"
-    />
-
-    <!-- 发起单聊选人弹层（内置闭环：选完人 addConversation 后以 select 事件透出，宿主负责跳聊天页） -->
-    <em-select-contact
-      :items="contactItems"
-      :show="selectContactVisible"
-      @update:show="selectContactVisible = $event"
-      @select="onSelectContact"
-    />
+      <!-- 发起单聊选人弹层（内置闭环：选完人 addConversation 后以 select 事件透出，宿主负责跳聊天页） -->
+      <em-select-contact
+        :items="contactItems"
+        :show="selectContactVisible"
+        @update:show="selectContactVisible = $event"
+        @select="onSelectContact"
+      />
+    </view>
   </view>
 </template>
 
@@ -80,6 +88,7 @@ import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmConversationTabs from '../../em-conversation-tabs/em-conversation-tabs.vue'
 import EmConversationItem from '../../em-conversation-item/em-conversation-item.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
+import EmButton from '../../em-button/em-button.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmSelectContact from '../../em-select-contact/em-select-contact.vue'
 import { EmKit } from '../../../libs'
@@ -105,20 +114,27 @@ interface Props {
   showSearch?: boolean
   /** 筛选 tab 及顺序（对齐 vue conversation-tabs），默认全部五项；传空数组隐藏 tab 栏 */
   tabs?: ConversationTabKeyValue[]
+  /** 筛选 tab 栏显隐，默认 true；false 时无论 tabs 传什么都不渲染 */
+  showTabs?: boolean
   /** 列表空态文案（仅空列表场景，搜索无结果仍走 searchEmpty 文案）；空串走 i18n 默认 */
   emptyText?: string
   /** 首次挂载自动拉会话快照，默认 true；宿主可关闭后自行控制同步时机 */
   autoSync?: boolean
   /** 顶部连接状态条显隐，默认 true */
   showConnectionBanner?: boolean
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showSearch: true,
   tabs: () => DEFAULT_CONVERSATION_TABS,
+  showTabs: true,
   emptyText: '',
   autoSync: true,
-  showConnectionBanner: true
+  showConnectionBanner: true,
+  customClass: '',
+  customStyle: ''
 })
 
 const emit = defineEmits<{
@@ -131,11 +147,30 @@ const { themeClass } = useTheme()
 const { t } = useLocale()
 const { config } = useConfig()
 
+const syncFailed = ref(false)
+const syncPending = ref(false)
+const syncing = computed(() => conversationStore.syncing || syncPending.value)
+const keyword = ref('')
+
+// 首次挂载与失败重试共用锁；有缓存时失败只记录状态，不用全屏错误遮住列表。
+async function syncList(): Promise<void> {
+  if (syncPending.value) return
+  syncPending.value = true
+  syncFailed.value = false
+  try {
+    await EmKit.syncConversations()
+  } catch (e) {
+    syncFailed.value = true
+  } finally {
+    syncPending.value = false
+  }
+}
+
 // 首次挂载自拉一次（P1-11）：宿主漏调 syncConversations 时不再出现空列表；
 // 返回页面后的刷新仍建议宿主在 onShow 再调一次（组件拿不到页面级 onShow）。
 onMounted(() => {
   if (!props.autoSync || connectionStore.userId === '') return
-  EmKit.syncConversations().catch(() => {})
+  syncList()
 })
 
 // 空态文案：搜索无结果 > emptyText prop > 分 tab i18n 默认（#empty 插槽整体优先于三者，见模板）
@@ -143,9 +178,6 @@ const emptyTipText = computed(() => {
   if (keyword.value.trim() !== '') return t('conversation.searchEmpty')
   return props.emptyText !== '' ? props.emptyText : tabEmptyText.value[activeTab.value] ?? t('conversation.empty')
 })
-
-const syncing = computed(() => conversationStore.syncing)
-const keyword = ref('')
 
 // 筛选 tab 激活态（页面内部状态，不透出；对齐 vue conversation-list effectiveActiveTab）
 const activeTab = ref<ConversationTabKeyValue>(CONVERSATION_TAB_KEY.ALL)
@@ -263,15 +295,29 @@ const createActions = computed<EmActionSheetAction[]>(() => [
   { key: CONVERSATION_MENU_KEY.CREATE_GROUP, text: t('conversation.menu.createGroup'), icon: 'person-double' }
 ])
 
+const pendingActionKeys = ref<string[]>([])
+
+function actionLockKey(conversationId: string, actionKey: string): string {
+  return JSON.stringify([conversationId, actionKey])
+}
+
+function isActionPending(conversationId: string, actionKey: string): boolean {
+  return pendingActionKeys.value.indexOf(actionLockKey(conversationId, actionKey)) >= 0
+}
+
+function endAction(lockKey: string): void {
+  pendingActionKeys.value = pendingActionKeys.value.filter((key) => key !== lockKey)
+}
+
 const itemActions = computed<EmActionSheetAction[]>(() => {
   const item = activeItem.value
   if (item == null) return []
   // 候选全集按 uiConfig.conversationMenuKeys 过滤排序（默认 pin/mute/delete 全量）
   // 图标逐项对齐 vue conversation-item 右键菜单：pin/slash ↔ pin、bell ↔ bell/slash
   const candidates: EmActionSheetAction[] = [
-    { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: item.isPinned ? 'pin-slash' : 'pin' },
-    { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: item.isMuted ? 'bell' : 'bell-slash' },
-    { key: CONVERSATION_MENU_KEY.DELETE, text: t('conversation.delete'), icon: 'trash', danger: true }
+    { key: CONVERSATION_MENU_KEY.PIN, text: item.isPinned ? t('conversation.unpin') : t('conversation.pin'), icon: item.isPinned ? 'pin-slash' : 'pin', disabled: isActionPending(item.conversationId, CONVERSATION_MENU_KEY.PIN) },
+    { key: CONVERSATION_MENU_KEY.MUTE, text: item.isMuted ? t('conversation.unmute') : t('conversation.mute'), icon: item.isMuted ? 'bell' : 'bell-slash', disabled: isActionPending(item.conversationId, CONVERSATION_MENU_KEY.MUTE) },
+    { key: CONVERSATION_MENU_KEY.DELETE, text: t('conversation.delete'), icon: 'trash', danger: true, disabled: isActionPending(item.conversationId, CONVERSATION_MENU_KEY.DELETE) }
   ]
   return config.conversationMenuKeys
     .map((key) => candidates.find((a) => a.key === key))
@@ -307,17 +353,42 @@ function sheetTitleOf(item: EmConversationData): string {
 
 async function onItemAction(action: EmActionSheetAction): Promise<void> {
   const item = activeItem.value
-  if (item == null) return
+  if (item == null || isActionPending(item.conversationId, action.key)) return
+  const lockKey = actionLockKey(item.conversationId, action.key)
+  pendingActionKeys.value.push(lockKey)
+  if (action.key === CONVERSATION_MENU_KEY.DELETE) {
+    uni.showModal({
+      title: t('conversation.delete'),
+      content: t('conversation.deleteConfirm'),
+      success: (res) => {
+        if (!res.confirm) {
+          endAction(lockKey)
+          return
+        }
+        EmKit.deleteConversation(item.conversationId, item.chatType)
+          .catch(() => {
+            uni.showToast({ title: t('error.unknown'), icon: 'none' })
+          })
+          .finally(() => {
+            endAction(lockKey)
+          })
+      },
+      fail: () => {
+        endAction(lockKey)
+      }
+    })
+    return
+  }
   try {
     if (action.key === CONVERSATION_MENU_KEY.PIN) {
       await EmKit.pinConversation(item.conversationId, item.chatType, !item.isPinned)
     } else if (action.key === CONVERSATION_MENU_KEY.MUTE) {
       await EmKit.setConversationMuted(item.conversationId, item.chatType, !item.isMuted)
-    } else if (action.key === CONVERSATION_MENU_KEY.DELETE) {
-      await EmKit.deleteConversation(item.conversationId, item.chatType)
     }
   } catch (e) {
     uni.showToast({ title: t('error.unknown'), icon: 'none' })
+  } finally {
+    endAction(lockKey)
   }
 }
 </script>

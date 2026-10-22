@@ -1,72 +1,82 @@
 <template>
-  <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
-    <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）；返回动作以 back 事件透出，路由由宿主接线 -->
-    <em-nav-bar :title="t('contact.entryContact')" @back="emit('back')" />
+  <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
+    <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
+    <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
+      <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）；返回动作以 back 事件透出，路由由宿主接线 -->
+      <em-nav-bar :title="t('contact.entryContact')" @back="emit('back')" />
 
-    <em-search-bar v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
+      <em-search-bar v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
 
-    <view :class="ns.e('body')">
-      <scroll-view
-        :class="ns.e('scroll')"
-        scroll-y
-        :scroll-into-view="scrollIntoId"
-        :scroll-with-animation="scrollAnim"
-      >
-        <!-- 好友同步骨架（对齐 vue 版 contact-list：8 条条目占位） -->
-        <view v-if="syncing && groups.length === 0" :class="ns.e('skeleton')">
-          <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
-            <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
-            <view :class="ns.e('skeleton-lines')">
-              <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
-              <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+      <view :class="ns.e('body')">
+        <scroll-view
+          :class="ns.e('scroll')"
+          scroll-y
+          :scroll-into-view="scrollIntoId"
+          :scroll-with-animation="scrollAnim"
+        >
+          <!-- 好友同步骨架（对齐 vue 版 contact-list：8 条条目占位） -->
+          <view v-if="syncing && groups.length === 0" :class="ns.e('skeleton')">
+            <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
+              <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
+              <view :class="ns.e('skeleton-lines')">
+                <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
+                <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+              </view>
             </view>
           </view>
-        </view>
-        <em-empty
-          v-else-if="groups.length === 0"
-          icon="person-single"
-          :description="keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty')"
-        />
-
-        <view v-for="group in groups" :key="group.key">
-          <!-- 分组锚点 id 供索引条 scroll-into-view 定位 -->
-          <view :id="anchorId(group.key)" :class="ns.e('group-header')">
-            <text :class="ns.e('group-header-text')">{{ group.key }}</text>
-          </view>
-          <view
-            v-for="c in group.items"
-            :key="c.userId"
-            :class="ns.e('item')"
-            @touchstart="onTouchStart"
-            @click="onSelect(c)"
-            @longpress="onLongPress(c)"
+          <em-empty
+            v-else-if="syncFailed && contactStore.items.length === 0"
+            icon="circle-bang"
+            :description="t('common.syncFailed')"
           >
-            <em-avatar :src="avatarOfItem(c)" :name="nameOf(c)" :size="48" />
-            <view :class="ns.e('item-body')">
-              <em-text :text="nameOf(c)" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
+            <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
+          </em-empty>
+          <em-empty
+            v-else-if="groups.length === 0"
+            icon="person-single"
+            :description="keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty')"
+          />
+
+          <view v-for="group in groups" :key="group.key">
+            <!-- 分组锚点 id 供索引条 scroll-into-view 定位 -->
+            <view :id="anchorId(group.key)" :class="ns.e('group-header')">
+              <text :class="ns.e('group-header-text')">{{ group.key }}</text>
+            </view>
+            <view
+              v-for="c in group.items"
+              :key="c.userId"
+              :class="ns.e('item')"
+              @touchstart="onTouchStart"
+              @click="onSelect(c)"
+              @longpress="onLongPress(c)"
+            >
+              <em-avatar :src="avatarOfItem(c)" :name="nameOf(c)" :size="48" />
+              <view :class="ns.e('item-body')">
+                <em-text :text="nameOf(c)" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
+              </view>
             </view>
           </view>
-        </view>
 
-        <!-- 底部「没有更多了」（对齐 vue 版 contact-list no-more；SDK 本地全量无分页，恒 noMore 态） -->
-        <em-load-more v-if="groups.length > 0" :state="LOAD_MORE_STATE.NO_MORE" />
-      </scroll-view>
+          <!-- 底部「没有更多了」（对齐 vue 版 contact-list no-more；SDK 本地全量无分页，恒 noMore 态） -->
+          <em-load-more v-if="groups.length > 0" :state="LOAD_MORE_STATE.NO_MORE" />
+        </scroll-view>
 
-      <em-alphabet-nav
-        v-if="groups.length > 0"
-        :active-key="activeKey"
-        :dim-keys="dimKeys"
-        @jump="onJump"
+        <em-alphabet-nav
+          v-if="groups.length > 0"
+          :active-key="activeKey"
+          :dim-keys="dimKeys"
+          @jump="onJump"
+        />
+      </view>
+
+      <em-action-sheet
+        :visible="itemSheetVisible"
+        :actions="itemActions"
+        :title="activeContact != null ? nameOf(activeContact) : ''"
+        @select="onItemAction"
+        @update:visible="itemSheetVisible = $event"
       />
     </view>
-
-    <em-action-sheet
-      :visible="itemSheetVisible"
-      :actions="itemActions"
-      :title="activeContact != null ? nameOf(activeContact) : ''"
-      @select="onItemAction"
-      @update:visible="itemSheetVisible = $event"
-    />
   </view>
 </template>
 
@@ -75,6 +85,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import EmAlphabetNav from '../../em-alphabet-nav/em-alphabet-nav.vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
+import EmButton from '../../em-button/em-button.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmLoadMore from '../../em-load-more/em-load-more.vue'
@@ -102,11 +113,15 @@ interface Props {
   menuKeys?: ContactMenuKeyValue[]
   /** 首次挂载自动读好友快照，默认 true；宿主可关闭后自行控制同步时机 */
   autoSync?: boolean
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   menuKeys: () => [CONTACT_MENU_KEY.DELETE],
-  autoSync: true
+  autoSync: true,
+  customClass: '',
+  customStyle: ''
 })
 
 // 名称文字内联样式收口 libs/style/textStyles.ts（小程序样式隔离，须走 text-style；详见 em-text 注释）
@@ -123,13 +138,28 @@ const { t } = useLocale()
 // H5 长按后仍会补发 click：长按删除菜单与点击进会话会同时触发，这里吞掉长按抬手那一次 click
 const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
-const syncing = computed(() => contactStore.syncing)
+const syncFailed = ref(false)
+const syncPending = ref(false)
+const syncing = computed(() => contactStore.syncing || syncPending.value)
 const keyword = ref('')
 
-// 首次挂载自拉好友快照（登录后 SDK 已后台同步，这里读内存；失败静默，事件会继续驱动刷新）
+async function syncList(): Promise<void> {
+  if (syncPending.value) return
+  syncPending.value = true
+  syncFailed.value = false
+  try {
+    await EmKit.syncContacts()
+  } catch (e) {
+    syncFailed.value = true
+  } finally {
+    syncPending.value = false
+  }
+}
+
+// 首次挂载自拉好友快照；失败时无缓存显示重试，有缓存继续展示现有联系人。
 onMounted(() => {
   if (!props.autoSync || EmKit.state.userId === '') return
-  EmKit.syncContacts().catch(() => {})
+  syncList()
 })
 
 // 好友同步骨架：条数与行宽对齐 vue 版 contact-list（8 条、35%/65% 两行）
@@ -211,10 +241,15 @@ function onSelect(c: EmContactItem): void {
 // 长按条目：action-sheet 菜单项按 menuKeys props 过滤排序（默认删除好友，CONTACT_MENU_KEY 收口，danger 项）
 const itemSheetVisible = ref(false)
 const activeContact = ref<EmContactItem | null>(null)
+const deletingContactIds = ref<string[]>([])
+
+function isDeletingContact(userId: string): boolean {
+  return deletingContactIds.value.indexOf(userId) >= 0
+}
 
 const itemActions = computed<EmActionSheetAction[]>(() => {
   const candidates: EmActionSheetAction[] = [
-    { key: CONTACT_MENU_KEY.DELETE, text: t('contact.delete'), icon: 'trash', danger: true }
+    { key: CONTACT_MENU_KEY.DELETE, text: t('contact.delete'), icon: 'trash', danger: true, disabled: activeContact.value != null && isDeletingContact(activeContact.value.userId) }
   ]
   return props.menuKeys
     .map((key) => candidates.find((a) => a.key === key))
@@ -228,19 +263,23 @@ function onLongPress(c: EmContactItem): void {
 
 function onItemAction(action: EmActionSheetAction): void {
   const c = activeContact.value
-  if (c == null) return
+  if (c == null || isDeletingContact(c.userId)) return
   if (action.key === CONTACT_MENU_KEY.DELETE) {
     uni.showModal({
       title: '',
       content: t('contact.deleteConfirm'),
       success: (res) => {
-        if (!res.confirm) return
+        if (!res.confirm || isDeletingContact(c.userId)) return
+        deletingContactIds.value.push(c.userId)
         EmKit.deleteContact(c.userId)
           .then(() => {
             uni.showToast({ title: t('contact.deleteSuccess'), icon: 'none' })
           })
           .catch(() => {
             uni.showToast({ title: t('error.unknown'), icon: 'none' })
+          })
+          .finally(() => {
+            deletingContactIds.value = deletingContactIds.value.filter((id) => id !== c.userId)
           })
       }
     })

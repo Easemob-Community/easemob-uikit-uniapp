@@ -9,7 +9,14 @@
 
     <scroll-view :class="ns.e('scroll')" scroll-y @scrolltolower="onScrollToLower">
       <em-empty
-        v-if="!initialLoading && displayMembers.length === 0"
+        v-if="initialLoadFailed && members.length === 0"
+        icon="circle-bang"
+        :description="t('group.memberLoadFailed')"
+      >
+        <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="initialLoading" :disabled="initialLoading" @click="loadInitialMembers" />
+      </em-empty>
+      <em-empty
+        v-else-if="!initialLoading && displayMembers.length === 0 && groupStore.memberMapByGroupId[props.groupId] != null"
         :icon="keyword.trim() !== '' ? 'search' : 'person-double'"
         :description="keyword.trim() !== '' ? t('group.memberNoResult') : t('group.memberEmpty')"
       />
@@ -47,6 +54,7 @@ import { computed, onMounted, ref } from 'vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
+import EmButton from '../../em-button/em-button.vue'
 import EmIcon from '../../em-icon/em-icon.vue'
 import EmLoadMore from '../../em-load-more/em-load-more.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
@@ -54,10 +62,11 @@ import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmText from '../../em-text/em-text.vue'
 import { EmKit } from '../../../libs'
 import { GROUP_MEMBER_ACTION, GROUP_MEMBER_ROLE, LOAD_MORE_STATE } from '../../../libs/constants'
-import type { LoadMoreStateValue } from '../../../libs/constants'
+import type { GroupMemberRoleValue, LoadMoreStateValue } from '../../../libs/constants'
 import { connectionStore } from '../../../libs/store/connection'
 import { groupMemberDisplayNameOf, groupStore, sortGroupMembers } from '../../../libs/store/group'
 import { avatarOf } from '../../../libs/store/user'
+import { canRemoveGroupMember } from '../../../libs/utils/group'
 import { TEXT_STYLE_NAME } from '../../../libs/style/textStyles'
 import type { EmActionSheetAction, EmGroupMember } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
@@ -91,6 +100,7 @@ const nameTextStyle = TEXT_STYLE_NAME
 
 const keyword = ref('')
 const initialLoading = ref(false)
+const initialLoadFailed = ref(false)
 
 const members = computed(() => groupStore.memberMapByGroupId[props.groupId] ?? [])
 
@@ -121,27 +131,36 @@ function memberAvatar(m: EmGroupMember): string {
   return m.avatar ?? avatarOf(m.userId)
 }
 
-// 首屏：无缓存时拉第一页（enterGroup 预热通常已就位，此处兜底）
+// 首屏：无缓存时拉第一页（enterGroup 预热通常已就位，此处兜底）；失败保留可重试状态。
+async function loadInitialMembers(): Promise<void> {
+  if (initialLoading.value) return
+  initialLoading.value = true
+  try {
+    await EmKit.getGroupMemberList(props.groupId)
+    initialLoadFailed.value = false
+  } catch (e) {
+    initialLoadFailed.value = true
+    uni.showToast({ title: t('group.memberLoadFailed'), icon: 'none' })
+  } finally {
+    initialLoading.value = false
+  }
+}
+
 onMounted(() => {
   if (groupStore.memberMapByGroupId[props.groupId] == null) {
-    initialLoading.value = true
-    EmKit.getGroupMemberList(props.groupId)
-      .catch(() => {
-        uni.showToast({ title: t('group.memberLoadFailed'), icon: 'none' })
-      })
-      .finally(() => {
-        initialLoading.value = false
-      })
+    loadInitialMembers()
   }
 })
 
-// ========== 游标翻页（domain 内部回写 store 游标/hasMore，这里只维护 loading 锁） ==========
+// ========== 游标翻页（domain 内部回写 store 游标/hasMore，这里维护 loading 锁与失败重试态） ==========
 
 const loadingMore = ref(false)
+const loadMoreFailed = ref(false)
 const hasMore = computed(() => groupStore.memberHasMoreByGroupId[props.groupId] === true)
 
 const loadMoreState = computed<LoadMoreStateValue>(() => {
   if (loadingMore.value) return LOAD_MORE_STATE.LOADING
+  if (loadMoreFailed.value) return LOAD_MORE_STATE.ERROR
   return hasMore.value ? LOAD_MORE_STATE.BUTTON : LOAD_MORE_STATE.NO_MORE
 })
 
@@ -152,8 +171,10 @@ function onScrollToLower(): void {
 function onLoadMore(): void {
   if (loadingMore.value || !hasMore.value) return
   loadingMore.value = true
+  loadMoreFailed.value = false
   EmKit.getGroupMemberList(props.groupId, groupStore.memberCursorByGroupId[props.groupId])
     .catch(() => {
+      loadMoreFailed.value = true
       uni.showToast({ title: t('group.memberLoadFailed'), icon: 'none' })
     })
     .finally(() => {
@@ -163,47 +184,48 @@ function onLoadMore(): void {
 
 // ========== 角色判定（memberMap 为准，owner 字段兜底，与 chat-info-page 同口径） ==========
 
-const selfRole = computed(() =>
+const selfRole = computed<GroupMemberRoleValue | null>(() =>
   members.value.find((m) => m.userId === connectionStore.userId)?.role ?? null
 )
-const isOwner = computed(() => {
-  if (connectionStore.userId === '') return false
-  if (selfRole.value === GROUP_MEMBER_ROLE.OWNER) return true
-  return groupStore.infoByGroupId[props.groupId]?.owner === connectionStore.userId
+const actorRole = computed<GroupMemberRoleValue | null>(() => {
+  if (selfRole.value != null) return selfRole.value
+  if (connectionStore.userId !== '' && groupStore.infoByGroupId[props.groupId]?.owner === connectionStore.userId) {
+    return GROUP_MEMBER_ROLE.OWNER
+  }
+  return null
 })
-const isAdmin = computed(() => selfRole.value === GROUP_MEMBER_ROLE.ADMIN)
+const isOwner = computed(() => actorRole.value === GROUP_MEMBER_ROLE.OWNER)
 
 // ========== 成员操作菜单（em-action-sheet，按角色权限动态生成） ==========
 
 const sheetVisible = ref(false)
 const activeMember = ref<EmGroupMember | null>(null)
+let pendingOperation: Promise<void> | null = null
 
 const activeMemberName = computed(() => (activeMember.value != null ? memberName(activeMember.value) : ''))
 
-// 权限矩阵（对齐 vue group-member-list-item 裁剪：禁言/拉黑不在一期）：
-// 任意角色对非自己可私聊；owner 对 admin/member 可设/撤管理员、转让群主、移出群聊；admin 对 member 可移出群聊
+// 任意角色对非自己可私聊；owner 可设撤管理员/转让，移除权限与批量入口共用 canRemoveGroupMember。
 function actionsOf(m: EmGroupMember): EmActionSheetAction[] {
   if (m.userId === connectionStore.userId) return []
   const actions: EmActionSheetAction[] = [
     { key: GROUP_MEMBER_ACTION.CHAT, text: t('group.memberAction.chat'), icon: 'bubble-circle' }
   ]
-  if (isOwner.value) {
+  if (isOwner.value && m.role !== GROUP_MEMBER_ROLE.OWNER) {
     if (m.role === GROUP_MEMBER_ROLE.ADMIN) {
       actions.push({ key: GROUP_MEMBER_ACTION.REMOVE_ADMIN, text: t('group.memberAction.removeAdmin'), icon: 'shield-person' })
     } else {
       actions.push({ key: GROUP_MEMBER_ACTION.SET_ADMIN, text: t('group.memberAction.setAdmin'), icon: 'shield-person' })
     }
     actions.push({ key: GROUP_MEMBER_ACTION.TRANSFER_OWNER, text: t('group.memberAction.transferOwner'), icon: 'person-arrows' })
-    // 转让/移除不标 danger（vue 设计稿警示色从严，红色区仅退群/解散）
-    actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'person-minus' })
-  } else if (isAdmin.value && m.role === GROUP_MEMBER_ROLE.MEMBER) {
+  }
+  if (canRemoveGroupMember(connectionStore.userId, actorRole.value, m)) {
     actions.push({ key: GROUP_MEMBER_ACTION.REMOVE, text: t('group.memberAction.remove'), icon: 'person-minus' })
   }
   return actions
 }
 
 function hasActions(m: EmGroupMember): boolean {
-  return m.userId !== connectionStore.userId
+  return actionsOf(m).length > 0
 }
 
 const memberActions = computed<EmActionSheetAction[]>(() =>
@@ -211,45 +233,113 @@ const memberActions = computed<EmActionSheetAction[]>(() =>
 )
 
 function onOpenActions(m: EmGroupMember): void {
-  if (actionsOf(m).length === 0) return
+  if (pendingOperation != null || actionsOf(m).length === 0) return
   activeMember.value = m
   sheetVisible.value = true
 }
 
-// 群域写方法成功即回写 store（角色修正/成员移除），列表自动刷新；失败 toast
-function runOp(req: () => Promise<void>): void {
-  req()
+function revalidateTarget(actionKey: string, userId: string, failureKey: string): EmGroupMember | null {
+  const target = members.value.find((m) => m.userId === userId) ?? null
+  let valid = target != null
+  if (target != null) {
+    if (actionKey === GROUP_MEMBER_ACTION.SET_ADMIN) {
+      valid = isOwner.value && target.role === GROUP_MEMBER_ROLE.MEMBER
+    } else if (actionKey === GROUP_MEMBER_ACTION.REMOVE_ADMIN) {
+      valid = isOwner.value && target.role === GROUP_MEMBER_ROLE.ADMIN
+    } else if (actionKey === GROUP_MEMBER_ACTION.TRANSFER_OWNER) {
+      valid = isOwner.value && target.userId !== connectionStore.userId && target.role !== GROUP_MEMBER_ROLE.OWNER
+    } else if (actionKey === GROUP_MEMBER_ACTION.REMOVE) {
+      valid = canRemoveGroupMember(connectionStore.userId, actorRole.value, target)
+    }
+  }
+  if (!valid) {
+    uni.showToast({ title: t(failureKey), icon: 'none' })
+    return null
+  }
+  return target
+}
+
+async function refreshAfterRemoval(): Promise<void> {
+  await Promise.all([
+    EmKit.getGroupInfo(props.groupId, true).catch(() => {}),
+    EmKit.getGroupMemberList(props.groupId).catch(() => {})
+  ])
+}
+
+// 所有成员写操作共享同一条可 await pending 链；旧请求未完成时不启动新请求。
+function runOp(req: () => Promise<void>, successKey: string, failureKey: string): Promise<void> {
+  if (pendingOperation != null) return pendingOperation
+  const operation = Promise.resolve()
+    .then(req)
     .then(() => {
-      uni.showToast({ title: t('group.updateSuccess'), icon: 'success' })
+      uni.showToast({ title: t(successKey), icon: 'success' })
     })
     .catch(() => {
-      uni.showToast({ title: t('group.updateFailed'), icon: 'none' })
+      uni.showToast({ title: t(failureKey), icon: 'none' })
     })
+    .finally(() => {
+      if (pendingOperation === operation) {
+        pendingOperation = null
+      }
+    })
+  pendingOperation = operation
+  return operation
 }
 
 function onAction(action: EmActionSheetAction): void {
   const m = activeMember.value
-  if (m == null) return
+  if (m == null || pendingOperation != null) return
   if (action.key === GROUP_MEMBER_ACTION.CHAT) {
     emit('chat-member', m.userId)
     return
   }
   if (action.key === GROUP_MEMBER_ACTION.SET_ADMIN) {
-    runOp(() => EmKit.addGroupAdmin(props.groupId, m.userId))
+    uni.showModal({
+      title: t('group.memberAction.setAdmin'),
+      content: t('group.memberAction.setAdminConfirm', { name: memberName(m) }),
+      success: (res) => {
+        if (!res.confirm || pendingOperation != null) return
+        const target = revalidateTarget(action.key, m.userId, 'group.memberAction.setAdminFailed')
+        if (target == null) return
+        runOp(
+          () => EmKit.addGroupAdmin(props.groupId, target.userId),
+          'group.memberAction.setAdminSuccess',
+          'group.memberAction.setAdminFailed'
+        )
+      }
+    })
     return
   }
   if (action.key === GROUP_MEMBER_ACTION.REMOVE_ADMIN) {
-    runOp(() => EmKit.removeGroupAdmin(props.groupId, m.userId))
+    uni.showModal({
+      title: t('group.memberAction.removeAdmin'),
+      content: t('group.memberAction.removeAdminConfirm', { name: memberName(m) }),
+      success: (res) => {
+        if (!res.confirm || pendingOperation != null) return
+        const target = revalidateTarget(action.key, m.userId, 'group.memberAction.removeAdminFailed')
+        if (target == null) return
+        runOp(
+          () => EmKit.removeGroupAdmin(props.groupId, target.userId),
+          'group.memberAction.removeAdminSuccess',
+          'group.memberAction.removeAdminFailed'
+        )
+      }
+    })
     return
   }
-  // 转让/移出二次确认（对齐 vue leave/destroy confirm 语义）
   if (action.key === GROUP_MEMBER_ACTION.TRANSFER_OWNER) {
     uni.showModal({
       title: t('group.memberAction.transferOwner'),
       content: t('group.memberAction.transferConfirm', { name: memberName(m) }),
       success: (res) => {
-        if (!res.confirm) return
-        runOp(() => EmKit.changeGroupOwner(props.groupId, m.userId))
+        if (!res.confirm || pendingOperation != null) return
+        const target = revalidateTarget(action.key, m.userId, 'group.memberAction.transferFailed')
+        if (target == null) return
+        runOp(
+          () => EmKit.changeGroupOwner(props.groupId, target.userId),
+          'group.memberAction.transferSuccess',
+          'group.memberAction.transferFailed'
+        )
       }
     })
     return
@@ -259,8 +349,13 @@ function onAction(action: EmActionSheetAction): void {
       title: t('group.memberAction.remove'),
       content: t('group.memberAction.removeConfirm', { name: memberName(m) }),
       success: (res) => {
-        if (!res.confirm) return
-        runOp(() => EmKit.removeGroupMembers(props.groupId, [m.userId]))
+        if (!res.confirm || pendingOperation != null) return
+        const target = revalidateTarget(action.key, m.userId, 'group.memberRemoveFailed')
+        if (target == null) return
+        runOp(async () => {
+          await EmKit.removeGroupMembers(props.groupId, [target.userId])
+          await refreshAfterRemoval()
+        }, 'group.memberRemoveSuccess', 'group.memberRemoveFailed')
       }
     })
   }
