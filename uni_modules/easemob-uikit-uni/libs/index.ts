@@ -256,6 +256,13 @@ class EmKitImpl {
     return this.chat.recallMessage(conversationId, chatType, messageId)
   }
 
+  async deleteMessage(message: EmMessageItem): Promise<void> {
+    if (message.id !== '') {
+      await this.client.whenReady()
+    }
+    return this.chat.deleteMessage(message)
+  }
+
   deleteLocalMessage(conversationId: string, localId: string): void {
     this.chat.deleteLocalMessage(conversationId, localId)
   }
@@ -338,9 +345,9 @@ class EmKitImpl {
     this.group.getGroupMemberList(groupId).catch(() => {})
   }
 
-  async getGroupInfo(groupId: string): Promise<EmGroup> {
+  async getGroupInfo(groupId: string, force = false): Promise<EmGroup> {
     await this.client.whenReady()
-    return this.group.getGroupInfo(groupId)
+    return this.group.getGroupInfo(groupId, force)
   }
 
   async getGroupMemberList(groupId: string, cursor?: string, pageSize?: number): Promise<{ items: EmGroupMember[], cursor: string, hasMore: boolean }> {
@@ -444,12 +451,12 @@ class EmKitImpl {
       if (path === '') {
         return 'download'
       }
-      copyText(text)
+      await copyText(text).catch(() => {})
       return path
     } catch (e) {
       // 不要静默吞：App 端写文件失败的原因（编码/沙盒路径/基座缺模块）必须能从控制台看到
       kitLogger.warn('exportLogs: 写文件失败，已回退剪贴板', e)
-      copyText(text)
+      await copyText(text).catch(() => {})
       return 'clipboard'
     }
   }
@@ -467,8 +474,8 @@ export const EmKit = new EmKitImpl()
 
 export * from './types'
 export * from './constants'
-export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio, PLATFORM_CAPABILITIES, isPageVisible } from './platform'
-export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult, EmRecordOptions, EmPlatformCapabilities } from './platform'
+export { setStorage, getStorage, chooseImage, previewImage, chooseVideo, chooseFile, startRecord, stopRecord, isRecording, playAudio, stopAudio, PLATFORM_CAPABILITIES, isPageVisible, copyText, getCameraAuthorizeState, openAppAuthorizeSetting } from './platform'
+export type { EmPickedVideo, EmPickedFile, EmPickedImage, EmRecordResult, EmRecordOptions, EmPlatformCapabilities, EmCameraAuthorizeState } from './platform'
 export {
   setAttachmentProvider,
   refreshAttachmentAvailability,
@@ -490,6 +497,8 @@ export {
 export type { EmThemeInitOptions, EmThemeSyncOptions } from './use/useTheme'
 export { useLocale, mergeMessages, initLocale, setLocale, getLocale, LOCALE_STORAGE_KEY } from './use/useLocale'
 export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
+export { useChatComposer } from './use/useChatComposer'
+export type { UseChatComposerOptions, UseChatComposerResult } from './use/useChatComposer'
 export { nextZIndex } from './use/usePopup'
 export { useConfig, setConfig } from './store/config'
 export { themeStore } from './store/theme'
