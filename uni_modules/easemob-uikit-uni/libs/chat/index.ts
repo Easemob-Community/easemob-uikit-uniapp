@@ -214,8 +214,16 @@ export class EmChat {
     return this.messages.recallMessage(conversationId, chatType, messageId)
   }
 
+  async deleteMessage(message: EmMessageItem): Promise<void> {
+    await this.messages.deleteMessage(message)
+    this.conversations.syncMessageSummary(message.conversationId)
+  }
+
   deleteLocalMessage(conversationId: string, localId: string): void {
-    this.messages.deleteLocalMessage(conversationId, localId)
+    const deleted = this.messages.deleteLocalMessage(conversationId, localId)
+    if (deleted) {
+      this.conversations.syncMessageSummary(conversationId)
+    }
   }
 
   async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {

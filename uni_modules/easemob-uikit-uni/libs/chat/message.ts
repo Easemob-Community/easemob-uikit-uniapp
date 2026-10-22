@@ -1,5 +1,5 @@
 // 消息生命周期域：发送（文本/图片/语音/视频/文件）、投递回写、历史加载、撤回、
-// 本地删除、失败重发、已读回执与 typing 信令（cmd）。
+// 漫游/本地删除、失败重发、已读回执与 typing 信令（cmd）。
 // 门面（./index.ts）负责组合本域与会话域并接线 SDK 事件。
 import type {
   ChatClient,
@@ -871,19 +871,34 @@ export class EmMessageDomain {
     }
   }
 
-  // 仅从本地消息列表移除，不联服务端
-  deleteLocalMessage(conversationId: string, localId: string): void {
-    delete this.uploadFileByLocalId[localId]
+  // 有服务端 ID 时先删漫游，成功后才删本地；本地消息不等待 SDK 就绪，也不发服务端请求
+  async deleteMessage(message: EmMessageItem): Promise<void> {
+    if (message.id !== '') {
+      const chatManager = await this.readyChatManager()
+      await chatManager.removeHistoryMessages({
+        conversationId: message.conversationId,
+        conversationType: message.chatType,
+        messageIds: [message.id]
+      })
+    }
+    this.deleteLocalMessage(message.conversationId, message.localId)
+  }
+
+  // 仅从本地消息列表移除，不联服务端；返回是否实际命中，供门面避免 no-op 后误校正摘要
+  deleteLocalMessage(conversationId: string, localId: string): boolean {
     const list = messageStore.messagesByConversationId[conversationId]
     if (list == null) {
-      return
+      return false
     }
-    // 删除失败/本地消息时顺手清掉宿主附件临时副本（发送成功的已在 deliver 清理，重复调用是 no-op）
     const target = list.find((m) => m.localId === localId)
-    if (target != null) {
-      this.releaseTemporary(target.url)
+    if (target == null) {
+      return false
     }
+    delete this.uploadFileByLocalId[localId]
+    // 删除失败/本地消息时顺手清掉宿主附件临时副本（发送成功的已在 deliver 清理，重复调用是 no-op）
+    this.releaseTemporary(target.url)
     messageStore.messagesByConversationId[conversationId] = list.filter((m) => m.localId !== localId)
+    return true
   }
 
   // 失败重发：原 Message 对象不入 store，用 item 上留存的内容重建消息再投递；

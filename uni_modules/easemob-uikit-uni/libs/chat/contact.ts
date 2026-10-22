@@ -69,10 +69,14 @@ export class EmContact {
         })
         this.mergeProfile(p.from, p.userInfo)
       },
-      // 好友关系建立（双方收）：刷新快照；已是好友的申请不再保留 pending
+      // 好友关系建立（双方收）：刷新快照；全部匹配且收到的 pending 好友申请置 accepted 并持久化
       onContactAdded: (p: ContactRosterEventPayload) => {
         logPayload(logger, 'onContactAdded:', p)
         this.refresh()
+        const pending = contactStore.invites.filter((i) => i.kind === CONTACT_INVITE_KIND.CONTACT && i.from === p.from && !i.outgoing && i.status === CONTACT_INVITE_STATUS.PENDING)
+        pending.forEach((invite) => {
+          updateInviteStatus(invite.id, CONTACT_INVITE_STATUS.ACCEPTED)
+        })
         this.mergeProfile(p.from, p.userInfo)
       },
       // 被对方删除：刷新快照并清掉与其相关的 contact kind 申请记录（群邀请与好友关系无关，保留）
