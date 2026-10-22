@@ -1,5 +1,5 @@
 <template>
-  <view :class="rootClass" :style="rootStyle">
+  <view :class="[rootClass, customClass]" :style="rootStyle + customStyle">
     <image
       v-if="showImage"
       :class="imgClass"
@@ -32,6 +32,8 @@ interface Props {
   badgeDot?: boolean
   badgeMax?: number
   placeholderColors?: string[]
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -41,7 +43,9 @@ const props = withDefaults(defineProps<Props>(), {
   shape: 'circle',
   badge: 0,
   badgeDot: false,
-  badgeMax: 99
+  badgeMax: 99,
+  customClass: '',
+  customStyle: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })

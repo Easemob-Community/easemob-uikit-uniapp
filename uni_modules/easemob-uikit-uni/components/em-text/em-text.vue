@@ -1,5 +1,5 @@
 <template>
-  <view :class="ns.b()">
+  <view :class="[ns.b(), customClass]" :style="customStyle">
     <text :class="[ns.e('value'), clampClass, textClass]" :style="textStyle">{{ text }}<slot /></text>
   </view>
 </template>
@@ -20,13 +20,17 @@ interface Props {
   lines?: number      // 默认 1 行折叠省略；0 = 不折叠、只做长文断词
   textClass?: string
   textStyle?: string
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   text: '',
   lines: 1,
   textClass: '',
-  textStyle: ''
+  textStyle: '',
+  customClass: '',
+  customStyle: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })

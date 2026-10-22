@@ -52,12 +52,24 @@
   --em-bubble-radius-square: 8px;
   --em-file-card-radius: 12px;
   --em-input-radius: 999px;
+  /* 组件小圆角（对齐 vue --uikit-components-radius 6px）：多行输入区等非胶囊容器 */
+  --em-component-radius: 6px;
 
   /* 列表/消息区尺寸（对齐 vue 版 normal 密度档） */
   --em-cell-height: 64px;
   --em-bubble-gap: 8px;
   --em-message-gap: 16px;
   --em-message-padding: 12px;
+
+  /* 气泡内边距与文件卡尺寸（几何类 token，明暗同值；文本气泡为基准气泡壳） */
+  --em-bubble-padding-x: 14px;
+  --em-bubble-padding-y: 12px;
+  --em-audio-bubble-padding-x: 14px;
+  --em-audio-bubble-padding-y: 10px;
+  --em-file-card-padding-x: 12px;
+  --em-file-card-padding-y: 10px;
+  --em-file-card-min-width: 166px;
+  --em-file-card-max-width: 240px;
 
   /* 输入栏「+」emoji/媒体面板高度（与常见键盘高度接近，对齐 vue 版 h5-input panel） */
   --em-chat-panel-height: 240px;
@@ -140,6 +152,9 @@
 
   /* 遮罩（弹层 overlay / 视频播放钮与时长胶囊底） */
   --em-mask-color: rgba(0, 0, 0, 0.4);
+
+  /* 全屏媒体预览底（视频播放器黑底，明暗同值） */
+  --em-video-viewer-bg: #000000;
 }
 
 /* ========== 暗色（全量颜色 token，缺一项 var() 即失效，勿只写覆盖项） ========== */
@@ -195,4 +210,6 @@
 
   /* 暗色遮罩更深一档，压住亮色内容对比 */
   --em-mask-color: rgba(0, 0, 0, 0.6);
+
+  --em-video-viewer-bg: #000000;
 }

@@ -2,17 +2,17 @@
   <!-- avatar：单块圆形/圆角头像占位 -->
   <view
     v-if="variant === 'avatar'"
-    :class="[ns.b(), ns.m('avatar'), shapeClass]"
-    :style="boxStyle"
+    :class="[ns.b(), ns.m('avatar'), shapeClass, customClass]"
+    :style="boxStyle + customStyle"
   />
   <!-- text：单行占位，高 1em -->
   <view
     v-else-if="variant === 'text'"
-    :class="[ns.b(), ns.m('text')]"
-    :style="boxStyle"
+    :class="[ns.b(), ns.m('text'), customClass]"
+    :style="boxStyle + customStyle"
   />
   <!-- paragraph：多行占位，末行宽 60%（vue 版口径），行间距 8px -->
-  <view v-else :class="[ns.b(), ns.m('paragraph')]">
+  <view v-else :class="[ns.b(), ns.m('paragraph'), customClass]" :style="customStyle">
     <view
       v-for="index in safeRows"
       :key="index"
@@ -33,6 +33,8 @@ interface Props {
   rows?: number                              // 仅 paragraph 生效，默认 3
   width?: string                             // 覆盖默认宽度（如 '40%'）
   height?: string                            // 覆盖默认高度（如 '48px'）
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -40,7 +42,9 @@ const props = withDefaults(defineProps<Props>(), {
   shape: 'circle',
   rows: 3,
   width: '',
-  height: ''
+  height: '',
+  customClass: '',
+  customStyle: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })

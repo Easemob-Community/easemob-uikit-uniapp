@@ -2,7 +2,7 @@
   <!-- 通讯录入口项列表（对齐 vue 版 ContactNav）：可选左图标 + 标题(内联计数) + hot 红点 + 右箭头。
        纯呈现原子组件：不连 store、不碰路由，点击原样透出 entry key 由宿主接线。
        图标/红点一律 view 包裹——mp 样式隔离下父组件 wxss 够不到子组件宿主节点 -->
-  <view :class="ns.b()">
+  <view :class="[ns.b(), customClass]" :style="customStyle">
     <view
       v-for="entry in entries"
       :key="entry.key"
@@ -29,9 +29,14 @@ import { useNamespace } from '../../libs/use/useNamespace'
 interface Props {
   /** 入口配置列表，按数组顺序展示（内置 key 见 CONTACT_ENTRY_KEY） */
   entries: EmContactNavEntry[]
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  customClass: '',
+  customStyle: ''
+})
 
 const emit = defineEmits<{
   (e: 'entry-click', key: string): void

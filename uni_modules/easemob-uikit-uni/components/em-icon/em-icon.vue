@@ -1,5 +1,5 @@
 <template>
-  <text :class="ns.b()" :style="iconStyle" @click="onClick">{{ glyph }}</text>
+  <text :class="[ns.b(), customClass]" :style="iconStyle + customStyle" @click="onClick">{{ glyph }}</text>
 </template>
 
 <script setup lang="ts">
@@ -11,11 +11,15 @@ interface Props {
   name: EmIconName
   size?: number
   color?: string
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 24,
-  color: ''
+  color: '',
+  customClass: '',
+  customStyle: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })

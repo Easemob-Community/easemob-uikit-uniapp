@@ -1,9 +1,9 @@
 @import '../../libs/style/variables.css';
 @import '../../libs/style/bubble.css';
 
-/* 壳（底色/圆角）收口 libs/style/bubble.css 的 .em-bubble；此处只留文本气泡特有 padding */
+/* 壳（底色/圆角）收口 libs/style/bubble.css 的 .em-bubble；此处只留文本气泡特有 padding（token 化，宿主可调） */
 .em-text-message {
-  padding: 12px 14px;
+  padding: var(--em-bubble-padding-y) var(--em-bubble-padding-x);
   max-width: 100%;
 }
 

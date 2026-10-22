@@ -3,7 +3,8 @@
        容器撑满列表区高度，字母格 flex:1 等比分配（单项封顶 20px、字号 9px/500）；
        点按走单元格 touchstart 精确命中（无需几何测量），按住滑动走容器 touchmove 占比映射 -->
   <view
-    :class="ns.b()"
+    :class="[ns.b(), customClass]"
+    :style="customStyle"
     @touchmove="onTouchMove"
     @touchend="onTouchEnd"
     @touchcancel="onTouchEnd"
@@ -32,12 +33,16 @@ interface Props {
   keys?: string[]        // 渲染序列，默认完整 A-Z + '#'
   activeKey?: string     // 当前高亮字母（空串无高亮）
   dimKeys?: string[]     // 无对应分组的字母：淡化且不响应
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   keys: () => [...ALPHABET_KEYS],
   activeKey: '',
-  dimKeys: () => []
+  dimKeys: () => [],
+  customClass: '',
+  customStyle: ''
 })
 
 const emit = defineEmits<{

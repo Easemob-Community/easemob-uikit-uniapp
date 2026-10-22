@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '']" @touchstart="onTouchStart" @click="onClick" @longpress="onLongpress">
+  <view :class="[ns.b(), 'em-bubble', message.self ? 'em-bubble--self' : '', customClass]" :style="customStyle" @touchstart="onTouchStart" @click="onClick" @longpress="onLongpress">
     <view :class="[ns.e('icon'), iconTypeClass]">
       <EmIcon :name="iconName" :size="20" :class="ns.e('icon-glyph')" />
     </view>
@@ -23,9 +23,14 @@ import { PLATFORM_CAPABILITIES } from '../../libs/platform'
 
 interface Props {
   message: EmMessageItem
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  customClass: '',
+  customStyle: ''
+})
 
 defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 

@@ -1,14 +1,15 @@
 @import '../../libs/style/variables.css';
 @import '../../libs/style/bubble.css';
 
-/* 壳底色收口 .em-bubble（含 --self 覆写）；圆角为文件卡专属 --em-file-card-radius，保留 */
+/* 壳底色收口 .em-bubble（含 --self 覆写）；圆角为文件卡专属 --em-file-card-radius，保留；
+   padding 与宽度上下限走 token（宿主可调） */
 .em-file-message {
   display: flex;
   flex-direction: row;
   align-items: center;
-  min-width: 166px;
-  max-width: 240px;
-  padding: 10px 12px;
+  min-width: var(--em-file-card-min-width);
+  max-width: var(--em-file-card-max-width);
+  padding: var(--em-file-card-padding-y) var(--em-file-card-padding-x);
   border-radius: var(--em-file-card-radius);
 }
 

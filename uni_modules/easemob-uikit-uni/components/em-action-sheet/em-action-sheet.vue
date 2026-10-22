@@ -1,5 +1,12 @@
 <template>
-  <em-popup :visible="visible" position="bottom" :mask-closable="false" @mask-click="onMaskClick">
+  <em-popup
+    :visible="visible"
+    position="bottom"
+    :mask-closable="false"
+    :custom-class="customClass"
+    :custom-style="customStyle"
+    @mask-click="onMaskClick"
+  >
     <view :class="ns.b()">
       <view v-if="title !== ''" :class="ns.e('header')">
         <em-text :text="title" :text-class="ns.e('title')" :text-style="titleTextStyle" />
@@ -42,11 +49,15 @@ interface Props {
   actions: EmActionSheetAction[]
   title?: string
   showCancel?: boolean
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   title: '',
-  showCancel: true
+  showCancel: true,
+  customClass: '',
+  customStyle: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })

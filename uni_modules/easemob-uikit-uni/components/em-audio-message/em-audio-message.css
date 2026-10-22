@@ -1,12 +1,12 @@
 @import '../../libs/style/variables.css';
 @import '../../libs/style/bubble.css';
 
-/* 壳收口 .em-bubble（含 --self 底色覆写） */
+/* 壳收口 .em-bubble（含 --self 底色覆写）；padding 走 token（宿主可调） */
 .em-audio-message {
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 10px 14px;
+  padding: var(--em-audio-bubble-padding-y) var(--em-audio-bubble-padding-x);
 }
 
 /* 播放态波形：对齐 vue voice-message__wave（3 根 2px 柱，圆角 1px，间距 2px）。
