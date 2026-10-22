@@ -89,3 +89,11 @@
 .em-chat-info-page__footer-btn {
   margin-top: var(--em-spacing-2);
 }
+
+/* 品牌色内联变量作用域层：接替根的 flex 容器角色（flex:1 + height:0 保持滚动约束链） */
+.em-chat-info-page__brand-scope {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 0;
+}

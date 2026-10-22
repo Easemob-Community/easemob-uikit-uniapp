@@ -1,247 +1,299 @@
 <template>
-  <view :class="[ns.b(), themeClass]" :style="primaryColorStyle()">
-    <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar -->
-    <em-nav-bar
-      :title="title !== '' ? title : peerDisplayName"
-      :subtitle="headerSubtitle"
-      :action-icon="showAction ? 'vertical' : ''"
-      @back="onBack"
-      @action="onOpenInfo"
-    />
+  <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
+    <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
+    <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
+      <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar -->
+      <em-nav-bar
+        :title="title !== '' ? title : peerDisplayName"
+        :subtitle="headerSubtitle"
+        :action-icon="showAction ? 'vertical' : ''"
+        @back="onBack"
+        @action="onOpenInfo"
+      />
 
-    <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
-    <em-connection-banner :show="showConnectionBanner" />
+      <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
+      <em-connection-banner :show="showConnectionBanner" />
 
-    <!-- 业务横幅（#banner）：nav-bar 与群公告条之间的固定区，不随消息滚动；
-         医疗病情摘要条/招聘职位条/交易商品条等由宿主渲染（样式与间距宿主自管） -->
-    <slot name="banner" />
+      <!-- 业务横幅（#banner）：nav-bar 与群公告条之间的固定区，不随消息滚动；
+           医疗病情摘要条/招聘职位条/交易商品条等由宿主渲染（样式与间距宿主自管） -->
+      <slot name="banner" />
 
-    <!-- 群公告条（仅群聊 + showAnnouncement）：标题 + 单行省略正文，超一行给出展开按钮（全量走 em-popup 弹层） -->
-    <view v-if="showAnnouncementBanner" :class="ns.e('announcement')">
-      <EmIcon name="board" :size="14" :class="ns.e('announcement-icon')" />
-      <view :class="ns.e('announcement-main')">
-        <text :class="ns.e('announcement-title')">{{ t('chat.announcementBanner.title') }}</text>
-        <em-text :text="announcement" :text-class="ns.e('announcement-text')" :text-style="announcementTextStyle" :class="ns.e('announcement-host')" />
-      </view>
-      <view v-if="announcementCanExpand" :class="ns.e('announcement-toggle')" @click="announcementVisible = true">
-        <EmIcon name="chevron-down" :size="14" :class="ns.e('announcement-toggle-icon')" />
-      </view>
-    </view>
-    <scroll-view
-      :class="ns.e('scroll')"
-      scroll-y
-      :scroll-top="scrollTopVal"
-      :scroll-into-view="anchorId"
-      :scroll-with-animation="scrollWithAnimation"
-      :show-scrollbar="false"
-      :enhanced="true"
-      :style="ready ? '' : 'opacity: 0;'"
-      @scroll="onChatScroll"
-      @scrolltolower="onChatScrollToLower"
-      @click="onChatAreaClick"
-    >
-      <view v-if="historyFailed && list.length > 0" :class="ns.e('history')" @click="retryHistory">
-        <text :class="ns.e('history-text')">{{ t('chat.historyFailedRetry') }}</text>
-      </view>
-      <view v-else-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
-        <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
-      </view>
-      <view v-else-if="list.length > 0" :class="ns.e('history')">
-        <text :class="ns.e('history-text')">{{ t('conversation.noMoreHistory') }}</text>
-      </view>
-
-      <!-- 首屏历史未回包：骨架占位；不显示空态，避免「先闪暂无消息再出消息」 -->
-      <view v-if="showHistorySkeleton" :class="ns.e('skeleton')">
-        <view v-for="index in 4" :key="index" :class="ns.e('skeleton-row')">
-          <em-skeleton variant="avatar" shape="circle" width="36px" height="36px" :class="ns.e('skeleton-avatar')" />
-          <view :class="ns.e('skeleton-body')">
-            <em-skeleton width="62%" height="14px" :class="ns.e('skeleton-line')" />
-            <em-skeleton width="44%" height="14px" />
-          </view>
+      <!-- 群公告条（仅群聊 + showAnnouncement）：标题 + 单行省略正文，超一行给出展开按钮（全量走 em-popup 弹层） -->
+      <view v-if="showAnnouncementBanner" :class="ns.e('announcement')">
+        <EmIcon name="board" :size="14" :class="ns.e('announcement-icon')" />
+        <view :class="ns.e('announcement-main')">
+          <text :class="ns.e('announcement-title')">{{ t('chat.announcementBanner.title') }}</text>
+          <em-text :text="announcement" :text-class="ns.e('announcement-text')" :text-style="announcementTextStyle" :class="ns.e('announcement-host')" />
+        </view>
+        <view v-if="announcementCanExpand" :class="ns.e('announcement-toggle')" @click="announcementVisible = true">
+          <EmIcon name="chevron-down" :size="14" :class="ns.e('announcement-toggle-icon')" />
         </view>
       </view>
-
-      <!-- 消息为空的宿主自定义出口（默认 em-empty 空态；必须等首次历史请求成功后才展示） -->
-      <slot v-else-if="list.length === 0 && historySettled && !historyFailed" name="empty">
-        <em-empty icon="bubble-rect-2" size="large" :description="t('chat.noMessages')" />
-      </slot>
-
-      <!-- 首次历史失败：toast + 点击重试（已缓存消息时改为顶部重试行，不遮消息） -->
-      <view v-else-if="list.length === 0 && historyFailed" :class="ns.e('history-error')">
-        <em-empty icon="circle-bang" size="large" :description="t('chat.historyFailed')">
-          <view :class="ns.e('history-retry')">
-            <em-button
-              type="outline"
-              size="medium"
-              pill
-              :text="t('chat.retry')"
-              :disabled="historyLoading"
-              @click="retryHistory"
-            />
-          </view>
-        </em-empty>
-      </view>
-
-      <view
-        v-for="m in list"
-        :key="m.localId"
+      <scroll-view
+        :class="ns.e('scroll')"
+        scroll-y
+        :scroll-top="scrollTopVal"
+        :scroll-into-view="anchorId"
+        :scroll-with-animation="scrollWithAnimation"
+        :show-scrollbar="false"
+        :enhanced="true"
+        :style="ready ? '' : 'opacity: 0;'"
+        @scroll="onChatScroll"
+        @scrolltolower="onChatScrollToLower"
+        @click="onChatAreaClick"
       >
-        <!-- 时间分隔条：首条必显，相邻消息间隔超过 uiConfig.timeDividerInterval（默认 5 分钟）插入（对齐 vue 版 message-list divider） -->
-        <view v-if="dividerBefore[m.localId] === true" :class="ns.e('divider')">
-          <text :class="ns.e('divider-text')">{{ formatDividerTime(m.time) }}</text>
+        <view v-if="(historyFailed || loadMoreFailed) && list.length > 0" :class="ns.e('history')" @click="retryHistory">
+          <text :class="ns.e('history-text')">{{ t('chat.historyFailedRetry') }}</text>
         </view>
+        <view v-else-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
+          <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
+        </view>
+        <view v-else-if="list.length > 0" :class="ns.e('history')">
+          <text :class="ns.e('history-text')">{{ t('conversation.noMoreHistory') }}</text>
+        </view>
+
+        <!-- 首屏历史未回包：骨架占位；不显示空态，避免「先闪暂无消息再出消息」 -->
+        <view v-if="showHistorySkeleton" :class="ns.e('skeleton')">
+          <view v-for="index in 4" :key="index" :class="ns.e('skeleton-row')">
+            <em-skeleton variant="avatar" shape="circle" width="36px" height="36px" :class="ns.e('skeleton-avatar')" />
+            <view :class="ns.e('skeleton-body')">
+              <em-skeleton width="62%" height="14px" :class="ns.e('skeleton-line')" />
+              <em-skeleton width="44%" height="14px" />
+            </view>
+          </view>
+        </view>
+
+        <!-- 消息为空的宿主自定义出口（默认 em-empty 空态；必须等首次历史请求成功后才展示） -->
+        <slot v-else-if="list.length === 0 && historySettled && !historyFailed && !loadMoreFailed" name="empty">
+          <em-empty icon="bubble-rect-2" size="large" :description="t('chat.noMessages')" />
+        </slot>
+
+        <!-- 历史失败：toast + 点击重试（已缓存消息时改为顶部重试行，不遮消息） -->
+        <view v-else-if="list.length === 0 && (historyFailed || loadMoreFailed)" :class="ns.e('history-error')">
+          <em-empty icon="circle-bang" size="large" :description="t('chat.historyFailed')">
+            <view :class="ns.e('history-retry')">
+              <em-button
+                type="outline"
+                size="medium"
+                pill
+                :text="t('chat.retry')"
+                :disabled="historyLoading"
+                @click="retryHistory"
+              />
+            </view>
+          </em-empty>
+        </view>
+
         <view
-          :id="msgAnchorId(m)"
-          :class="[ns.e('msg'), m.self && ns.m('msg-self'), (m.status === MESSAGE_STATUS.RECALLED || m.type === MESSAGE_TYPE.NOTICE) && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && highlightPulseOn && ns.m('msg-highlight')]"
+          v-for="m in list"
+          :key="m.localId"
         >
-        <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
-          <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
-        </view>
-        <!-- 群系统通知（本地灰条，不落服务端）：居中 chip 形态同撤回提示条；无头像无气泡，长按菜单禁用 -->
-        <view v-else-if="m.type === MESSAGE_TYPE.NOTICE" :class="ns.e('notice')">
-          <em-text :text="m.text" :text-class="ns.e('notice-text')" :text-style="noticeTextStyle" :class="ns.e('notice-text-host')" />
-        </view>
-        <template v-else>
-          <em-avatar :src="avatarOf(m.from)" :name="senderNameOf(m)" :size="36" :shape="avatarShape" />
-          <view :class="[ns.e('content'), m.self && ns.m('content-self')]">
-            <!-- 群聊发送者昵称行（己方不显示；senderNameMode 控制显隐，伪装模式预留 'on-change' 档） -->
-            <em-text v-if="showSenderName(m)" :text="senderNameOf(m)" :text-class="ns.e('sender-name')" :text-style="senderNameTextStyle" :class="ns.e('sender-name-host')" />
-            <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
-            <view :class="ns.e('bubble-row')">
-              <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="ns.e('state')" @click="onResend(m)">
-                <EmIcon name="circle-bang" :size="14" :class="ns.e('state-icon-failed')" />
-              </view>
-              <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="ns.e('state')">
-                <EmIcon name="loading-arc-normal" :size="14" :class="ns.e('state-icon-sending')" />
-              </view>
-              <!-- 单聊已读回执：仅最新一条己方已发送消息展示（对齐 vue 版 readIconDisplay 'latest'），未读空心圆/已读对勾 -->
-              <view v-else-if="showReadState(m)" :class="ns.e('state')">
-                <EmIcon :name="readIconName(m)" :size="14" :class="[ns.e('state-icon'), ns.m(isPeerRead(m) ? 'state-icon-read' : 'state-icon-unread')]" />
-              </view>
-              <!-- 富格式流式气泡（customType='markdown' 等）由宿主经 #stream-message 插槽接管；
-                   未提供插槽时回落内核纯文本气泡（内容仍随分片增长） -->
-              <slot v-if="m.type === MESSAGE_TYPE.TEXT && isRichStream(m.stream)" name="stream-message" :message="m">
+          <!-- 时间分隔条：首条必显，相邻消息间隔超过 uiConfig.timeDividerInterval（默认 5 分钟）插入（对齐 vue 版 message-list divider） -->
+          <view v-if="dividerBefore[m.localId] === true" :class="ns.e('divider')">
+            <text :class="ns.e('divider-text')">{{ formatDividerTime(m.time) }}</text>
+          </view>
+          <view
+            :id="msgAnchorId(m)"
+            :class="[ns.e('msg'), m.self && ns.m('msg-self'), (m.status === MESSAGE_STATUS.RECALLED || m.type === MESSAGE_TYPE.NOTICE) && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && highlightPulseOn && ns.m('msg-highlight')]"
+          >
+          <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
+            <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
+          </view>
+          <!-- 群系统通知（本地灰条，不落服务端）：居中 chip 形态同撤回提示条；无头像无气泡，长按菜单禁用 -->
+          <view v-else-if="m.type === MESSAGE_TYPE.NOTICE" :class="ns.e('notice')">
+            <em-text :text="m.text" :text-class="ns.e('notice-text')" :text-style="noticeTextStyle" :class="ns.e('notice-text-host')" />
+          </view>
+          <template v-else>
+            <em-avatar :src="avatarOf(m.from)" :name="senderNameOf(m)" :size="36" :shape="avatarShape" />
+            <view :class="[ns.e('content'), m.self && ns.m('content-self')]">
+              <!-- 群聊发送者昵称行（己方不显示；senderNameMode 控制显隐，伪装模式预留 'on-change' 档） -->
+              <em-text v-if="showSenderName(m)" :text="senderNameOf(m)" :text-class="ns.e('sender-name')" :text-style="senderNameTextStyle" :class="ns.e('sender-name-host')" />
+              <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
+              <view :class="ns.e('bubble-row')">
+                <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="ns.e('state')" @click="onResend(m)">
+                  <EmIcon name="circle-bang" :size="14" :class="ns.e('state-icon-failed')" />
+                </view>
+                <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="ns.e('state')">
+                  <EmIcon name="loading-arc-normal" :size="14" :class="ns.e('state-icon-sending')" />
+                </view>
+                <!-- 单聊已读回执：仅最新一条己方已发送消息展示（对齐 vue 版 readIconDisplay 'latest'），未读空心圆/已读对勾 -->
+                <view v-else-if="showReadState(m)" :class="ns.e('state')">
+                  <EmIcon :name="readIconName(m)" :size="14" :class="[ns.e('state-icon'), ns.m(isPeerRead(m) ? 'state-icon-read' : 'state-icon-unread')]" />
+                </view>
+                <!-- 富格式流式气泡（customType='markdown' 等）由宿主经 #stream-message 插槽接管；
+                     未提供插槽时回落内核纯文本气泡（内容仍随分片增长） -->
+                <slot v-if="m.type === MESSAGE_TYPE.TEXT && isRichStream(m.stream)" name="stream-message" :message="m">
+                  <em-text-message
+                    :message="m"
+                    :mention-contacts="mentionContacts"
+                    @long-press="onLongPressMessage"
+                    @mention-click="onMentionClick"
+                  />
+                </slot>
                 <em-text-message
+                  v-else-if="m.type === MESSAGE_TYPE.TEXT"
                   :message="m"
                   :mention-contacts="mentionContacts"
                   @long-press="onLongPressMessage"
                   @mention-click="onMentionClick"
                 />
-              </slot>
-              <em-text-message
-                v-else-if="m.type === MESSAGE_TYPE.TEXT"
-                :message="m"
-                :mention-contacts="mentionContacts"
-                @long-press="onLongPressMessage"
-                @mention-click="onMentionClick"
-              />
-              <em-image-message
-                v-else-if="m.type === MESSAGE_TYPE.IMAGE"
-                :message="m"
-                @preview="onPreview"
-                @long-press="onLongPressMessage"
-              />
-              <em-audio-message
-                v-else-if="m.type === MESSAGE_TYPE.AUDIO"
-                :message="m"
-                @long-press="onLongPressMessage"
-              />
-              <em-video-message
-                v-else-if="m.type === MESSAGE_TYPE.VIDEO"
-                :message="m"
-                @preview="onVideoPreview"
-                @long-press="onLongPressMessage"
-              />
-              <em-file-message
-                v-else-if="m.type === MESSAGE_TYPE.FILE"
-                :message="m"
-                @download="onFileDownload"
-                @long-press="onLongPressMessage"
-              />
-              <!-- 未识别消息类型：默认不支持占位气泡，宿主可经 #custom-message 插槽自定义渲染（作用域传 message） -->
-              <!-- 自定义消息（custom）：业务卡片统一出口，宿主经 #custom-message 按 customEvent 判别渲染；
-                   外层 view 承接原生 longpress（事件冒泡），宿主卡片内容也能打开长按菜单（业务动作/引用/删除） -->
-              <view v-else :class="ns.e('custom')" @longpress="onLongPressMessage(m)">
-                <slot name="custom-message" :message="m">
-                  <view :class="[ns.e('bubble'), 'em-bubble']">
-                    <text :class="ns.e('text')">{{ m.type === MESSAGE_TYPE.CUSTOM ? t('message.custom') : t('message.unsupported') }}</text>
-                  </view>
-                </slot>
+                <em-image-message
+                  v-else-if="m.type === MESSAGE_TYPE.IMAGE"
+                  :message="m"
+                  @preview="onPreview"
+                  @long-press="onLongPressMessage"
+                />
+                <em-audio-message
+                  v-else-if="m.type === MESSAGE_TYPE.AUDIO"
+                  :message="m"
+                  @long-press="onLongPressMessage"
+                />
+                <em-video-message
+                  v-else-if="m.type === MESSAGE_TYPE.VIDEO"
+                  :message="m"
+                  @preview="onVideoPreview"
+                  @long-press="onLongPressMessage"
+                />
+                <em-file-message
+                  v-else-if="m.type === MESSAGE_TYPE.FILE"
+                  :message="m"
+                  @download="onFileDownload"
+                  @long-press="onLongPressMessage"
+                />
+                <!-- 未识别消息类型：默认不支持占位气泡，宿主可经 #custom-message 插槽自定义渲染（作用域传 message） -->
+                <!-- 自定义消息（custom）：业务卡片统一出口，宿主经 #custom-message 按 customEvent 判别渲染；
+                     外层 view 承接原生 longpress（事件冒泡），宿主卡片内容也能打开长按菜单（业务动作/引用/删除） -->
+                <view v-else :class="ns.e('custom')" @longpress="onLongPressMessage(m)">
+                  <slot name="custom-message" :message="m">
+                    <view :class="[ns.e('bubble'), 'em-bubble']">
+                      <text :class="ns.e('text')">{{ m.type === MESSAGE_TYPE.CUSTOM ? t('message.custom') : t('message.unsupported') }}</text>
+                    </view>
+                  </slot>
+                </view>
+              </view>
+              <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧；点击定位原消息 -->
+              <view v-if="m.quote != null" :class="[ns.e('quote'), m.self && ns.m('quote-self')]" @click="onQuoteClick(m)">
+                <view :class="[ns.e('quote-line'), m.self && ns.m('quote-line-self')]"></view>
+                <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="20" :class="[ns.e('quote-icon'), m.self && ns.m('quote-icon-self')]" />
+                <em-text :lines="2" :text-class="quoteTextClass(m)" :text-style="quoteTextStyle(m)" :class="ns.e('quote-host')">
+                  <text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text>
+                </em-text>
               </view>
             </view>
-            <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧；点击定位原消息 -->
-            <view v-if="m.quote != null" :class="[ns.e('quote'), m.self && ns.m('quote-self')]" @click="onQuoteClick(m)">
-              <view :class="[ns.e('quote-line'), m.self && ns.m('quote-line-self')]"></view>
-              <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="20" :class="[ns.e('quote-icon'), m.self && ns.m('quote-icon-self')]" />
-              <em-text :lines="2" :text-class="quoteTextClass(m)" :text-style="quoteTextStyle(m)" :class="ns.e('quote-host')">
-                <text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text>
-              </em-text>
-            </view>
+          </template>
           </view>
-        </template>
         </view>
+
+        <!-- 滚底锚点：scroll-into-view 定位目标（Android 蒸汽端 scroll-top 超大值只在赋值瞬间钳位、
+             内容未布局时钳到 0 且后续不重钳，大值技巧失效；锚点方案同机已被引用定位验证可用） -->
+        <view :id="BOTTOM_ANCHOR_ID" :class="ns.e('bottom-anchor')"></view>
+      </scroll-view>
+
+      <!-- 输入栏上方宿主工具条（#input-toolbar）：业务快捷入口固定位，宿主自绘胶囊/按钮
+           （发订单、发病例、换手机号等），点击后自行 sendCustom/sendText；随键盘一起上移，不参与消息滚动 -->
+      <slot name="input-toolbar" />
+
+      <!-- 整栏自绘（#input-bar，M2.16）：宿主提供插槽时整栏替换默认输入栏，结构/样式任意自绘；
+           行为核心（键盘避让/键盘↔面板互斥/录音手势/禁用守卫）由页面侧 composer 承担并经 scope
+           （EmChatInputBarScope）透出，壳节点负责键盘顶起与安全区，自绘栏只需绑定 scope 契约 -->
+      <view v-if="hasCustomInputBar" :class="ns.e('inputbar-shell')" :style="composerShellStyle">
+        <slot
+          name="input-bar"
+          :draft="draft"
+          :set-draft="setDraftValue"
+          :quote="quoteInfo"
+          :close-quote="closeQuoteInfo"
+          :disabled="isMutedAll"
+          :notify-disabled-tap="onMuteAllTap"
+          :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
+          :features="config.inputFeatures"
+          :emojis="config.emojiList"
+          :quick-replies="quickReplies"
+          :keyboard-lift="composerKeyboardLift"
+          :panel="composerPanelState"
+          :panel-style="composerPanelStyle"
+          :toggle-panel="composerTogglePanel"
+          :collapse-panel="composerCollapsePanel"
+          :input-focus="composerInputFocus"
+          :close-keyboard="composerCloseKeyboard"
+          :notify-input-focus="composerNotifyInputFocus"
+          :notify-input-blur="composerNotifyInputBlur"
+          :voice-mode="composerVoiceMode"
+          :recording="composerRecording"
+          :will-cancel="composerWillCancel"
+          :toggle-voice-mode="composerToggleVoiceMode"
+          :on-voice-touch-start="composerVoiceTouchStart"
+          :on-voice-touch-move="composerVoiceTouchMove"
+          :on-voice-touch-end="composerVoiceTouchEnd"
+          :on-voice-touch-cancel="composerVoiceTouchCancel"
+          :send="onSend"
+          :select-media="onMediaSelect"
+          :select-quick-reply="onQuickReply"
+        />
       </view>
+      <em-chat-inputbar
+        v-else
+        v-model="draft"
+        :quote="quoteInfo"
+        :features="config.inputFeatures"
+        :emojis="config.emojiList"
+        :quick-replies="quickReplies"
+        :collapse-signal="inputbarCollapseSignal"
+        :disabled="isMutedAll"
+        :submitting="sendingText"
+        :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
+        @send="onSend"
+        @quote-close="quoteInfo = null"
+        @media-select="onMediaSelect"
+        @voice-send="onVoiceSend"
+        @mention-trigger="onMentionTrigger"
+        @quick-reply="onQuickReply"
+        @disabled-tap="onMuteAllTap"
+      />
 
-      <!-- 滚底锚点：scroll-into-view 定位目标（Android 蒸汽端 scroll-top 超大值只在赋值瞬间钳位、
-           内容未布局时钳到 0 且后续不重钳，大值技巧失效；锚点方案同机已被引用定位验证可用） -->
-      <view :id="BOTTOM_ANCHOR_ID" :class="ns.e('bottom-anchor')"></view>
-    </scroll-view>
+      <!-- @提及成员选择面板（仅群聊 + enableMention 时由 mention-trigger 打开；选人后尾部追加 @{name} 空格） -->
+      <em-mention-picker
+        v-model:show="mentionVisible"
+        :contacts="mentionContacts"
+        :keyword="mentionKeyword"
+        @select="onMentionSelect"
+      />
 
-    <!-- 输入栏上方宿主工具条（#input-toolbar）：业务快捷入口固定位，宿主自绘胶囊/按钮
-         （发订单、发病例、换手机号等），点击后自行 sendCustom/sendText；随键盘一起上移，不参与消息滚动 -->
-    <slot name="input-toolbar" />
+      <em-action-sheet
+        :visible="msgSheetVisible"
+        :actions="messageActions"
+        :title="messageSummary"
+        @select="onMessageAction"
+        @update:visible="msgSheetVisible = $event"
+      />
 
-    <em-chat-inputbar
-      v-model="draft"
-      :quote="quoteInfo"
-      :features="config.inputFeatures"
-      :emojis="config.emojiList"
-      :quick-replies="quickReplies"
-      :collapse-signal="inputbarCollapseSignal"
-      :disabled="isMutedAll"
-      :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
-      @send="onSend"
-      @quote-close="quoteInfo = null"
-      @media-select="onMediaSelect"
-      @voice-send="onVoiceSend"
-      @mention-trigger="onMentionTrigger"
-      @quick-reply="onQuickReply"
-      @disabled-tap="onMuteAllTap"
-    />
-
-    <!-- @提及成员选择面板（仅群聊 + enableMention 时由 mention-trigger 打开；选人后尾部追加 @{name} 空格） -->
-    <em-mention-picker
-      v-model:show="mentionVisible"
-      :contacts="mentionContacts"
-      :keyword="mentionKeyword"
-      @select="onMentionSelect"
-    />
-
-    <em-action-sheet
-      :visible="msgSheetVisible"
-      :actions="messageActions"
-      :title="messageSummary"
-      @select="onMessageAction"
-      @update:visible="msgSheetVisible = $event"
-    />
-
-    <!-- 群公告全文弹层（单行省略态超一行时的展开出口） -->
-    <em-popup :visible="announcementVisible" position="center" @update:visible="announcementVisible = $event">
-      <view :class="ns.e('announcement-dialog')">
-        <text :class="ns.e('announcement-dialog-title')">{{ t('chat.announcementBanner.title') }}</text>
-        <scroll-view :class="ns.e('announcement-dialog-scroll')" scroll-y>
-          <text :class="ns.e('announcement-dialog-text')">{{ announcement }}</text>
-        </scroll-view>
-        <view :class="ns.e('announcement-dialog-close')" @click="announcementVisible = false">
-          <text :class="ns.e('announcement-dialog-close-text')">{{ t('button.close') }}</text>
+      <!-- 群公告全文弹层（单行省略态超一行时的展开出口） -->
+      <em-popup :visible="announcementVisible" position="center" @update:visible="announcementVisible = $event">
+        <view :class="ns.e('announcement-dialog')">
+          <text :class="ns.e('announcement-dialog-title')">{{ t('chat.announcementBanner.title') }}</text>
+          <scroll-view :class="ns.e('announcement-dialog-scroll')" scroll-y>
+            <text :class="ns.e('announcement-dialog-text')">{{ announcement }}</text>
+          </scroll-view>
+          <view :class="ns.e('announcement-dialog-close')" @click="announcementVisible = false">
+            <text :class="ns.e('announcement-dialog-close-text')">{{ t('button.close') }}</text>
+          </view>
         </view>
-      </view>
-    </em-popup>
+      </em-popup>
+
+      <!-- 视频全屏预览（App/小程序/H5 统一走原生 video）：打开时先停语音，
+           关闭或组件卸载时 video 节点销毁，原生播放器随之释放，不会留后台声音 -->
+      <em-video-preview
+        :visible="videoPreviewVisible"
+        :src="videoPreviewSrc"
+        :poster="videoPreviewPoster"
+        @update:visible="videoPreviewVisible = $event"
+      />
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useSlots, watch } from 'vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmButton from '../../em-button/em-button.vue'
@@ -254,6 +306,7 @@ import EmTextMessage from '../../em-text-message/em-text-message.vue'
 import EmImageMessage from '../../em-image-message/em-image-message.vue'
 import EmAudioMessage from '../../em-audio-message/em-audio-message.vue'
 import EmVideoMessage from '../../em-video-message/em-video-message.vue'
+import EmVideoPreview from '../../em-video-preview/em-video-preview.vue'
 import EmFileMessage from '../../em-file-message/em-file-message.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmConnectionBanner from '../../em-connection-banner/em-connection-banner.vue'
@@ -262,9 +315,10 @@ import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
-import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, pickAttachments, previewImage } from '../../../libs'
+import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
+import type { EmCameraAuthorizeState } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
-import type { EmActionSheetAction, EmAvatarShape, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
+import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { clearDraft, getDraft, setDraft } from '../../../libs/store/draft'
@@ -275,6 +329,7 @@ import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
 import { useKeyboardHeight } from '../../../libs/use/useKeyboardHeight'
+import { useChatComposer } from '../../../libs/use/useChatComposer'
 import { formatDividerTime } from '../../../libs/utils/time'
 import { isRichStream } from '../../../libs/utils/stream'
 import { quoteHasIcon, quoteIconNameOf, quoteSenderOf, quoteSuffixOf, quoteTextClassOf, quoteTextStyleOf } from '../../../libs/utils/quote'
@@ -324,6 +379,8 @@ interface Props {
   quickReplyMode?: EmQuickReplyMode
   /** 消息长按菜单追加的业务动作（M2.12）：追加在内置项之后，命中时 emit message-menu 由宿主处理 */
   extraMessageMenus?: EmMessageMenuExtra[]
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -338,7 +395,9 @@ const props = withDefaults(defineProps<Props>(), {
   showConnectionBanner: true,
   quickReplies: () => [],
   quickReplyMode: 'fill',
-  extraMessageMenus: () => []
+  extraMessageMenus: () => [],
+  customClass: '',
+  customStyle: ''
 })
 
 const emit = defineEmits<{
@@ -392,6 +451,7 @@ const BOTTOM_ANCHOR_ID = 'em-chat-bottom-anchor'
 const ready = ref(false)
 const historySettled = ref(false)
 const historyFailed = ref(false)
+const loadMoreFailed = ref(false)
 const historyLoading = ref(false)
 
 const list = computed<EmMessageItem[]>(() => messageStore.messagesByConversationId[props.conversationId] ?? [])
@@ -501,6 +561,83 @@ function onMuteAllTap(): void {
   uni.showToast({ title: t('group.muteAllToast'), icon: 'none' })
 }
 
+// ========== #input-bar 整栏自绘（M2.16）==========
+// 宿主提供 #input-bar 插槽时整栏替换默认 em-chat-inputbar：结构/样式任意自绘，但行为核心
+// （键盘避让/键盘↔面板互斥/录音手势状态机/禁用守卫）由页面侧 composer 承担，状态与动作经
+// 插槽 scope（EmChatInputBarScope）透出；壳节点 :style=composerShellStyle 负责键盘顶起与安全区。
+// 默认路径（无插槽）渲染 em-chat-inputbar，collapseSignal 模式与此前完全一致（零回归）。
+const slots = useSlots()
+const hasCustomInputBar = slots['input-bar'] != null
+const composer = hasCustomInputBar
+  ? useChatComposer({
+      disabled: isMutedAll,
+      onDisabledTap: onMuteAllTap,
+      onVoiceSend: (path, duration) => {
+        onVoiceSend(path, duration).catch(() => {})
+      }
+    })
+  : null
+
+// scope 动作：草稿写入（走 draft ref，草稿持久化/typing/@ 检测的 watch 自动生效）
+function setDraftValue(v: string): void {
+  draft.value = v
+}
+
+function closeQuoteInfo(): void {
+  quoteInfo.value = null
+}
+
+// scope 只读状态（composer 为 null 时给空值，模板 v-if 已保证不渲染，此处仅为类型收窄）
+const composerShellStyle = computed(() => composer?.rootStyle.value ?? '')
+const composerPanelStyle = computed(() => composer?.panelStyle.value ?? '')
+const composerPanelState = computed<EmChatComposerPanel>(() => composer?.panel.value ?? 'none')
+const composerKeyboardLift = computed(() => composer?.keyboardLift.value ?? 0)
+const composerInputFocus = computed(() => composer?.inputFocus.value ?? false)
+const composerVoiceMode = computed(() => composer?.voiceMode.value ?? false)
+const composerRecording = computed(() => composer?.recording.value ?? false)
+const composerWillCancel = computed(() => composer?.willCancel.value ?? false)
+
+// scope 动作转发（composer 仅整栏自绘时存在）
+function composerTogglePanel(kind: EmChatComposerPanelKind): void {
+  composer?.togglePanel(kind)
+}
+
+function composerCollapsePanel(): void {
+  composer?.collapse()
+}
+
+function composerCloseKeyboard(): void {
+  composer?.closeKeyboard()
+}
+
+function composerNotifyInputFocus(): void {
+  composer?.onInputFocus()
+}
+
+function composerNotifyInputBlur(): void {
+  composer?.onInputBlur()
+}
+
+function composerToggleVoiceMode(): void {
+  composer?.toggleVoiceMode()
+}
+
+function composerVoiceTouchStart(e: EmChatComposerTouchEvent): void {
+  composer?.onRecordTouchStart(e)
+}
+
+function composerVoiceTouchMove(e: EmChatComposerTouchEvent): void {
+  composer?.onRecordTouchMove(e)
+}
+
+function composerVoiceTouchEnd(): void {
+  composer?.onRecordTouchEnd()
+}
+
+function composerVoiceTouchCancel(): void {
+  composer?.onRecordTouchCancel()
+}
+
 // ========== @提及链路（仅群聊 + enableMention；单聊全门控，isGroupChat 为唯一分流点） ==========
 
 const mentionVisible = ref(false)
@@ -525,6 +662,16 @@ function onMentionTrigger(): void {
     EmKit.getGroupMemberList(props.conversationId).catch(() => {})
   }
   mentionVisible.value = true
+}
+
+// @ 触发检测（仅 #input-bar 整栏自绘路径；默认输入栏路径由 em-chat-inputbar 的 mention-trigger
+// emit 驱动，逻辑相同）：草稿变长且新值以 @ 结尾。自绘栏只要经 setDraft 写草稿即自动获得整条 @ 链
+if (hasCustomInputBar) {
+  watch(draft, (v, old) => {
+    if (v.length > (old ?? '').length && v.endsWith('@')) {
+      onMentionTrigger()
+    }
+  })
 }
 
 // 面板搜索词：面板打开期间取草稿最后一个 @ 之后的尾部（尾部追加模型，uni input 无光标 API）
@@ -646,12 +793,17 @@ watch(keyboardHeight, (h, prev) => {
 })
 
 // ========== 点击聊天区收起输入栏（emoji/媒体面板 + 软键盘） ==========
-// 面板状态归 em-chat-inputbar 内部，父级不持有，故用递增信号 props 传达一次性「收起」命令
-// （不用 $refs 调子组件方法：蒸汽端/小程序/H5 行为一致）。点消息区任意位置即收，对齐 vue 版
-// chat__content 的 onChatContentClick → messageInput.blur()；无展开态时子组件内为空操作。
+// 默认输入栏：面板状态归 em-chat-inputbar 内部，父级不持有，故用递增信号 props 传达一次性「收起」
+// 命令（不用 $refs 调子组件方法：蒸汽端/小程序/H5 行为一致）。#input-bar 整栏自绘：状态在页面侧
+// composer，直接 collapse。点消息区任意位置即收，对齐 vue 版 chat__content 的 onChatContentClick →
+// messageInput.blur()；无展开态时为空操作。
 const inputbarCollapseSignal = ref(0)
 
 function onChatAreaClick(): void {
+  if (composer != null) {
+    composer.collapse()
+    return
+  }
   inputbarCollapseSignal.value += 1
 }
 
@@ -741,6 +893,10 @@ async function loadInitialHistory(): Promise<void> {
 }
 
 function retryHistory(): void {
+  if (loadMoreFailed.value) {
+    onLoadMore().catch(() => {})
+    return
+  }
   loadInitialHistory().catch(() => {})
 }
 
@@ -844,6 +1000,8 @@ watch(() => props.conversationId, () => {
   quoteInfo.value = null
   mentionVisible.value = false
   mentionedContacts.value = []
+  // 宿主复用同一聊天页切换会话时，不把上一个会话的视频播放器留在屏幕上
+  videoPreviewVisible.value = false
   // 会话切换：跟随态与滚动基线复位（新会话首屏必须贴底）
   streamFollow = true
   lastScrollTop = -1
@@ -853,6 +1011,7 @@ watch(() => props.conversationId, () => {
 async function onLoadMore(): Promise<void> {
   if (loadingMore.value) return
   loadingMore.value = true
+  loadMoreFailed.value = false
   // 锚点保位（对齐 TUIKit uniapp 版）：prepend 前记录当前首条消息，加载后 scroll-into-view 回位，
   // 延时清空锚点——消除加载历史时视口被顶动的跳动
   const first = list.value.length > 0 ? list.value[0] : null
@@ -870,6 +1029,7 @@ async function onLoadMore(): Promise<void> {
       })
     }
   } catch (e) {
+    loadMoreFailed.value = true
     logger.error('loadHistory fail:', e)
     uni.showToast({ title: t('chat.historyFailed'), icon: 'none' })
   } finally {
@@ -877,7 +1037,10 @@ async function onLoadMore(): Promise<void> {
   }
 }
 
+const sendingText = ref(false)
+
 async function onSend(): Promise<void> {
+  if (sendingText.value) return
   // 全员禁言防御门控（inputbar 禁用态已拦发送动作，此处兜底草稿 confirm 等旁路）
   if (isMutedAll.value) {
     onMuteAllTap()
@@ -890,6 +1053,7 @@ async function onSend(): Promise<void> {
   const mentionIds = isGroupChat.value
     ? filterActiveMentions(text, mentionedContacts.value).map((c) => c.userId)
     : []
+  sendingText.value = true
   try {
     const item = await EmKit.sendText(props.conversationId, props.chatType, text, quote, mentionIds.length > 0 ? mentionIds : undefined)
     draft.value = ''
@@ -903,6 +1067,8 @@ async function onSend(): Promise<void> {
     logger.error('sendText fail:', e)
     // 未连上/超时等失败可能根本没进消息列表（没有 FAILED 气泡），必须给用户一个提示
     uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+  } finally {
+    sendingText.value = false
   }
 }
 
@@ -912,6 +1078,7 @@ function quickReplyTextOf(item: EmQuickReply): string {
 }
 
 function onQuickReply(item: EmQuickReply): void {
+  if (sendingText.value) return
   if (isMutedAll.value) {
     onMuteAllTap()
     return
@@ -927,6 +1094,8 @@ function onQuickReply(item: EmQuickReply): void {
 }
 
 async function sendQuickReplyText(text: string): Promise<void> {
+  if (sendingText.value) return
+  sendingText.value = true
   try {
     const item = await EmKit.sendText(props.conversationId, props.chatType, text)
     scrollToBottom()
@@ -934,13 +1103,31 @@ async function sendQuickReplyText(text: string): Promise<void> {
   } catch (e) {
     logger.error('sendQuickReply fail:', e)
     uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+  } finally {
+    sendingText.value = false
   }
 }
 
 async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<void> {
-  // 用户取消选择也会走 fail：这里静默返回，只有发送失败才提示
-  const images = await chooseImage(1, sourceType).catch(() => [])
-  if (images.length === 0) return
+  // iOS 相机权限被拒后，uni.chooseImage 仍会拉起拍摄页并停在纯黑画面（系统不再弹窗）；
+  // 拍摄前先查授权，denied/config error 直接引导去系统设置，不进入黑屏拍摄页。
+  // H5/小程序/基座缺模块时 getCameraAuthorizeState() 返回 unknown，行为与原来一致。
+  if (sourceType === 'camera') {
+    const cameraAuth = getCameraAuthorizeState()
+    // 真机黑屏排查：authorized 仍黑说明不是权限层，先看这条日志再查 base/硬件/模拟器
+    logger.info('camera authorize state:', cameraAuth)
+    if (cameraAuth === 'denied' || cameraAuth === 'config error') {
+      showCameraPermissionGuide(cameraAuth)
+      return
+    }
+  }
+  // 平台层将用户取消归一为空数组；只有真实选择/读取失败进入 catch。
+  const images = await chooseImage(1, sourceType).catch((e) => {
+    logger.error('chooseImage fail:', e)
+    uni.showToast({ title: t('error.imagePickFailed'), icon: 'none' })
+    return null
+  })
+  if (images == null || images.length === 0) return
   try {
     const item = await EmKit.sendImage(props.conversationId, props.chatType, images[0])
     scrollToBottom()
@@ -949,6 +1136,22 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
     logger.error('sendImage fail:', e)
     uni.showToast({ title: t('message.send.failed'), icon: 'none' })
   }
+}
+
+// 相机授权被拒/安装包缺权限描述：不再拉起系统拍摄页（iOS 会停在黑屏），改为明确引导
+function showCameraPermissionGuide(state: EmCameraAuthorizeState): void {
+  const configError = state === 'config error'
+  const content = configError ? t('chat.cameraPermission.config') : t('chat.cameraPermission.denied')
+  uni.showModal({
+    title: t('chat.cameraPermission.title'),
+    content,
+    showCancel: !configError,
+    confirmText: configError ? t('button.confirm') : t('chat.cameraPermission.openSetting'),
+    success: (res) => {
+      if (!res.confirm || configError) return
+      openAppAuthorizeSetting()
+    }
+  })
 }
 
 // 输入栏「+」面板选择（语音由 inputbar 内部消化，这里只有 album/camera/video/file）
@@ -965,7 +1168,11 @@ async function onMediaSelect(key: string): Promise<void> {
 }
 
 async function onPickVideo(): Promise<void> {
-  const video = await chooseVideo()
+  const video = await chooseVideo().catch((e) => {
+    logger.error('chooseVideo fail:', e)
+    uni.showToast({ title: t('error.videoPickFailed'), icon: 'none' })
+    return null
+  })
   if (video == null) return
   try {
     const item = await EmKit.sendVideo(props.conversationId, props.chatType, video)
@@ -1031,15 +1238,20 @@ function onPreview(m: EmMessageItem): void {
   }
 }
 
+// 视频全屏预览状态（App/小程序/H5 统一）：url/poster 为空时不上屏
+const videoPreviewVisible = ref(false)
+const videoPreviewSrc = ref('')
+const videoPreviewPoster = ref('')
+
 // 视频消息点击默认行为（从 em-video-message 上移，组件本身纯 emit 透传，与 em-image-message 对齐）：
-// 一期仅 H5 接了 window.open；App/小程序播放器待接，气泡侧已隐藏播放入口，这里再兜底一次。
+// 全端打开内置全屏播放器；URL 缺失时不打开空播放器。打开前停掉正在播放的语音，避免两路声音叠加。
 function onVideoPreview(m: EmMessageItem): void {
   if (!PLATFORM_CAPABILITIES.videoPreview) return
-  const url = m.url
-  if (url === '') return
-  // #ifdef WEB
-  window.open(url, '_blank')
-  // #endif
+  if (m.url === '') return
+  stopAudio()
+  videoPreviewSrc.value = m.url
+  videoPreviewPoster.value = m.thumbUrl
+  videoPreviewVisible.value = true
 }
 
 // 文件消息点击默认行为（从 em-file-message 上移，组件本身纯 emit 透传）：
@@ -1048,7 +1260,7 @@ function onFileDownload(m: EmMessageItem): void {
   if (!PLATFORM_CAPABILITIES.fileOpen) return
 }
 
-// 消息长按菜单（项与顺序经 uiConfig.messageMenuKeys 配置）：复制（仅文本）/ 引用 / 撤回（窗口内）/ 删除（本地）
+// 消息长按菜单（项与顺序经 uiConfig.messageMenuKeys 配置）：复制（仅文本）/ 引用 / 撤回（窗口内）/ 删除（漫游 + 本地）
 const msgSheetVisible = ref(false)
 const activeMessage = ref<EmMessageItem | null>(null)
 // 引用目标快照（选择引用时生成，发送成功/手动关闭/切会话时清除）
@@ -1121,15 +1333,66 @@ function onLongPressMessage(m: EmMessageItem): void {
   msgSheetVisible.value = true
 }
 
-// 失败重发：点状态列红叹号触发，原地回到 sending，失败再落 failed
+const resendingByLocalId: Record<string, boolean> = {}
+const recallingByLocalId: Record<string, boolean> = {}
+const deletingByLocalId: Record<string, boolean> = {}
+
+// 失败重发：点状态列红叹号触发，等待 SDK 就绪前即按 localId 占锁，失败再落 failed 并允许重试
 async function onResend(m: EmMessageItem): Promise<void> {
-  if (m.status !== MESSAGE_STATUS.FAILED) return
+  if (m.status !== MESSAGE_STATUS.FAILED || resendingByLocalId[m.localId] === true) return
+  resendingByLocalId[m.localId] = true
   try {
     await EmKit.resendMessage(m.conversationId, m.chatType, m.localId)
     scrollToBottom()
   } catch (e) {
     logger.error('resendMessage fail:', e)
     uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+  } finally {
+    delete resendingByLocalId[m.localId]
+  }
+}
+
+async function recallMessage(m: EmMessageItem): Promise<void> {
+  if (recallingByLocalId[m.localId] === true) return
+  // 菜单打开后也可能跨过撤回窗口，执行时重查而不是只依赖菜单生成时的条件
+  if (Date.now() - m.time > config.recallTimeLimit) {
+    uni.showToast({ title: t('message.recall.timeLimit'), icon: 'none' })
+    return
+  }
+  recallingByLocalId[m.localId] = true
+  try {
+    await EmKit.recallMessage(m.conversationId, m.chatType, m.id)
+    emit('recall', m)
+  } catch (e) {
+    uni.showToast({ title: t('message.recall.failed'), icon: 'none' })
+  } finally {
+    delete recallingByLocalId[m.localId]
+  }
+}
+
+function confirmDeleteMessage(m: EmMessageItem): void {
+  uni.showModal({
+    title: t('message.action.delete'),
+    content: t('message.delete.confirm'),
+    success: (res) => {
+      if (!res.confirm) return
+      void deleteMessage(m)
+    }
+  })
+}
+
+async function deleteMessage(m: EmMessageItem): Promise<void> {
+  if (deletingByLocalId[m.localId] === true) return
+  deletingByLocalId[m.localId] = true
+  try {
+    await EmKit.deleteMessage(m)
+    // 成功反馈就是气泡消失；失败保留气泡且不向宿主派发完成事件
+    emit('delete', m)
+  } catch (e) {
+    logger.error('deleteMessage fail:', e)
+    uni.showToast({ title: t('message.delete.failed'), icon: 'none' })
+  } finally {
+    delete deletingByLocalId[m.localId]
   }
 }
 
@@ -1142,19 +1405,18 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
     return
   }
   if (action.key === MESSAGE_MENU_KEY.COPY) {
-    uni.setClipboardData({ data: m.text })
+    try {
+      await copyText(m.text)
+      uni.showToast({ title: t('message.copySuccess'), icon: 'none' })
+    } catch (e) {
+      uni.showToast({ title: t('message.copyFailed'), icon: 'none' })
+    }
   } else if (action.key === MESSAGE_MENU_KEY.QUOTE) {
     quoteInfo.value = EmKit.makeQuote(m)
   } else if (action.key === MESSAGE_MENU_KEY.RECALL) {
-    try {
-      await EmKit.recallMessage(m.conversationId, m.chatType, m.id)
-      emit('recall', m)
-    } catch (e) {
-      uni.showToast({ title: t('message.recall.failed'), icon: 'none' })
-    }
+    await recallMessage(m)
   } else if (action.key === MESSAGE_MENU_KEY.DELETE) {
-    EmKit.deleteLocalMessage(m.conversationId, m.localId)
-    emit('delete', m)
+    confirmDeleteMessage(m)
   }
 }
 
