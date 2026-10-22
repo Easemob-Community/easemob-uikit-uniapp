@@ -293,11 +293,12 @@ export const SELECT_CONTACT_MODE = {
 
 export type SelectContactModeValue = (typeof SELECT_CONTACT_MODE)[keyof typeof SELECT_CONTACT_MODE]
 
-/** em-load-more 触底加载 footer 三态 */
+/** em-load-more 触底加载 footer 四态 */
 export const LOAD_MORE_STATE = {
   LOADING: 'loading',
   NO_MORE: 'noMore',
-  BUTTON: 'button'
+  BUTTON: 'button',
+  ERROR: 'error'
 } as const
 
 export type LoadMoreStateValue = (typeof LOAD_MORE_STATE)[keyof typeof LOAD_MORE_STATE]

@@ -49,6 +49,14 @@
   opacity: 0.4;
 }
 
+.em-button.is-loading {
+  opacity: 0.7;
+}
+
+.em-button__spinner {
+  margin-right: var(--em-spacing-2);
+}
+
 .em-button__text {
   font-family: var(--em-font-family);
   font-weight: var(--em-font-weight-medium);
