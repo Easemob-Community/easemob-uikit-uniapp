@@ -21,7 +21,9 @@
     "app" : {
         "defaultAppTheme" : "auto",
         "distribute" : {
-            "modules" : {}
+            "modules" : {
+                "uni-video" : {}
+            }
         }
     },
     "web" : {
@@ -29,7 +31,9 @@
     },
     "app-android" : {
         "distribute" : {
-            "modules" : {},
+            "modules" : {
+                "uni-video" : {}
+            },
             "icons" : {},
             "splashScreens" : {
                 "default" : {}
@@ -38,7 +42,15 @@
     },
     "app-ios" : {
         "distribute" : {
-            "modules" : {},
+            "modules" : {
+                "uni-video" : {}
+            },
+            "privacyDescription" : {
+                "NSCameraUsageDescription" : "用于拍摄照片发送给聊天对象",
+                "NSPhotoLibraryUsageDescription" : "用于从相册选择图片发送给聊天对象",
+                "NSPhotoLibraryAddUsageDescription" : "用于保存聊天中的图片到相册",
+                "NSMicrophoneUsageDescription" : "用于录制并发送语音消息"
+            },
             "icons" : {},
             "splashScreens" : {}
         }
@@ -47,7 +59,10 @@
         "distribute" : {
             "deviceTypes" : [ "phone" ],
             "deviceArchs" : [ "arm64-v8a" ],
-            "bundleName" : "uni.app.UNI08EF252"
+            "bundleName" : "uni.app.UNI08EF252",
+            "modules" : {
+                "uni-video" : {}
+            }
         }
     }
 }

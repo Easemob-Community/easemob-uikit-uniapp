@@ -12,7 +12,7 @@ const logger = createLogger('platform')
  * 平台差异只允许出现在本文件（#ifdef），组件消费布尔值，不再散落条件编译。
  */
 export interface EmPlatformCapabilities {
-  /** 视频播放/预览：一期仅 H5（window.open）；App/小程序原生播放器待接 */
+  /** 视频播放/预览：全端支持（内置全屏 em-video-preview + 原生 video 组件） */
   videoPreview: boolean
   /** 内置文件选择：小程序 + H5；App 无内置选择器（宿主注入附件能力后由 libs/attachment.ts 调起） */
   filePick: boolean
@@ -22,13 +22,10 @@ export interface EmPlatformCapabilities {
 
 function detectPlatformCapabilities(): EmPlatformCapabilities {
   const caps: EmPlatformCapabilities = {
-    videoPreview: false,
+    videoPreview: true,
     filePick: true,
     fileOpen: false
   }
-  // #ifdef WEB
-  caps.videoPreview = true
-  // #endif
   // #ifdef APP
   // 内置选择器在 App 端不可用；宿主可经 EmKit.setAttachmentProvider 注入平台文件选择能力，
   // UI 显隐统一读 libs/attachment.ts 的 canPickAttachment()（本开关只表示“内置能力”）
@@ -116,6 +113,46 @@ function fileNameOf(path: string): string {
 // 媒体选择收口：SDK 5.x createXxxMessage 的 data 不收字符串路径，
 // 必须 File（H5）或 MiniAppFile { path, name, size }（小程序/App），这里把两端的素材都带齐
 // sourceType 'camera' 即拍摄（小程序/App 调起相机；H5 浏览器无相机概念，一律退化为文件选择器）
+function isUserCancellation(error: unknown): boolean {
+  const detail = error as { errMsg?: string, message?: string } | null
+  const text = typeof error === 'string' ? error : `${detail?.errMsg ?? ''} ${detail?.message ?? ''}`
+  return /\bcancel(?:ed|led)?\b/i.test(text)
+}
+
+export type EmCameraAuthorizeState = 'authorized' | 'denied' | 'not determined' | 'config error' | 'unknown'
+
+/**
+ * 相机系统授权状态（仅 iOS 预检；其它端/基座缺模块回 unknown，调用方不做预检）。
+ * iOS 上用户拒绝相机权限后，uni.chooseImage 仍会拉起拍摄页并停在纯黑画面（系统不再弹窗），
+ * 所以调起前先查一次：denied / config error 交给宿主引导去设置，别把用户丢在黑屏里。
+ * Android 不做预检：未授权时也可能返回 denied，提前拦截会挡掉首次系统弹窗。
+ */
+export function getCameraAuthorizeState(): EmCameraAuthorizeState {
+  // #ifdef APP-IOS
+  try {
+    return uni.getAppAuthorizeSetting().cameraAuthorized as EmCameraAuthorizeState
+  } catch (e) {
+    // 自定义基座没编入 uni-getAppAuthorizeSetting 时降级为 unknown（不阻断拍摄）
+    logger.warn('getAppAuthorizeSetting unavailable:', e)
+    return 'unknown'
+  }
+  // #endif
+  // #ifndef APP-IOS
+  return 'unknown'
+  // #endif
+}
+
+/** 打开系统应用授权设置页（仅 App；基座缺模块/调用失败时静默，由调用方文案兜底） */
+export function openAppAuthorizeSetting(): void {
+  // #ifdef APP
+  try {
+    uni.openAppAuthorizeSetting({})
+  } catch (e) {
+    logger.warn('openAppAuthorizeSetting unavailable:', e)
+  }
+  // #endif
+}
+
 export function chooseImage(count = 1, sourceType: 'album' | 'camera' = 'album'): Promise<EmPickedImage[]> {
   return new Promise((resolve, reject) => {
     uni.chooseImage({
@@ -136,6 +173,10 @@ export function chooseImage(count = 1, sourceType: 'album' | 'camera' = 'album')
         }))
       },
       fail: (e) => {
+        if (isUserCancellation(e)) {
+          resolve([])
+          return
+        }
         reject(e)
       }
     })
@@ -144,6 +185,122 @@ export function chooseImage(count = 1, sourceType: 'album' | 'camera' = 'album')
 
 export function previewImage(urls: string[], current: string): void {
   uni.previewImage({ urls, current })
+}
+
+/**
+ * 视频 URL 归一：iOS App 的 ATS 默认拒绝 http，历史消息/旧服务端可能回 http 文件地址，
+ * 这里统一升到 https（EaseMob 文件服务同时支持 https）。其它端原样返回，避免破坏 http-only 环境。
+ * 协议相对地址（//host/...）原生播放器不认，统一补 https。
+ */
+export function normalizeVideoUrl(url: string): string {
+  if (url.indexOf('//') === 0) return `https:${url}`
+  // #ifdef APP-IOS
+  if (url.indexOf('http://') === 0) return `https://${url.slice(7)}`
+  // #endif
+  return url
+}
+
+export interface EmVideoSourceTask {
+  promise: Promise<string>
+  abort: () => void
+}
+
+// App 端已下载的视频本地路径缓存（同一消息重复打开不再重复下载；文件在 USER_DATA_PATH，随应用数据清理）
+const videoSourceCache = new Map<string, string>()
+let videoFileSeq = 0
+
+// EaseMob chatfiles 直链没有扩展名；AVPlayer 对无后缀本地文件也可能拒绝，
+// 复制到 USER_DATA_PATH 并补 .mp4 后缀后再交给 video（复制失败则退回原临时路径）
+function toMp4FilePath(tempPath: string): Promise<string> {
+  // #ifdef APP
+  return new Promise<string>((resolve) => {
+    const base = (uni.env.USER_DATA_PATH ?? '').replace(/\/+$/, '')
+    if (base === '') {
+      resolve(tempPath)
+      return
+    }
+    videoFileSeq += 1
+    const target = `${base}/em-video-${Date.now()}-${videoFileSeq}.mp4`
+    try {
+      uni.getFileSystemManager().copyFile({
+        srcPath: tempPath,
+        destPath: target,
+        success: () => resolve(target),
+        fail: (e) => {
+          logger.warn('copy video to mp4 fail:', e)
+          resolve(tempPath)
+        }
+      })
+    } catch (e) {
+      logger.warn('copy video to mp4 fail:', e)
+      resolve(tempPath)
+    }
+  })
+  // #endif
+  // #ifndef APP
+  return Promise.resolve(tempPath)
+  // #endif
+}
+
+/**
+ * 视频源准备：App 端先下载到本地再交给 `video` 播放。
+ *
+ * EaseMob 的 chatfiles 直链（`.../chatfiles/<uuid>`，无扩展名）实测 **不支持 Range**
+ * （带 `Range: bytes=0-1023` 仍返回 200 全量、无 Accept-Ranges/Content-Range）。
+ * iOS AVPlayer 对远程渐进播放要求 Range，服务端不支持就会一直转圈（浏览器能边下边播，所以
+ * Safari 正常）。下载到本地后播放可绕开该限制；H5/小程序仍直接给远程 URL。
+ */
+export function prepareVideoSource(url: string, onProgress?: (percent: number) => void): EmVideoSourceTask {
+  // #ifdef APP
+  // 本地路径直接交给 video；HLS 也不能整包下载（m3u8 是分片索引），保持远程播放
+  if ((url.indexOf('http://') !== 0 && url.indexOf('https://') !== 0) || url.indexOf('.m3u8') >= 0) {
+    if (onProgress != null) onProgress(100)
+    return { promise: Promise.resolve(url), abort: () => {} }
+  }
+  const cached = videoSourceCache.get(url)
+  if (cached != null && cached !== '') {
+    if (onProgress != null) onProgress(100)
+    return { promise: Promise.resolve(cached), abort: () => {} }
+  }
+  let task: ReturnType<typeof uni.downloadFile> | null = null
+  const promise = new Promise<string>((resolve, reject) => {
+    task = uni.downloadFile({
+      url,
+      success: (res) => {
+        const path = res.tempFilePath ?? ''
+        if (res.statusCode === 200 && path !== '') {
+          toMp4FilePath(path).then((finalPath) => {
+            videoSourceCache.set(url, finalPath)
+            resolve(finalPath)
+          })
+          return
+        }
+        reject(new Error(`download video fail: status ${res.statusCode}`))
+      },
+      fail: (e) => {
+        reject(new Error(e?.errMsg ?? 'download video fail'))
+      }
+    })
+    if (task != null && onProgress != null) {
+      task.onProgressUpdate((res) => {
+        onProgress(res.progress)
+      })
+    }
+  })
+  return {
+    promise,
+    abort: () => {
+      if (task == null) return
+      try {
+        task.abort()
+      } catch (e) {}
+    }
+  }
+  // #endif
+  // #ifndef APP
+  if (onProgress != null) onProgress(100)
+  return { promise: Promise.resolve(url), abort: () => {} }
+  // #endif
 }
 
 // ========== 媒体选择 / 录音 / 播放收口 ==========
@@ -157,10 +314,10 @@ export interface EmPickedVideo {
   size: number      // 字节
 }
 
-// 取消/失败统一 resolve(null)，组件层不区分
+// 用户取消 resolve(null)，真实选择/读取失败 reject，由组件层反馈
 export function chooseVideo(): Promise<EmPickedVideo | null> {
-  return new Promise((resolve) => {
-    // H5 的 uni.chooseVideo 支持度有限（依赖浏览器文件选择与视频元数据解析），失败同样回落 null
+  return new Promise((resolve, reject) => {
+    // H5 的 uni.chooseVideo 支持度有限（依赖浏览器文件选择与视频元数据解析）
     uni.chooseVideo({
       sourceType: ['album'],
       success: (res) => {
@@ -173,8 +330,12 @@ export function chooseVideo(): Promise<EmPickedVideo | null> {
           size: res.size ?? 0
         })
       },
-      fail: () => {
-        resolve(null)
+      fail: (e) => {
+        if (isUserCancellation(e)) {
+          resolve(null)
+          return
+        }
+        reject(e)
       }
     })
   })
@@ -186,7 +347,7 @@ export interface EmPickedFile extends EmAttachment {
 }
 
 export function chooseFile(): Promise<EmPickedFile | null> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     // #ifdef MP-WEIXIN
     uni.chooseMessageFile({
       count: 1,
@@ -195,8 +356,12 @@ export function chooseFile(): Promise<EmPickedFile | null> {
         const f = res.tempFiles[0]
         resolve({ path: f.path, name: f.name, size: f.size, webFile: null })
       },
-      fail: () => {
-        resolve(null)
+      fail: (e) => {
+        if (isUserCancellation(e)) {
+          resolve(null)
+          return
+        }
+        reject(e)
       }
     })
     // #endif
@@ -211,6 +376,9 @@ export function chooseFile(): Promise<EmPickedFile | null> {
       }
       const f = files[0]
       resolve({ path: '', name: f.name, size: f.size, webFile: f })
+    }
+    input.oncancel = () => {
+      resolve(null)
     }
     input.click()
     // #endif
@@ -429,15 +597,27 @@ export function exportTextFile(filename: string, content: string): Promise<strin
   })
 }
 
-// 剪贴板兜底（日志导出降级、复制类功能共用）；失败不阻塞业务，但要进日志便于排查
-// （App 端超长文本可能超系统剪贴板限制，静默失败会让「已复制」的提示骗人）
-export function copyText(text: string): void {
-  try {
-    uni.setClipboardData({
-      data: text,
-      fail: (e) => logger.warn('setClipboardData fail:', e?.errMsg ?? e)
-    })
-  } catch (e) {
-    logger.warn('setClipboardData unavailable:', e)
-  }
+// 剪贴板兜底（日志导出降级、复制类功能共用）：关闭原生提示，由调用方统一反馈；
+// 空文本、同步异常与原生 fail 均 reject，避免伪造「已复制」成功提示
+export function copyText(text: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (text === '') {
+      reject(new Error('copy text is empty'))
+      return
+    }
+    try {
+      uni.setClipboardData({
+        data: text,
+        showToast: false,
+        success: () => resolve(),
+        fail: (e) => {
+          logger.warn('setClipboardData fail:', e?.errMsg ?? e)
+          reject(new Error(e?.errMsg ?? 'setClipboardData fail'))
+        }
+      })
+    } catch (e) {
+      logger.warn('setClipboardData unavailable:', e)
+      reject(e)
+    }
+  })
 }
