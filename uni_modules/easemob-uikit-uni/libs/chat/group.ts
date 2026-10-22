@@ -60,10 +60,13 @@ export class EmGroupDomain {
   private client: ChatClient | null = null
   private waitOnline: (() => Promise<void>) | null = null
   private hooks: EmGroupHooks | null = null
-  // 飞行中 Promise 去重（参照 vue group-domain pendingGroupInfoRequests）
+  // 飞行中 Promise 去重（参照 vue group-domain pendingGroupInfoRequests）；请求序号阻止旧响应覆盖新读取。
   private infoPromiseByGroupId: Record<string, Promise<EmGroup>> = {}
+  private infoRequestIdByGroupId: Record<string, number> = {}
+  private memberRequestIdByGroupId: Record<string, number> = {}
   private announcementPromiseByGroupId: Record<string, Promise<string>> = {}
   private adminPromiseByGroupId: Record<string, Promise<void>> = {}
+  private adminRequestIdByGroupId: Record<string, number> = {}
 
   bind(client: ChatClient, waitOnline: () => Promise<void>, hooks: EmGroupHooks): void {
     if (this.client != null) {
@@ -252,32 +255,44 @@ export class EmGroupDomain {
     return groupStore.items
   }
 
-  // 单群详情：飞行中去重，写 items + infoByGroupId
-  async getGroupInfo(groupId: string): Promise<EmGroup> {
+  // 单群详情：普通调用飞行中去重；force 用于移除后的权威重读，旧请求不得覆盖新请求或清理其 pending。
+  async getGroupInfo(groupId: string, force = false): Promise<EmGroup> {
     const existing = this.infoPromiseByGroupId[groupId]
-    if (existing != null) {
+    if (existing != null && !force) {
       return existing
     }
+    const requestId = (this.infoRequestIdByGroupId[groupId] ?? 0) + 1
+    this.infoRequestIdByGroupId[groupId] = requestId
     const promise = (async () => {
       const mgr = await this.readyGroupManager()
       const detail = await mgr.getGroupInfo({ groupId })
       const group = this.toEmGroup(detail)
-      upsertGroup(group)
+      if (requestId === this.infoRequestIdByGroupId[groupId]) {
+        upsertGroup(group)
+      }
       return group
     })()
     this.infoPromiseByGroupId[groupId] = promise
     try {
       return await promise
     } finally {
-      delete this.infoPromiseByGroupId[groupId]
+      if (this.infoPromiseByGroupId[groupId] === promise) {
+        delete this.infoPromiseByGroupId[groupId]
+      }
     }
   }
 
-  // 成员游标分页：首页整量回写 + 补拉 admin 合并角色（成员接口不回 admin 角色）；后续页 append
+  // 成员游标分页：首页整量回写 + 补拉 admin 合并角色；仅最新请求可写成员/游标，防旧预拉重加已移除成员。
   async getGroupMemberList(groupId: string, cursor?: string, pageSize = GROUP_MEMBER_PAGE_SIZE): Promise<{ items: EmGroupMember[], cursor: string, hasMore: boolean }> {
+    const requestId = (this.memberRequestIdByGroupId[groupId] ?? 0) + 1
+    this.memberRequestIdByGroupId[groupId] = requestId
     const mgr = await this.readyGroupManager()
     const page = await mgr.getGroupMemberList({ groupId, cursor, pageSize })
     const members = page.items.map((e) => this.toEmGroupMember(e))
+    const result = { items: members, cursor: page.cursor ?? '', hasMore: page.hasMore ?? false }
+    if (requestId !== this.memberRequestIdByGroupId[groupId]) {
+      return result
+    }
     if (cursor == null || cursor === '') {
       setGroupMembers(groupId, members)
       // 首屏后补拉管理员合并角色；失败不阻塞成员列表展示
@@ -285,10 +300,10 @@ export class EmGroupDomain {
     } else {
       appendGroupMembers(groupId, members)
     }
-    groupStore.memberCursorByGroupId[groupId] = page.cursor ?? ''
-    groupStore.memberHasMoreByGroupId[groupId] = page.hasMore ?? false
+    groupStore.memberCursorByGroupId[groupId] = result.cursor
+    groupStore.memberHasMoreByGroupId[groupId] = result.hasMore
     ensureUserInfos(members.map((m) => m.userId))
-    return { items: members, cursor: page.cursor ?? '', hasMore: page.hasMore ?? false }
+    return result
   }
 
   // 群公告：飞行中去重；undefined=未拉取、空串=已拉无公告
@@ -420,6 +435,10 @@ export class EmGroupDomain {
   async removeGroupMembers(groupId: string, userIds: string[]): Promise<void> {
     const mgr = await this.readyGroupManager()
     await mgr.removeGroupMembers({ groupId, userIds })
+    // 移除成功后旧管理员快照即失效；允许移除后的成员首屏重新同步，旧响应不得重加成员。
+    this.adminRequestIdByGroupId[groupId] = (this.adminRequestIdByGroupId[groupId] ?? 0) + 1
+    delete this.adminPromiseByGroupId[groupId]
+    groupStore.adminSyncedByGroupId[groupId] = false
     removeGroupMembersLocal(groupId, userIds)
   }
 
@@ -451,7 +470,7 @@ export class EmGroupDomain {
     clearGroups()
   }
 
-  // 拉取并合并群管理员到成员缓存；已同步过的群不重复拉（增删管理员事件做增量角色修正）
+  // 拉取并合并群管理员到成员缓存；普通首屏复用在途请求，只有最新一代可写角色/成员并清理自身 pending。
   private async syncGroupAdmins(groupId: string): Promise<void> {
     if (groupStore.adminSyncedByGroupId[groupId]) {
       return
@@ -460,9 +479,14 @@ export class EmGroupDomain {
     if (existing != null) {
       return existing
     }
+    const requestId = (this.adminRequestIdByGroupId[groupId] ?? 0) + 1
+    this.adminRequestIdByGroupId[groupId] = requestId
     const promise = (async () => {
       const mgr = await this.readyGroupManager()
       const admins = await mgr.getGroup(groupId).getAdmins()
+      if (requestId !== this.adminRequestIdByGroupId[groupId]) {
+        return
+      }
       const adminMembers = (admins ?? []).map((u) => this.toGroupMemberFromUser(u, GROUP_MEMBER_ROLE.ADMIN))
       appendGroupMembers(groupId, adminMembers)
       adminMembers.forEach((a) => updateGroupMemberRole(groupId, a.userId, GROUP_MEMBER_ROLE.ADMIN))
@@ -472,7 +496,9 @@ export class EmGroupDomain {
     try {
       return await promise
     } finally {
-      delete this.adminPromiseByGroupId[groupId]
+      if (this.adminPromiseByGroupId[groupId] === promise) {
+        delete this.adminPromiseByGroupId[groupId]
+      }
     }
   }
 
@@ -510,7 +536,7 @@ export class EmGroupDomain {
     this.hooks?.insertGroupNotice?.(groupId, text)
   }
 
-  // 成员变动通知文案：单成员直接展示，多成员取首位非当前用户并带总数（对齐 vue formatMemberNotice）
+  // 多成员通知：中文 count 为总人数；英文 “and N others” 使用 othersCount（排除已点名的首位成员）。
   private memberNoticeText(members: readonly NoticeUser[], singleKey: string, multipleKey: string): string {
     if (members.length === 0) {
       return ''
@@ -520,7 +546,11 @@ export class EmGroupDomain {
       return t(singleKey, { name: this.noticeNameOf(members[0]) })
     }
     const nonSelf = members.find((m) => m.userId !== connectionStore.userId) ?? members[0]
-    return t(multipleKey, { name: this.noticeNameOf(nonSelf), count: members.length })
+    return t(multipleKey, {
+      name: this.noticeNameOf(nonSelf),
+      count: members.length,
+      othersCount: members.length - 1
+    })
   }
 
   // 通知展示名：自己显示「你」，其余昵称 > userStore 展示名（userId 兜底）
