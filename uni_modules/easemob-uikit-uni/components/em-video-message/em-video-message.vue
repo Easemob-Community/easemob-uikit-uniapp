@@ -1,5 +1,5 @@
 <template>
-  <view :class="[ns.b(), 'em-bubble']" :style="sizeStyle" @touchstart="onTouchStart" @click="onPlay" @longpress="onLongpress">
+  <view :class="[ns.b(), 'em-bubble', customClass]" :style="sizeStyle + customStyle" @touchstart="onTouchStart" @click="onPlay" @longpress="onLongpress">
     <image
       v-if="message.thumbUrl !== ''"
       :class="ns.e('thumb')"
@@ -7,8 +7,7 @@
       mode="aspectFill"
     />
     <view v-else :class="ns.e('placeholder')"></view>
-    <!-- 播放入口按平台显隐：一期仅 H5 接了 window.open；App/小程序播放器待接，
-         先隐藏播放按钮与点击行为，只保留封面/时长（能力源见 PLATFORM_CAPABILITIES） -->
+    <!-- 播放入口全端显示：App/小程序/H5 统一走聊天页的全屏 em-video-preview（原生 video 组件） -->
     <view v-if="canPreview" :class="ns.e('overlay')">
       <view :class="ns.e('play')">
         <!-- 播放三角逐项对齐 vue video-message：Icon triangle 20 / 白色（不再用 border 手绘 / videocam 占位） -->
@@ -32,9 +31,14 @@ import { formatVideoDuration } from '../../libs/utils/time'
 
 interface Props {
   message: EmMessageItem
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  customClass: '',
+  customStyle: ''
+})
 
 defineOptions({ styleIsolation: 'app-and-page', virtualHost: true })
 
@@ -65,7 +69,7 @@ const sizeStyle = computed(() => {
 
 const durationText = computed(() => formatVideoDuration(props.message.duration))
 
-// 播放能力按平台显隐（见 platform.ts）：不支持的端不渲染播放按钮、不发 preview，避免点击无反馈
+// 播放能力按平台显隐（见 platform.ts）：videoPreview 全端 true；保留开关便于后续按端裁剪
 const canPreview = PLATFORM_CAPABILITIES.videoPreview
 
 // 点击行为纯 emit 透传（与 em-image-message 对齐）：默认播放/预览逻辑由宿主（em-chat-page 的 preview 监听）实现
