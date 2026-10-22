@@ -120,8 +120,8 @@ EmKit.init({
 
 ### 2.3 覆盖边界
 
-- 可以：`primaryColor`、页面根节点局部覆盖 token、宿主自己的卡片样式。
-- 不要：改 `uni_modules/easemob-uikit-uni/libs/style/*.css` 源码（升级被覆盖）；用 `!important` 硬压组件内部类名（跨端不稳定）。
+- 可以：`primaryColor`、子树根节点内联 `:style` 覆盖 token（App 端 class 方式覆盖变量会被主题类顶掉，必须内联）、组件的 `custom-class` / `custom-style`（全组件根节点透出，custom-style 内联五端可靠）、宿主自己的卡片样式。
+- 不要：改 `uni_modules/easemob-uikit-uni/libs/style/*.css` 源码（升级被覆盖）；用 `!important` 硬压组件内部类名（跨端不稳定）；App 端用同名 class 覆盖组件已设置的属性（单类选择器无特异性可言，拼声明顺序不可靠——覆盖走 custom-style，追加才用 custom-class）。
 
 ## 3. 语言（i18n）
 

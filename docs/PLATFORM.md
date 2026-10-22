@@ -31,7 +31,7 @@
 | 语音：录制与发送 | 支持（最长 60 秒，超时自动结束并按正常语音发送） | 不支持（语音入口隐藏） | 支持 |
 | 语音：播放 | 支持（全局互斥，播新停旧） | 支持 | 支持 |
 | 视频：选择与发送 | 支持（相册） | 支持（浏览器文件选择，宽高/时长依赖浏览器解析） | 支持（相册） |
-| 视频：播放/预览 | 不支持（气泡只显示封面与时长，无播放入口） | 支持（新窗口打开视频 URL） | 不支持（气泡只显示封面与时长） |
+| 视频：播放/预览 | 支持（内置全屏播放器 + 原生 `video`） | 支持（内置全屏播放器 + 原生 `video`） | 支持（内置全屏播放器 + 原生 `video`） |
 | 文件：选择与发送 | 支持（需宿主注册附件能力；未注册时「文件」入口隐藏） | 支持（浏览器文件选择） | 支持（从会话选择文件） |
 | 文件：打开/下载 | 不支持（文件卡为纯展示） | 不支持（文件卡为纯展示） | 不支持（文件卡为纯展示） |
 | 自定义消息收发 | 支持 | 支持 | 支持 |
@@ -57,14 +57,14 @@
 ```ts
 import { PLATFORM_CAPABILITIES } from '@/uni_modules/easemob-uikit-uni/libs'
 
-const canPreviewVideo = PLATFORM_CAPABILITIES.videoPreview // 仅 H5 为 true
+const canPreviewVideo = PLATFORM_CAPABILITIES.videoPreview // 全端为 true
 const canPickFile = PLATFORM_CAPABILITIES.filePick         // 表示“内置选择器”：小程序与 H5 为 true，App 为 false
 const canOpenFile = PLATFORM_CAPABILITIES.fileOpen         // 全端为 false
 ```
 
 | 字段 | 类型 | 取值 | 说明 |
 |---|---|---|---|
-| `videoPreview` | `boolean` | 仅 H5 `true` | 视频播放入口与点击预览 |
+| `videoPreview` | `boolean` | 全端 `true` | 视频播放入口与点击播放（内置全屏播放器） |
 | `filePick` | `boolean` | 小程序、H5 `true`；App `false` | 是否有内置文件选择器；App 端注册附件能力后入口由 `EmKit.canPickAttachment` 变为 `true` |
 | `fileOpen` | `boolean` | 全端 `false` | 文件打开/下载（当前版本不提供） |
 
@@ -81,6 +81,8 @@ App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应�
 - **CSS 是子集**：App 端只支持 class 选择器、不支持伪元素与 CSS 动画（`@keyframes` 不执行），库内动画改用 JS 定时器。见文末「已知平台约束」。
 - **宽度链用 rpx**：多行文本气泡在 App 端使用固定 `rpx` 宽度，避免百分比 `max-width` 造成的行尾裁字。
 - **原生 `<button>` 垂直居中**：App 端按钮靠默认上下 `padding` 居中，不要用固定 `height` + `line-height` 对齐，否则文字贴底。
+- **视频组件与基座**：`<video>` 属于内置模块 `uni-video`，会参与模块摇树。自定义基座若是在接入视频组件之前打的，组件会被降级成普通 `<view>`，表现为点开播放器后全屏黑屏；接入视频后重新打一次自定义基座即可，或在 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`。示例工程已配置。
+- **视频播放链路**：App 端先把视频整包下载到本地 `.mp4` 再交给 `video` 播放（EaseMob chatfiles 直链不支持 Range、无扩展名，远程直接播会停在 `00:00`）；下载期显示进度，关闭会中止下载。因此大视频需要等待完整下载后才能起播，这是服务端不支持 Range 时的预期行为。
 - **iOS 15+ / Android 6+**：低于该版本的系统不在支持范围。
 - **文件发送**：App 端没有跨端内置的系统文件选择器。宿主安装文件选择器插件后，用 `EmKit.setAttachmentProvider()` 注册选择/复制/清理能力，输入栏「文件」格才会出现；UIKit 不静态依赖插件，未注册时入口保持隐藏。接入示例见 [EmKit API · 附件能力注入](./API-KIT.md)。附件上传由 `uni.uploadFile` 以原生方式读取本地路径；SDK 的 md5 预检在路径不在 uni 文件系统可读范围时会自动跳过，不影响发送。
 
@@ -89,6 +91,7 @@ App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应�
 - **签名三处一致**：AGC 注册包名、HBuilderX 签名配置、构建产物 `bundleName` 必须完全一致，否则签名失败。完整步骤见[鸿蒙真机运行与签名](./HARMONY-REALDEVICE-RUN.md)。
 - **安全区**：导航栏顶部安全区读取 `safeAreaInsets.top`（HBuilderX 4.25+ 返回状态栏高度）；全屏弹层同样需要自己补顶部安全区。
 - **动画与光标**：CSS 动画不执行；流式打字机光标是静态字符，语音播放波形由 JS 定时器驱动。
+- **视频组件**：`<video>` 依赖内置模块 `uni-video`；鸿蒙自定义基座/HAP 同样需要在接入视频后重新打包，否则播放页黑屏。
 - **真机联调**：需要 DevEco Studio 与鸿蒙开发者账号；模拟器有额外系统版本要求，以官方文档为准。
 
 ### H5
@@ -97,7 +100,7 @@ App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应�
 - **没有键盘高度 API**：uni-app x 的 H5 运行时未实现 `uni.onKeyboardHeightChange`，UIKit 在 H5 不注册该监听，键盘避让交给浏览器。
 - **没有原生导航栏/tabBar 样式 API**：H5 无 `setNavigationBarColor` / `setTabBarStyle`，内置导航栏与 tabBar 是普通 DOM，需要宿主用 CSS 同步主题（示例工程在 `index.html` 与 `common/theme.ts` 里做了这件事）。
 - **不录音**：`startRecord` 在 H5 直接抛错，输入栏因此隐藏语音入口；语音消息可以播放。
-- **视频播放入口**：点击视频气泡用新窗口打开视频 URL，不内置播放器 UI。
+- **H5 视频播放**：点击视频气泡打开内置全屏播放器；浏览器可能拦截带声音的自动播放，点播放器里的播放键即可。
 - **拍摄退化为选文件**：浏览器没有相机概念，`chooseImage` 的 `camera` 来源退化为文件选择器。
 - **页面可见性**：H5 标签页隐藏时不把当前会话的新消息清未读、不发已读回执，避免用户不在页面上时被误清。
 
@@ -119,6 +122,8 @@ App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应�
 | H5 | 浏览器文件选择授权；不涉及摄像头/麦克风（不录音） | 点击「图片/视频/文件」入口时 | 不选文件即不上传 |
 
 App 端发布前需要在打包配置中声明相机、录音与相册用途（Android 权限声明、iOS 用途描述）；未声明时系统会直接拒绝，表现为「点选图没反应」。插件市场声明中已注明：相机、相册、麦克风仅在用户主动发送图片/视频/语音时调用，拒绝后对应功能不可用，不影响文本收发。
+
+**iOS 拍摄黑屏**：iOS 在用户拒绝相机授权后，系统仍可能拉起拍摄页并停在纯黑画面（且不再弹窗），看起来像「摄像头调起了但是黑的」。`em-chat-page` 在调起相机前会读 `uni.getAppAuthorizeSetting().cameraAuthorized`：`denied` 弹窗引导到系统设置（`uni.openAppAuthorizeSetting`），`config error` 提示安装包缺少权限描述；`not determined` 仍交给系统首次弹窗。发布包还需要在 `manifest.json` 的 `app-ios.distribute.privacyDescription` 中声明 `NSCameraUsageDescription`（相册/麦克风同理），改完需重新云打包或重打自定义基座才生效。iOS 模拟器没有摄像头，拍摄必为黑屏，请用真机验证。
 
 ## 构建与运行
 
@@ -168,8 +173,6 @@ bash scripts/uni.sh dev mp-weixin
 
 ### 其他约束
 
-- **H5 不录音**：语音消息可播放，但不能录制；语音入口自动隐藏，不需要宿主判断。
-- **视频播放仅在 H5**：App 与小程序只展示封面与时长，不提供播放入口。
 - **文件打开/下载当前版本不提供**：文件卡在各端都是纯展示，宿主需要下载能力时自行用 `message.url` 实现并在自己的卡片里接入。
 - **小程序主包体积**：平台 2MB，仓库门禁 1.5MB；新增业务页面优先放分包。
 - **H5 未做 PC 宽屏**：布局按移动端设计，桌面浏览器建议限制视口宽度。
@@ -184,6 +187,7 @@ bash scripts/uni.sh dev mp-weixin
 | 顶部/底部安全区 | `libs/use/useSafeArea.ts` |
 | 输入栏语音入口与文件入口显隐 | `components/em-chat-inputbar/em-chat-inputbar.vue` |
 | 视频播放入口 | `components/em-video-message/em-video-message.vue` |
+| 视频全屏播放器 | `components/em-video-preview/em-video-preview.vue` |
 | 文件卡点击行为 | `components/em-file-message/em-file-message.vue` |
 | 导航栏安全区与小程序胶囊避让 | `components/em-nav-bar/em-nav-bar.vue` |
 | 小程序 SDK 分包加载 | `libs/client/sdk.ts` |

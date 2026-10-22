@@ -180,7 +180,14 @@ AI 流式输出通过 SDK 的 `onStreamMessage` 驱动：
 
 完整接入见 [AI 流式消息](./AI-STREAM.md)。
 
-## 8. 撤回、重发、已读、typing
+## 8. 删除、复制、撤回、重发、已读、typing
+
+### 删除与复制
+
+- `EmKit.deleteMessage(message)` 对有服务端 ID 的消息先删除漫游历史，成功后再删除本地消息；无服务端 ID 的本地消息不调用 SDK。
+- 漫游删除失败会抛错并保留本地气泡。聊天页删除前需要确认，成功后通过气泡消失反馈并派发 `delete`，失败显示提示。
+- 删除后按剩余的最后一条消息校正会话摘要与时间；仅需显式本地删除时可调用 `EmKit.deleteLocalMessage(conversationId, localId)`。
+- `copyText(text)` 返回 `Promise<void>`，空文本或系统剪贴板失败会 reject；聊天页据此显示复制成功或失败提示，并关闭剪贴板原生提示以避免重复反馈。
 
 ### 撤回
 

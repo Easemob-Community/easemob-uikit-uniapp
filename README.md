@@ -295,7 +295,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 ### 已知限制
 
 - **@ 提及为追加式插入**：选人后追加到草稿尾部，不支持光标处插入——uni `<input>` 无光标位置 API（无 selectionStart），属平台物理上限。
-- **视频播放**：当前版本仅 H5 支持点击播放（新窗口）；App/小程序未接原生播放器，播放按钮已按平台隐藏，气泡保留封面与时长。
+- **视频播放**：五端内置全屏播放器，点击视频气泡即可播放。App 端会先整包下载视频再播放（EaseMob chatfiles 直链不支持 Range），下载期显示进度，大视频需要等待；解码能力跟随系统/浏览器，冷门编码会提示「视频加载失败」。H5 浏览器可能拦截带声音的自动播放，点播放器内的播放键即可。
 - **文件打开/下载**：当前版本全端未接下载/预览，文件气泡为纯展示，点击入口已隐藏。
 - **App 端发送文件**：App 无通用文件选择器，「文件」入口已隐藏；小程序/H5 不受影响。
 - **H5 桌面宽屏**：H5 按移动端 rpx 布局，未做 PC 宽屏/多栏适配；插件市场兼容矩阵标为不支持宽屏。
@@ -317,5 +317,5 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 
 - **引用协议**：发送改为 `ext.msgQuote`（与 vue 版同 key/同结构）为主、`ext.emQuote` 双写兼容 0.x；接收优先 `msgQuote`，旧消息回落 `emQuote`。业务 ext 不要占用这两个 key。
 - **返回事件**：`em-chat-page` 新增 `back` emit 与 `autoBack` prop。默认 `autoBack=true`，组件仍自行 `navigateBack`，旧用法零改动；需要拦截返回时传 `:auto-back="false"` 并监听 `@back`。
-- **平台能力**：新增 `PLATFORM_CAPABILITIES` / `videoPreview` / `filePick` / `fileOpen`；视频播放仅 H5，文件打开全端暂缺（入口已隐藏）。
+- **平台能力**：新增 `PLATFORM_CAPABILITIES` / `videoPreview` / `filePick` / `fileOpen`；视频播放全端可用，文件打开全端暂缺（入口已隐藏）。
 - **版本号**：插件 `1.0.0-rc.1`；0.x 未正式发布，无历史用户迁移负担。

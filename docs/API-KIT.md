@@ -232,9 +232,13 @@ onUnmounted(off)
 
 重发失败消息。按原消息类型重建（文本/图片/语音/视频/文件/自定义）；本地临时文件缺失时会抛错。返回 `Promise<void>`。
 
+### `EmKit.deleteMessage(message)`
+
+删除单条消息。`message.id` 非空时先删除服务端漫游消息，成功后再删除本地消息；`message.id` 为空时仅删除本地消息，不调用 SDK。漫游删除失败会保留本地消息并抛错。删除成功后按剩余消息校正会话摘要与时间，返回 `Promise<void>`。
+
 ### `EmKit.deleteLocalMessage(conversationId, localId)`
 
-只删除本地消息，不影响服务端。返回 `void`。
+仅删除本地消息，不影响服务端，也不等待 SDK 就绪；删除后同样校正会话摘要与时间。返回 `void`。
 
 ### `EmKit.sendTyping(conversationId, chatType)`
 
@@ -454,9 +458,11 @@ await EmKit.updateGroupInfo(groupId, { name: '新群名' })
 |---|---|
 | `PLATFORM_CAPABILITIES` / `isPageVisible()` | 平台能力快照与页面可见性 |
 | `chooseImage()` / `previewImage()` / `chooseVideo()` / `chooseFile()` | 媒体选择与预览（`chooseFile` 为内置实现，App 端走 provider） |
+| `getCameraAuthorizeState()` / `openAppAuthorizeSetting()` | iOS 相机系统授权状态（其它端返回 `unknown`）与跳转系统授权设置页，用于拍摄前预检，见 [平台与权限](./PLATFORM.md#权限) |
 | `setAttachmentProvider()` / `refreshAttachmentAvailability()` / `hasAttachmentProvider()` / `canPickAttachment()` / `attachmentCapability()` / `pickAttachments()` / `resolveAttachment()` | App 端附件能力注入与低层选择入口 |
 | `startRecord()` / `stopRecord()` / `isRecording()` / `playAudio()` / `stopAudio()` | 录音与音频播放 |
 | `setStorage()` / `getStorage()` | 本地存储封装（App 端不走 localStorage） |
+| `copyText(text)` | 写入系统剪贴板，返回 `Promise<void>`；空文本与原生失败会 reject，原生提示已关闭，由调用方统一反馈 |
 
 ### 日志与 SDK 加载
 

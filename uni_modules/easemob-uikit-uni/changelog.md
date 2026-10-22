@@ -1,5 +1,28 @@
 # 更新日志
 
+## 1.0.0-rc.2（未发布）
+
+### 修复
+
+- **iOS 拍摄黑屏**：iOS 相机授权被拒绝后，`uni.chooseImage` 仍会打开系统拍摄页并停在纯黑画面且不再弹窗。`em-chat-page` 在调起相机前用 `uni.getAppAuthorizeSetting` 预检 `cameraAuthorized`：`denied` 弹窗引导到系统设置（`uni.openAppAuthorizeSetting`），`config error` 提示安装包缺少权限描述；`not determined` 仍交给系统首次弹窗。新增 `getCameraAuthorizeState` / `openAppAuthorizeSetting` 从 `libs` 透出；H5/小程序/未知基座跳过预检，行为不变。示例工程在 `app-ios.distribute.privacyDescription` 补齐相机/相册/麦克风用途描述（改后需重新云打包或重打自定义基座生效）。
+- **`primaryColor` 在 App 端不生效**：页面级组件根节点同时绑定主题 class 与内联品牌色变量，而 App（uni-app x）端同一节点上 class 规则定义的 CSS 变量会顶掉内联同名变量，导致 `EmKit.init({ primaryColor })` / `setConfig({ primaryColor })` 在 App 端一直被主题值覆盖。七个页面级组件统一新增品牌作用域内层节点，内联品牌色变量下沉一层（与主题 class 分节点），App 端品牌色恢复正常。
+- **App 视频播放页黑屏（自定义基座缺 `uni-video` 模块）**：视频组件属于 uni-app x 内置模块 `uni-video`，会按代码用量摇树。基座如果是在接入视频组件之前打的，`<video>` 会被降级成 `<view>`，表现为点开播放器后全屏黑屏、无控制条。示例工程在 `manifest.json` 的 `app` / `app-android` / `app-ios` / `app-harmony` → `distribute.modules` 显式声明 `"uni-video": {}`；宿主接入视频后需重新打一次自定义基座，JS 热更不包含原生模块。
+- **iOS 视频一直转圈 `00:00`**：EaseMob chatfiles 直链无扩展名且不支持 HTTP Range（带 `Range` 仍返回 200 全量），iOS AVPlayer 远程渐进播放会卡死。App 端改为 `uni.downloadFile` 整包下载 → 复制为本地 `.mp4` → 播放；下载期显示进度，关闭时中止，同一 URL 会话内缓存。
+- **iOS 视频进度条在走但画面不动**：原生 `autoplay` 会在 `<video>` 事件绑定前起播，`play` 事件丢失后组件一直保留首帧/封面层。改为 `autoplay=false`、挂载后显式 `createVideoContext().play()`（未收到 `@play` 每 500ms 重试），且不再把 `poster` 传给 `<video>`（封面只用于下载 loading 背景）。iOS 真机已验证画面随进度更新。
+
+### 新增
+
+- **聊天详情页删除好友**：`em-chat-info-page` 单聊分支新增「删除好友」按钮（红色字档），仅对方已是好友时显示；二次确认后删除，带提交锁，成功 toast 并新增 `contact-deleted` 事件通知宿主退场（不连带删除会话与本地消息），失败 toast 停留当前页。
+- **消息删除、复制与提交防重**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删漫游再删本地，失败保留气泡，删除后校正会话摘要与时间；保留 `deleteLocalMessage` 作为显式本地删除入口。聊天页删除增加确认与失败提示，复制按系统结果提示成功或失败。`em-chat-inputbar` 新增 `submitting`，`em-quick-reply-bar` 新增 `disabled`，文本发送、直发快捷回复、失败重发与撤回均拦截重复提交，撤回执行时重新检查时间窗。
+- **输入栏多行输入**：新增 `inputFeatures.sendOnReturn`（默认 `true`，对齐微信「回车键发送消息」）：置 `false` 进入换行输入模式，输入框随打字生长（封顶 5 行，超出内部滚动），回车换行、发送走输入栏右侧的纸飞机发送键；`true` 时回车发送（iOS 上输入框仍可随粘贴内容生长，Android 保持单行输入）。
+- **视频消息全端播放**：新增 `em-video-preview` 全屏播放器（原生 `video` + 安全区关闭键 + 加载失败提示），聊天页点击视频消息即播放；`PLATFORM_CAPABILITIES.videoPreview` 全端 `true`，App/小程序不再隐藏播放入口，H5 由新窗口改为内置播放。App 端会先把视频下载到本地再播放（EaseMob chatfiles 直链不支持 Range，iOS 直接远程播放会卡 loading），下载期显示进度、关闭时中止；点击前会停掉正在播放的语音，关闭或离开页面时释放原生播放器。
+- **组件样式透出**：所有页面组件与原子组件新增 `custom-class` / `custom-style` 属性，用于在组件根节点追加宿主 class 与内联样式。`custom-style` 拼接到根节点内联样式末尾，五端生效且支持 `var()`；弹层类组件（`em-action-sheet`、`em-select-contact`、`em-mention-picker`）两属性落在最外层遮罩容器上。
+- **样式定制指南**：文档门户新增「样式定制」一页，汇总 `primaryColor` 配置、`--em-*` 变量、`custom-class` / `custom-style`、具名插槽四条定制通道的选型与平台边界；示例工程「样式实验室」页面新增 custom-style / custom-class / 变量覆盖三组对照演示，以及「拖动色相条实时换全页主题色」演示（根节点内联变量 + `setConfig` 双通道）。
+
+### 变更
+
+- **输入栏发送键改为纸飞机**：不再常驻文字「发送」按钮，右侧发送位与「+」同槽互斥——草稿为空显示「+」媒体入口，草稿有内容时换成品牌色纸飞机发送键（`plane`）。输入框不再被发送按钮挤窄，空草稿也不会出现无反馈的发送键。
+
 ## 1.0.0-rc.1（2026-10-21）
 
 首个 1.0 候选版本。能力范围：单聊、群聊、联系人、多场景扩展与 AI 流式消息；五端为 uni-app x（Android / iOS / 鸿蒙）、H5 与微信小程序。

@@ -104,6 +104,8 @@
 
 ### P0-3 视频/文件消息在 App/小程序不可用（“5 种气泡”名不副实）
 
+> 视频部分已于 2026-10-22 解决（M2.19）：`em-video-preview` 全端内置全屏播放器，`videoPreview` 全端 true；下文“视频点击仅 H5”为修复前证据。文件打开/下载仍未接。
+
 **证据**
 - `components/pages/em-chat-page/em-chat-page.vue:921-929`：视频点击仅 H5 `window.open`，App/小程序直接 toast“暂不支持预览”。
 - `em-chat-page.vue:934-936`：文件点击在**所有端**都只 toast“暂不支持”。
@@ -312,7 +314,7 @@
 
 | 项 | 状态 | 落地 |
 |---|---|---|
-| P0-3 视频/文件 | ◐ 已按平台显隐 | 新增 `PLATFORM_CAPABILITIES`（`videoPreview` 仅 WEB、`filePick` App=false、`fileOpen` 全端 false）；App 隐藏「文件」入口、App/mp 隐藏视频播放按钮、文件卡点击不再 toast；README/插件 readme 增平台能力矩阵。播放器/下载器本身仍待接 |
+| P0-3 视频/文件 | ✅ 视频已解决并 iOS 真机验证，文件待接 | 视频：`em-video-preview` 全端全屏播放器 + `videoPreview` 全端 true；App 先下载本地 `.mp4` 再播（chatfiles 不支持 Range），关闭 autoplay + 挂载后显式起播（修 iOS 进度走画面不动），iOS 真机已验证（M2.19）；文件：`PLATFORM_CAPABILITIES.filePick` App=false、`fileOpen` 全端 false，App 隐藏「文件」入口、文件卡点击不再 toast；README/插件 readme 增平台能力矩阵。文件下载器仍待接 |
 | P0-7 未读复活 | ✅ 代码已修 | `clearUnread`：本地归零 + 服务端合批清；进会话/当前会话收消息/离页 force 三处调用；`EmKit.clearConversationUnread` 透出 |
 | P0-2 Token/连接 | ◐ 代码已接，待真机 | `onTokenWillExpire/onTokenExpired` 配置 + `EmKit.renewToken`；补齐 `onConnecting/onReconnectFailed` 与 `reason/errorCode` 状态；`CONNECTION_STATUS.RECONNECTING`；demo 守卫改按 userId |
 | P1-3 连接状态 UI | ◐ 仅数据层 | 状态/原因/重连次数已可读，离线条组件仍未做 |

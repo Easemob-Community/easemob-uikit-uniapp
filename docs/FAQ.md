@@ -136,13 +136,25 @@ EmKit.clearConversationUnread(conversationId, chatType)
 
 App 端没有通用文件选择器，文件发送入口隐藏。小程序与 H5 支持文件选择。
 
-### 视频点击没有播放
+### 视频点击没有播放 / App 播放器黑屏
 
-视频播放入口仅 H5 显示；App 与小程序展示封面和时长。需要原生播放时，宿主可接管视频气泡或 `preview` 事件。
+视频气泡在 App、H5、微信小程序都内置全屏播放器。若点击后停在黑屏或提示「视频加载失败」，按顺序排查：
+
+1. **App 自定义基座**：`<video>` 依赖内置模块 `uni-video`。基座如果是在接入视频组件之前打的，组件会被降级为 `<view>`，播放页只显示黑底，控制台通常报 `uni-video 模块不存在，请重新打自定义基座`。接入视频后重新打一次自定义基座，或在 manifest 的 `app-ios` / `app-android` → `distribute.modules` 显式声明 `"uni-video": {}`（示例工程已配置）。
+2. **视频地址/编码**：确认 `message.url` 可访问、格式为设备支持的编码（推荐 H.264/AAC 的 MP4）。
+3. **H5 自动播放**：浏览器可能拦截带声音的自动播放，点播放器内的播放键即可。
+4. **App 先下载再播**：EaseMob chatfiles 直链不支持 Range，App 端会先把视频整包下载到本地再播放，下载期显示百分比；大视频需要等下载完成，关闭播放器会中止下载。
+5. **进度条在走但画面停在首帧**：当前版本已通过「关闭原生 autoplay + 挂载后显式起播 + 不把封面传给 video」处理；若仍出现，确认使用的是最新 UIKit，且没有自行替换播放器。
+
+需要自定义播放器时，宿主可接管 `preview` 事件。
 
 ### 图片/语音/视频发送失败
 
 检查对应平台权限：相机、相册、麦克风。用户拒绝权限后，对应功能不可用，但不影响文本收发。小程序还需要检查域名白名单与上传配置。
+
+### 点击「拍摄」调起摄像头后是黑屏
+
+先确认不是 iOS 模拟器（模拟器没有摄像头，必黑）。真机上 iOS 在相机权限被拒绝后仍会打开拍摄页并停在黑屏，且系统不再弹窗；UIKit 会在调起前预检 `uni.getAppAuthorizeSetting().cameraAuthorized`，`denied` 时引导去系统设置。若状态是 `config error`，说明安装包没有声明 `NSCameraUsageDescription`，需要在 `manifest.json` 的 `app-ios.distribute.privacyDescription` 补上并重新打包/重打自定义基座。
 
 ### 长按菜单弹出后又进入了会话/播放了语音
 

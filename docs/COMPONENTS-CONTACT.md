@@ -2,7 +2,7 @@
 
 这页覆盖通讯录与群组相关的组件：入口项列表 `em-contact-nav`、字母索引条 `em-alphabet-nav`、选人弹层 `em-select-contact`，以及群资料页内的三个组合件 `em-group-info-blocks`、`em-group-field-dialog`、`em-group-members-view`。前三者是通用原子组件；后三者与 `em-chat-info-page` 同目录，属于页面内的组合件，用于替换或重排聊天信息页的群分支内容。
 
-原子组件符合 easycom 目录约定；三个组合件需要显式 `import`，方式见 [组件总览与选型](./COMPONENTS.md)。
+原子组件符合 easycom 目录约定；三个组合件需要显式 `import`，方式见 [组件总览与选型](./COMPONENTS.md)。本页组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。
 
 ## em-contact-nav
 

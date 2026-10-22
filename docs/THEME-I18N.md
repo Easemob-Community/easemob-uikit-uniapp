@@ -133,7 +133,7 @@ import { setConfig } from '@/uni_modules/easemob-uikit-uni/libs'
 setConfig({ primaryColor: '#FF6B00' })
 ```
 
-品牌色会写到页面根节点的 `--em-primary-color`；H5 还会写到 `document.documentElement`。适合主色替换，不适合做完整换肤；如果需要大面积自定义，直接覆盖 `--em-*` 变量。
+品牌色会以内联变量形式写进页面级组件的品牌作用域节点（子树继承）；H5 还会写到 `document.documentElement`。适合主色替换，不适合做完整换肤；如果需要大面积自定义，直接覆盖 `--em-*` 变量（见 [设计变量](./DESIGN-TOKENS.md) 与 [样式定制](./GUIDE-STYLING.md)）。
 
 ## 5. 国际化
 

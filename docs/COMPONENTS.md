@@ -4,6 +4,8 @@
 
 组件分两层：**页面组件**负责一整屏的列表、聊天、通讯录、群资料；**原子组件**是页面里的一块积木，可单独嵌进宿主自己的界面。两层共用同一套设计变量（见 [设计变量](./DESIGN-TOKENS.md)）与主题（见 [主题与国际化](./THEME-I18N.md)）。
 
+**样式定制**：所有组件（页面组件与原子组件）都支持 `custom-class` / `custom-style` 两个属性，在组件根节点上追加宿主的 class 与内联样式；搭配 `--em-*` 变量与具名插槽可覆盖从单实例微调到整区替换的全部场景，选型与平台边界见 [样式定制](./GUIDE-STYLING.md)。
+
 ## 引入方式
 
 ### 原子组件：easycom 自动引入
@@ -105,7 +107,7 @@ import EmGroupInfoBlocks from '@/uni_modules/easemob-uikit-uni/components/pages/
 
 ## 聊天与消息组件
 
-输入栏、五类消息气泡与两个辅助弹层。完整契约见 [聊天与消息组件](./COMPONENTS-CHAT.md)。
+输入栏、五类消息气泡与三个辅助组件。完整契约见 [聊天与消息组件](./COMPONENTS-CHAT.md)。
 
 | 组件 | 用途 |
 |---|---|
@@ -113,7 +115,8 @@ import EmGroupInfoBlocks from '@/uni_modules/easemob-uikit-uni/components/pages/
 | `em-text-message` | 文本气泡：@ 片段高亮、流式光标与异常提示 |
 | `em-image-message` | 图片气泡：缩略图优先、按宽高比约束尺寸 |
 | `em-audio-message` | 语音气泡：时长阶梯宽度、点击播放/停止、播放波形 |
-| `em-video-message` | 视频气泡：封面 + 时长，播放入口按平台显隐 |
+| `em-video-message` | 视频气泡：封面 + 时长 + 播放入口 |
+| `em-video-preview` | 视频全屏播放器：原生 `video` 播放、关闭、加载失败提示 |
 | `em-file-message` | 文件气泡：按扩展名取图标、文件名与大小 |
 | `em-quick-reply-bar` | 快捷回复条：常用语胶囊，横向滚动 |
 | `em-mention-picker` | @ 提及选人弹层：搜索、成员列表、选中即回填 |
@@ -139,6 +142,7 @@ import EmGroupInfoBlocks from '@/uni_modules/easemob-uikit-uni/components/pages/
 | 只替换其中一屏的视觉 | 页面组件 + 页面级 props / 插槽 | 先看页面指南里的开关，能覆盖再考虑换掉整页 |
 | 已有自己的会话列表，只想复用行样式 | `em-conversation-item` + `em-badge` + `em-avatar` | 行组件是纯展示，数据由宿主装配 |
 | 已有自己的聊天页，只想复用一个输入栏 | `em-chat-inputbar` + `em-text` | 输入栏只负责编辑与面板，发送由 `send` / `voice-send` / `media-select` 事件驱动 |
+| 想换掉聊天页整个输入栏的结构 | 页面组件 `#input-bar` 插槽 | 结构全自绘，键盘/面板/录音/禁言/@ 行为经作用域契约保持，见 [聊天页](./PAGES-CHAT.md) |
 | 需要弹一个"选择成员"面板 | `em-select-contact` | 单选取一人、多选取一批，两种形态都已封装 |
 | 需要底部动作菜单 | `em-action-sheet`（或 `em-popup` 自绘） | 动作菜单已含取消项、禁用项与警示色 |
 | 需要自定义业务卡片气泡 | 页面组件 `#custom-message` 插槽 | 整卡由宿主渲染，避免自己接消息生命周期 |
@@ -193,3 +197,4 @@ function onTabChange(tab: ConversationTabKeyValue): void {
 - 类型与常量：[类型与常量](./API-TYPES.md)
 - 配置项：[配置参考](./CONFIG.md)
 - 平台差异：[平台能力与差异](./PLATFORM.md)
+- 样式定制：[样式定制](./GUIDE-STYLING.md)

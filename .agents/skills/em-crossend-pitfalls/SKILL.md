@@ -26,7 +26,7 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 ### 3. CSS 动画 / word-break 不生效
 - **症状**：`@keyframes` 动画、闪烁高亮、`word-break: break-all` 在 App 端静默失效。
 - **根因**：HBuilderX 5.26 蒸汽引擎不支持 CSS 动画与 word-break（5.31 alpha 才新增）。
-- **解法**：动画改 JS 定时器驱动（参考 chat-page 引用定位 `HIGHLIGHT_PULSE_SEQ` 双脉冲）；文本折行走 em-text 的 `lines` + 宽度约束。已知降级：发送中 spinner 蒸汽端为静态图标，二期再议。
+- **解法**：动画改 JS 定时器驱动（参考 chat-page 引用定位 `HIGHLIGHT_PULSE_SEQ` 双脉冲）；文本折行走 em-text 的 `lines` + 宽度约束。旋转类动画（loading spinner）用 `useSpinRotation`（`libs/use/useSpinRotation.ts`）逐帧写内联 `transform: rotate()`，em-button / em-load-more 已接入。
 
 ### 4. 软键盘把自绘 nav-bar 顶飞（Android 实测）
 - **症状**：输入框聚焦后整个页面上移，顶部自绘导航栏被推出屏幕。
@@ -75,11 +75,11 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **根因**：uni-app x 的 `uni.onXxx(callback)` 返回监听 **id（number）**，`uni.offXxx(id)` 按 id 反注册；经典 uni-app 是按函数引用。
 - **解法**：保存 onXxx 返回值，offXxx 传 id。范式见 `libs/use/useKeyboardHeight.ts`（onMounted 注册、onUnmounted 反注册）。`EmKit.onMessage` 泄漏 P0 修复同理（返回取消函数，页面 onUnmounted 必须调用）。
 
-### 5a. 全屏弹层顶部贴屏顶，被刘海/状态栏遮挡（Android 实测）
-- **症状**：全屏弹层（如建群选人 `em-select-contact` multiple）的标题行与系统状态栏同一行，被刘海遮挡。
-- **根因**：Android 蒸汽端窗口 edge-to-edge，内容渲染到状态栏/刘海下；页面级自绘导航（`em-nav-bar`）有 `padding-top: getSafeAreaTop()`，但弹层路径（`em-popup` fullscreen）原本只处理底部 safeArea，顶部漏了。
-- **解法**：`em-popup` 的 `panelStyle` 在 `fullscreen` 时追加 `padding-top: getSafeAreaTop()`；**内容方配 `height: windowHeight` 时必须扣除同一值**，否则总高超窗把底部确认键顶出屏（`em-select-contact` 已按此口径落地）。底部短弹层（action-sheet 等）够不到屏幕顶，无需处理。
-- **口径**：app-android `safeAreaInsets.top` 自 HBuilderX 4.25 起返回状态栏高度（官方 getWindowInfo 文档），`getSafeAreaTop()` 直接读即可；若真机发现返回 0，另起 spike 修 `useSafeArea.ts`。
+### 5a. 全屏弹层顶部贴屏顶，被刘海/灵动岛遮挡（Android/iOS 实测）
+- **症状**：全屏弹层（如建群选人 `em-select-contact` multiple）的标题行与系统状态栏同一行，被刘海/灵动岛遮挡。
+- **根因**：Android 蒸汽端窗口 edge-to-edge，内容渲染到状态栏/刘海下；页面级自绘导航（`em-nav-bar`）有 `padding-top: getSafeAreaTop()`，但弹层路径（`em-popup` fullscreen）原本只处理底部 safeArea，顶部漏了。iOS 复现时 `getSafeAreaTop()` 实测为 59（不是 0），对照探针中 `em-popup` panel 额外增加 60pt 标题不动、内层 sheet 增加 60pt 标题立即移动，证明 fullscreen panel 的 padding 在 iOS 蒸汽端不参与布局，不能把它当作安全区承载节点。
+- **解法**：顶部安全区直接由 `em-select-contact` multiple 的 `sheetStyle` 注入 `padding-top: top`，同时 `height: windowHeight - top`，padding 与内容高度合计仍为窗口高，底部确认键不被顶出屏；`em-popup` 只保留底部 safeArea。底部短弹层（action-sheet 等）够不到屏幕顶，无需处理。
+- **口径**：app-android `safeAreaInsets.top` 自 HBuilderX 4.25 起返回状态栏高度（官方 getWindowInfo 文档），`getSafeAreaTop()` 直接读即可。iOS 出现遮挡时先用「外层/内层同值对照」确认 padding 是否生效，不要未测取值就加 statusBarHeight 兜底或盲目加大 inset。
 
 ### 5b. 原生 `<button>` 文字贴按钮底部（Android/鸿蒙蒸汽端，H5/小程序正常居中）
 - **症状**：原生 `<button>` 同时写了 `height` 与 `line-height`（如都 40px），App 端文字贴在按钮下沿、上方空一大截；H5 与微信小程序同一份样式却天然居中。
@@ -94,6 +94,12 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **判定方法**（产物就是 ESM，可静态查）：直接跑 `node scripts/check-app-module-graph.mjs`（零依赖，默认扫 `demo/unpackage/dist/dev/.app-harmony/assets`，也可传 App 产物目录）——命中 `libs → components` 反向 import 或 libs/index 参与的循环即 exit 1 并打印链路。手工口径：① 在 App 产物 `assets/uni_modules/easemob-uikit-uni/libs/` 里 grep `from "../../components/`；② 从各页面/App 入口模拟 ESM 求值（模块 state 1=求值中 / 2=完成），看 `libs/index.js` body 执行时 `store/conversation.js` 是否仍在求值中。本机修复前只有 1 条循环，`pages/login/login.js` 等 8 个入口必现。
 - **解法**：**libs 内禁用 for-of / for-in**（改 `forEach` 或索引 `for`），消除 `__values` 这类被提升的 helper；`em-chat-page` 里唯一的 for-of（字符串按码点计宽）也一并改索引 + 代理对跳过。改后重跑同一检查：循环 0 条、所有入口模拟 ok。
 - **纪律**：libs 模块（尤其 store）必须保持「零反向依赖组件」；新增 for-of 或其它会触发 helper 提升的语法前，先确认产物里没有 `libs → components/pages` 的 import。`components/` 下的 `.vue/.uvue` 也建议不用 for-of，避免 helper 落点随编译批次漂移再次串成环。
+
+### 5m. App 端白屏无报错：setup/render 期 ReferenceError 被蒸汽引擎吞掉（iOS 真机实测 2026-10-22，M2.18 回归）
+- **症状**：改动后从会话进聊天页整页白屏，控制台**没有任何报错**；H5 开发时同样代码可能只是 warn（VDOM 重渲染掩盖）或不触发，难在桌面端复现。
+- **根因**：`<script setup>` 里误用了模板自动暴露的 props 名（如计算属性写 `features.sendOnReturn` 而 script 只有 `props.features`），vite 转译不做类型/未定义检查，产物为裸自由变量；computed 在首次渲染求值时 ReferenceError，蒸汽端挂载期异常不冒泡 → 整页白屏。
+- **解法/排查**：先 diff 最近改动的组件，重点查 script 作用域新引用的标识符是否都有定义（props 自动暴露名在 script 不可用）；真机白屏无报错时按「setup 期异常」方向查，别先怀疑样式/布局。
+- **纪律**：script 里引用 props 一律 `props.xxx`；给组件加新计算属性/方法后，自查一遍标识符定义（构建绿不代表运行绿，CLI 构建不做类型检查）。
 
 ### 5d. `<text>` 内 v-if 增删子 text → 整条气泡空白（鸿蒙实测 2026-10-21，M2.13 流式光标）
 - **症状**：AI 流式气泡分片增长正常（末尾带 `▍` 光标），**流结束瞬间整条气泡变空白**：气泡底色与高度都在（甚至按全文撑开），但一个字也不绘制；该条消息后续一直空白。
@@ -129,6 +135,51 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **解法**：`libs/client/index.ts` 的 `platformAdapterOptions.overrides` 包装 `imageProcessor`：`computeMd5` 失败降级为空 md5（warn 带 `details`），上传继续；`getImageInfo`/`generateBigImage` 原样委托。md5 只用于服务端秒传预检，SDK 自身对缺能力平台也是不传 md5 继续上传，消息内容/接收端无差异。
 - **纪律**：App 端**不要**用 `uni.getFileSystemManager` 读宿主给的文件路径；需要读字节（md5/解析）的能力都要有「读不到就不做」的降级。选择器副本路径只承诺「`uni.uploadFile` 可上传」，不承诺「FSM 可读」。
 - **排查口径**：若仍失败，看 `[emkit:client] attachment md5 unavailable ...` 的 warn——`details.filePath` + `errCode` 可区分「读不到」与「路径已不存在」；此时错误若变成 `Mini program upload failed`，才是上传链路问题。
+
+### 5i. App 端 class 方式覆盖 `--em-*` 变量结果随构建漂移（顺序无契约，两次真机构建相反，2026-10-22）
+- **症状**：子树根节点挂 `themeClass` + 自定义 class（`.my-brand { --em-primary-color: #FF6B00; }`）覆盖变量：同一写法第一版构建 App 真机是蓝的（被主题类顶掉），探针版构建 P1 对照组又是橙的——**没改任何相关代码，结果随样式合并顺序漂移**。H5/小程序稳定生效。
+- **根因**：库内每个组件 css 都 `@import` variables.css，蒸汽端样式合并后 `.em-theme-*` 的多份拷贝与宿主自定义 class 是**同特异性单类选择器**，同名自定义属性胜负拼声明顺序；宿主页面 css 与各组件拷贝的合并顺序不受宿主控制，随构建批次漂移。
+- **解法**：App 端变量覆盖走内联（见 §5k 的节点分离规则）；class 方式仅 H5/小程序可用。
+- **纪律**：跨端覆盖三原则——变量覆盖走内联 `:style`（注意 §5k 节点分离）；属性覆盖走 `custom-style` 内联；`custom-class` 只追加组件未设置的属性（边框/间距等）。
+
+### 5k. 蒸汽端同节点 class 变量顶掉内联变量 → `primaryColor` 在 App 端失效（iOS 探针实测 2026-10-22）
+- **症状**：节点同时绑 `themeClass` 与 `:style="'--em-primary-color: #FF6B00;'"`，内联变量不生效（按钮仍是主题蓝）；同一内联变量改挂到**不带 themeClass 的子包裹节点**立即生效。探针矩阵（style-lab P1–P5）：内联→组件 ✓、内联→宿主文本 ✓、custom-style 字面量 ✓、custom-style 内 var() ✓，唯「同节点 themeClass + 内联变量」 ✗。
+- **根因**：蒸汽端自定义属性级联非标准——**同一元素上 class 规则定义的自定义属性优先于内联 style 里的同名自定义属性**；内联只能赢过继承值。普通属性无此问题（custom-style 字面量在同节点正常覆盖 class）。库内 7 个页面级组件根节点 `themeClass + primaryColorStyle()` 同节点绑定正踩中此坑，`EmKit.init({ primaryColor })` 在 App 端从未生效。
+- **解法**：内联变量与 themeClass **分节点**——themeClass 挂根，内联变量挂子层包裹节点（页面级组件已统一加 `__brand-scope` 内层：`:style="primaryColorStyle()"`，css `flex:1 + height:0` 接替根的 flex 容器角色；根节点 `:style` 只留宿主 customStyle）。宿主自己的页面同样照此分层。
+- **纪律**：蒸汽端给子树注入自定义属性时，携带节点不得同时绑定义了同名变量的 class（themeClass/主题类）；一律下沉一层。
+
+### 5j. 蒸汽端 `createSelectorQuery` 查不到 rect → 触摸拖拽整体静默失效（iOS 实测 2026-10-22）
+- **症状**：style-lab 色相条拖拽换主题色，mp-weixin 正常，iOS 真机完全拖不动（点按也无反应）。
+- **根因**：拖拽几何靠 `uni.createSelectorQuery().in(getCurrentInstance()).boundingClientRect()` 异步查询，蒸汽端回调拿不到有效 rect，就绪标记永不置位，所有 touchstart/touchmove 被静默跳过（无任何报错）。em-alphabet-nav 的滑动定位是同一查询路径，在蒸汽端有同样失效风险。
+- **解法**：几何可推导的位置一律同步算——通栏条用 `uni.getWindowInfo().windowWidth` 减已知页面边距，touchstart 即可用，不做异步查询；纵向 scroll-view 页面里拖拽期间 `:scroll-y="!sliding"` 锁定滚动，防手势被 scroll-view 接管。
+- **纪律**：蒸汽端触摸拖拽优先同步几何；selectorQuery 只能做增强/兜底，不能做唯一路径。
+
+### 5l. 蒸汽端原生 `textarea` 不吃 flex 尺寸/背景样式 → 多行输入区「消失」（iOS 真机实测 2026-10-22，M2.18）
+- **症状**：输入栏换行档（`sendOnReturn=false`）多行生长态，textarea 区域整体不可见（无灰底、无占位符、不随行数长高）；H5/mp 正常。
+- **根因**：textarea 是原生组件（iOS 为 `UITextView`），蒸汽端 `flex:1` 不生效（文档明示 App 默认宽 300px）、`background-color`/`border-radius` 等装饰样式渲染不可靠；内联 `height` 也可能被组件自身布局覆盖。参照 §5b（原生 button 文字基线）——**原生组件只保证内容区，装饰与尺寸必须由外层包裹承担**。
+- **解法**：包裹层 view 承担高度（跟 `linechange` 上报值走）+ 灰底 + 圆角 + 裁切，textarea 自身 `width/height: 100%` 填充、`background` 不设（iOS 另加 `disable-default-padding` 去默认内边距）。`em-chat-inputbar` 的生长输入已按此落地（`__multiline-wrap`）。
+- **纪律**：蒸汽端给原生输入类组件（textarea/button）做定制样式时，尺寸、背景、圆角一律落包裹层；组件自身只留文字相关样式。
+
+### 5n. App 播放器全屏黑屏：自定义基座缺 `uni-video` 模块，`<video>` 被降级为 `<view>`（iOS 真机实测 2026-10-22，M2.19）
+> 视频播放问题先按三连排查：① 基座 `uni-video` 模块 → ② App 下载本地再播（chatfiles 无 Range/无后缀）→ ③ 关 autoplay、挂载后显式 play、poster 不进 video。分别见 §5n / §5o / §5p。
+- **症状**：点视频消息能进入全屏播放页，但整页黑底、无原生控制条、无声音；H5/小程序同一份代码正常。控制台通常报 `undefined class: UTSSDKModulesDCloudUniVideoBrightnessByJs, uni-video 模块不存在，请重新打自定义基座。`（栈从 `video` 组件 setup 起），也可能提示「未找到 "video" 组件，已自动当做 "view" 组件处理」。
+- **根因**：uni-app x 对内置模块做摇树。自定义基座在接入 `<video>` 之前打包时，基座 `duts` 清单里没有 `uni-video`（查 `unpackage/cache/vapor/uts_custom_ios/uniapp-x-uts.json`），运行时 video 组件不存在，被降级成普通 view → 黑屏。不是组件样式或视频 URL 问题（后者会走 error/失败提示）。
+- **解法**：工程引用 video 组件后重新打包自定义基座；需要固定模块时在 manifest 的 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`（鸿蒙同理）。demo 的 manifest 三端均已配置。
+- **纪律**：新增依赖内置组件的功能（video/map/canvas 等）后，真机验证前必须重打自定义基座；「H5 正常、App 黑屏」先查基座 `duts`，不要先怀疑布局或样式。
+
+### 5o. iOS 播放器一直转圈 `00:00 / 00:00`：chatfiles 不支持 Range + URL 无后缀（iOS 真机实测 2026-10-22，M2.19）
+- **症状**：基座已含 `uni-video`，能拉起原生播放器并显示 poster/控制条，但一直 loading、两端时长都是 `00:00`；同一 URL 在 iPhone Safari 能正常播；控制台无 `play error`。
+- **根因**：EaseMob chatfiles 直链形如 `https://.../chatfiles/<uuid>`，**没有扩展名**；实测响应 `Content-Type: video/mp4`、有 `Content-Length`，但带 `Range: bytes=0-1023` 仍返回 `HTTP 200` 全量、没有 `Accept-Ranges`/`Content-Range`。iOS AVPlayer 的远程渐进播放依赖 Range，且对无后缀 URL 容忍差，于是停在 prepared 前一直转圈。浏览器/小程序内部下载器是整包拉取，所以浏览器正常。
+- **解法**：App 端不要直接把远程直链喂 `<video>`：`uni.downloadFile` 整包下载 → `FileSystemManager.copyFile` 到 `USER_DATA_PATH/em-video-*.mp4` 补后缀 → 用本地路径播放；下载期显示进度，关闭时 `DownloadTask.abort()`，同一 URL 会话内缓存。H5/小程序保持远程 URL；HLS（`.m3u8`）与本地路径不整包下载。
+- **排查口径**：`curl -sI -H 'Range: bytes=0-1023' <url>` 看是否 206 + `Content-Range`；若 200 全量，iOS 远程播放必卡。另看 URL 是否带扩展名、`Content-Type` 是否 `video/*`。
+- **纪律**：IM 文件直链（chatfiles/无后缀 CDN/需鉴权链接）在 iOS 上优先「下载到本地再播」；不要指望 AVPlayer 像浏览器一样边下边播。
+
+### 5p. iOS 视频进度条在走、画面停在首帧（2026-10-22，M2.19 已定案，iOS 真机验证）
+- **症状**：本地文件已下载并播放，时间/进度条前进（可能有声音），但画面停在约 0s 的首帧/封面；同一文件用 `AVAssetImageGenerator` 抽 0s/2s 帧内容不同，说明文件与编码正常。
+- **根因**：原生 `autoplay` 在 `<video>` 事件绑定完成前就起播，`play` 事件丢失，组件一直把首帧/封面层留在画面上；`poster` 又进一步把静态首帧盖在播放层上。表现为「有进度、没画面」。
+- **定案解法**：`<video>` 不传 `poster`（封面只用于下载 loading 的背景图）；`:autoplay="false"`，等组件挂载后显式 `createVideoContext(id, instance).play()`，未收到 `@play` 每 500ms 重试、最多 8 次。改后 iOS 真机画面随进度更新、声音正常。
+- **排查口径**：先确认文件可解（`AVAssetImageGenerator` 抽两帧对比）；若时间不自己走，是起播问题；若时间走画面不动，按本节处理；仍不动时点原生全屏按钮——全屏能播说明内联层问题，可 `requestFullScreen` 兜底，全屏也黑才是播放器缺陷。
+- **纪律**：不要用 `autoplay=true` + 延迟 `play()` 混用（会双起播/丢事件）；`poster` 只用于加载态，不要让它盖在播放层上。视频源链路（下载本地）见 §5o。
 
 ## 小程序（mp-weixin）
 
@@ -177,7 +228,7 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 | `adjust-position` 手动键盘避让 | ✅ 官方支持（App 三端） |
 | 键盘上报值口径（面板 vs 上推） | ⚠️ iOS/鸿蒙上报值含底部安全区：上推 `margin-bottom` 直接用原值（iOS 34pt / 鸿蒙 28vp 不能再扣），emoji/媒体面板高度才扣安全区（§4d） |
 | `getAndroidView`/`getIOSView` | ⚠️ 蒸汽模式 js 拿不到原生 view，须 uts 插件 |
-| 发送中 spinner 动画 | ⚠️ 降级为静态图标 |
+| 发送中 spinner 动画 | ✅ JS 定时器驱动 `useSpinRotation` 逐帧旋转（em-button / em-load-more）；chat-page 发送中仍为 keyframes（H5/mp 转、蒸汽静态） |
 | for-of / for-in（App 编译降级） | ⚠️ 生成 `__values` 等 helper 并提升到任意 chunk；**libs 内禁用**（会造成 `libs → components/pages` 循环依赖，首屏 `Xxx is not initialized` 白屏） |
 | `<text>` 内 v-if 增删子 text | ❌ 移除子节点后父 text 字形丢失（气泡空白但高度保留）；改常驻子节点换内容 |
 | `box-shadow` 的 `inset` | ⚠️ iOS 丢 alpha，低透明度高光会被画成实色白线；装饰改用 border/渐变 |
@@ -187,3 +238,6 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 | `uni.env.USER_DATA_PATH` | ⚠️ App 是应用沙盒，文件管理器不可见；写成功也取不出，日志导出以剪贴板/分享为准 |
 | `uni.getFileSystemManager().readFile`（App） | ⚠️ 只认 uni 沙盒目录（`uni.env.*`）；系统缓存里的宿主文件读不到（1300013/1300002），SDK 的附件 md5 即踩中，见 §5h |
 | `uni.uploadFile` 读宿主缓存路径（App） | ✅ 原生读文件，不受 FSM 沙盒限制；附件上传以它为准 |
+| `<video>` 组件（App） | ⚠️ 属内置模块 `uni-video`，参与摇树；自定义基座未包含时组件降级为 `<view>`（播放页黑屏），接入视频后需重打基座或 manifest 显式声明（§5n） |
+| iOS 远程视频直链 | ⚠️ chatfiles 无后缀且不支持 Range，AVPlayer 会停在 `00:00`；先下载到本地 `.mp4` 再播（§5o） |
+| iOS `autoplay` + `poster` | ⚠️ autoplay 可能抢在事件绑定前起播导致 `play` 丢失、画面停在首帧；改 `autoplay=false` + 挂载后显式 `play()`，`poster` 不进 `<video>`（§5p） |

@@ -2,7 +2,7 @@
 
 这页覆盖会话列表用到的三个原子组件：列表行 `em-conversation-item`、筛选 tab `em-conversation-tabs`、连接状态条 `em-connection-banner`。三者都是纯展示组件——不连 store、不碰路由，数据由宿主装配，交互以事件抛出。整页实现见 [会话列表页](./PAGES-CONVERSATION.md)。
 
-本页组件均符合 easycom 目录约定，可直接写标签；引入方式见 [组件总览与选型](./COMPONENTS.md)。
+本页组件均符合 easycom 目录约定，可直接写标签；引入方式见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。
 
 ## em-conversation-item
 
@@ -140,6 +140,7 @@ function onTabChange(tab: ConversationTabKeyValue): void {
 |---|---|---|---|
 | `showSearch` | `boolean` | `true` | 顶部搜索条显隐 |
 | `tabs` | `ConversationTabKeyValue[]` | 全部五项 | 筛选 tab 及顺序；传空数组隐藏 tab 栏 |
+| `showTabs` | `boolean` | `true` | 筛选 tab 栏显隐；`false` 时无论 `tabs` 传什么都不渲染 |
 | `emptyText` | `string` | `''` | 空列表文案；空串走 i18n 默认 |
 | `autoSync` | `boolean` | `true` | 首次挂载是否自动拉会话快照 |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条显隐 |

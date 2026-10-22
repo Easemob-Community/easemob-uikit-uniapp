@@ -87,6 +87,7 @@ function onMenu(key: string) {
 |---|---|---|---|
 | `showSearch` | `boolean` | `true` | 顶部搜索条显隐 |
 | `tabs` | `ConversationTabKeyValue[]` | `['all','unread','atMe','single','group']` | 筛选 tab 及顺序，取值来自 `CONVERSATION_TAB_KEY`；传 `[]` 隐藏 tab 栏 |
+| `showTabs` | `boolean` | `true` | 筛选 tab 栏显隐；`false` 时无论 `tabs` 传什么都不渲染 |
 | `emptyText` | `string` | `''` | 空列表文案；空串使用分 tab 的 i18n 默认文案。搜索无结果时不使用该值 |
 | `autoSync` | `boolean` | `true` | 首次挂载自动拉取会话快照（要求 `EmKit.state.userId` 非空）；关闭后由宿主自行控制同步时机 |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条显隐 |

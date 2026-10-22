@@ -20,15 +20,16 @@
 - 首次历史未回包时展示骨架；历史失败时显示「点击重试」空态，已有缓存消息时改为顶部重试行，不遮挡消息。
 - 点击消息区顶部的「加载更早消息」加载更早历史，加载前记录首条消息锚点，加载后回位，避免视口跳动；没有更多时显示「没有更多历史消息」。
 - 相邻消息间隔超过 `uiConfig.timeDividerInterval`（默认 5 分钟）插入时间分隔条，首条消息必显。
-- 消息发送成功后以 `send` 事件透出；失败消息显示红色状态图标，点击即调用 `EmKit.resendMessage` 原地重发。
+- 消息发送成功后以 `send` 事件透出；文本与直发快捷回复提交中会拦截重复发送。失败消息显示红色状态图标，点击即调用 `EmKit.resendMessage` 原地重发，同一 `localId` 重发完成前不可重复点击，失败后仍可重试。
 - 输入草稿按会话保存（`uiConfig.enableDraft` 默认开启）；离开页面时清空当前会话的服务端未读。
 
 ### 引用、撤回与长按菜单
 
 - 长按消息打开菜单：复制（仅文本）、引用、撤回、删除。菜单项与顺序由 `uiConfig.messageMenuKeys` 决定。
 - 引用后输入栏上方出现引用条，发送的文本消息同时写入 `ext.msgQuote` 与兼容字段 `ext.emQuote`；气泡下方生成引用卡，点击定位原消息并闪烁高亮，原消息未加载或已删除时 toast 提示。
-- 撤回仅对「自己发送、状态为已发送、且在撤回窗口内」的消息出现；窗口由 `uiConfig.recallTimeLimit` 控制，默认 2 分钟。撤回成功后以 `recall` 事件透出。
-- 删除只删本地消息，以 `delete` 事件透出。
+- 撤回仅对「自己发送、状态为已发送、且在撤回窗口内」的消息出现；窗口由 `uiConfig.recallTimeLimit` 控制，默认 2 分钟。执行撤回时会再次检查时间窗，并拦截重复提交；成功后以 `recall` 事件透出，不额外弹确认框。
+- 复制等待系统剪贴板返回结果，成功与失败分别提示；空文本按失败处理。
+- 删除先弹确认框。有服务端 ID 的消息先删漫游再删本地，本地消息仅本地删除；失败保留气泡并提示，成功后才以 `delete` 事件透出。删除后会话摘要与时间同步校正。
 - 业务动作可经 `extraMessageMenus` 追加在内置项之后（删除项保持末位），命中时以 `message-menu` 把 key 与消息项交给宿主。
 
 ### 已读回执与输入状态
@@ -54,9 +55,12 @@
 ### 输入栏
 
 - 输入栏支持语音、Emoji、相册、拍照、视频、文件；单项可经 `uiConfig.inputFeatures` 关闭，Emoji 字符集可经 `uiConfig.emojiList` 替换。
+- 右侧是「+」与发送键的同槽互斥：草稿为空显示「+」媒体入口，草稿有内容时换成品牌色纸飞机发送键，不再常驻文字发送按钮，输入框因此更宽。
+- `inputFeatures.sendOnReturn`（默认 `true`）对齐微信「回车键发送消息」：`true` = 回车发送（iOS 上输入框可随粘贴内容生长）；`false` = 换行输入模式，输入框随打字生长（封顶 5 行，超出内部滚动），回车换行、发送走输入栏右侧的纸飞机发送键。Android 系统限制其 textarea 键盘右下角恒为换行，故回车发送档在 Android 保持单行输入。
 - `quickReplies` 在输入栏上方渲染常用语胶囊：`quickReplyMode='fill'`（默认）整句替换草稿，`'send'` 直接发送（不带引用与 @）。
 - 全员禁言且当前用户不是群主/管理员时，输入栏进入禁用态，输入框提示为「全员禁言中」；尝试发送/工具/语音时 toast「全员禁言中，仅群主和管理员可发言」。
 - 引用条、@ 选择面板、媒体面板与键盘之间的切换由组件自身处理；切换 `conversationId` 时清空引用与 @ 状态。
+- 对整个输入栏的结构/样式不满意时，可用 `#input-bar` 插槽整栏自绘：键盘避让、面板互斥、录音手势、禁言、@ 提及、草稿持久化等行为由库内经插槽作用域（scope）契约保持运作，见下文「整栏自绘输入栏」。
 
 ## 最小用法
 
@@ -150,6 +154,7 @@ function onOpenInfo(id: string) {
 | `stream-message` | `message: EmMessageItem` | 富格式流式消息（`stream.customType` 非空且不是 `text`）。未提供时回落为纯文本气泡 |
 | `custom-message` | `message: EmMessageItem` | 自定义消息（`type='custom'`，按 `customEvent` 区分）与未识别消息类型。默认文案为「[自定义消息]」/「[暂不支持的消息]」 |
 | `input-toolbar` | 无 | 输入栏上方固定区，随键盘一起上移、不参与消息滚动。用于「发订单」「发病例」等业务快捷入口 |
+| `input-bar` | `EmChatInputBarScope` | 整栏替换默认输入栏，结构/样式全自绘；键盘避让、面板互斥、录音、禁言、@、草稿等行为经作用域契约由库内保持，详见「整栏自绘输入栏」 |
 
 ### 插槽示例
 
@@ -232,6 +237,62 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 </script>
 ```
 
+## 整栏自绘输入栏（#input-bar）
+
+提供 `#input-bar` 插槽即整栏替换默认输入栏（`em-chat-inputbar` 不再渲染）。这是「受约束的重写」：栏的结构与样式完全由宿主自绘，但容易踩坑的行为逻辑由库内保持运作——插槽作用域（`EmChatInputBarScope`）既是数据源也是动作集，自绘栏绑定它即可。
+
+**无需重实现、由库内保持的行为**：
+
+- 软键盘避让：页面在插槽外保留了键盘顶起壳（`adjust-position=false` + 按键盘实际遮挡高度顶起，含 iOS/鸿蒙安全区口径），自绘栏不需要处理键盘高度
+- 键盘 ↔ 面板互斥：开面板前自动收键盘，面板高度跟随最近一次键盘高度（`panelStyle` 直接绑到自绘面板根节点），切换不跳变
+- 点击消息区收起面板与键盘、全员禁言禁用态、@ 提及整条链路（草稿尾部输入 `@` 自动打开成员面板）、草稿持久化与 typing、引用与发送链路
+
+**自绘栏必须接的契约**（不接则对应行为失效）：
+
+| 自绘元素 | 必须绑定 |
+|---|---|
+| 文本输入框 | `:value="scope.draft"` + `@input` 里调 `scope.setDraft(v)`（直接改草稿会丢草稿持久化/typing/@ 检测）；`@focus/@blur` 调 `scope.notifyInputFocus()/notifyInputBlur()`；`:focus="scope.inputFocus"`；`confirm-type="send"` 的 `@confirm` 调 `scope.send()` |
+| 发送按钮 | `scope.send()`（空草稿拦截、引用/@ext、清草稿、滚底内置） |
+| 禁用态 | 输入框 `:disabled="scope.disabled"`；禁用下的操作尝试调 `scope.notifyDisabledTap()`（页面 toast） |
+| emoji / 媒体面板开关 | `scope.togglePanel('emoji' | 'media')`；面板根节点绑 `:style="scope.panelStyle"`；emoji 点选用 `scope.setDraft(scope.draft + emoji)` 追加 |
+| 媒体动作 | `scope.selectMedia(key)`，`key` 取 `MEDIA_PANEL_KEY.ALBUM/CAMERA/VIDEO/FILE`（选择器与发送内置） |
+| 语音按钮 | `scope.toggleVoiceMode()` 切换；「按住说话」条的四个手势事件绑 `scope.onVoiceTouchStart/Move/End/Cancel`，用 `scope.recording/willCancel` 渲染状态（60 秒自动发送、过短拦截、上滑取消内置） |
+| 引用条 | 按 `scope.quote` 自绘，关闭调 `scope.closeQuote()` |
+| 快捷回复 | 按 `scope.quickReplies` 自绘，点击调 `scope.selectQuickReply(item)` |
+
+注意：插槽的有无在页面实例创建时确定（库据此实例化行为核心），不能用运行时开关在同一个页面实例里动态切换默认输入栏与自绘输入栏；需要切换时用不同页面实例（如查询参数 + 重新进入）。
+
+**最小示例**（完整可运行版见 demo 工程 `demo/components/demo-custom-inputbar`，场景开关面板里可一键体验）：
+
+```vue
+<template>
+  <em-chat-page :conversation-id="conversationId" :chat-type="chatType" @open-info="onOpenInfo">
+    <template #input-bar="scope">
+      <view class="my-inputbar">
+        <input
+          class="my-inputbar__input"
+          :value="scope.draft"
+          :focus="scope.inputFocus"
+          :disabled="scope.disabled"
+          :placeholder="scope.placeholder"
+          confirm-type="send"
+          :adjust-position="false"
+          @input="(e) => scope.setDraft(e.detail.value)"
+          @confirm="scope.send"
+          @focus="scope.notifyInputFocus"
+          @blur="scope.notifyInputBlur"
+        />
+        <view class="my-inputbar__send" @click="scope.send">
+          <text>发送</text>
+        </view>
+      </view>
+    </template>
+  </em-chat-page>
+</template>
+```
+
+作用域完整字段与类型见 [EmChatInputBarScope](./API-TYPES.md)；行为核心也以 `useChatComposer` composable 导出，供完全自研聊天页的宿主复用同一套键盘/面板/录音逻辑。
+
 ## 消息能力与配置
 
 | 能力 | 默认行为 | 相关配置 |
@@ -266,7 +327,7 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 - @ 提及只支持在草稿尾部输入 `@` 触发：uni 的 input 没有光标 API，无法在文本中间定位插入点；发送前会过滤失效的 @ 提及。
 - 群公告条只显示单行摘要，展开按钮按屏宽与字号估算是否需要，不依赖 DOM 测量。
 - 富格式流式消息必须由宿主提供 `#stream-message` 才会按业务格式渲染；未提供时回落为纯文本气泡，内容仍会随分片增长。
-- 视频消息点击播放在 H5 打开新窗口；App 与小程序展示封面和时长，气泡不提供播放入口。
+- 视频消息点击后打开内置全屏播放器（原生 `video`），App、H5、微信小程序一致；播放器内可暂停、拖动进度与全屏。
 - 文件消息：App 端没有通用文件选择器，输入栏隐藏「文件」入口；小程序与 H5 可发送。文件打开/下载当前版本未接入，气泡不发出下载动作。
 - H5 端输入栏不显示语音入口（录音能力未接入）；App 与小程序可录音发送。
 - 长按菜单的「复制」只对文本消息出现；「删除」只删本地，不影响对端。

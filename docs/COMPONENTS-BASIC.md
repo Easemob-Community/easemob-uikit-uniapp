@@ -2,7 +2,7 @@
 
 这页是 12 个通用原子组件的契约参考：`em-action-sheet`、`em-avatar`、`em-badge`、`em-button`、`em-empty`、`em-icon`、`em-load-more`、`em-nav-bar`、`em-popup`、`em-search-bar`、`em-skeleton`、`em-text`。它们不连 store、不碰路由，props 进、events 出，可以直接嵌进宿主自己的界面。
 
-本页所有组件都符合 easycom 目录约定，`pages.json` 打开 `autoscan` 后可直接写标签；也可以显式 `import` 后局部注册。引入方式与选型见 [组件总览与选型](./COMPONENTS.md)。
+本页所有组件都符合 easycom 目录约定，`pages.json` 打开 `autoscan` 后可直接写标签；也可以显式 `import` 后局部注册。引入方式与选型见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。
 
 ## em-action-sheet
 
@@ -81,7 +81,7 @@ function onSelect(action: EmActionSheetAction): void {
 <em-avatar :src="contact.avatarUrl" :name="contact.nickname" :size="48" :badge="unread" />
 ```
 
-**行为与平台**：`<image>` 的 `@error` 会把内部状态切到文字头像，不会出现破图；文字字号按 `size * 0.4` 换算，底色由 `name` 首字符的字符码对色板长度取模决定，同一名字颜色稳定。角标直径与偏移按 `size` 等比换算（基准 48px），药丸形态与数字截断由 `em-badge` 负责，不需要宿主再定位。组件是 `virtualHost`，外部 class 直接落在根节点上参与父级 flex 布局。
+**行为与平台**：`<image>` 的 `@error` 会把内部状态切到文字头像，不会出现破图；文字字号按 `size * 0.4` 换算，底色由 `name` 首字符的字符码对色板长度取模决定，同一名字颜色稳定。角标直径与偏移按 `size` 等比换算（基准 48px），药丸形态与数字截断由 `em-badge` 负责，不需要宿主再定位。组件是 `virtualHost`，外部 class 直接落在根节点上参与父级 flex 布局。角标按负偏移探出头像盒（根节点已显式 `overflow: visible`）：App（uni-app x）端祖先 view 默认 `overflow: hidden`，紧贴头像的包裹行/容器需同样显式 `overflow: visible`，否则探出部分被裁；小程序端样式隔离会拦截打在组件上的外部布局 class，间距/布局约束请用普通 `view` 包裹组件。
 
 ## em-badge
 

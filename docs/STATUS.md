@@ -8,7 +8,7 @@
 - **库结构**：`uni_modules/easemob-uikit-uni/` —— `libs/`（EmKit 门面 + client/chat/store（connection/conversation/message/theme）/platform/use/locale/utils 功能拆分）、`components/`（`em-avatar`、`em-popup`（内部弹层基座）、`em-action-sheet`（底部动作菜单）、`em-conversation-page`、`em-chat-page`、`em-chat-info-page`（聊天详情）、`em-nav-bar`（safe-top + 44px 行，title/subtitle/showBack/actionIcon props + back/action 事件，小程序胶囊避让内置）、`em-button`、`em-chat-inputbar`（文本/语音/emoji/媒体面板/引用条）、气泡族 `em-text-message`/`em-image-message`/`em-audio-message`/`em-video-message`/`em-file-message`、`em-text`（lines 折叠 + word-break 收口原子组件））。枚举字符串统一收口 `libs/constants/`。
 - **SDK**：`easemob-websdk 5.1.3` 精确锁定（peer 同声明；demo login 页头展示 `SDK_VERSION`，升级时同步改）。ChatClient + Manager 注册制（已注册 ChatManager/PushManager/UserInfoManager/ContactManager）；`enableSyncData: ['conversation','contact']` 显式选择。
 - **logger 服务**：`libs/utils/logger.ts`（零依赖，`[emkit:<ns>]` 前缀；`EmKitConfig.logLevel/sdkConsoleLog/sdkLogLevel` 三项接线；SDK 结构化日志经 ChatClient 级 `onLog` 转发进 `[emkit:sdk]`）。2000 行内存环形缓冲（与 console 级别解耦），`EmKit.exportLogs()` 分端导出（H5 Blob 下载；小程序/App 写 `USER_DATA_PATH` + 兜底剪贴板），demo mine 页有入口。
-- **聊天链路**：引用（`EmMessageItem.quote` 快照，1.0 主协议 ext `msgQuote` 与 vue 版互通 + 旧 `emQuote` 兼容双写，toMessageItem 三路径统一解析）、撤回（2 分钟窗口，onMessageRecalled 落 recalled 态）、失败重发（原位红叹号，resendMessage 重建投递）、单聊已读回执（enableReadReceipt，≤50 条批量回执，仅最新己方消息显示对勾/空心圆）、typing（cmd 消息 action `TypingBegin`，5s 节流 + 5s 超时，cmd 在 onMessage/loadHistory 边界拦截不落列表）、语音/视频/文件收发（platform.ts 收口媒体选择/录音/播放，录音仅小程序+App、chooseFile 仅小程序+H5、视频预览仅 H5）。
+- **聊天链路**：引用（`EmMessageItem.quote` 快照，1.0 主协议 ext `msgQuote` 与 vue 版互通 + 旧 `emQuote` 兼容双写，toMessageItem 三路径统一解析）、撤回（2 分钟窗口，onMessageRecalled 落 recalled 态）、失败重发（原位红叹号，resendMessage 重建投递）、单聊已读回执（enableReadReceipt，≤50 条批量回执，仅最新己方消息显示对勾/空心圆）、typing（cmd 消息 action `TypingBegin`，5s 节流 + 5s 超时，cmd 在 onMessage/loadHistory 边界拦截不落列表）、语音/视频/文件收发（platform.ts 收口媒体选择/录音/播放，录音仅小程序+App、chooseFile 仅小程序+H5；视频播放全端内置全屏播放器，M2.19）。
 - **输入栏**（`em-chat-inputbar` 原子）：面板状态机 `none|emoji|media` 三态互斥（与键盘互斥、占键盘位）；emoji 96 字符集网格；媒体面板 56×56 瓷贴四格；按住说话（上滑 60px 取消）；引用条（发送成功/手动关闭/切会话清除）。
 - **用户属性**：`libs/store/user.ts`（infoByUserId 缓存 + 防重拉，回落链 nickname > conversation.name > userId）+ `libs/chat/user-info.ts`（ensureUserInfos 微任务合批，wire avatarurl 边界归一；登录/会话同步/收消息/拉历史/进会话自动补拉）。
 - **时间**：会话列表五档（今天 HH:mm / 昨天 / 周X / MM/DD / YYYY/MM/DD）+ 聊天页时间分隔条（`TIME_DIVIDER_INTERVAL` 默认 5 分钟，`formatDividerTime` 四档）。
@@ -16,7 +16,7 @@
 - **自绘导航栏**：pages.json 两页 `navigationStyle: custom` + `app-plus.titleNView: false`，header 收口 `em-nav-bar`。
 - **聊天详情页**：`em-chat-info-page`（头像昵称条 + 免打扰/置顶 switch（乐观更新失败回滚）+ 清空记录/删除会话（二次确认）；`clearConversationMessages` = removeHistoryMessages 截断 + 本地缓存/游标复位 + 摘要清零）；入口走 `open-info` emit 宿主接线。
 - **联系人页（M2.5）**：`em-contact-page`（字母分组 A-Z + `#`、索引条、搜索、新请求入口、长按删除）+ `em-contact-requests-page`（pending 双按钮 + processingIds 幂等）+ `em-alphabet-nav`（27 格恒渲染、touchstart 点按/touchmove 占比滑动、scroll-into-view 同组先清空再赋值）；数据层 `libs/chat/contact.ts`（bind + readyContactManager cast；roster 六事件刷新；**enableSyncData 不传 'contact' 好友同步不启动**；onSyncDataFinished success 才回填自愈；invite 持久化 key `emkit.contact.invites`）+ `libs/utils/pinyin.ts`（setPinyinAdapter 可选注入，零依赖降级）。未做（二期）：黑名单、群组、详情页、穿梭框、presence。
-- **一期范围未做/降级清单**：`@我` 提示、会话滑动删除（长按菜单替代）、链接识别与 @高亮、语音波形动画/未读红点、视频原生播放（H5 window.open/其它端 toast）、文件下载进度、引用点击定位原文、消息列表 list-view 复用（仍 scroll-view）、下拉加载历史（点击加载）。
+- **一期范围未做/降级清单**：`@我` 提示、会话滑动删除（长按菜单替代）、链接识别与 @高亮、语音波形动画/未读红点、文件下载进度、引用点击定位原文、消息列表 list-view 复用（仍 scroll-view）、下拉加载历史（点击加载）。
 
 ## 2026-10-14 结构治理
 
@@ -85,6 +85,7 @@
 | 输入栏业务入口端到端（`#input-toolbar` 注入/开关、点胶囊 sendCustom 对端渲染、键盘弹起时跟随与两行占位） | H5/mp/App | 详情页入口条免登录已验渲染；聊天内点击需真实账号 |
 | AI 流式消息端到端（真实 `onStreamMessage`：分片合并/丢片补偿/终态收敛/异常、`enableStreamMessage=false` 完整消息延迟上屏、断连重连） | H5/mp/App | 需业务服务端下发流式消息；H5 demo mock 已验渲染态 |
 | 手动避让时序与高度精度（上推口径 = 上报值原值；鸿蒙已验贴合、iOS 已复现并同因修复，待 iOS 复测贴合度） | App 三真机 | Android「顶飞消解」已由用户验；鸿蒙 2026-10-21 实测贴合；iOS 2026-10-21 截图量化后修复 |
+| 视频消息全端播放（点气泡拉起全屏播放器、声音输出、暂停/进度/全屏、关闭后无后台声音、切会话/退页释放、坏 URL 失败提示） | App 三真机 / mp / H5 | M2.19；**iOS 真机已验**（下载本地 + 关闭 autoplay 显式起播）；Android/鸿蒙/mp/H5 待回归；H5 自动播放被拦截时点播放键 |
 | 会话页/联系人页搜索聚焦顶飞 nav-bar（同根因，fix 待从 chat-page 铺到 conversation/contact 页） | App | 已立案 |
 | 聊天页「点击消息区收起输入栏」（emoji/媒体面板 + 软键盘；键盘弹起时点击不误触消息操作） | App 三真机 / mp / H5 | 需真实账号；H5 桌面端外部点击已由浏览器 blur 兜底 |
 | mp-weixin `onKeyboardHeightChange` 回调与面板跟随观感 | 小程序 | |
@@ -397,7 +398,7 @@
 - **Demo 接线**：聊天页 `#custom-message` 直接注入 `<demo-card :message fallback-text @action>`；未知 event / 无标题回落 `[自定义消息]`；「场景开关」面板保留 12 种卡片发送 + 「未知事件」按钮（不再有注册表开关）。免登录预览页 `sub-im/pages/scenario/cards` 改为宿主卡片渲染，无注销/重注册。
 - **文档**：`docs/GUIDE-MULTI-SCENARIO.md` §3.2 重写为「sendCustom + #custom-message 插槽 + 宿主卡片示例 + 样式/多语言/动作/兜底」；README、PLAN M2.14、EVAL §7 同步为插槽方案；契约 skill 移除内置卡片组件，保留插槽说明。
 - 验证：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 824KB / 分包合计 1365KB）；H5 产物伺服 200；宿主卡片预览页 500×900 截图走查（12 种卡片 + 未知回落，样式与改前一致）。
-- **待验（需真实账号/真机）**：聊天内发送/接收 12 种卡片、宿主 `action` 回传、未知 event 兜底、聊天页插槽在群聊/单聊的布局；宿主自定义样式在 mp-weixin 的生效范围。
+- **待验（需真实账号/真机）**：聊天内发送/接收 12 种卡片、宿主 `action` 回传、未知 event 兜底、聊天页插槽在群聊/单聊的布局；宿主自定义样式在 mp-weixin 的生效范围（2026-10-22 已静态验证机制成立——app-and-page 经运行时映射为 apply-shared，页面级 wxss 可穿透组件隔离；真机视觉见同日「组件样式透出」条目待验）。
 
 ## 2026-10-20 输入栏业务入口 + 场景化发卡（M2.15）
 
@@ -607,3 +608,220 @@
 - **修复**：`libs/client/index.ts` 的 `platformAdapterOptions.overrides` 增加 `imageProcessor` 包装——`getImageInfo` / `generateBigImage` 原样委托平台实现；`computeMd5` 读取失败时降级为空 md5 并打一行 `[emkit:client] attachment md5 unavailable, upload continues without md5: <message + details>`，让 `uni.uploadFile`（原生读文件，不受 FSM 沙盒限制）继续完成上传。md5 只用于服务端秒传预检，SDK 自身对缺能力平台也是「不传 md5 继续上传」，因此不改变消息内容与接收端表现。顺带补 `platformErrorDetail()`：SDK 的 `PlatformAdapterError.details`（filePath/errCode/cause）不再被 message 吞掉。
 - **验证**：`build web` ✓（产物含降级 warn，`platformAdapterOptions` 仍传函数单例）；`build mp-weixin` 11 项防回归全绿（主包 854KB / 分包合计 1367KB）；H5 产物静态伺服 200；`check-app-module-graph.mjs` ✓（0 反向 import / 0 循环）；HBuilderX dev watch 已重出 iOS 产物（`demo/unpackage/dist/dev/app-ios/app-service.js`，含 `attachment md5 unavailable` 降级分支，App 编译无新增告警）。**待验**：App 真机复跑选文件→发送→对端收到文件（iOS 优先，Android/鸿蒙随后）；若仍失败，`[emkit:client]` 的 warn 会带 `details.filePath` 与 `errCode`，据此判断是上传阶段问题还是 md5 之外的新问题。
 - **纪律**：App 端凡是依赖 `uni.getFileSystemManager` 读**宿主提供的文件路径**的能力都不可靠（FSM 只认 uni 目录）；选择器/分享进入的副本路径一律视为「上传可用、FSM 不可读」。详见 skill `em-crossend-pitfalls` §5h。
+
+## 2026-10-22 会话页 `showTabs` 布尔开关
+
+- **改动**：`em-conversation-page` 新增 `showTabs?: boolean` prop（默认 `true`），`false` 时无论 `tabs` 传什么都不渲染筛选 tab 栏；与既有「`tabs` 传空数组隐藏」并存（模板条件 `showTabs && tabs.length > 0`）。原子组件 `em-conversation-tabs` 不加该 prop，保持纯呈现 + 空数组约定。PLAN.md M2.6 透出清单补登记。
+- **文档**：CONFIG / PAGES-CONVERSATION / COMPONENTS-CONVERSATION 三处 `em-conversation-page` 配置表各补一行。
+
+## 2026-10-22 组件样式透出（custom-class / custom-style）+ 样式定制指南
+
+- **背景**：评估宿主「改 UIKit 内部组件样式」的可用通道，结论——变量覆盖五端可靠但只能改全局/子树；同名 class 覆盖在 App 蒸汽端不可靠（ucss 单类选择器无特异性武器、宿主与库 css 合并顺序无契约）；中层组件无单实例样式透出口。据此落地统一样式透出契约。
+- **契约**：全部 33 个公开组件（26 原子 + 7 页面级）根节点统一新增 `customClass` / `customStyle` 两个可选 prop：customClass 追加到根节点 class；customStyle 拼接到根节点内联 style 末尾（五端必生效、可引用 `var()`）。特殊结构：弹层类（em-action-sheet / em-select-contact / em-mention-picker）显式透传给 em-popup、落在最外层遮罩容器（em-action-sheet 初版走 class fallthrough，已统一为显式 prop 透传）；em-skeleton 三个互斥根各自绑定；em-text 保留既有 textClass/textStyle 双通道（文字节点），customClass/customStyle 落在根 view；页面级组件拼在 `primaryColorStyle()` 之后，宿主可覆盖品牌色内联值。
+- **使用口径（写进对外文档）**：追加组件未设置的属性用 custom-class；覆盖组件已设置的属性用 custom-style；批量换肤用 `--em-*` 变量；整区结构替换用具名插槽。App 端不要用同名 class 覆盖组件内部属性。
+- **Demo**：`sub-im/pages/style-lab` 新增「宿主样式覆盖」三组对照——custom-style 卡片底（em-empty）、custom-class 主色描边（em-empty，只加组件未设置的边框属性）、变量覆盖品牌橙（themeClass + 自定义 class 子树换 `--em-primary-color`）。
+- **文档**：新增公开页 `docs/GUIDE-STYLING.md`（manifest 已登记，「设计与运行」组，四通道决策表 + 平台边界矩阵 + 文字样式特殊性 + 完整示例）；COMPONENTS.md 总览补统一定段 + 四个家族页各补一句透出说明；DESIGN-TOKENS §5 加交叉链接；changelog 起 `1.0.0-rc.2（未发布）` 段；宿主技能 `em-host-theme-i18n` §2.3 覆盖边界同步；AGENTS.md 文档索引登记。
+- **验证**：`check-docs.mjs` ✓（28 页 / 33 组件 / 71 EmKit 方法 / 24 配置字段）；`check-skills.mjs` ✓；`build web` ✓；H5 产物静态伺服 200 ✓；`build mp-weixin` 11 项防回归全绿（主包 857KB / 分包合计 1369KB）。**mp-weixin 穿透机制静态验证**：产物 style-lab.wxss 含 `.lab__empty-override` / `.lab__brand` 页面级规则；style-lab.wxml 向 em-empty 传 `custom-class`；em-empty.js 的 Component options 带 `styleIsolation:"app-and-page"` 且 vendor 运行时将其映射为 `apply-shared`（页面 wxss 可影响组件内部，父组件 wxss 不可）——与评估结论一致。
+- **真机反馈修复（2026-10-22 当晚）**：style-lab「变量覆盖品牌橙」在 App 真机不生效——class 方式覆盖变量与 `.em-theme-*` 各组件拷贝同特异性拼声明顺序被顶掉（坑集新增 §5i）。demo 改内联 `:style` 绑定变量（`brandVarStyle`，与 `primaryColorStyle()` 同机制）；GUIDE-STYLING §3 改以内联形式为主示例、§6/§7 同步；DESIGN-TOKENS §5.2 补 App 端警示。
+- **运行时主题色拖拽演示（2026-10-22 当晚二轮）**：style-lab 新增「拖动色相条换全页主色」——36 段 JS 预算 hex 拼纯色相条（不依赖各端 CSS 渐变/色函数），拖拽几何用 em-alphabet-nav 同款 `createSelectorQuery().in(instance).boundingClientRect()` 惰性缓存模式；双通道生效：页面根 scroll-view 内联 `brandVars`（`--em-primary-color` + 派生 `--em-primary-hover`/`--em-bubble-bg-self`/`--em-bg-active` 一起算）+ `setConfig({ primaryColor })`（页面级组件跟随）。setConfig 运行时不写 H5 documentElement（仅 init 路径写）、不持久化——GUIDE-STYLING §3 新增「运行时换主题色」小节写明这两条边界。
+- **iOS 拖拽修复（2026-10-22 当晚三轮，真机确认）**：色相条在 iOS 完全拖不动、mp 正常——`createSelectorQuery` 异步查询在蒸汽端拿不到 rect（坑集新增 §5j）。改 `getWindowInfo().windowWidth` 同步算几何（条在 16px 页面边距内通栏）+ 拖拽期间 `:scroll-y="!hueSliding"` 锁定根 scroll-view；iOS 真机已确认可拖。style-lab 另加「覆盖机制探针」P1–P5（class 变量 / 内联变量→组件 / custom-style 字面量 / custom-style var / 内联变量→宿主文本），用于定位蒸汽端内联 `--em-*` 的真实支持度。
+- **蒸汽端变量级联定论（2026-10-22 当晚四轮，iOS 探针实证）**：探针 P1–P5 全橙但「品牌橙」仍蓝，对比定位两条非标准规则——① class 方式覆盖变量结果随构建漂移（§5i 改写：同写法两版构建一蓝一橙，顺序无契约铁证）；② **同节点 class 变量顶掉内联变量**（新增 §5k：内联只能赢继承值；普通属性不受影响，P3 字面量正常）。由此发现库 bug：7 个页面级组件根节点 `themeClass + primaryColorStyle()` 同节点绑定，`primaryColor` 在 App 端从未生效——统一加 `__brand-scope` 内层节点（css `flex:1 + height:0` 接替根的 flex 角色），根 `:style` 只留宿主 customStyle。style-lab 同步分层：根 scroll-view 留 themeClass，内层 `.lab__theme-scope` 绑 brandVars；「品牌橙」demo 去掉同节点 themeClass。文档：GUIDE-STYLING §3 重写（两条 App 限制 + 分节点示例）；DESIGN-TOKENS §5.1 改内层包裹写法；THEME-I18N §4 品牌色描述同步；changelog rc.2 增「修复」段。
+- **待验**：iOS 真机复测——拖色相条整页实时换色（brandVars 下沉内层后应生效）、品牌橙按钮变橙、登录后各页面组件跟随 `primaryColor`；em-alphabet-nav 滑动定位改同步几何；四个 COMPONENTS-* 家族页 props 表逐组件补两行；package.json 版本随 rc.2 发布时再 bump。
+
+## 2026-10-22 输入栏整栏自绘（`#input-bar`）+ `useChatComposer` 行为核心抽取（M2.16）
+
+- **背景**：宿主对整个输入栏不满意时只能 fork em-chat-inputbar（约 470 行），但键盘避让（iOS/鸿蒙安全区双口径）、键盘↔面板互斥、录音手势状态机、禁言守卫、@ 触发检测是跨端实测收口的逻辑，裸 fork 必丢。定案「受约束整栏替换」：行为核心下沉 composable 单一实现，插槽 scope 即契约。
+- **内核**：新增 `libs/use/useChatComposer.ts`（自 em-chat-inputbar 纯搬迁：rootStyle/panelStyle、面板三态互斥、录音状态机、禁用守卫）；em-chat-inputbar 改消费之（props/emits 不变）；em-chat-page 新增 `#input-bar` 作用域插槽（`EmChatInputBarScope`，页面保留键盘顶起壳），自绘路径 @ 触发检测上移页面（watch draft 同款逻辑）、消息区点击直调 composer.collapse；插槽有无静态确定（setup 实例化 composer），不支持同实例运行时切换。`libs` 导出 `useChatComposer` 及四个新类型（EmChatInputBarScope/EmChatComposerPanel/EmChatComposerPanelKind/EmChatComposerTouchEvent，均进 libs/types）。
+- **Demo**：`demo/components/demo-custom-inputbar`（全自绘参考实现：快捷回复/引用/语音/emoji/媒体全走 scope）；聊天页 `?inputbar=custom` 切换。两个可见入口：场景详情页主按钮下方描边次按钮「用自绘输入栏进入」（openChat 带 inputbar=custom）；聊天内场景面板「整栏自绘输入栏」按钮（redirectTo 重进生效——插槽有无必须页面级静态确定）。DEMO.md 补组件表行 + 「整栏自绘输入栏」小节。
+- **文档**：PAGES-CHAT 新增「整栏自绘输入栏」节（scope 契约表：必须接/库内保持清单 + 最小示例）；API-TYPES 增 `EmChatInputBarScope`；COMPONENTS-CHAT 补「行为核心复用」段；GUIDE-STYLING/COMPONENTS/HOME 各补入口行；PLAN 登记 M2.16；skill em-component-structure 透出契约表补行。
+- **验证**：`check-docs.mjs` ✓（28 页/33 组件/71 方法/24 字段）；`check-skills.mjs` ✓；`build web` ✓（demo-custom-inputbar 的 possibly-null warning 与 demo-composer-bar 等本地 ns 对象为同款编译器存量告警）；H5 产物静态伺服 200 ✓；`build mp-weixin` 11 项防回归全绿（主包 876KB / 分包合计 1371KB）。**待验**：自绘路径真机（App/小程序）键盘顶起、面板互切、录音发送、群聊 @ 面板、禁言 toast；demo-custom-inputbar 五端渲染。
+
+## 2026-10-22 气泡几何尺寸 token 化 + 气泡定制配方文档
+
+- **背景**：盘点「改对方/己方气泡样式」的便捷度。结论：颜色类已便捷（`--em-bubble-bg-self/other`、`--em-bubble-text-self/other/-self-secondary` 收口 `libs/style/bubble.css` 基类，五种气泡共用，明暗全量）；缺口在几何尺寸写死（文本气泡 `12px 14px`、语音 `10px 14px`、文件卡 `166~240px` + `10px 12px`），App 端无同名 class 覆盖武器，实质改不了。
+- **改动（零破坏，默认值=原写死值）**：`variables.css` 共享块新增 8 个几何 token——`--em-bubble-padding-x/y`（文本气泡）、`--em-audio-bubble-padding-x/y`（语音气泡）、`--em-file-card-padding-x/y` + `--em-file-card-min-width/max-width`（文件卡）；`em-text-message.css` / `em-audio-message.css` / `em-file-message.css` 改消费 var()。图片/视频气泡无 padding（媒体即气泡），不动。
+- **顺带发现（未改）**：`em-chat-page.css:242` 注释称占位气泡 padding 来自 `.em-bubble` 基类，但基类只定义底色/圆角——占位气泡实际无 padding，注释与实现不一致，留待后续确认是否补 padding。
+- **文档**：DESIGN-TOKENS §4.4 登记 8 个新 token；GUIDE-STYLING 新增 §5「聊天气泡定制」——高频诉求→变量对照表、「`em-chat-page` 的 `custom-style` 传变量串 = 单页气泡换肤」配方（根节点内联变量沿子树继承，五端可靠、不污染其他页面）、边界说明（标准消息无整卡插槽，结构替换走 `#custom-message`/`#stream-message`；描边/阴影/非对称字号 App 端不可靠）。原 §5–§7 顺延为 §6–§8。
+- **Demo**：style-lab 新增「气泡变量定制」对照组——内层包裹节点绑 `bubbleVarStyle`（对方暖黄底/棕字、己方橙底白字、padding-y 16px），渲染一对方一己方两条 em-text-message，验证子树内联变量只影响本组气泡（与色相条 brandVars 的全局 `--em-bubble-bg-self` 形成作用域对照）。
+- **验证**：`check-docs.mjs` ✓（28 页 / 33 组件 / 71 方法 / 24 字段）；`build web` ✓（产物 css 已含 `--em-bubble-padding-*`，style-lab 产物含 `lab__bubble-row`；存量 demo-custom-inputbar null 告警不变）；H5 产物静态伺服 200 ✓；`build mp-weixin` 11 项防回归全绿（主包 887KB / 分包合计 1380KB）。**待验**：style-lab 新演示组各端渲染（尤其 App 端内联变量对 padding 的生效）。
+
+## 2026-10-22 样式实验室改版：hub 目录页 + 五个二级专项页
+
+- **背景**：style-lab 单页 743 行、14 个板块混杂 token 阶梯/原子组件/交互演示；「我的」页两个入口（流式气泡演示、样式实验室）同指一页，单页已超载。
+- **结构**（照搬场景实验室 hub + 二级页模式，全部在 sub-im 分包）：`style-lab.uvue` 改造为目录页（保留主题三档循环 + 中英切换，themeStore 全局对子页生效；入口卡片列表 navigateTo）；新增五个专项页——`tokens`（文字/背景/气泡徽标/间距/字号五组阶梯）、`components`（em-avatar/em-icon/em-empty/em-skeleton）、`theming`（运行时色相条换色 + 气泡变量定制）、`overrides`（宿主覆盖三组对照 + P1–P5 探针）、`stream`（AI 流式气泡演示）。模板/脚本/样式纯搬运不改演示逻辑，坑集约束随代码走（内联变量与 themeClass 分节点、流式气泡 rpx 定宽、色相条同步几何）。
+- **入口**：「我的」页「流式气泡演示（样式实验室）」改为直达 `/sub-im/pages/style-lab/stream`、文案改「AI 流式气泡演示」；「样式实验室」仍进 hub。pages.json sub-im 注册 5 条新路由。
+- **文档**：DEMO.md（目录说明 + 我的页/样式实验室表格行 + 体验矩阵两行）、GUIDE-STYLING §3/§7（指向 theming/overrides 子页路径）、AI-STREAM.md 入口表同步。
+- **验证**：见当日门禁记录（check-docs + build web + build mp-weixin 11 项 + H5 伺服）。**待验**：hub 跳转与各专项页在 App/小程序真机渲染（尤其 theming 页色相条拖拽与 overrides 探针分层结构未变、预期行为一致）。
+
+## 2026-10-22 修复：style-lab 原子组件页 em-avatar 徽标被裁平顶（蒸汽端祖先层二次裁剪）
+
+- **症状**：样式实验室「原子组件」页（iOS 真机截图）em-avatar 的 `badge=3` / `badge=120` 徽标顶边被水平切平；dot 小红点基本正常（负偏移仅 2px）。
+- **根因**：坑集「overflow 默认值坑」的祖先链版本——em-avatar 根节点早已显式 `overflow: visible`，但徽标负偏移探出头像盒后，外层 `.lab__avatars` flex 行（高度恰等于头像高）在蒸汽端默认 `overflow: hidden`，把探出部分二次裁掉。H5/mp view 默认 visible 所以只在 App 端暴露。库内消费点（会话列表未读在行尾、通讯录入口红点）都不经过「徽标负偏移探出」路径，不受影响；该路径仅 demo 演示页走到。
+- **修复**（demo 侧）：`components.uvue` 的 `.lab__avatars` 与 `.lab__avatar-item` 显式 `overflow: visible`；顺手把打在 virtualHost 组件上的 `lab__avatar-item` 布局 class 改为普通 view 包裹（坑集 §8a：mp 上该类会被样式隔离拦截，margin 丢失）。
+- **沉淀**：编码纪律 skill「overflow 默认值坑」补「裁剪沿祖先链逐层生效，探出路径上每一层包裹都要放行」；COMPONENTS-BASIC em-avatar「行为与平台」补两条边界（App 祖先层 overflow、mp 布局 class 用 view 包裹）。
+- **验证**：`check-docs.mjs` ✓；`build web` ✓；H5 伺服 200 ✓；`build mp-weixin` 11 项防回归全绿（主包 888KB / 分包合计 1412KB）。**待验**：App 真机复看徽标完整药丸形态。
+
+
+## 2026-10-22 修复：iOS 创建群组标题被灵动岛遮挡（全屏选人安全区承载层）
+
+- **根因**：iPhone 14 Pro 实测 `getSafeAreaTop()` 返回 59，并非安全区读取为 0。对照探针证明：`em-popup` fullscreen panel 额外增加 60pt 时标题不动，内层 `em-select-contact__sheet` 增加同样数值时标题立即移动——iOS 蒸汽端该 panel 的 padding 不参与布局，原先放在 `em-popup.panelStyle` 的顶部安全区实际未生效。
+- **修复**：`em-select-contact` multiple 的 `sheetStyle` 直接注入 `padding-top: getSafeAreaTop()`，内容高度同步扣除同一值，保持总高不变；`em-popup` 移除失效的顶部处理、保留底部安全区。建群、邀请入群、批量移除成员三条 multiple 路径共用此修复。
+- **同类走查**：群成员管理全屏覆盖层及 7 个 custom 页面均复用 `em-nav-bar`，登录页单独读取 `getSafeAreaTop()`，本次未改其路径；单聊选人、@ 提及、action-sheet、居中编辑弹层均为半屏/居中形态，其余 demo 页使用原生导航栏，不属于同类贴顶风险。未发现另一套完全缺失顶部安全区的贴顶交互页。
+- **验证**：iOS 真实群组路径渲染确认标题/关闭键位于灵动岛下方、底部确认键正常；临时诊断与直达探针全部还原。`build web` ✓；H5 产物静态伺服 200 ✓；`build mp-weixin` 11 项防回归全绿（主包 888KB / 分包合计 1412KB）。邀请/移除成员共享组件已做调用链走查，真实群数据下的逐项操作仍随群链路真机回归。
+
+## 2026-10-22 消息删除、复制与发送/撤回防重（M2.17 Task 2）
+
+- **删除**：新增 `EmKit.deleteMessage(message)`；`message.id` 非空时先 `removeHistoryMessages` 再本地移除，空 id 不等待 SDK、仅本地删除，漫游失败保留气泡并抛错。`deleteLocalMessage` 保留显式本地删除；chat 门面组合会话域 `syncMessageSummary`，按剩余最后一条校正摘要/时间，空列表清零。聊天页删除先确认、按 localId 防重，成功才 emit `delete`，失败 toast `message.delete.failed`。
+- **复制**：`copyText` 改 Promise，空文本/同步异常/原生 fail 均 reject，`showToast:false` 关闭原生提示；聊天页统一 `message.copySuccess/copyFailed`，日志导出两个既有调用点均 await 并保持 best-effort 语义。
+- **防重**：`em-chat-inputbar.submitting=false` 与 `em-quick-reply-bar.disabled=false` 非 breaking 扩展；文本/直发快捷回复共享提交锁，重发按 localId 在等待 SDK 前占锁（失败仍由 domain 恢复 FAILED），撤回按 localId 防重且执行时重查 `recallTimeLimit`，不新增撤回确认。
+- **文档**：API-KIT / MESSAGING / PAGES-CHAT / COMPONENTS-CHAT / changelog、宿主技能与内部架构/组件契约同步；PLAN M2.17 补消息交互范围。
+- **验证**：一次性 RED 0/10 → GREEN 10/10（真实 EmChat/platform + 组件源码契约；临时文件已删除）；`check-docs.mjs` ✓（72 方法）；`check-skills.mjs` ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 892KB / 分包合计 1414KB）；H5 静态伺服 200 ✓；`git diff --check` ✓。**待验**：真实账号漫游删除后重进/重拉不复活、漫游失败保留、各端连点与复制原生提示（H5/mp/App 真机或模拟器）。
+- **审查修复**：`syncMessageSummary` 对剩余最新 recalled 消息改用 `message.recalledPreview`，不再还原原文；`deleteLocalMessage` 内部返回实际命中状态，未加载列表/陈旧 localId 的 no-op 不改摘要或上传缓存，只有真实删除才校正，已加载空列表仍清零。专项 RED 2/5（3 个预期失败）→ GREEN 5/5；web/mp/H5 与文档/技能门禁复跑通过。真实账号与五端人工矩阵仍未执行，明确留 Task 6。
+
+## 2026-10-22 会话与联系人操作闭环（M2.17 Task 3）
+
+- **会话设置**：pin/mute 按会话与设置项独立串行，乐观回写最新意图，旧成功/失败不回写，最新失败回滚最近已确认值；pin 在途快照保留本地状态，mute 批量校正按请求序号忽略旧响应。chat-info 开关改 computed 直读 conversationStore，请求中 disabled。
+- **破坏性操作**：会话列表删除先原生确认，pin/mute/delete 按会话+动作加锁；chat-info 清空/删除/退群/解散及联系人删除增加提交锁，deleted/leaved 设成功闩，每个页面实例最多发一次，覆盖宿主导航完成前的二次点击。`removeConversationLocal` 同步清持久化草稿。
+- **联系人/demo**：`onContactAdded` 将匹配 received contact pending 置 accepted 并持久化，申请页操作区与未读角标响应式收敛；删除好友按 userId 防重。demo 添加好友表单补 sending/disabled 与请求代次，旧完成回调不影响重开表单，UI 仍留在宿主。
+- **验证**：一次性首轮 RED 1/10 → GREEN 10/10；自审补旧同步响应/在途快照两条后 RED 10/12 → GREEN 12/12；最终补删除/退群成功闩专项 RED→GREEN 1/1（临时文件已删除）；`build web` ✓；`build mp-weixin` 11 项全绿（主包 896KB / 分包合计 1414KB）；H5 静态伺服 200 ✓；App 模块图 ✓；`git diff --check` ✓。**待验**：真实账号并发/失败矩阵、各端原生连点与确认弹层、roster 事件及持久化冷启动、微信开发者工具与 App 真机。
+
+## 2026-10-22 聊天详情页删除好友入口（M2.17 Task 3 规划项补落地）
+
+- **背景**：PLAN M2.17「chat-info …删除好友增加提交锁，成功事件只发一次」中 chat-info 的删除好友入口当时未随 Task 3 落地（仅好友列表长按删除可用）；vue 版 locale 已预留 `chat.info.deleteFriend*` 四条文案。
+- **实现**：`em-chat-info-page` 单聊分支 footer 新增 danger 档「删除好友」按钮（与退群/解散同档样式），仅对方已是好友（`contactStore.items` 命中）时显示；`uni.showModal` 二次确认 → `EmKit.deleteContact`（内部刷新好友快照）；`deletingContact` 提交锁 + `contactDeleted` 成功闩，成功 toast 并 emit `contact-deleted`（每实例最多一次），失败 toast `chat.info.deleteFriendFailed` 停留当前页；不连带删会话/清消息，会话去留由宿主决定。i18n 中英新增 `chat.info.deleteFriend/deleteFriendConfirm/deleteFriendSuccess/deleteFriendFailed`（key 与 vue 版一致）。
+- **demo/文档**：demo `chat-info.uvue` 接线 `@contact-deleted` → 退回会话列表（delta 2，与 deleted/leaved 同处理）；PAGES-CHAT-INFO（能力/Events/宿主接线/行为边界）、宿主技能 `em-host-conversation-chat`（接线示例/事件表/页面一句话）、changelog 1.0.0-rc.2 同步。
+- **验证**：`check-docs.mjs` ✓（28 页 / 33 组件 / 72 方法）；`check-skills.mjs` ✓；`build web` ✓；H5 产物静态伺服 200 ✓；`build mp-weixin` 11 项防回归全绿（主包 899KB / 分包合计 1414KB）。**待验**：真实账号删除好友后双方 roster 事件联动、非好友单聊（陌生人会话）按钮不显示、五端连点防重。
+
+## 2026-10-22 AI 演示浮钮：可配置显隐 + 上移避让引用条
+
+- **问题**：聊天页「AI 演示」浮钮（demo 层，`chat.uvue`）无条件渲染不可关闭；`bottom:96px` 正好落在输入栏引用条（`.em-chat-inputbar__quotebar`）垂直带上，右侧盖住引用条关闭按钮。
+- **改动**：`demo/common/ai-stream-demo.ts` 新增 `AI_STREAM_FAB_VISIBLE` 常量总开关（置 false 即关，仍属 demo 层不进 UIKit）；`chat.uvue` 浮钮加 `v-if` 消费。浮钮 `bottom: 96px → 150px` 抬到引用条/快捷回复条之上、浮于消息列表右下角；「场景开关」浮钮同步 `140px → 194px` 保持 44px 错开。
+- **文档**：`docs/AI-STREAM.md` 演示入口表同步位置描述与关闭方式。
+- **验证**：`check-docs.mjs` ✓（28 页/33 组件/72 方法/24 配置）；`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 898KB / 分包合计 1414KB）；H5 产物静态伺服 200 ✓。**待验**：App/小程序真机复看浮钮与引用条、场景浮钮的相对位置。
+
+## 2026-10-22 会话与联系人闭环审查修复（Task 3 Fix Round 1）
+
+- **跨动作退出**：chat-info 的 deleted/leaved 改用共享 `exitCompleted`，动作入口与成功回调双重检查；delete/leave 同时 pending 时仅先完成者发事件，后完成者不再触发第二次导航。
+- **回滚基线**：无本地在途意图时，多设备 mute、批量 mute 校正及 pin 快照同步更新队列 `settledValue`，后续本地失败不得恢复更旧的本地状态。
+- **生命周期失效**：pin/mute 队列增加会话与账号代次；删除会话和 reset 分别提升代次，旧成功/失败闭包不得写入重建的同 ID 会话或新账号状态。
+- **申请收敛**：`onContactAdded` 接受同发送者全部 received contact-pending，不再只处理第一条；outgoing/group/其他用户不受影响。
+- **验证**：domain/contact 首轮 RED 0/8，分阶段 3/8、7/8，最终 GREEN 8/8；真实 chat-info setup 两种交叉完成顺序 RED 0/2 → GREEN 2/2；`build web` ✓；`build mp-weixin` 11 项全绿（主包 899KB / 分包合计 1414KB）；H5 静态伺服 200 ✓；App 模块图与 `git diff --check` ✓。保留同期 Task 4 删除好友与 demo 其他改动，未扩大修复范围。真实账号与端侧人工矩阵仍待验。
+
+## 2026-10-22 样式实验室「通用提交态与错误态」独立子页 + loading spinner 转圈修复
+
+- **背景**：10-22 改版拆出 hub + 5 个专项页时，「通用提交态与错误态」仍内联在 hub 页；且 em-button / em-load-more 的 spinner 是静态 iconfont 字形从未绑动画——蒸汽端 5.26 不跑 `@keyframes`，vue 版 CSS 动画方案不可移植，组件注释写死「静态 spinner 一期不用动画」。
+- **结构**：新增 `demo/sub-im/pages/style-lab/states.uvue`（照搬专项页范式），迁入三个 demo——em-button loading 常显档、em-load-more 错误态（**重试改为真实状态流转**：点击 → LOADING 1.2s → 回 ERROR，此前只计数不切状态、点击零反馈）、选人提交态弹层。hub `style-lab.uvue` 删内联 section（含无用 script/styles），ENTRIES 加第 6 张卡片；pages.json sub-im 注册路由；DEMO.md 目录表加一行。
+- **动画**：新增 `libs/use/useSpinRotation.ts`——watch 启停 `setInterval`（30°/80ms，一圈 800ms，对齐 vue 版 `uikit-spin 0.8s`；初版 400ms 被反馈太快难看，已调慢）逐帧写内联 `transform: rotate()`，inactive 归零、onUnmounted 清理；em-button / em-load-more 的 EmIcon 绑 `custom-style="spinStyle"`（EmIcon 已透传）。口径同 em-audio-message 波柱 / chat-page 引用定位脉冲。范围外：chat-page 发送中 spinner 仍 keyframes（H5/mp 转、蒸汽静态）不动。
+- **文档/skill**：坑集 §3 解法与能力表「发送中 spinner」行更新为 JS 驱动口径。
+- **验证**：`check-app-module-graph` ✓（131 模块无环）；`check-docs.mjs` ✓（28 页/33 组件/72 方法/24 字段）；`check-skills.mjs` ✓；`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 900KB / 分包合计 1420KB）；H5 静态伺服 200 ✓ + headless Chrome 冒烟：states 页三个板块渲染、spinner 内联 rotate 角度随采样时点变化（90°/225°）、hub 第 6 张卡片文案在 DOM。**待验**：蒸汽端真机 `<text>` 内联 transform 逐帧渲染性能与观感、mp 真机重试流转。
+
+## 2026-10-22 设置在途权威更新回滚基线（Task 3 Fix Round 2）
+
+- **语义**：multi-device/batch/pin 权威值在本地请求在途时仍写 `queue.settledValue`，但只作最新确认/回滚基线，不覆盖当前乐观 UI；本地成功以本地值为最终确认，失败读取失败当下的基线回滚。
+- **过期与排队保护**：批量查询和会话 refresh 按 requestId 排除发出后产生更新本地意图的过期响应；多个 queued intents 按实际完成顺序更新基线。会话/账号 generation 失效机制保持不变。
+- **验证**：有效 RED 6/10（4 个目标失败）→ GREEN 10/10，覆盖三类 pending→authoritative→failure/success、queued intents、stale batch/refresh 与 generation；`build web` ✓；`build mp-weixin` 11 项全绿（主包 900KB / 分包合计 1420KB）；H5 静态伺服 200 ✓；App 模块图与 `git diff --check` ✓。真实 SDK 多设备/同步时序及端侧快速切换仍待验。
+
+## 2026-10-22 设置读取与本地结算顺序保护（Task 3 Fix Round 3）
+
+- **结算修订号**：pin/mute 队列新增 `settlementRevision`，本地成功/失败结算后递增；批量查询和会话 refresh 同时校验 requestId 与 settlementRevision，防止读取在途期间发生本地结算后，旧响应因 pendingCount 归零而覆盖成功状态或回滚基线。
+- **兼容语义**：结算前到达的新鲜权威值仍只更新 pending 回滚基线、不改乐观 UI；结算后新发起的读取正常生效；queued operations 与 generation 失效机制不变。
+- **验证**：RED 4/10（6 个 reverse-order 目标失败）→ GREEN 10/10，覆盖 batch/refresh 的成功与失败反序、queued 成功/失败、结算后读取、Round 2 pending 基线和 generation；`build web` ✓；`build mp-weixin` 11 项全绿（主包 905KB / 分包合计 1420KB）；H5 静态伺服 200 ✓；App 模块图与 `git diff --check` ✓。真实网络时序与端侧快速切换仍待验。
+
+## 2026-10-22 输入栏多行撑开输入（PLAN M2.18）
+
+- **背景**：一期输入栏单行 input，长文体验差；vue 版展开交互是 PC 拖拽卡片形态，移动端按微信手机版重做（固定 1/3 屏高，非富文本，图文混排 editor 方案另行评估）。
+- **内核**：`useChatComposer` 新增 `expanded`/`textareaFocus` + `toggleExpanded()`；input↔textarea 组件切换期间抑制旧组件 blur 的键盘高度清零（防输入栏掉底闪跳，新组件 focus 到达解除 + 500ms 兜底）；开面板/进语音模式/禁言翻转三处自动退出撑开态。
+- **组件**：`em-chat-inputbar` 收起态加撑开按钮（vue 同款 `polyline-topright`，iconfont 已有字形零字体改动）；撑开态 = 固定 1/3 屏高 textarea（windowHeight/3，同 mention-picker 60% 口径）+ chevron-down 收起键 + 工具/发送行（mic/emoji/⊕ 移入下行）。草稿 v-model 共享，禁言守卫沿用。
+- **透出**：`EmInputFeatures` 加 `expand`（config.ts 默认 true，`uiConfig.inputFeatures.expand=false` 关闭）；`EmChatInputBarScope` 加 `expanded`/`toggleExpanded`/`textareaFocus`，em-chat-page 插槽绑定同步；i18n 中英 `chat.input.expand/collapse`（vue 同名 key）。文档：CONFIG.md（默认值+说明行）、COMPONENTS-CHAT.md 示例、API-TYPES scope 表、PAGES-CHAT 输入栏节；PLAN 登记 M2.18；changelog rc.2 新增一条。
+- **验证**：`check-docs.mjs` ✓（28 页 / 33 组件 / 72 方法 / 24 配置字段）；`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 905KB / 分包合计 1420KB）；H5 产物静态伺服 200 ✓；App 模块图 ✓。
+- **真机反馈修正（2026-10-22 晚）**：① 撑开 icon 由常驻改条件显隐——单行 input 承载不了换行，仅当草稿已含 `\n`（典型为粘贴多行文本）才出现入口；② iOS 真机展开态 textarea 区域整体「消失」（无灰底无占位符）——textarea 为原生组件（iOS=UITextView），蒸汽端不吃 flex 尺寸、背景样式不可靠（官方文档明示 App 默认宽 300px），定案为包裹层 view 承担固定 1/3 屏高 + 灰底 + 圆角 + 裁切，textarea `width/height:100%` 填充 + `disable-default-padding`；坑入 `em-crossend-pitfalls` §5l。③ 修②引入的回归：script 计算属性误用模板自动暴露名 `features.expand`（应为 `props.features.expand`），setup 期 ReferenceError 被蒸汽端吞掉 → 进聊天页全屏白屏无报错；坑入 §5m。CLI 构建不做类型检查构建全绿但运行必白屏，引以为戒。
+- **交互迭代（2026-10-22 晚，第三版）**：真机反馈「单行 input 存不下换行、打字永远触发不了撑开 icon」是死胡同——按微信「回车键发送消息」三件套重做：`inputFeatures.sendOnReturn`（默认 true 零回归）——false=换行输入档（全端生长 textarea，回车=换行、发送走栏上按钮、封顶 5 行由 linechange 驱动转固定高度内滚）；true=回车发送档（iOS 用生长 textarea + `confirm-type=send`，UITextView 粘贴保留换行且键盘仍发送；Android 系统限制 textarea 键盘恒换行，其余端保持单行 input 零回归）。撑开 icon 规则不变（草稿含 `\n`，换行档打字即可触发）。新增 `EmTextareaLineChangeEvent` 入 libs/types；demo 登录 init 置 `sendOnReturn:false` 演示换行档；文档/PLAN/changelog 同步。验证：check-docs ✓ / build web ✓ / build mp-weixin 11 项全绿 / App 模块图 ✓。**待验**：真机三档各自表现（重点 iOS 换行档生长与封顶、Android 换行档键盘、生长 textarea 包裹层灰底在蒸汽端渲染）。
+- **真机反馈修正二（2026-10-22 晚，第四版）**：iOS 真机反馈「多行输入框椭圆难看 + 打了 5 行字不见撑开 icon」。修：① 多行输入区圆角 999px 胶囊改 6px 小圆角（新增 `--em-component-radius` token，值对齐 vue 多行输入卡；全屏 1/3 屏输入区同步，DESIGN-TOKENS 登记）；② 蒸汽端原生 textarea 布局/事件值不可靠实证：文字绘制高度 ≠ 布局高度（文字溢出灰底胶囊）、v-model 不回传 `\n`（draft.includes 判断永不成立、icon 不出现）——定案全部 JS 驱动：包裹层高度跟 linechange 上报值走（含封顶冻结）、padding 归包裹层、撑开 icon 按可视行数 ≥2 显隐（单行 input 档仍回落 draft `\n`）；坑补入 §5l。**待验**：iOS 真机复看小圆角观感、包裹层与文字贴合度、icon 出现时机、封顶内滚。**待验**：蒸汽端（尤其鸿蒙）与小程序真机的 input↔textarea 焦点迁移键盘闪跳、撑开态键盘顶起安全区、`show-confirm-bar` 各端差异、包裹层修复后 iOS 真机复看。
+
+## 2026-10-22 群管理确认、权限与提交反馈（M2.17 Task 4）
+
+- **权限/确认**：新增 `canRemoveGroupMember`，owner 可移除非自己且非 owner 的成员，admin 仅可移除普通 member；单成员菜单、批量候选与提交载荷共用，确认时按最新角色/成员重验。设撤管理员补带成员姓名确认，转让说明自己将成为普通成员；成员写操作共享可 await pending 链并使用独立成功/失败文案。
+- **提交/刷新**：邀请、批量移除、建群接入 `em-select-contact.submitting`；批量提交过滤失效/无权限/重复 ID，全部失效不请求并提示。单条/批量移除成功后重拉群详情与成员首屏，移除失败保留批量选择和弹层；群名/公告保存中拦截遮罩与取消关闭。
+- **通知**：多成员进出文案同时提供中文总人数 `count` 与英文其余人数 `othersCount`，修正英文 “and N others” 多数一人的问题，中文口径不变。
+- **验证**：临时 focused RED 14 项失败 → GREEN（含可执行三角色权限矩阵）；zh-CN/en 241 keys parity ✓；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 910KB / 分包合计 1420KB）；H5 静态伺服 200 ✓；`git diff --check` ✓。**待验**：真实账号 owner/admin/member 菜单与确认、SDK 失败时状态保留、权限变化中的陈旧提交、保存中各端遮罩/取消、群详情与 memberCount 权威刷新。
+
+## 2026-10-22 群移除刷新顺序审查修复（Task 4 Fix Round 1）
+
+- **等待语义**：单条/批量移除后的详情与成员刷新分别 catch，外层等待两个尝试均 settle；一个失败不再提前关窗/解锁或清 pending。
+- **权威顺序**：`getGroupInfo(groupId, force=false)` 可选强制重读并透传门面；详情/成员按 groupId 记录请求序号，只有最新响应可写 store，旧预拉不能恢复 memberCount 或重加已移除成员；旧详情 finally 不清新请求 pending。普通 enterGroup/dedupe 不变。
+- **验证**：deferred RED 5 项 → GREEN，覆盖一失败一 pending、移除时预拉在途、旧响应晚于强制响应、普通 dedupe；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 910KB / 分包合计 1420KB）；H5 静态伺服 200 ✓。真实 SDK 时序与端侧观感仍待验。
+
+## 2026-10-22 群管理员陈旧合并审查修复（Task 4 Fix Round 2）
+
+- **失效与重拉**：移除成功递增 admin 请求代次、释放旧 pending 引用并复位 adminSynced，移除后首屏可强制新鲜 getAdmins；旧成功响应不得 append/角色回写，旧失败/完成不得清新 pending。
+- **普通行为**：无移除时首屏仍复用在途 getAdmins，角色校正、按 ID 去重 append 与 adminSynced 防重不变；公开 API 不变。
+- **验证**：deferred RED 5 项 → GREEN，覆盖旧 admin 成功/失败、移除后 fresh 响应及无关普通首屏；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 911KB / 分包合计 1420KB）；H5 静态伺服 200 ✓。真实 SDK 时序与端侧观感仍待验。
+
+## 2026-10-22 选择异常与列表失败恢复（M2.17 Task 5）
+
+- **选择**：platform 统一识别图片/视频/内置文件选择的用户取消，图片返回 `[]`、视频/文件返回 `null`，其他失败 reject；H5 文件 input 补 `oncancel`。聊天页图片/视频使用独立选择失败 toast，内置文件沿用读取失败提示，取消继续静默。
+- **列表**：会话、联系人、群列表的挂载同步与重试共用 `syncPending` 锁并记录 `syncFailed`；仅无缓存失败时以 `em-empty + em-button` 替换普通空态，已有缓存或搜索无结果不被全屏错误覆盖。
+- **成员/历史**：群成员首屏失败可重试，只有已加载空缓存才显示「暂无成员」；分页失败进入 `LOAD_MORE_STATE.ERROR`。聊天加载更多以独立 `loadMoreFailed` 保留顶部重试行，重试仍走分页锚点路径，首次历史骨架与首屏错误逻辑不变。
+- **验证**：临时 focused RED 0/11 → GREEN 11/11（真实 platform MP/WEB 取消与失败 + 页面源码契约）；zh-CN/en 245 keys parity ✓；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 918KB / 分包合计 1421KB）；H5 静态伺服 200 ✓；目标文件无新增编译告警。**待验**：真实断网首进→恢复重试、缓存后台刷新失败、各端原生选择取消/权限或读取失败，以及群成员和聊天分页的端侧点击恢复。
+
+## 2026-10-22 输入栏发送位「+」/纸飞机同槽互斥（M2.18 交互迭代）
+
+- **背景**：真机反馈输入栏常驻文字「发送」按钮占宽太多，输入区被挤窄；改为微信手机版口径——不常驻发送按钮。
+- **交互**：`em-chat-inputbar` 收起态把发送键与「+」放同一槽位互斥：草稿 `trim()` 为空显示「+」媒体入口；有可发送内容时同位置换为品牌色纸飞机 `plane`（点击仍走 `onSend`，空值/禁用/提交中拦截不变）。撑开态工具行保留文字发送键（固定 1/3 屏输入区在上方，不挤占输入宽度）；撑开入口移到发送位左侧，多行时纸飞机仍贴右缘。
+- **顺带修复**：输入区三态此前是 `v-if` 独立链——`sendOnReturn=false` 且处于撑开态/语音模式时会同时渲染生长 textarea 与撑开区/录音条（两个输入框）。改为 `v-else-if` 收进同一链：撑开态只渲染 1/3 屏 textarea，语音模式只渲染按住说话。
+- **验证**：390 宽 H5 隔离 harness（临时工程，未入库）截图确认三态为「emoji +」「emoji 纸飞机」「emoji 撑开 纸飞机」；点击撑开后仅 `expand-row`，无残留 `.multiline-wrap`；输入框可用宽度由约 210px 增至 278px（省出文字发送键 + 间距 68px）。`check-docs.mjs` ✓（28 页 / 33 组件 / 72 方法 / 24 配置字段）；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 918KB / 分包合计 1421KB）；H5 静态伺服 200 ✓；`git diff --check` ✓。**待验**：蒸汽端/小程序真机纸飞机字形渲染与点击热区、输入法组合态下 `trim()` 的显隐切换、暗色主题品牌色对比度。
+
+## 2026-10-22 移除输入栏 1/3 屏撑开输入（M2.18 回退）
+
+- **决定**：真机看点击「撑开」进入固定 1/3 屏全屏输入区的效果不佳，暂时移除该交互与入口 icon；**多行输入保留**（`sendOnReturn=false` 的生长 textarea，封顶 5 行内部滚动）。上一条中 1/3 屏撑开态、撑开 icon、撑开态工具行发送键的描述随之作废；纸飞机发送位不变。
+- **移除面**：组件删除撑开态模板/样式（`__expand-*`、`--bar-column`）与 `polyline-topright` 入口；`useChatComposer` 删除 `expanded`/`textareaFocus`/`toggleExpanded`/`onTextareaFocus`/`onTextareaBlur` 及撑开专用的 input↔textarea 焦点迁移抑制；`EmInputFeatures.expand`、`EmChatInputBarScope` 的 `expanded`/`toggleExpanded`/`textareaFocus`、em-chat-page 插槽绑定、i18n `chat.input.expand/collapse`、config 默认项一并删除。文字发送键样式 `__send`/`__send-text` 只在撑开态使用，随之一并删除。
+- **保留**：`sendOnReturn` 三态、linechange 驱动生长/封顶、纸飞机发送位、禁言/面板/录音行为；`polyline-topright` 字形保留在 iconfont（图标库是 vue icons-v2 全量镜像，不因单组件停用删字形，parity ✓）。
+- **文档**：PLAN M2.18 改为「多行输入（生长 + 回车/换行档）」并注明全屏撑开暂缓；CONFIG / PAGES-CHAT / COMPONENTS-CHAT / API-TYPES / changelog 去掉 `expand` 与 scope 字段；坑集 §5l 示例改为生长输入 `__multiline-wrap`，§5m 示例改用 `sendOnReturn`。
+- **验证**：390 宽 H5 隔离 harness（临时工程，未入库）截图确认三态：空草稿 `emoji +`、有草稿 `emoji 纸飞机`、换行档三行生长 `emoji 纸飞机`；DOM 中无 `expand-row` / `expand-toggle`，`multiline-wrap` 正常，输入区宽 278px。`check-docs.mjs` ✓（28 页 / 33 组件 / 72 方法 / 24 配置字段）；图标 parity ✓；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 913KB / 分包合计 1421KB）；H5 静态伺服 200 ✓；`git diff --check` ✓。**待验**：蒸汽端/小程序真机多行生长与封顶内滚、键盘右下角键（回车/换行档）、纸飞机字形与点击热区。
+
+## 2026-10-22 iOS 拍摄黑屏：相机授权预检 + 示例工程 iOS 权限描述
+
+- **现象**：点击「拍摄」系统相机页被拉起但画面全黑。iOS 在用户拒绝相机授权后仍会打开系统拍摄页并停在黑屏且不再弹窗（`uni.chooseImage` 不会因此 reject）；另外 iOS 模拟器无摄像头，拍摄也必黑。
+- **代码**：`libs/platform.ts` 新增 `getCameraAuthorizeState()`（仅 `APP-IOS` 读 `uni.getAppAuthorizeSetting().cameraAuthorized`；其它端/缺模块回 `unknown`）与 `openAppAuthorizeSetting()`；`em-chat-page.onPickImage('camera')` 调起前预检——`denied` 弹「去设置」、`config error` 提示安装包缺权限描述、`not determined` 交给系统首次弹窗、`unknown` 走原路径零回归。预检只做 iOS：Android 未授权时也可能返回 `denied`，提前拦截会挡掉首次系统弹窗。i18n 中英新增 4 键（247/247 parity）；两个 helper 从 `libs` 透出。
+- **打包配置**：`demo/manifest.json` 的 `app-ios.distribute.privacyDescription` 补 `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` / `NSPhotoLibraryAddUsageDescription` / `NSMicrophoneUsageDescription`；改后需重新云打包或重打自定义基座才进 Info.plist。当前 custom base 的 `duts` 已含 `uni-getAppAuthorizeSetting` / `uni-openAppAuthorizeSetting`，JS 热更即可跑预检。
+- **文档**：PLATFORM 权限节新增「iOS 拍摄黑屏」判定与打包口径、QUICKSTART 补 iOS 键名、FAQ 新增黑屏条目、API-KIT 平台能力表登记两个 helper、readme 已知限制、changelog rc.2 修复。
+- **验证**：`build web` ✓；`build mp-weixin` 11 项全绿（主包 914KB / 分包合计 1421KB）；H5 静态伺服 200 ✓；`check-docs.mjs` ✓（28 页 / 33 组件 / 72 方法 / 24 配置字段）；App 模块图 ✓；locale parity 247/247 ✓；web/mp 产物无 `cameraAuthorized`（`APP-IOS` 分支已条件编译剔除）。**待验**：iOS 真机 `cameraAuthorized` 三态（authorized / denied / config error）与「去设置」跳转、首次授权拒绝后系统仍会停在黑屏页（预检只能在下次点击拦截，无法预判首次弹窗结果）、iOS 模拟器黑屏属预期。
+
+## 2026-10-22 iOS 权限允许后拍摄仍黑屏（排查中）
+
+- **反馈**：补齐 iOS 隐私描述并允许相机后，系统拍摄页仍全黑；权限声明/授权层已排除，问题落在 native 拍摄页预览/会话或运行环境。
+- **诊断埋点**：`em-chat-page.onPickImage('camera')` 增加 `logger.info('camera authorize state:', cameraAuth)`；`authorized` 仍黑即证明不是权限层（预检只在 denied/config error 拦截，逻辑未变）。
+- **待隔离**：① 确认 HBuilderX 底部当前 target 是 iPhone App 而非「微信小程序」（截图中两个 target 都在；MP 不走 iOS 预检也不读该 manifest）；② 确认真机不是 iOS 模拟器（模拟器无摄像头必黑）；③ 允许后退出拍摄页再点一次（首轮 session 可能未重启）；④ 黑屏页快门能否出图（能=预览层问题，不能=相机会话未起）、系统相机 App 是否正常；⑤ 用 hello-uni-app-x 官方 `chooseImage` 拍摄页 + 当前 base 复现，排除 UIKit；⑥ 自定义基座用当前 HBuilderX 重打（原生相机模块在 base 内，改 manifest/JS 不会更新 base）。
+- **验证**：本轮仅为日志埋点，`build web` ✓；`build mp-weixin` 11 项全绿（主包 914KB / 分包合计 1421KB）。**待验**：真机日志 `camera authorize state` 与上述隔离结论。
+
+## 2026-10-22 视频消息全端播放（M2.19）
+
+- **现象与结论**：iOS 真机点视频消息无反应。排查确认不是点击链路丢了：`PLATFORM_CAPABILITIES.videoPreview` 仅 WEB=true，`em-video-message` 在 App 隐藏播放覆盖层且 `onVideoPreview` 直接 return——一期只接了 H5 `window.open`，原生播放器未落地（PLAN 1.2 原设计为「封面 + 原生 `video` 播放」，本轮补齐）。
+- **实现**：新增原子组件 `components/em-video-preview`（fixed 黑底全屏 + 原生 `video` + 安全区下移的关闭键 + 加载失败提示；无 CSS 动画依赖）；`em-chat-page` 增 `onVideoPreview` 状态与接线——点击气泡先 `stopAudio()` 再打开播放器，切会话/卸载时关闭并释放原生播放器；App 端下载本地 `.mp4` 后再播、关闭 autoplay + 挂载后显式起播（详见下方回归 2/3）；`em-video-message` 注释与能力口径同步；`platform.ts` 的 `videoPreview` 全端 true（保留字段便于后续按端裁剪）；新增 token `--em-video-viewer-bg` 与 i18n `message.video.playFailed/loading`（zh/en）。
+- **文档**：PLATFORM / COMPONENTS / COMPONENTS-CHAT / PAGES-CHAT / CONFIG / FAQ / GUIDE-MULTI-SCENARIO / README / 插件 readme 全面去掉「仅 H5」口径，新增 `em-video-preview` 契约；内部 REVIEW / RELEASE / EVAL 的过期结论以本节为准。
+- **验证**：`build web` ✓；`build mp-weixin` 11 项防回归全绿（主包 924KB / 分包合计 1422KB）；H5 静态伺服 200 ✓；mp 产物 `em-video-preview.wxml` 已生成且 `video` 标签携带 src/controls/object-fit。**iOS 真机已验证**（下载本地 + 显式起播，画面/声音/关闭正常）；**待验**：Android/鸿蒙真机、微信小程序真机全屏与进度拖动、H5 远程播放回归、弱网/坏 URL 失败提示。
+
+## 2026-10-22 iOS 播放页黑屏：自定义基座缺 `uni-video` 模块（M2.19 真机回归）
+
+- **现象**：补上视频播放后，iOS 真机点视频消息能进入全屏播放页，但整页黑底、无控制条、无声音；H5 harness 同组件正常出画面。控制台报 `undefined class: UTSSDKModulesDCloudUniVideoBrightnessByJs, uni-video 模块不存在，请重新打自定义基座。`，栈从 `video` 组件 setup（`uni-app-x-framework-vapor.js` 的 `Video` 组件）起。属于「组件被降级」，不是 URL/编码/布局问题（后者会走 `message.video.playFailed` 提示）。
+- **定位**：uni-app x 按代码用量对内置模块摇树。查当前自定义基座清单 `demo/unpackage/cache/vapor/uts_custom_ios/uniapp-x-uts.json` 的 `duts` 共 40 项，**没有 `uni-video`**；对照 HBuilderX 标准基座 `HXDependencies/uniapp-x-uts.json` 的 94 项包含 `uni-video`。基座是在接入 `<video>` 之前打的，运行期找不到 video 组件，被降级为 `<view>` → 黑屏。
+- **修复**：`demo/manifest.json` 在 `app` / `app-android` / `app-ios` / `app-harmony` 的 `distribute.modules` 显式声明 `"uni-video": {}`（HBuilderX 4.71+ 读 app-ios/app-android，旧版读 app）；宿主接入文档补充「接入 video 后必须重打自定义基座」。**需要重打一次 iOS 自定义基座并重新运行**，JS 热更不包含原生模块。
+- **文档/技能**：QUICKSTART（App 基座说明 + 排错表）、PLATFORM（App/鸿蒙注意事项）、FAQ（黑屏三步排查）、插件 readme（平台矩阵下注）、坑集新增 §5n。
+- **验证**：`manifest.json` JSON ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 924KB / 分包 1422KB）。**待验**：重打基座后 iOS/Android/鸿蒙真机播放。
+
+## 2026-10-22 视频播放器卡 loading：chatfiles 不支持 Range + URL 无后缀（M2.19 真机回归 2）
+
+- **现象**：重打基座后 iOS 真机已能拉起原生播放器（出现 poster、原生控制条、关闭键），但一直转 loading，进度 `00:00 / 00:00`；报错日志为 `[emkit:video-preview] open: https://ngi-a1.easemob.com/.../chatfiles/<uuid>`，无 `play error`；同一 URL 在 Safari 可播。
+- **定位（curl 实测）**：chatfiles 直链无扩展名，响应头 `Content-Type: video/mp4` / `Content-Length: 583483`，但**带 `Range: bytes=0-1023` 仍返回 `HTTP 200` 全量，无 `Accept-Ranges` / `Content-Range`**。iOS AVPlayer 的远程渐进播放依赖 Range，且对无后缀 URL 容忍差，所以停在 prepared 前；浏览器/小程序内部下载器可整包拉取，故浏览器正常。
+- **修复**：App 端不再把远程直链喂给 `<video>`：`platform.ts` 新增 `prepareVideoSource`——`uni.downloadFile` 整包下载 → `FileSystemManager.copyFile` 到 `USER_DATA_PATH/em-video-<ts>.mp4`（补后缀）→ 本地播放；下载期显示进度、关闭时 `DownloadTask.abort()`、同 URL 会话内缓存；H5/小程序保持远程 URL，HLS（`.m3u8`）与本地路径不整包下载。
+- **辅助兜底（保留）**：打开后 400ms 显式 `uni.createVideoContext(id, instance).play()`（autoplay 偶发不触发）；`normalizeVideoUrl` iOS 上 `http → https`（ATS），`@error` 再切 https 重试一次；`[emkit:video-preview] open/ready/prepare error/play error` 日志。
+- **验证**：`build web` ✓；`build mp-weixin` 11 项全绿（主包 924KB / 分包 1422KB）。**待验**：iOS 真机重跑后下载进度与本地播放；Android/鸿蒙同链路；H5/小程序远程播放回归（应不受影响）。
+
+## 2026-10-22 iOS 视频进度条在走、画面停在首帧（M2.19 真机回归 3，已解决）
+
+- **现象**：下载到本地后播放器时间/进度条前进，但画面停在约 0s 的首帧/封面，不动；`AVAssetImageGenerator` 对同一文件抽 0s/2s 帧内容明显不同，文件本身与编码（avc1 / 360×640 / 30fps / AAC）正常，不是坏文件或解码不了。
+- **根因（iOS 真机验证）**：原生 `autoplay` 在 `<video>` 事件绑定完成前就起播，`play` 事件丢失，组件一直保留首帧/封面层；`poster` 又进一步把静态首帧盖在播放层上。表现为「有进度、没画面」。
+- **定案解法**：`video` 不再传 `poster`（封面只用于下载 loading 背景图）；`:autoplay="false"`，等组件挂载后显式 `createVideoContext().play()`，未收到 `@play` 每 500ms 重试、最多 8 次。iOS 真机复测：画面随进度更新、声音正常、关闭/重开正常。
+- **保留的兜底**：下载→本地 `.mp4`（解决 chatfiles 不支持 Range + 无后缀）；`normalizeVideoUrl`（iOS http→https）；全屏按钮可继续用原生全屏。
+- **验证**：`build web` ✓；`build mp-weixin` 11 项全绿（主包 924KB / 分包 1422KB）；**iOS 真机已验**。**待验**：Android/鸿蒙同链路、微信小程序真机、H5 远程播放回归。
+- **复盘（按症状分层）**：点开黑屏/无控制条 → 基座缺 `uni-video`；卡 `00:00` 一直转圈 → chatfiles 无 Range/无后缀；有进度没画面 → autoplay 抢跑或封面层盖住播放层。三者可能叠加，按此顺序排查。

@@ -1,12 +1,12 @@
 # 聊天与消息组件
 
-这页覆盖聊天页里的 8 个原子组件：输入栏 `em-chat-inputbar`、五类消息气泡（`em-text-message`、`em-image-message`、`em-audio-message`、`em-video-message`、`em-file-message`）、快捷回复条 `em-quick-reply-bar` 与 @ 提及选人弹层 `em-mention-picker`。它们只负责渲染与手势，消息收发、重发、引用状态都由宿主或 `em-chat-page` 管理。
+这页覆盖聊天页里的 9 个原子组件：输入栏 `em-chat-inputbar`、五类消息气泡（`em-text-message`、`em-image-message`、`em-audio-message`、`em-video-message`、`em-file-message`）、视频全屏播放器 `em-video-preview`、快捷回复条 `em-quick-reply-bar` 与 @ 提及选人弹层 `em-mention-picker`。它们只负责渲染与手势，消息收发、重发、引用状态都由宿主或 `em-chat-page` 管理。
 
-本页组件均符合 easycom 目录约定，可直接写标签；引入方式见 [组件总览与选型](./COMPONENTS.md)。整页实现见 [聊天页](./PAGES-CHAT.md)。
+本页组件均符合 easycom 目录约定，可直接写标签；引入方式见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。整页实现见 [聊天页](./PAGES-CHAT.md)。
 
 ## em-chat-inputbar
 
-输入栏：文本输入、语音按住说话、emoji 面板、"+" 媒体面板、引用条、快捷回复条与禁用态。
+输入栏：文本输入、语音按住说话、emoji 面板、"+" 媒体面板、纸飞机发送键、引用条、快捷回复条与禁用态。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
@@ -15,6 +15,7 @@
 | `features` | `EmInputFeatures` | 六项全开 | 功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` |
 | `emojis` | `string[]` | 内置 96 个 | emoji 面板字符集 |
 | `disabled` | `boolean` | `false` | 禁用态（如全员禁言）：输入、发送、语音、面板全部拦截 |
+| `submitting` | `boolean` | `false` | 文本或直发快捷回复提交中：拦截重复 `send` 与快捷回复点选，不影响草稿编辑 |
 | `placeholder` | `string` | `''` | 输入框提示文案；空串使用内置"输入消息"文案 |
 | `quickReplies` | `EmQuickReply[]` | `[]` | 快捷回复常用语；空数组不渲染，禁用态自动隐藏 |
 | `collapseSignal` | `number` | `0` | 外部收起信号：数值变化即收起 emoji/媒体面板并收起键盘 |
@@ -22,7 +23,7 @@
 | 事件 | 载荷 | 说明 |
 |---|---|---|
 | `update:modelValue` | `value: string` | 草稿变化（输入、点 emoji） |
-| `send` | — | 点击发送或键盘回车；草稿全为空白时不派发 |
+| `send` | — | 点击纸飞机发送键或键盘回车；草稿全为空白时不派发 |
 | `quote-close` | — | 点击引用条右侧关闭 |
 | `media-select` | `key: string` | 媒体面板点选，key 见 `MEDIA_PANEL_KEY`：`album` / `camera` / `video` / `file` |
 | `voice-send` | `path: string, duration: number` | 录音完成；`duration` 单位为秒 |
@@ -95,7 +96,8 @@ const inputFeatures = ref<EmInputFeatures>({
   image: true,
   camera: true,
   video: true,
-  file: true
+  file: true,
+  sendOnReturn: true
 })
 
 function onSend(): void {
@@ -133,7 +135,11 @@ function onQuickReply(item: EmQuickReply): void {
 </script>
 ```
 
+**发送键布局**：右侧的发送位与"+"同槽互斥——草稿为空时显示"+"媒体入口，草稿有内容时在同一位换成品牌色纸飞机发送键（对应 `send` 事件）。因此输入栏不再常驻文字发送按钮，省出的宽度给输入框；空草稿也不会出现点了没反应的发送键。草稿只剩空白字符时仍视作空，不显示纸飞机。
+
 **行为与平台**：H5 不渲染语音入口——浏览器端没有录音能力，显示麦克风只会得到"按住 → 不支持 → 退出语音模式"的体验；App 与小程序仍按 `features.voice` 生效。媒体面板的"文件"项在 App 端隐藏（没有跨端通用文件选择器），小程序与 H5 显示，判断依据是平台能力表；四项功能全关时"+"入口整体隐藏。设备软键盘与面板互斥：打开 emoji 或媒体面板前会先收起键盘，点击输入框聚焦时收起面板；面板高度取 `max(最近一次键盘高度, 280px)`，开过键盘后面板与键盘等高，来回切换不跳变。输入栏用下外边距顶到键盘上方，没有面板时自己承担底部安全区，面板打开时安全区改由面板承担，避免双重间距。emoji 与 @ 都只能追加在草稿末尾（uni 的 `input` 没有光标位置 API）；`@` 的判定是"草稿变长且新值以 `@` 结尾"，删除到 `@` 结尾不会触发。录音手势上滑超过 60px 切为取消文案，松手取消；不足 1 秒按过短提示，不派发 `voice-send`。`disabled` 翻转时组件会主动收起面板、退出语音模式与焦点，避免禁言后还停留在半开状态。
+
+**行为核心复用**：上述键盘避让、键盘↔面板互斥、录音手势与禁用守卫的单一实现是 `useChatComposer` composable（从 `libs` 导出），本组件与 `em-chat-page` 的 `#input-bar` 整栏自绘插槽消费同一份逻辑。想在 `em-chat-page` 里整栏替换输入栏时优先用 `#input-bar` 插槽（见 [聊天页](./PAGES-CHAT.md)「整栏自绘输入栏」）；完全自研聊天页、只想要这套键盘/面板/录音行为时，可直接 `import { useChatComposer } from '@/uni_modules/easemob-uikit-uni/libs'`。
 
 ## em-text-message
 
@@ -205,15 +211,15 @@ function onQuickReply(item: EmQuickReply): void {
 
 ## em-video-message
 
-视频气泡：封面 + 时长，播放按钮按平台能力显隐。
+视频气泡：封面 + 时长，点击打开全屏播放器。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `message` | `EmMessageItem` | 必填 | 消息项，取 `thumbUrl`、`duration`、`width`、`height` |
+| `message` | `EmMessageItem` | 必填 | 消息项，取 `thumbUrl`、`url`、`duration`、`width`、`height` |
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `preview` | `message: EmMessageItem` | 点击播放区；仅在当前平台支持播放预览时派发 |
+| `preview` | `message: EmMessageItem` | 点击播放区；视频 URL 为空时不派发 |
 | `long-press` | `message: EmMessageItem` | 长按气泡，宿主据此弹消息菜单 |
 
 无插槽。
@@ -222,7 +228,29 @@ function onQuickReply(item: EmQuickReply): void {
 <em-video-message :message="message" @preview="playVideo" @long-press="openMessageMenu" />
 ```
 
-**行为与平台**：当前版本中，播放入口只在 H5 显示；App 与微信小程序不渲染播放按钮、点击也不派发 `preview`，只展示封面与时长，避免"点了没反应"。尺寸按消息宽高比等比缩放到 240×240 内，没有宽高元数据时按 16:9 显示，避免加载后撑高列表。时长格式为 `分:秒`。H5 上长按补发的 `click` 同样被吞掉。播放器本身由宿主实现（默认聊天页在 H5 打开新窗口），组件只派发事件。
+**行为与平台**：播放入口在 App、H5、微信小程序一致显示；点击派发 `preview`，默认聊天页用内置的 `em-video-preview` 全屏播放，宿主也可以接自己的播放器或业务路由。尺寸按消息宽高比等比缩放到 240×240 内，没有宽高元数据时按 16:9 显示，避免加载后撑高列表。时长格式为 `分:秒`。H5 上长按补发的 `click` 会被吞掉，不会同时打开播放器与长按菜单。
+
+## em-video-preview
+
+全屏视频播放器：原生 `video` 组件 + 关闭键 + 加载失败提示。聊天页点击视频消息时默认打开它，宿主也可以单独复用。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `visible` | `boolean` | 必填 | 是否展示（`v-model:visible` 形态） |
+| `src` | `string` | 必填 | 视频 URL |
+| `poster` | `string` | `''` | 封面图 URL，空串时不显示封面 |
+
+| 事件 | 载荷 | 说明 |
+|---|---|---|
+| `update:visible` | `boolean` | 关闭时派发 `false` |
+
+无插槽。
+
+```vue
+<em-video-preview v-model:visible="videoVisible" :src="videoUrl" :poster="videoPoster" />
+```
+
+**行为与平台**：容器固定铺满窗口并使用黑底，顶部工具条里的关闭键按安全区顶部下移，避免被状态栏/刘海遮挡；视频区在工具条下方吃满剩余高度，`video` 走各端原生播放控件（播放/暂停、进度拖动、全屏）。App 端会先把视频下载到本地再播放并显示下载进度（大文件需等待整包下载）——EaseMob 的 chatfiles 直链不支持 Range，iOS AVPlayer 直接远程播放会一直转圈；H5 与微信小程序直接播放远程 URL。App 端不使用原生 `autoplay`，而是在组件挂载后显式起播并等待 `play` 事件，避免 iOS 上「进度条在走、画面停在首帧」。聊天页打开前会停掉正在播放的语音；关闭或组件卸载时中止未完成的下载、移除 `video` 节点并释放原生播放器。加载失败（地址失效、编码不支持、网络异常）显示「视频加载失败」提示并保留关闭键。
 
 ## em-file-message
 
@@ -252,6 +280,7 @@ function onQuickReply(item: EmQuickReply): void {
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `items` | `EmQuickReply[]` | 必填 | 常用语列表，`label` 用于展示 |
+| `disabled` | `boolean` | `false` | 禁用点选，提交中等场景可拦截重复 `select` |
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|

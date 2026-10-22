@@ -265,6 +265,31 @@ import {
 
 `EmQuickReplyMode = 'fill' | 'send'`。
 
+### `EmChatInputBarScope`
+
+`em-chat-page` `#input-bar` 整栏自绘插槽的作用域契约（用法与示例见 [聊天页](./PAGES-CHAT.md)「整栏自绘输入栏」）。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `draft` / `setDraft(v)` | `string` / 函数 | 草稿值与写入；写入即触发草稿持久化、typing、@ 尾部检测 |
+| `quote` / `closeQuote()` | `EmQuoteInfo \| null` / 函数 | 引用条数据与关闭 |
+| `disabled` / `notifyDisabledTap()` | `boolean` / 函数 | 禁用态（全员禁言）；禁用下的操作尝试统一上报，页面 toast |
+| `placeholder` | `string` | 建议提示文案（禁用态为「全员禁言中」），空串可回落自绘文案 |
+| `features` | `EmInputFeatures` | 功能集开关（`uiConfig.inputFeatures`） |
+| `emojis` | `string[]` | emoji 字符集（`uiConfig.emojiList`） |
+| `quickReplies` | `EmQuickReply[]` | 快捷回复常用语 |
+| `keyboardLift` | `number` | 上推口径键盘高度（页面壳已顶起，自绘栏一般无需使用） |
+| `panel` / `togglePanel(kind)` / `collapsePanel()` | `EmChatComposerPanel` / 函数 | 底部面板态（`'none' \| 'emoji' \| 'media'`）与开关/收起 |
+| `panelStyle` | `string` | 自绘面板根节点内联样式（高度跟随最近键盘高度 + 安全区） |
+| `inputFocus` / `closeKeyboard()` / `notifyInputFocus()` / `notifyInputBlur()` | `boolean` / 函数 | 输入框焦点绑定值、主动收键盘、focus/blur 事件上报 |
+| `voiceMode` / `recording` / `willCancel` / `toggleVoiceMode()` | `boolean` / 函数 | 语音模式、录音中、上滑取消态、语音模式切换 |
+| `onVoiceTouchStart(e)` / `onVoiceTouchMove(e)` / `onVoiceTouchEnd()` / `onVoiceTouchCancel()` | 函数 | 「按住说话」条的四个手势事件绑定（60 秒自动发送、过短拦截内置） |
+| `send()` | 函数 | 发送当前草稿（空草稿拦截、引用/@ext、清草稿、滚底内置） |
+| `selectMedia(key)` | 函数 | 媒体动作，`key` 取 `MEDIA_PANEL_KEY.ALBUM/CAMERA/VIDEO/FILE` |
+| `selectQuickReply(item)` | 函数 | 快捷回复点选（按 `quickReplyMode` 填草稿或直接发送） |
+
+相关类型：`EmChatComposerPanel = 'none' | 'emoji' | 'media'`、`EmChatComposerPanelKind = 'emoji' | 'media'`、`EmChatComposerTouchEvent`（`{ touches: Array<{ clientY: number }> }`，原生 `TouchEvent` 结构兼容）。行为核心 `useChatComposer(options)` 亦从 `libs` 导出，供完全自研聊天页复用同一套键盘/面板/录音逻辑（`options`：`disabled` / `onDisabledTap` / `onVoiceSend`；返回与上表同名的状态与动作）。
+
 ### `EmSelectContactItem`
 
 `userId` / `name` / `avatar`，供 `em-select-contact` 使用。
@@ -331,7 +356,7 @@ import {
 
 ### `EmPlatformCapabilities`
 
-`videoPreview` / `filePick` / `fileOpen` 三个布尔值；运行时 `PLATFORM_CAPABILITIES` 是只读快照。`filePick` 只表示“有内置选择器”（小程序/H5），App 端注册附件能力后判断入口请用 `EmKit.canPickAttachment`。
+`videoPreview` / `filePick` / `fileOpen` 三个布尔值；运行时 `PLATFORM_CAPABILITIES` 是只读快照。`videoPreview` 当前全端为 `true`；`filePick` 只表示“有内置选择器”（小程序/H5），App 端注册附件能力后判断入口请用 `EmKit.canPickAttachment`。
 
 ## 7. 其他
 

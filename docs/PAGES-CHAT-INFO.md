@@ -17,7 +17,7 @@
 
 - 顶部展示对方信息条：48px 头像、展示名（昵称回落 userId）、userId。
 - 会话设置：免打扰、置顶两个开关，初值取会话快照，切换为乐观更新，失败回滚并 toast。
-- 底部操作：清空聊天记录、删除会话（均带二次确认）。
+- 底部操作：清空聊天记录、删除会话（均带二次确认）；对方已是好友时额外显示「删除好友」（红色字档，二次确认，成功后发 `contact-deleted`）。
 
 ### 群聊分支
 
@@ -43,6 +43,7 @@
       @back="onBack"
       @deleted="onExit"
       @leaved="onExit"
+      @contact-deleted="onExit"
       @chat-member="onChatMember"
     />
   </view>
@@ -74,7 +75,7 @@ function onBack() {
 }
 
 function onExit() {
-  // 删除会话/退群/解散成功后回到会话列表（聊天详情 ← 聊天页 ← 会话列表）
+  // 删除会话/退群/解散/删除好友成功后回到会话列表（聊天详情 ← 聊天页 ← 会话列表）
   uni.navigateBack({ delta: 2 })
 }
 
@@ -113,6 +114,7 @@ function onChatMember(userId: string) {
 | `back` | 无 | 点击导航栏返回；路由由宿主执行 |
 | `deleted` | `conversationId: string` | 删除会话成功；宿主负责退场 |
 | `leaved` | `conversationId: string` | 退出群聊/解散群聊成功（组件已删会话与本地消息）；宿主负责退场 |
+| `contact-deleted` | `userId: string` | 删除好友成功（不删会话与本地消息）；宿主负责退场 |
 | `invite` | `groupId: string` | 打开了邀请入群弹层。选人与写操作已在组件内闭环，事件仅通知宿主 |
 | `remove-members` | `groupId: string` | 打开了移除成员弹层。同样已在组件内闭环 |
 | `open-members` | `groupId: string` | 打开了页内成员管理视图，事件仅通知宿主 |
@@ -191,7 +193,7 @@ function onChatMember(userId: string) {
 
 1. **路由参数**：与聊天页同源，解析 `conversationId` 与 `chatType`；空 ID 用 `v-if` 保护。
 2. **返回**：`back` 里 `uni.navigateBack({ delta: 1 })`；本页没有 `autoBack` 开关，退场完全由宿主决定。
-3. **删会话/退群/解散**：`deleted` 与 `leaved` 用同一处理函数；从聊天详情直接退回会话列表时用 `delta: 2`，若宿主页面栈不同按实际层级调整。
+3. **删会话/退群/解散/删除好友**：`deleted`、`leaved` 与 `contact-deleted` 用同一处理函数；从聊天详情直接退回会话列表时用 `delta: 2`，若宿主页面栈不同按实际层级调整。删除好友只解除好友关系，不删会话与本地消息。
 4. **成员私聊**：`chat-member` 里先 `EmKit.addConversation(userId, SINGLE_CHAT)` 再跳聊天页，保证会话列表出现该会话。
 5. **通知类事件**：`invite`、`remove-members`、`open-members` 的 UI 与写操作已经完成，宿主可只做埋点或业务联动，不需要再弹窗。
 6. **导航样式**：`navigationStyle: "custom"`，否则会出现原生导航栏与 `em-nav-bar` 双标题。
@@ -207,6 +209,7 @@ function onChatMember(userId: string) {
 - 群公告为空时不显示聊天页公告条；群名称/群头像缺失时回落 groupId 与文字头像。
 - 免打扰与置顶是「当前用户对该会话」的设置，不会改变群的全员禁言状态。
 - 清空聊天记录与删除会话都有二次确认；删除会话成功后才发 `deleted`，失败 toast 并停留当前页。
+- 删除好友仅在对方已是好友时显示（好友快照未同步完成前可能短暂不显示）；二次确认后调 `EmKit.deleteContact`，有提交锁防重复点击，成功 toast 并发一次 `contact-deleted`，失败 toast 并停留当前页。
 
 ## 相关文档
 

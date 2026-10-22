@@ -1,6 +1,6 @@
 ---
 name: em-host-troubleshooting
-description: Use when easemob-uikit-uni 接入后出现白屏、输入栏消失、双导航栏、会话/好友列表为空、登录后被踢回、发送失败、收不到消息、未读不消、小程序 module 'sub-sdk/im-sdk.js' is not defined、SyntaxError 或主题/语言异常，需要按症状定位根因并给出修复步骤。
+description: Use when easemob-uikit-uni 接入后出现白屏、输入栏消失、双导航栏、会话/好友列表为空、登录后被踢回、发送失败、收不到消息、未读不消、视频播放黑屏/卡 loading/画面不动、小程序 module 'sub-sdk/im-sdk.js' is not defined、SyntaxError 或主题/语言异常，需要按症状定位根因并给出修复步骤。
 ---
 
 # 接入排错与平台边界
@@ -137,6 +137,15 @@ console.log('im state', {
 | 预览总包变大 | 正常，SDK 搬到分包 | 只看主包 |
 | `require is not a function` | 基础库 < 2.11.2 | 升级微信 |
 
+## 9.1 App 视频播放专项
+
+| 症状 | 根因 | 修复 |
+|---|---|---|
+| 点视频全屏黑、无控制条，控制台报 `UTSSDKModulesDCloudUniVideoBrightnessByJs, uni-video 模块不存在` | 自定义基座是在接入 `<video>` 之前打的，内置模块 `uni-video` 被摇树 | 重新打自定义基座；或在 manifest 的 `app-ios`/`app-android` → `distribute.modules` 声明 `"uni-video": {}`（示例工程已配） |
+| 一直 loading、`00:00 / 00:00`，同一 URL 在 Safari 能播 | EaseMob chatfiles 直链无扩展名且不支持 HTTP Range，iOS AVPlayer 远程播放卡死 | 升级到当前 UIKit（App 先下载本地 `.mp4` 再播）；服务端支持 `Accept-Ranges` 才能流式 |
+| 进度条在走、画面停在首帧 | 原生 autoplay 抢跑导致 play 事件丢失，poster 首帧层盖住播放层 | 升级到当前 UIKit（关闭 autoplay、挂载后显式起播、poster 不进 video） |
+| 打开视频要等一会才播 | App 端先整包下载再播放（chatfiles 不支持 Range） | 预期行为；下载期有百分比进度，关闭会中止 |
+
 ## 10. 平台能力矩阵（1.0 如实告知）
 
 | 能力 | H5 | 微信小程序 | App（Android/iOS/鸿蒙） |
@@ -144,7 +153,7 @@ console.log('im state', {
 | 图片/拍照 | ✅ | ✅ | ✅ |
 | 语音发送 | ❌（入口隐藏，仅接收播放） | ✅ | ✅ |
 | 视频发送 | ✅ | ✅ | ✅ |
-| 视频播放 | ✅（新窗口） | ❌（仅封面/时长） | ❌（仅封面/时长） |
+| 视频播放 | ✅（内置全屏播放器） | ✅（内置全屏播放器） | ✅（内置全屏播放器，先下载后播） |
 | 文件发送 | ✅ | ✅ | ❌（入口隐藏） |
 | 文件打开/下载 | ❌（仅展示） | ❌（仅展示） | ❌（仅展示） |
 | 软键盘避让 | 浏览器自管 | ✅ | ✅（手动顶起） |
@@ -155,7 +164,7 @@ console.log('im state', {
 ## 11. 一期已知限制
 
 - `@` 提及为**追加式插入**（uni `<input>` 无光标位置 API）；
-- 视频播放仅 H5；文件打开全端未接；App 端不能选文件；
+- App 视频先整包下载再播（chatfiles 直链不支持 Range），大视频需等待；文件打开全端未接；App 端不能选文件；
 - 录音 60s 自动发送，麦克风权限失败只 toast，不跳系统设置；
 - 日志原始 payload 默认关闭；开启后可能含 userId/昵称/群名；
 - 非当前会话只保留最近 100 条内存消息；

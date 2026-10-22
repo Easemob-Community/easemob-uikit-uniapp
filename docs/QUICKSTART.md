@@ -314,7 +314,9 @@ scripts/uni.sh build mp-weixin
 
 用 HBuilderX 打开 `demo/` 或宿主工程，运行到真机。鸿蒙签名步骤见 [HARMONY-REALDEVICE-RUN.md](./HARMONY-REALDEVICE-RUN.md)。
 
-App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克风（语音）均在用户主动操作时申请；若自行裁剪 manifest，保留 `CAMERA` / `RECORD_AUDIO` / 相册读取权限，否则对应功能会失败。
+App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克风（语音）均在用户主动操作时申请；若自行裁剪 manifest，保留 `CAMERA` / `RECORD_AUDIO` / 相册读取权限，否则对应功能会失败。iOS 另需在 `app-ios.distribute.privacyDescription` 声明 `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` / `NSMicrophoneUsageDescription`（`NSPhotoLibraryAddUsageDescription` 按需），改后重新云打包或重打自定义基座才生效；示例工程已配置。
+
+视频消息依赖内置模块 `uni-video`。uni-app x 会按代码用量摇树：自定义基座如果是在接入视频组件之前打的，`<video>` 会被降级为普通 `<view>`，表现为点开播放器后全屏黑屏。接入视频后重新打一次自定义基座即可；需要提前固定模块时在 `manifest.json` 的 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`，示例工程已配置。
 
 ## 9. 排错与验收
 
@@ -325,6 +327,7 @@ App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克�
 | 会话列表空 | 是否已登录（`state.userId`）；`autoSync` 是否被关闭、`onShow` 是否补调 `EmKit.syncConversations()` |
 | 好友列表空 | SDK 同步未完成（等待 `onSyncDataFinished`）；H5 清缓存后重试 |
 | 小程序 `sub-sdk/im-sdk.js` 未定义 | 跑分包 prepare 脚本；检查 `pages.json` 分包与预下载 |
+| App 点视频进播放器但全屏黑 | 当前自定义基座是否包含 `uni-video` 模块（接入视频后需重打基座；manifest 可显式声明） |
 | 登录后立刻被踢回登录页 | 是否用 `status !== online` 判断；断网重连不应视为未登录 |
 | 发送一直失败 | token 是否过期；实现 `onTokenWillExpire`；查看 `EmKit.state.reason/errorCode` |
 | 聊天页一直骨架 / 历史加载失败 | 看网络与 `loadHistory` 日志；点空态「点击重试」或顶部重试行；确认 `conversationId/chatType` 正确 |

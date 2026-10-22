@@ -169,7 +169,7 @@ easemob-uikit-uniapp/
 
 - **配置基建**：`libs/store/config.ts` reactive `uiConfig`（默认值收口自 constants，`RECALL_TIME_LIMIT`/`TYPING_THROTTLE`/`TYPING_TIMEOUT`/`TIME_DIVIDER_INTERVAL` 降级为默认值来源）+ `useConfig()`（getter + `setConfig(partial)` 运行时合并）；`EmKitConfig` 扩展 UI 行为维度，`EmKit.init` 接线写入 config store
 - **EmKitConfig 新增可选项（默认值 = 现状，零行为变更）**：`enableDraft`/`enableTyping`/`showTime`（默认 true/true/false）、`recallTimeLimit`/`typingThrottle`/`typingTimeout`/`timeDividerInterval`（数值常量可覆盖）、`inputFeatures{voice,emoji,image,camera,video,file}`（输入栏功能集，默认全开）、`messageMenuKeys`/`conversationMenuKeys`（长按菜单项与顺序）、`emojiList`（emoji 字符集注入，默认内置 96）、`primaryColor`（品牌色，init 落 `--em-primary-color`）
-- **组件透出**：`em-chat-page` 增 `avatarShape` prop + `send`/`recall`/`delete` emits + `#custom-message`（PLAN 承诺的自定义消息出口，未识别 type 时渲染）/`#empty` 插槽；`em-conversation-page` 增 `showSearch`/`emptyText` + `#empty`；`em-contact-page` 增 `menuKeys`（长按菜单）；`em-video-message` 补 `preview` emit（与 em-image-message 对齐，默认行为不变）、`em-file-message` 补 `download` 事件；`em-nav-bar` 补 `#title`/`#action` 插槽；`em-avatar` 占位五色板提为 `placeholderColors` prop
+- **组件透出**：`em-chat-page` 增 `avatarShape` prop + `send`/`recall`/`delete` emits + `#custom-message`（PLAN 承诺的自定义消息出口，未识别 type 时渲染）/`#empty` 插槽；`em-conversation-page` 增 `showSearch`/`emptyText` + `#empty`，后续补 `tabs`（筛选 tab 集与顺序）/`showTabs`（tab 栏显隐布尔开关）；`em-contact-page` 增 `menuKeys`（长按菜单）；`em-video-message` 补 `preview` emit（与 em-image-message 对齐，默认行为不变）、`em-file-message` 补 `download` 事件；`em-nav-bar` 补 `#title`/`#action` 插槽；`em-avatar` 占位五色板提为 `placeholderColors` prop
 - **i18n 注入口**：`useLocale` 增 `mergeMessages(locale, table)`（业务方运行时注入新语言/覆盖文案；messages 表从模块私有常量改为可变 store，zh-CN/en 为初始值）
 - 消费点接线：`libs/chat/message.ts`（撤回窗口/typing/cmd 拦截）、`em-chat-page`（分隔条间隔/菜单构建）、`em-chat-inputbar`（features → 面板项增删/emoji 集/voice 显隐）
 - 明确不做（留二期）：formatter/filterFn 函数注入、`readIconDisplay` 档位、bubbleShape 全局开关、群相关配置
@@ -266,6 +266,40 @@ easemob-uikit-uniapp/
   - **场景目录**：每条卡片补 `entryLabel`（短动词胶囊文案）/`entryIcon`；新增 `orderCard`（客服「发订单」）与 `resumeCard`（招聘「发简历」），卡片总数 12 → 14；详情页增免登录「输入栏业务入口」预览。
 - **明确不做**：内置入口条组件、入口配置 schema、入口图标语义（UIKit 只出插槽）；UIKit 内自动发卡（发送时机与内容由宿主掌控）。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200；聊天内入口点击/键盘联动需真实账号，待验（见 STATUS.md）。
+
+### M2.16：输入栏整栏自绘（`#input-bar`）+ 行为核心 composable 抽取（2026-10-22 立项）
+
+- **背景**：宿主可能对整个输入栏结构/样式不满意而想全组件重写；但输入栏的软键盘避让（iOS/鸿蒙安全区双口径）、键盘↔面板互斥、录音手势状态机、禁言守卫、@ 触发检测是跨端实测收口的「值钱逻辑」，裸 fork 必丢。定案做「受约束的整栏替换」：行为核心下沉为 composable 单一实现，插槽 scope 即契约——自绘栏绑定契约则全部内置行为保持运作。
+- **范围**：
+  - **内核**：新增 `libs/use/useChatComposer.ts`（键盘避让/rootStyle+panelStyle、面板三态互斥、录音手势状态机、禁用守卫，自 em-chat-inputbar 原样抽取）；`em-chat-inputbar` 改为消费该 composable（props/emits 契约不变，独立复用场景零影响）；`em-chat-page` 新增 `#input-bar` 作用域插槽（scope 类型 `EmChatInputBarScope`：draft/setDraft、quote/closeQuote、disabled/notifyDisabledTap、features/emojis/quickReplies、panel/togglePanel/panelStyle、inputFocus/notifyInputFocus/Blur、录音状态与四个手势处理、send/selectMedia/selectQuickReply），页面保留键盘顶起壳；@ 尾部触发检测在自绘路径上移到页面（watch draft，与 inputbar 内逻辑同款）；点击消息区收起在自绘路径直调 composer.collapse。插槽有无在页面实例创建时静态确定（composer 于 setup 实例化），不支持同实例运行时切换。
+  - **导出**：`libs` 导出 `useChatComposer` + `UseChatComposerOptions/Result` 类型（完全自研聊天页的宿主可复用同一行为核心）；`EmChatInputBarScope`/`EmChatComposerPanel`/`EmChatComposerPanelKind`/`EmChatComposerTouchEvent` 进 libs/types。
+  - **Demo**：新增 `demo/components/demo-custom-inputbar`（全自绘输入栏参考实现：快捷回复/引用条/语音/emoji/媒体面板全走 scope）；聊天页 `?inputbar=custom` 查询参数切换（场景面板加「整栏自绘输入栏」按钮，redirectTo 重进生效）。
+- **明确不做**：栏内分区插槽（左/右工具位、自定义面板槽）；运行时动态切换默认/自绘输入栏；emoji/媒体面板沉淀为独立原子组件（自绘方可照 demo 实现，数据源与 panelStyle 已由 scope 提供）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；默认输入栏路径行为零回归（composable 为纯搬迁）；自绘路径真机联动（键盘/录音/@）待验（见 STATUS.md）。
+
+### M2.17：交互一致性批次——通用提交态与错误态原子能力（2026-10-22 立项）
+
+- **范围（均为非 breaking 扩展，默认值保持现有调用方行为）**：`em-button` 新增 `loading?: boolean = false`，loading 与 disabled 均拦截 click，loading 显示既有 `loading-arc-normal` 静态图标；`em-select-contact` 新增 `submitting?: boolean = false`，提交中禁确认、切换选择、关闭按钮和遮罩关闭，`confirm` 不重复派发；`LOAD_MORE_STATE` 新增 `ERROR = 'error'`，`em-load-more` 显示「加载失败，点击重试」并继续 emit `load`。
+- **消息交互一致性**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删漫游再删本地，无服务端 ID 仅本地删除，失败保留气泡并抛错；保留 `deleteLocalMessage` 为显式本地删除 API，删除后由会话域按剩余消息校正摘要/时间。聊天页删除先确认、成功才 emit `delete`，按 localId 防重；复制统一走 Promise 结果与成功/失败提示，空文本按失败处理并屏蔽剪贴板原生提示；`em-chat-inputbar.submitting` 与 `em-quick-reply-bar.disabled` 默认 false，文本发送、直发快捷回复、重发与撤回均防重复提交，撤回执行时重查时间窗，不新增撤回确认。
+- **会话与联系人操作闭环**：会话列表删除先原生确认；删除、置顶、免打扰按会话与动作防重，会话域对同一会话的 pin/mute 分别串行并以最新请求回写/回滚。chat-info 开关直接以会话 store 为数据源，请求中禁用；清空、删除、退群/解散及删除好友增加提交锁，成功事件只发一次。`removeConversationLocal` 同步清理持久化草稿；`onContactAdded` 将匹配且收到的 pending 好友申请置 accepted 并持久化，联动申请页操作态与未读角标。demo 添加好友弹层保留在宿主侧，补发送中禁用及表单代次保护，旧请求不得关闭后来重开的新表单。
+- **群管理确认、权限与提交反馈**：新增 `canRemoveGroupMember` 共享权限判定，owner 可移除非自己且非 owner 的成员，admin 仅可移除普通成员；单成员菜单、批量候选与提交载荷共用并在确认时重验。设/撤管理员确认带成员姓名，转让确认说明转让后自己成为普通成员；邀请/建群/批量移除不增加确认。邀请、批量移除、建群接入 `em-select-contact.submitting`，成员写操作使用单一可 await pending 链防重；移除成功重拉群详情与成员首屏，失败保留选择及弹层。群名/公告保存中禁止关闭，设撤管理员/转让/移出使用独立成功/失败文案；英文多人进出通知的 others 使用剩余人数，中文总人数口径不变。
+- **选择异常与列表失败恢复**：平台层统一区分用户取消与图片/视频/内置文件选择失败，取消静默、其他异常 reject 并由聊天页提示选择/读取失败。会话、联系人、群列表记录 autoSync/onMounted 失败，只有成功且为空才显示原空态；无缓存失败显示错误与重试，后台刷新失败保留缓存列表，重试复用同一 loading 锁。群成员首屏失败可重试，分页失败进入 `LOAD_MORE_STATE.ERROR`，搜索无结果与真正空列表文案不变；聊天加载更多保留错误/重试态，首次历史骨架与既有错误恢复不变。
+- **实现约束**：复用现有原子组件与 style-lab 演示页，不新增组件、不连接 store、不引入运行时依赖；蒸汽端继续使用静态 spinner，不写 CSS 动画；错误文案同步维护 zh-CN/en。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200；默认可选/可点行为不变。
+
+### M2.18：输入栏多行输入（生长 + 回车/换行档）（2026-10-22 立项）
+
+- **背景**：一期输入栏为单行 input，长文输入（多段文字、多行粘贴）体验差；vue 版是 PC 拖拽卡片形态，移动端按微信手机版重做：输入框随打字生长（封顶 5 行），并提供回车发送/换行输入两档；纯文本，不做富文本。
+- **范围**：`em-chat-inputbar` 输入区按微信「回车键发送」三态落地——`inputFeatures.sendOnReturn=false` 全端生长 textarea（封顶 5 行，linechange 驱动，原生组件尺寸/背景由包裹层承担，见坑集 §5l）回车换行、`true` 时 iOS 用生长 textarea + `confirm-type=send`（粘贴保留换行）、其余端单行 input 零回归；`EmInputFeatures` 新增 `sendOnReturn`（默认真，`uiConfig.inputFeatures` 可关）。发送键不常驻：右侧「+」与发送键同槽互斥，草稿为空显示「+」、有内容换成品牌色纸飞机发送键（`plane`），省出的宽度给输入框。纯文本多行，不做输入框内图文混排（editor 方案另行评估）。
+- **明确不做**：输入框内插入图片/富文本混排；PC 拖拽改高；固定 1/3 屏高全屏撑开输入（2026-10-22 试做后因效果不佳暂时移除，待交互方案重定）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；默认路径零回归。蒸汽端/小程序真机键盘联动与多行生长待验。
+
+### M2.19：视频消息全端播放（2026-10-22 立项）
+
+- **背景**：PLAN 1.2 原设计为「视频：封面 + 原生 `video` 组件播放」，一期实现只接了 H5 `window.open`，App/小程序按平台能力隐藏入口；iOS 真机反馈点视频消息无反应，本轮补齐原生播放器。
+- **范围**：新增原子组件 `em-video-preview`（fixed 全屏黑底 + 原生 `video` + 安全区关闭键 + 失败提示，App/H5/小程序共用）；`em-chat-page` 点击视频消息先停语音再打开播放器，切会话/卸载时关闭；`PLATFORM_CAPABILITIES.videoPreview` 全端 `true`（字段保留，便于后续按端裁剪）；i18n 增播放失败文案，token 增 `--em-video-viewer-bg`。
+- **明确不做**：自研手势层/播放进度条（使用各端原生 `video` 控件）；视频下载/保存到相册；列表内联自动播放。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；iOS 真机已验证播放/声音/退出释放（含 chatfiles 下载本地与显式起播修复），Android/鸿蒙/小程序真机待验（见 STATUS.md）。
 
 ### M3：组件沉淀与发布
 

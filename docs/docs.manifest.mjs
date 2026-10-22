@@ -32,6 +32,7 @@ export const pages = [
   // 设计与运行
   { source: 'docs/THEME-I18N.md', to: 'uniapp/guide/theme-i18n.md', group: '设计与运行', text: '主题与国际化' },
   { source: 'docs/DESIGN-TOKENS.md', to: 'uniapp/guide/design-tokens.md', group: '设计与运行', text: '设计变量' },
+  { source: 'docs/GUIDE-STYLING.md', to: 'uniapp/guide/styling.md', group: '设计与运行', text: '样式定制' },
   { source: 'docs/PLATFORM.md', to: 'uniapp/guide/platform.md', group: '设计与运行', text: '平台能力与差异' },
   { source: 'docs/FAQ.md', to: 'uniapp/guide/faq.md', group: '设计与运行', text: '常见问题' },
 
@@ -119,6 +120,7 @@ export default {
             'uniapp/guide/messaging.md': 'docs/MESSAGING.md',
             'uniapp/guide/theme-i18n.md': 'docs/THEME-I18N.md',
             'uniapp/guide/design-tokens.md': 'docs/DESIGN-TOKENS.md',
+            'uniapp/guide/styling.md': 'docs/GUIDE-STYLING.md',
             'uniapp/guide/platform.md': 'docs/PLATFORM.md',
             'uniapp/guide/faq.md': 'docs/FAQ.md',
             'uniapp/guide/multi-scenario.md': 'docs/GUIDE-MULTI-SCENARIO.md',

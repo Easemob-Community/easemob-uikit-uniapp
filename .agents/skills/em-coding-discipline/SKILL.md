@@ -19,7 +19,7 @@ description: Use when writing or reviewing ANY code in easemob-uikit-uni（新�
 - BEM 命名（`em-button--primary__text`），由 `useNamespace`（ns.b()/ns.e()/ns.m()）生成，不手写类名串。
 - 组件样式独立为同目录同名 `.css`，`.vue` 的 style 块仅留一行 `@import './em-xxx.css'`。目录与 easycom 规则见 skill `em-component-structure`。
 - **样式隔离**：`defineOptions({ styleIsolation: 'app-and-page' })`，不写 scoped。
-- **overflow 默认值坑**：uni-app x 的 view 默认 `overflow: hidden`——绝对定位负偏移探出的子元素会被根节点裁剪（实测：em-avatar 徽标被切成平顶）。需要探出时根节点显式 `overflow: visible`；圆形裁切交给子元素自身 border-radius。
+- **overflow 默认值坑**：uni-app x 的 view 默认 `overflow: hidden`——绝对定位负偏移探出的子元素会被根节点裁剪（实测：em-avatar 徽标被切成平顶）。需要探出时根节点显式 `overflow: visible`；圆形裁切交给子元素自身 border-radius。**裁剪沿祖先链逐层生效**：组件根放行了，紧贴的宿主包裹层（如恰好等高的 flex 行）仍会二次裁掉探出部分（2026-10-22 style-lab 原子组件页实测：em-avatar 根已放行，外层 flex 行把徽标顶边切平）——探出路径上的每一层包裹都要显式放行。
 
 ## 条件编译
 

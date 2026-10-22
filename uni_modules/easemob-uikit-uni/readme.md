@@ -156,10 +156,12 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue) {
 | 能力 | H5 | 微信小程序 | App（Android/iOS/鸿蒙） |
 |---|---|---|---|
 | 视频消息：发送 | ✅ | ✅ | ✅ |
-| 视频消息：播放 | ✅ 新窗口 | ⏳ 仅展示封面/时长 | ⏳ 仅展示封面/时长 |
+| 视频消息：播放 | ✅ 内置全屏播放器 | ✅ 内置全屏播放器 | ✅ 内置全屏播放器 |
 | 文件消息：发送 | ✅ | ✅ | ✅ 需注册附件能力 |
 | 文件消息：打开/下载 | ⏳ 仅展示 | ⏳ 仅展示 | ⏳ 仅展示 |
 | 语音消息：发送 | ⏳ 入口隐藏 | ✅ | ✅ |
+
+> **App 自定义基座**：视频播放依赖 uni-app x 内置模块 `uni-video`，该模块会按代码用量摇树。基座如果是在接入视频组件之前打的，`<video>` 会被降级为普通 `<view>`，表现为点开播放器后全屏黑屏；重新打一次自定义基座即可，或在 manifest 的 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`（示例工程已配置）。
 
 ## App 端文件发送（宿主注入）
 
@@ -181,11 +183,12 @@ EmKit.setAttachmentProvider({
 
 ## 已知限制（1.0）
 
-- 视频播放仅 H5；App/小程序隐藏播放入口。
+- 视频播放依赖系统/浏览器解码能力；冷门编码会提示「视频加载失败」。App 端会先整包下载视频再播放（chatfiles 直链不支持 Range），大视频需要等待下载完成；H5 浏览器可能拦截带声音的自动播放，点播放器内的播放键即可。
 - 文件打开/下载全端未接入，文件气泡为纯展示。
 - App 端发送文件需宿主注册附件能力（见上节）；未注册时「文件」入口保持隐藏。
 - H5 为移动端布局，未做桌面宽屏适配。
 - 语音发送仅 App/小程序；录音 60s 上限自动发送，麦克风权限失败只 toast（不自动跳系统设置）。
+- iOS 相机权限被拒绝后，系统拍摄页可能停在黑屏且不再弹窗；UIKit 在拍摄前预检 `uni.getAppAuthorizeSetting`，`denied` 时弹窗引导去设置。iOS 发布包需在 `manifest.json` 的 `app-ios.distribute.privacyDescription` 声明相机/相册/麦克风用途描述，改后重新打包生效。
 - `@` 提及为追加式插入（uni `<input>` 无光标位置 API）；消息列表仍为 `scroll-view` 全量渲染（长会话性能优化在 1.1）。
 - 非当前会话只保留最近 100 条内存消息，回会话时重拉最新页；完整本地历史需宿主自行持久化。
 - 日志原始 payload 默认关闭（`logPayload`），生产排查请临时开启并及时关闭。

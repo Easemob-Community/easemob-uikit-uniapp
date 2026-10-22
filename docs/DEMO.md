@@ -9,9 +9,9 @@
 ```text
 demo/
 ├── pages/                  # 主包页面：登录、会话、通讯录、我的（tabBar）
-├── sub-im/pages/           # IM 分包页面：聊天、聊天信息、好友、群组、场景实验室、样式实验室
+├── sub-im/pages/           # IM 分包页面：聊天、聊天信息、好友、群组、场景实验室、样式实验室（hub + 专项页）
 ├── sub-sdk/pages/          # SDK 分包声明页（微信小程序异步加载 SDK 需要）
-├── components/             # 宿主侧参考组件：demo-card、demo-composer-bar
+├── components/             # 宿主侧参考组件：demo-card、demo-composer-bar、demo-custom-inputbar
 ├── common/                 # 场景目录、卡片数据、主题封装、AI 流式模拟器
 ├── static/                 # tabBar 图标等静态资源
 ├── uni_modules/            # 指向仓库根 uni_modules 的软链（UIKit 插件本体）
@@ -28,6 +28,7 @@ demo/
 | `pages/` `sub-im/pages/` | 演示页面，接线 UIKit 页面组件与插槽 | 否，宿主侧示例 |
 | `components/demo-card` | 宿主自绘卡片组件（按 `customEvent` 渲染） | 否，可整份替换 |
 | `components/demo-composer-bar` | 输入栏业务入口条（注入 `#input-toolbar`） | 否，可整份替换 |
+| `components/demo-custom-inputbar` | 输入栏整栏自绘（注入 `#input-bar`，行为全走 scope 契约） | 否，可整份替换 |
 | `common/scenario-catalog.ts` | 6 个场景的业务上下文与卡片数据 | 否，演示数据 |
 | `common/demo-card-data.ts` | event → 卡片视觉族的映射与字段解析 | 否，宿主逻辑 |
 | `common/ai-stream-demo.ts` | 本地模拟 AI 流式分片 | 否，演示工具 |
@@ -84,7 +85,7 @@ bash scripts/uni.sh dev mp-weixin
 | 登录 | `pages/login/login` | 手填 appkey / userId / token 登录；右上角开发者模式可用密码换取测试 token（仅开发用） |
 | 会话 | `pages/conversation/conversation` | `em-conversation-page`：筛选 tab、搜索、置顶、免打扰、未读角标、连接状态条；点击预热进入会话与历史 |
 | 通讯录 | `pages/contact/contact` | `em-contact-page`：入口列表、好友申请红点、群组入口、添加好友弹层 |
-| 我的 | `pages/mine/mine` | 深浅色三档、AI 流式开关、场景实验室/样式实验室/连通性自检入口、导出调试日志、退出登录 |
+| 我的 | `pages/mine/mine` | 深浅色三档、AI 流式开关、场景实验室/样式实验室/AI 流式演示/连通性自检入口、导出调试日志、退出登录 |
 
 会话页与通讯录页都接了 `useTabBarBadge`：会话总未读与好友申请未读实时同步到原生 tabBar 角标。
 
@@ -92,7 +93,7 @@ bash scripts/uni.sh dev mp-weixin
 
 | 页面 | 路由 | 看什么 |
 |---|---|---|
-| 聊天 | `sub-im/pages/chat/chat` | `em-chat-page` 的完整封装：`#banner`、`#custom-message`、`#input-toolbar` 三个插槽，AI 演示浮钮，场景开关面板 |
+| 聊天 | `sub-im/pages/chat/chat` | `em-chat-page` 的完整封装：`#banner`、`#custom-message`、`#input-toolbar` 三个插槽，`#input-bar` 整栏自绘分支（`?inputbar=custom`），AI 演示浮钮，场景开关面板 |
 | 聊天信息 | `sub-im/pages/chat-info/chat-info` | `em-chat-info-page`：单聊信息、群资料、成员宫格与成员管理 |
 | 好友列表 | `sub-im/pages/contact-list/contact-list` | 字母索引、搜索、好友资料与删除 |
 | 新请求 | `sub-im/pages/contact-requests/contact-requests` | 好友申请与群邀请的接受/拒绝 |
@@ -100,7 +101,13 @@ bash scripts/uni.sh dev mp-weixin
 | 场景实验室 | `sub-im/pages/scenario/scenario` | 6 个业务场景卡片与卡片预览入口 |
 | 场景详情 | `sub-im/pages/scenario/detail` | 业务上下文、对端/群组选择、输入栏入口预览、进入会话 |
 | 卡片预览 | `sub-im/pages/scenario/cards` | 14 种宿主自绘卡片 + 未知事件回落，**无需登录** |
-| 样式实验室 | `sub-im/pages/style-lab/style-lab` | 设计变量、原子组件、AI 流式气泡、明暗与中英切换 |
+| 样式实验室 | `sub-im/pages/style-lab/style-lab` | 目录页：明暗三档与中英切换（对子页全局生效），入口卡片进各专项页 |
+| └ 设计变量 | `sub-im/pages/style-lab/tokens` | 文字 / 背景 / 气泡徽标 / 间距 / 字号五组 token 阶梯 |
+| └ 原子组件 | `sub-im/pages/style-lab/components` | em-avatar / em-icon / em-empty / em-skeleton 走查 |
+| └ 主题定制 | `sub-im/pages/style-lab/theming` | 运行时主题色（色相条拖拽换全页主色）+ 子树气泡变量定制 |
+| └ 覆盖机制 | `sub-im/pages/style-lab/overrides` | custom-style / custom-class / 变量覆盖三组对照 + 覆盖机制探针 |
+| └ AI 流式演示 | `sub-im/pages/style-lab/stream` | 流式气泡：光标 / 终态收敛 / 异常提示，分片数与状态实时可见，**无需登录** |
+| └ 通用提交态与错误态 | `sub-im/pages/style-lab/states` | 按钮 loading 旋转 / 触底加载错误重试流转 / 选人提交态，**无需登录** |
 
 另有两个诊断页（`sub-im/pages/spike/spike` 五端连通性自检、`sub-im/pages/text-probe/text-probe` 文本测量），不属于演示主流程，可忽略。
 
@@ -135,6 +142,7 @@ bash scripts/uni.sh dev mp-weixin
 - 选对端：单聊填 userId 或点最近会话；群聊从已加入群组里选，没有群组时给出去群组页的入口。
 - 输入栏入口预览：点击胶囊只弹说明，真实发送在聊天页。
 - 底部主按钮：进入会话，路由带 `?conversationId=...&chatType=...&scenario=<key>&scene=1`。
+- 主按钮下方是描边次按钮「用自绘输入栏进入」：同样的会话，额外带 `&inputbar=custom`，聊天页把默认输入栏整栏换成 `demo-custom-inputbar`（`#input-bar` 插槽演示，见下节）。
 
 ### 进入会话后的场景开关
 
@@ -150,7 +158,14 @@ bash scripts/uni.sh dev mp-weixin
 | 业务长按动作 | `extraMessageMenus` 注入业务菜单项，回调 `@message-menu` |
 | 输入栏业务入口 | `#input-toolbar` 插槽，一点即发本场景卡片 |
 
-面板还提供：发送本场景卡片（卡片列表）、发送带业务 `ext` 的文本、插入本地系统提示（`insertLocalNotice`）、发送未注册事件（验证宿主回落）。面板顶部还显示当前会话未读与总未读，进会话清零后数字实时变化。
+面板还提供：发送本场景卡片（卡片列表）、发送带业务 `ext` 的文本、插入本地系统提示（`insertLocalNotice`）、发送未注册事件（验证宿主回落），以及「整栏自绘输入栏」切换按钮（`redirectTo` 带/去 `inputbar=custom` 重进页面，与详情页次按钮殊途同归）。面板顶部还显示当前会话未读与总未读，进会话清零后数字实时变化。
+
+### 整栏自绘输入栏（`#input-bar`）
+
+- 入口一：场景详情页主按钮下方的「用自绘输入栏进入」；入口二：聊天内「场景开关」面板的「整栏自绘输入栏」按钮（重进页面生效）。
+- 演示组件是 `demo/components/demo-custom-inputbar`：快捷回复、引用条、语音按住说话、emoji 与媒体面板全部自绘，但行为全部经插槽 scope（`EmChatInputBarScope`）驱动——键盘避让由页面壳承担，面板互斥/录音状态机/禁言/@/草稿链路由库内保持。
+- 插槽的有无在页面实例创建时确定（UIKit 据此实例化行为核心），所以 demo 用查询参数 + 重进页面切换，而不是场景面板里的实时开关。
+- 契约字段与「必须接什么」清单见 [聊天页](./PAGES-CHAT.md)「整栏自绘输入栏」；组件可直接复制到自己工程改样式。
 
 ### 卡片发送与输入栏入口
 
@@ -305,8 +320,8 @@ function onCardAction(key: string, message: EmMessageItem): void {
 | 会话列表 | 会话 tab | [会话列表页](./PAGES-CONVERSATION.md) |
 | 聊天交互 | 聊天页 | [聊天页](./PAGES-CHAT.md) |
 | 业务卡片与插槽 | 场景实验室 + 卡片预览 | [多场景接入](./GUIDE-MULTI-SCENARIO.md) |
-| AI 流式 | 聊天页「AI 演示」+ 样式实验室 | [AI 流式消息](./AI-STREAM.md) |
-| 主题与设计变量 | 我的页深色模式 + 样式实验室 | [主题与国际化](./THEME-I18N.md) · [设计变量](./DESIGN-TOKENS.md) |
+| AI 流式 | 聊天页「AI 演示」+ 样式实验室「AI 流式演示」 | [AI 流式消息](./AI-STREAM.md) |
+| 主题与设计变量 | 我的页深色模式 + 样式实验室「设计变量」「主题定制」 | [主题与国际化](./THEME-I18N.md) · [设计变量](./DESIGN-TOKENS.md) |
 | 各端差异 | 五个端各跑一遍 | [平台能力与差异](./PLATFORM.md) |
 | 小程序分包 | `scripts/uni.sh build mp-weixin` | [微信小程序 SDK 分包](./GUIDE-WEAPP-SDK-SUBPACKAGE.md) |
 | 鸿蒙真机 | 运行到鸿蒙 | [鸿蒙真机运行与签名](./HARMONY-REALDEVICE-RUN.md) |

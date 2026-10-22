@@ -14,7 +14,7 @@ description: Use when 接入或定制 easemob-uikit-uni 的会话列表页、聊
 |---|---|---|
 | `em-conversation-page` | 会话列表、搜索、筛选 tab、置顶/免打扰/删除（长按）、发起单聊（「+」内置选人）、连接状态条 | 根容器高度、`@select` 跳聊天页、`@menu` 接建群 |
 | `em-chat-page` | 进会话、拉历史、滚底、发消息（文本/图片/语音/视频/文件）、引用/撤回/重发/已读、草稿、键盘避让、未读清零 | 路由参数、根容器高度、`@open-info` 跳详情 |
-| `em-chat-info-page` | 聊天详情：免打扰/置顶/清空/删除；群分支的成员宫格、公告、群管理 | 根容器高度、`@back`/`@deleted`/`@leaved` 退场、群成员私聊接线 |
+| `em-chat-info-page` | 聊天详情：免打扰/置顶/清空/删除会话/删除好友；群分支的成员宫格、公告、群管理 | 根容器高度、`@back`/`@deleted`/`@leaved`/`@contact-deleted` 退场、群成员私聊接线 |
 
 **不要**在宿主里重复实现这些页面的标题栏、消息列表、输入栏；需要视觉差异先看 props/插槽（见第 6 节）。
 
@@ -207,7 +207,7 @@ function onOpenInfo(id: string): void {
 | `open-info` | `conversationId` | 右上角详情入口 |
 | `send` | `EmMessageItem` | 任一种消息发送成功后通知（用于埋点/回执，不要在这里再发一次） |
 | `recall` | `EmMessageItem` | 撤回成功 |
-| `delete` | `EmMessageItem` | 本地删除 |
+| `delete` | `EmMessageItem` | 删除成功（有服务端 ID 时先删漫游再删本地；失败不派发） |
 | `mention-click` | `userId` | 气泡内 @ 片段点击，宿主可跳成员资料 |
 | `message-menu` | `(key, message)` | `extraMessageMenus` 命中 |
 
@@ -220,6 +220,7 @@ function onOpenInfo(id: string): void {
 | `#stream-message` | `{ message }` | 仅富格式流式消息（如 `customType='markdown'`）；纯文本流式走内置渲染 |
 | `#custom-message` | `{ message }` | 自定义消息整卡渲染；接收与**己方发送**都走这里 |
 | `#input-toolbar` | — | 消息区与输入栏之间，随键盘上移；不注入不占高 |
+| `#input-bar` | `EmChatInputBarScope` | 输入栏整栏自绘：结构全自绘，键盘避让/面板互斥/录音/禁言/@/草稿行为经 scope 契约由库内保持；插槽有无在页面创建时确定，不能运行时切换。契约字段见文档站「聊天页 · 整栏自绘输入栏」 |
 
 详细用法见 `em-host-business-extension` 与 `em-host-ai-stream`。
 
@@ -245,6 +246,7 @@ function onOpenInfo(id: string): void {
       @back="onBack"
       @deleted="onExit"
       @leaved="onExit"
+      @contact-deleted="onExit"
       @chat-member="onChatMember"
     />
   </view>
@@ -271,7 +273,7 @@ onLoad((query) => {
     : CONVERSATION_TYPE.SINGLE_CHAT
 })
 
-// 删除会话/退群/解散：聊天详情 ← 聊天页 ← 会话列表，退两层
+// 删除会话/退群/解散/删除好友：聊天详情 ← 聊天页 ← 会话列表，退两层
 function onExit(): void {
   uni.navigateBack({ delta: 2 })
 }
@@ -300,6 +302,7 @@ function onBack(): void {
 | `back` | 点返回 | `navigateBack`（组件不自退） |
 | `deleted` | 删除会话成功 | 退场 |
 | `leaved` | 退群/解散成功 | 退场 |
+| `contact-deleted` | 删除好友成功（不删会话，单聊分支且对方已是好友时有该按钮） | 退场 |
 | `invite` / `remove-members` / `open-members` | 群管理内部已闭环，仅通知 | 一般无需处理 |
 | `chat-member` | 成员宫格点私聊 | `addConversation` + 跳聊天页 |
 

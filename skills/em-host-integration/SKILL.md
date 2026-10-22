@@ -355,7 +355,7 @@ function onOpenInfo(id: string): void {
 |---|---|
 | 生命周期 | `init` / `whenReady` / `login` / `logout` / `renewToken` / `setLocale` / `getLocale` |
 | 会话 | `syncConversations` / `enterConversation` / `loadHistory` / `clearConversationUnread` / `pinConversation` / `setConversationMuted` / `deleteConversation` / `clearConversationMessages` / `addConversation` |
-| 消息 | `sendText` / `sendCustom` / `sendImage` / `sendAudio` / `sendVideo` / `sendFile` / `recallMessage` / `deleteLocalMessage` / `resendMessage` / `sendTyping` / `makeQuote` / `onMessage` / `onStreamMessage` |
+| 消息 | `sendText` / `sendCustom` / `sendImage` / `sendAudio` / `sendVideo` / `sendFile` / `recallMessage` / `deleteMessage` / `deleteLocalMessage` / `resendMessage` / `sendTyping` / `makeQuote` / `onMessage` / `onStreamMessage` |
 | 本地提示 | `insertLocalNotice` / `insertGroupNotice` |
 | 联系人 | `syncContacts` / `addContact` / `deleteContact` / `setContactRemark` / `acceptContactInvite` / `declineContactInvite` |
 | 群 | `getJoinedGroups` / `enterGroup` / `getGroupInfo` / `getGroupMemberList` / `getGroupAnnouncement` / `createGroup` / `inviteUsersToGroup` / `acceptGroupInvite` / `declineGroupInvite` / `leaveGroup` / `destroyGroup` / `changeGroupOwner` / `updateGroupInfo` / `updateGroupAnnouncement` / `removeGroupMembers` / `addGroupAdmin` / `removeGroupAdmin` / `muteAllGroupMembers` / `unmuteAllGroupMembers` |

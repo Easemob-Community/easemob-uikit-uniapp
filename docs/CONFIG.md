@@ -16,7 +16,7 @@ EmKit.init({
   enableDraft: true,
   enableTyping: true,
   recallTimeLimit: 120000,
-  inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true },
+  inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true, sendOnReturn: true },
   primaryColor: '#009EFF'
 })
 ```
@@ -57,7 +57,7 @@ EmKit.init({
 
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `inputFeatures` | `Partial<EmInputFeatures>` | 全部开启 | 输入栏功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file`；缺项保持默认开 |
+| `inputFeatures` | `Partial<EmInputFeatures>` | 全部开启 | 输入栏功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` / `sendOnReturn`（回车发送，关闭则换行输入）；缺项保持默认开 |
 | `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `recall` / `delete` | 消息长按菜单项与顺序 |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | `pin` / `mute` / `delete` | 会话长按菜单项与顺序 |
 | `emojiList` | `string[]` | 内置 96 个 | emoji 面板字符集 |
@@ -118,6 +118,7 @@ console.log(config.recallTimeLimit)
 |---|---|---|---|
 | `showSearch` | `boolean` | `true` | 顶部搜索条 |
 | `tabs` | `ConversationTabKeyValue[]` | 全部五项 | 筛选 tab 与顺序；空数组隐藏 |
+| `showTabs` | `boolean` | `true` | 筛选 tab 栏显隐；`false` 时无论 `tabs` 传什么都不渲染 |
 | `emptyText` | `string` | `''` | 空列表文案；空串用 i18n 默认 |
 | `autoSync` | `boolean` | `true` | 首次挂载自动拉会话快照 |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条 |
@@ -178,7 +179,6 @@ console.log(config.recallTimeLimit)
 
 - H5 不显示语音入口（录音未接入浏览器）。
 - App 不显示文件选择入口（无通用文件选择器）。
-- 视频预览仅 H5 显示播放入口；App/小程序展示封面与时长。
 
 因此即使 `inputFeatures.file=true`，App 端也不会出现文件按钮。完整矩阵见 [平台能力与差异](./PLATFORM.md)。
 

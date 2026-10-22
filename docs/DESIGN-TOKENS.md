@@ -154,7 +154,8 @@ const { themeClass } = useTheme()
 | `--em-bubble-radius` | `16px` | 气泡圆角（带尖角侧） |
 | `--em-bubble-radius-square` | `8px` | 气泡靠头像侧的小圆角 |
 | `--em-file-card-radius` | `12px` | 文件卡圆角 |
-| `--em-input-radius` | `999px` | 输入框胶囊 |
+| `--em-input-radius` | `999px` | 单行输入框胶囊 |
+| `--em-component-radius` | `6px` | 组件小圆角（多行输入区等非胶囊容器） |
 
 ### 4.3 字体、字号、字重、行高
 
@@ -176,6 +177,10 @@ const { themeClass } = useTheme()
 | `--em-bubble-gap` | `8px` | 同一发送者相邻气泡间距 |
 | `--em-message-gap` | `16px` | 消息行间距 |
 | `--em-message-padding` | `12px` | 消息区左右内边距 |
+| `--em-bubble-padding-x` / `--em-bubble-padding-y` | `14px` / `12px` | 文本气泡内边距 |
+| `--em-audio-bubble-padding-x` / `--em-audio-bubble-padding-y` | `14px` / `10px` | 语音气泡内边距 |
+| `--em-file-card-padding-x` / `--em-file-card-padding-y` | `12px` / `10px` | 文件卡内边距 |
+| `--em-file-card-min-width` / `--em-file-card-max-width` | `166px` / `240px` | 文件卡宽度上下限 |
 | `--em-chat-panel-height` | `240px` | 输入栏 emoji / 媒体面板高度 |
 
 ### 4.5 文件类型图标底色
@@ -192,6 +197,8 @@ const { themeClass } = useTheme()
 
 ## 5. 如何安全地覆盖
 
+> 变量之外的三条通道（`custom-style` / `custom-class` / 具名插槽）与选型决策见 [样式定制](./GUIDE-STYLING.md)。
+
 ### 5.1 品牌主色：优先用 `primaryColor`
 
 ```ts
@@ -200,17 +207,32 @@ EmKit.init({ appkey: 'your-appkey', primaryColor: '#0F8CFF' })
 
 `primaryColor` 会写入 `--em-primary-color`：页面级组件把它内联在根节点上（子树继承），H5 同时写到 `documentElement`。这是改品牌色最省事也最稳妥的路径。
 
-需要更完整的品牌适配（例如气泡也换色）时，在页面根节点追加内联样式：
+需要更完整的品牌适配（例如气泡也换色）时，在页面根节点**内层**追加一个包裹节点绑定内联变量（内联变量不要与 `themeClass` 同节点：App 端同节点的 class 变量会顶掉内联变量）：
 
 ```vue
-<view class="page" :class="themeClass" :style="brandStyle">
+<view class="page" :class="themeClass">
+  <view class="page__brand" :style="brandStyle">
+    <!-- 页面内容 -->
+  </view>
+</view>
 ```
 
 ```ts
 const brandStyle = '--em-primary-color: #0F8CFF; --em-primary-hover: #0A78DB; --em-bubble-bg-self: #0F8CFF;'
 ```
 
+```css
+.page__brand {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 0;
+}
+```
+
 ### 5.2 局部覆盖：写自己的 class
+
+> **App 端注意**：class 方式覆盖变量与主题类（`.em-theme-*`）是同名单类选择器，胜负取决于各组件样式合并后的声明顺序，App（uni-app x）端宿主无法控制该顺序，可能出现覆盖不生效。App 端请改用 5.1 的内联 `:style` 绑定变量；class 方式在 H5 与微信小程序可用。
 
 覆盖变量不需要 `!important`，只要让自定义 class 与主题类落在同一节点（同名特异性时按声明顺序，后声明的生效）：
 
