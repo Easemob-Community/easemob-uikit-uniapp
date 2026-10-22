@@ -14,6 +14,9 @@ import type { ConversationTypeValue, EmMessageItem, EmStreamInfo } from '@/uni_m
 export const AI_ASSISTANT_ID = 'ai_assistant'
 export const AI_ASSISTANT_NICKNAME = 'AI 助手'
 
+/** 聊天页「AI 演示」浮钮总开关（仅 demo 工程）：不需要时置 false 或整段删除入口 */
+export const AI_STREAM_FAB_VISIBLE = true
+
 export type MockStreamEnd = 'completed' | 'error'
 
 export interface MockStreamOptions {

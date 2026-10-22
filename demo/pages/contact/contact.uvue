@@ -4,11 +4,11 @@
     <view v-if="showAddContact" class="addcontact">
       <view class="addcontact__panel">
         <text class="addcontact__title">添加好友</text>
-        <input class="addcontact__input" v-model="peerId" placeholder="输入用户 ID" />
-        <input class="addcontact__input" v-model="inviteMessage" placeholder="输入验证信息（可选）" />
+        <input class="addcontact__input" v-model="peerId" placeholder="输入用户 ID" :disabled="sendingInvite" />
+        <input class="addcontact__input" v-model="inviteMessage" placeholder="输入验证信息（可选）" :disabled="sendingInvite" />
         <view class="addcontact__row">
           <button class="addcontact__btn addcontact__btn--plain" @click="showAddContact = false">取消</button>
-          <button class="addcontact__btn" @click="onSendInvite">发送申请</button>
+          <button class="addcontact__btn" :disabled="sendingInvite" @click="onSendInvite">发送申请</button>
         </view>
       </view>
     </view>
@@ -29,6 +29,8 @@ const tabBarBadge = useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })
 const showAddContact = ref(false)
 const peerId = ref('')
 const inviteMessage = ref('')
+const sendingInvite = ref(false)
+const inviteRequestId = ref(0)
 
 // 只按「是否已登录」判断：断网/自动重连不应把用户踢回登录页（同会话页口径）
 function ensureLogin(): boolean {
@@ -70,25 +72,38 @@ function onEntryClick(key: string) {
 
 // 添加好友为 demo 级 modal（对齐 vue 版契约：页面组件只 emit add，弹窗由业务侧实现）
 function onAdd() {
+  inviteRequestId.value += 1
+  sendingInvite.value = false
   peerId.value = ''
   inviteMessage.value = ''
   showAddContact.value = true
 }
 
 function onSendInvite() {
+  if (sendingInvite.value) return
   const id = peerId.value.trim()
   if (id === '') return
   if (id === EmKit.state.userId) {
     uni.showToast({ title: '不能添加自己为好友', icon: 'none' })
     return
   }
-  EmKit.addContact(id, inviteMessage.value.trim())
+  const requestId = ++inviteRequestId.value
+  const message = inviteMessage.value.trim()
+  sendingInvite.value = true
+  EmKit.addContact(id, message)
     .then(() => {
+      if (requestId !== inviteRequestId.value) return
       showAddContact.value = false
       uni.showToast({ title: '好友申请已发送', icon: 'none' })
     })
     .catch(() => {
+      if (requestId !== inviteRequestId.value) return
       uni.showToast({ title: '添加失败，请稍后重试', icon: 'none' })
+    })
+    .finally(() => {
+      if (requestId === inviteRequestId.value) {
+        sendingInvite.value = false
+      }
     })
 }
 </script>

@@ -1,0 +1,135 @@
+<template>
+  <scroll-view scroll-y :class="['lab', themeClass]">
+    <view class="lab__section">
+      <text class="lab__section-title">宿主样式覆盖（custom-style / custom-class / 变量）</text>
+
+      <!-- custom-style：拼到组件根节点 style 末尾，五端生效 -->
+      <em-empty
+        icon="list-bullet"
+        description="custom-style：卡片底 + 圆角 + 内边距"
+        custom-style="background-color: var(--em-bg-secondary); border-radius: var(--em-radius); padding: 16px; margin-bottom: 12px;"
+      />
+
+      <!-- custom-class：页面级 class 追加到组件根节点；只加组件未设置的属性（边框），不拼特异性 -->
+      <em-empty
+        icon="search"
+        size="small"
+        description="custom-class：主色描边"
+        custom-class="lab__empty-override"
+      />
+
+      <!-- 变量覆盖：内联绑定变量。注意不能与 themeClass 同节点（蒸汽端同节点 class 变量顶掉内联变量），themeClass 由页面根承担 -->
+      <view class="lab__brand" :style="brandVarStyle">
+        <em-button text="变量覆盖：品牌橙主色" type="primary" />
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">覆盖机制探针（真机看哪几行变橙，截图反馈）</text>
+      <view class="lab__probe-row">
+        <text class="lab__probe-label">P1 class 变量（对照组）</text>
+        <view :class="[themeClass, 'lab__probe-var']">
+          <em-button text="P1" type="primary" size="medium" />
+        </view>
+      </view>
+      <view class="lab__probe-row">
+        <text class="lab__probe-label">P2 内联变量→组件</text>
+        <view :style="brandVarStyle">
+          <em-button text="P2" type="primary" size="medium" />
+        </view>
+      </view>
+      <view class="lab__probe-row">
+        <text class="lab__probe-label">P3 custom-style 字面量</text>
+        <em-button text="P3" type="primary" size="medium" custom-style="background-color: #FF6B00;" />
+      </view>
+      <view class="lab__probe-row">
+        <text class="lab__probe-label">P4 custom-style 引用变量</text>
+        <view :style="brandVarStyle">
+          <em-button text="P4" type="primary" size="medium" custom-style="background-color: var(--em-primary-color);" />
+        </view>
+      </view>
+      <view class="lab__probe-row">
+        <text class="lab__probe-label">P5 内联变量→宿主文本</text>
+        <view :style="brandVarStyle">
+          <text class="lab__probe-var-text">这行字变橙 = 变量生效</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</template>
+
+<script setup lang="ts">
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
+// 变量覆盖演示：内联写变量五端可靠（与库内 primaryColorStyle 同机制）；
+// class 方式在 App 端与主题类同特异性拼声明顺序，变量可能被顶掉
+const brandVarStyle = '--em-primary-color: #FF6B00;'
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.lab {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--em-bg-base);
+}
+
+.lab__section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-border-light);
+}
+
+.lab__section-title {
+  font-size: var(--em-font-size-13);
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-tertiary);
+  margin-bottom: var(--em-spacing-3);
+}
+
+/* 宿主覆盖验证：custom-class 只加组件未设置的属性（边框/间距），避免同类特异性拼声明顺序 */
+.lab__empty-override {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-primary-color);
+  border-radius: var(--em-radius);
+  margin-bottom: var(--em-spacing-3);
+}
+
+/* 宿主覆盖验证：变量覆盖——布局留在 class，变量本身走内联（brandVarStyle），App 端 class 方式覆盖变量会被主题类顶掉 */
+.lab__brand {
+  padding: var(--em-spacing-3);
+  background-color: var(--em-bg-secondary);
+  border-radius: var(--em-radius);
+}
+
+/* 覆盖机制探针：P1 class 变量（对照）/ P2 内联变量→组件 / P3 custom-style 字面量 / P4 custom-style var / P5 内联变量→宿主文本 */
+.lab__probe-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: var(--em-spacing-2);
+}
+
+.lab__probe-label {
+  width: 210px;
+  font-size: var(--em-font-size-12);
+  color: var(--em-text-tertiary);
+}
+
+.lab__probe-var {
+  --em-primary-color: #FF6B00;
+}
+
+.lab__probe-var-text {
+  font-size: var(--em-font-size-14);
+  color: var(--em-primary-color);
+}
+</style>

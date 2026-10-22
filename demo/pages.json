@@ -109,6 +109,42 @@
           }
         },
         {
+          "path": "pages/style-lab/tokens",
+          "style": {
+            "navigationBarTitleText": "设计变量"
+          }
+        },
+        {
+          "path": "pages/style-lab/components",
+          "style": {
+            "navigationBarTitleText": "原子组件"
+          }
+        },
+        {
+          "path": "pages/style-lab/theming",
+          "style": {
+            "navigationBarTitleText": "主题定制"
+          }
+        },
+        {
+          "path": "pages/style-lab/overrides",
+          "style": {
+            "navigationBarTitleText": "覆盖机制"
+          }
+        },
+        {
+          "path": "pages/style-lab/stream",
+          "style": {
+            "navigationBarTitleText": "AI 流式演示"
+          }
+        },
+        {
+          "path": "pages/style-lab/states",
+          "style": {
+            "navigationBarTitleText": "通用提交态与错误态"
+          }
+        },
+        {
           "path": "pages/scenario/scenario",
           "style": {
             "navigationBarTitleText": "IM 场景实验室"

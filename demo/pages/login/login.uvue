@@ -183,7 +183,9 @@ async function onLogin() {
   }
   logging.value = true
   try {
-    EmKit.init({ appkey: appkey.value, enableReadReceipt: true, logLevel: 'debug', sdkLogLevel: 'DEBUG' })
+    // inputFeatures.sendOnReturn=false：demo 演示「换行输入」档（回车=换行、输入框生长、发送走按钮）；
+    // 库默认 true（回车发送，零回归）
+    EmKit.init({ appkey: appkey.value, enableReadReceipt: true, logLevel: 'debug', sdkLogLevel: 'DEBUG', inputFeatures: { sendOnReturn: false } })
     await EmKit.login({ userId: userId.value, token: token.value })
     setStorage(KEY_APPKEY, appkey.value)
     setStorage(KEY_USERID, userId.value)

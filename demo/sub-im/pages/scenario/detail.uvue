@@ -85,10 +85,14 @@
         </view>
       </view>
 
-      <view class="detail__cta" :style="`background-color: ${scenario.accent};`" @click="openChat">
+      <view class="detail__cta" :style="`background-color: ${scenario.accent};`" @click="openChat(false)">
         <text class="detail__cta-text">{{ ctaText }}</text>
       </view>
-      <text class="detail__hint">进入会话后点右侧「场景开关」，可逐项开关横幅/标题/详情入口/快捷回复/业务长按动作/输入栏入口，并发送本场景的演示卡片。</text>
+      <!-- #input-bar 整栏自绘演示入口：带 inputbar=custom 进同一个聊天页，输入栏换成 demo-custom-inputbar -->
+      <view class="detail__cta detail__cta--ghost" :style="`border-color: ${scenario.accent};`" @click="openChat(true)">
+        <text class="detail__cta-text" :style="`color: ${scenario.accent};`">用自绘输入栏进入（#input-bar 演示）</text>
+      </view>
+      <text class="detail__hint">进入会话后点右侧「场景开关」，可逐项开关横幅/标题/详情入口/快捷回复/业务长按动作/输入栏入口，并发送本场景的演示卡片；面板里也可随时切换默认/自绘输入栏（重进页面生效）。</text>
     </view>
   </scroll-view>
 </template>
@@ -170,14 +174,15 @@ function openGroupPage(): void {
   uni.navigateTo({ url: '/sub-im/pages/group/group' })
 }
 
-function openChat(): void {
+function openChat(customInputBar: boolean): void {
+  const inputbarParam = customInputBar ? '&inputbar=custom' : ''
   if (scenario.value.chatType === 'groupChat') {
     if (groupId.value === '') {
       uni.showToast({ title: '请先选择群组', icon: 'none' })
       return
     }
     uni.navigateTo({
-      url: `/sub-im/pages/chat/chat?conversationId=${groupId.value}&chatType=groupChat&scenario=${scenario.value.key}&scene=1`
+      url: `/sub-im/pages/chat/chat?conversationId=${groupId.value}&chatType=groupChat&scenario=${scenario.value.key}&scene=1${inputbarParam}`
     })
     return
   }
@@ -188,7 +193,7 @@ function openChat(): void {
   }
   uni.setStorageSync('demo.scene.peer', id)
   uni.navigateTo({
-    url: `/sub-im/pages/chat/chat?conversationId=${encodeURIComponent(id)}&chatType=singleChat&scenario=${scenario.value.key}&scene=1`
+    url: `/sub-im/pages/chat/chat?conversationId=${encodeURIComponent(id)}&chatType=singleChat&scenario=${scenario.value.key}&scene=1${inputbarParam}`
   })
 }
 </script>
@@ -464,6 +469,14 @@ function openChat(): void {
   margin: var(--em-spacing-4) var(--em-spacing-4) 0;
   height: 48px;
   border-radius: 10px;
+}
+
+/* 次级 CTA（描边态）：整栏自绘输入栏演示入口，主色由场景 accent 内联注入 */
+.detail__cta--ghost {
+  margin-top: var(--em-spacing-2);
+  background-color: transparent;
+  border-width: 1px;
+  border-style: solid;
 }
 
 .detail__cta-text {

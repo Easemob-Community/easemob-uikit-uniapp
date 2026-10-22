@@ -1,0 +1,263 @@
+<template>
+  <scroll-view :scroll-y="!hueSliding" :class="['lab', themeClass]">
+    <!-- 蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k）：brandVars 必须挂在内层包裹节点，与 themeClass 分开 -->
+    <view class="lab__theme-scope" :style="brandVars">
+    <view class="lab__section">
+      <text class="lab__section-title">运行时主题色（按住色相条拖动，全页主色实时跟随）</text>
+      <view
+        class="lab__hue-bar"
+        @touchstart="onHueTouchStart"
+        @touchmove="onHueTouchMove"
+        @touchend="onHueTouchEnd"
+      >
+        <view v-for="seg in hueSegments" :key="seg" class="lab__hue-seg" :style="'background-color: ' + seg + ';'"></view>
+        <view class="lab__hue-thumb" :style="hueThumbStyle"></view>
+      </view>
+      <view class="lab__hue-meta">
+        <view class="lab__hue-swatch" :style="'background-color: ' + brandHex + ';'"></view>
+        <text class="lab__hex">{{ brandHex }}</text>
+        <button class="lab__btn" @click="resetBrand">重置</button>
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">气泡变量定制（子树内联变量：底色 / 文字色 / 内边距，不影响全局）</text>
+      <view class="lab__bubble-demo" :style="bubbleVarStyle">
+        <view class="lab__bubble-row">
+          <em-text-message :message="bubbleOtherMessage" />
+        </view>
+        <view class="lab__bubble-row lab__bubble-row--self">
+          <em-text-message :message="bubbleSelfMessage" />
+        </view>
+      </view>
+    </view>
+    </view>
+  </scroll-view>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { setConfig, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+import { buildAiMessage } from '@/common/ai-stream-demo'
+
+const { themeClass } = useDemoTheme()
+
+// 气泡定制演示：变量串绑在内层包裹节点（不与 themeClass 同节点，原因同上），只影响本组气泡；
+// 己方/对方底色与文字色各自独立成 token，padding 走 --em-bubble-padding-*
+const bubbleVarStyle =
+  '--em-bubble-bg-other: #FFF1D6; --em-bubble-text-other: #7A4E00; --em-bubble-bg-self: #FF6B00; --em-bubble-text-self: #FFFFFF; --em-bubble-padding-y: 16px;'
+const bubbleOtherMessage = buildAiMessage('style-lab', CONVERSATION_TYPE.SINGLE_CHAT, 'me')
+bubbleOtherMessage.text = '对方气泡：底色 / 文字色 / 内边距都来自内联变量'
+const bubbleSelfMessage = buildAiMessage('style-lab', CONVERSATION_TYPE.SINGLE_CHAT, 'me')
+bubbleSelfMessage.text = '己方气泡：--em-bubble-bg-self 独立成变量'
+bubbleSelfMessage.self = true
+
+// ===== 运行时主题色：拖动色相条换全页主色 =====
+// 双通道：页面根节点内联变量（brandVars，含派生色，本页全子树跟随）
+// + setConfig primaryColor（官方配置，页面级组件根节点跟随；运行时生效、不持久化，需要持久化由宿主自存）
+const DEFAULT_PRIMARY = '#33B1FF'
+const brandHex = ref(DEFAULT_PRIMARY)
+const brandVars = ref('')
+const hueRatio = ref(0.553) // 与 DEFAULT_PRIMARY 的色相一致
+
+// 色相条 36 段纯色（hsv 在 JS 侧算成 hex，不依赖各端 CSS 色函数支持）
+function hsvToHex(h: number, s: number, v: number): string {
+  const c = v * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = v - c
+  let r = 0
+  let g = 0
+  let b = 0
+  if (h < 60) { r = c; g = x } else if (h < 120) { r = x; g = c } else if (h < 180) { g = c; b = x } else if (h < 240) { g = x; b = c } else if (h < 300) { r = x; b = c } else { r = c; b = x }
+  const to255 = (n: number): string => Math.round((n + m) * 255).toString(16).padStart(2, '0')
+  return `#${to255(r)}${to255(g)}${to255(b)}`.toUpperCase()
+}
+
+const hueSegments: string[] = []
+for (let i = 0; i < 36; i++) {
+  hueSegments.push(hsvToHex(i * 10, 0.85, 0.95))
+}
+
+const hueThumbStyle = computed(() =>
+  `left: ${(hueRatio.value * 100).toFixed(2)}%; background-color: ${brandHex.value};`
+)
+
+function hexToRgb(hex: string): { r: number, g: number, b: number } {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16)
+  }
+}
+
+function setBrand(hue: number): void {
+  const hex = hsvToHex(hue, 0.85, 0.95)
+  const hover = hsvToHex(hue, 0.9, 0.78)
+  const { r, g, b } = hexToRgb(hex)
+  brandHex.value = hex
+  hueRatio.value = hue / 360
+  // 派生色一并覆盖：hover 加深、bubble-self 与 bg-active 跟随（默认 token 里这两项不随 primaryColor 派生）
+  brandVars.value =
+    `--em-primary-color: ${hex}; --em-primary-hover: ${hover}; --em-bubble-bg-self: ${hex}; --em-bg-active: rgba(${r}, ${g}, ${b}, 0.12);`
+  setConfig({ primaryColor: hex })
+}
+
+function resetBrand(): void {
+  brandVars.value = ''
+  brandHex.value = DEFAULT_PRIMARY
+  hueRatio.value = 0.553
+  setConfig({ primaryColor: DEFAULT_PRIMARY })
+}
+
+// 拖拽几何：色条在 section 16px 水平内边距内通栏，left/width 由 windowWidth 同步算出
+// （createSelectorQuery 在蒸汽端可能查不到 rect 导致拖拽失效，不用异步查询）
+let hueSliding = false
+let hueRectLeft = 0
+let hueRectWidth = 0
+let hueRectReady = false
+
+function ensureHueRect(): void {
+  if (hueRectReady) return
+  const win = uni.getWindowInfo()
+  hueRectLeft = 16
+  hueRectWidth = win.windowWidth - 32
+  hueRectReady = hueRectWidth > 0
+}
+
+function applyHueByClientX(clientX: number): void {
+  if (!hueRectReady || hueRectWidth <= 0) return
+  const ratio = Math.min(0.999, Math.max(0, (clientX - hueRectLeft) / hueRectWidth))
+  setBrand(ratio * 360)
+}
+
+function onHueTouchStart(e: TouchEvent): void {
+  hueSliding = true
+  ensureHueRect()
+  const touch = e.touches[0]
+  if (touch != null) applyHueByClientX(touch.clientX)
+}
+
+function onHueTouchMove(e: TouchEvent): void {
+  if (!hueSliding) return
+  const touch = e.touches[0]
+  if (touch != null) applyHueByClientX(touch.clientX)
+}
+
+function onHueTouchEnd(): void {
+  hueSliding = false
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.lab {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--em-bg-base);
+}
+
+/* 内联变量的作用域层：与 themeClass 所在根分开（蒸汽端同节点 class 变量会顶掉内联变量） */
+.lab__theme-scope {
+  display: flex;
+  flex-direction: column;
+}
+
+.lab__section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-border-light);
+}
+
+.lab__section-title {
+  font-size: var(--em-font-size-13);
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-tertiary);
+  margin-bottom: var(--em-spacing-3);
+}
+
+.lab__btn {
+  height: 32px;
+  line-height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: var(--em-spacing-4);
+  padding-right: var(--em-spacing-4);
+  margin-right: var(--em-spacing-3);
+  font-size: var(--em-font-size-14);
+  color: var(--em-text-inverse);
+  background-color: var(--em-primary-color);
+  border-radius: var(--em-radius);
+}
+
+/* 运行时主题色：色相条（36 段纯色拼出，避免依赖各端渐变/色函数支持） */
+.lab__hue-bar {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  height: 28px;
+  border-radius: var(--em-radius);
+  overflow: hidden;
+}
+
+.lab__hue-seg {
+  flex: 1;
+  height: 28px;
+}
+
+.lab__hue-thumb {
+  position: absolute;
+  top: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #ffffff;
+  margin-left: -12px;
+}
+
+.lab__hue-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: var(--em-spacing-3);
+}
+
+.lab__hue-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--em-radius);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--em-border-color);
+}
+
+.lab__hex {
+  flex: 1;
+  margin-left: var(--em-spacing-3);
+  font-size: var(--em-font-size-14);
+  color: var(--em-text-secondary);
+}
+
+/* 流式气泡演示：宽度链用 rpx 定宽（蒸汽端多行 text 禁用 % max-width，见坑集 #1） */
+.lab__bubble-demo {
+  display: flex;
+  flex-direction: column;
+}
+
+.lab__bubble-row {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: var(--em-bubble-gap);
+}
+
+.lab__bubble-row--self {
+  justify-content: flex-end;
+}
+</style>

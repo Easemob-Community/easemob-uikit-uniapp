@@ -49,8 +49,8 @@
             :color="config.enableStreamMessage ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
           />
         </view>
-        <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/style-lab')">
-          <text class="mine__cell-label">流式气泡演示（样式实验室）</text>
+        <view class="mine__cell" @click="onOpen('/sub-im/pages/style-lab/stream')">
+          <text class="mine__cell-label">AI 流式气泡演示</text>
           <text class="mine__cell-arrow">›</text>
         </view>
       </view>

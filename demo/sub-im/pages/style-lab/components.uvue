@@ -1,0 +1,146 @@
+<template>
+  <scroll-view scroll-y :class="['lab', themeClass]">
+    <view class="lab__section">
+      <text class="lab__section-title">em-avatar</text>
+      <view class="lab__avatars">
+        <!-- em-avatar 是 virtualHost：布局 class 落普通 view 包裹（mp 宿主类失效，坑集 §8a）；
+             包裹层与行容器都要 overflow: visible——徽标负偏移探出头像盒，蒸汽端 view 默认 overflow:hidden 会裁 -->
+        <view class="lab__avatar-item"><em-avatar name="环信" :size="64" :badge="3" /></view>
+        <view class="lab__avatar-item"><em-avatar name="Neo" :size="48" shape="square" :badge="120" /></view>
+        <view class="lab__avatar-item"><em-avatar name="张小龙" :size="40" :badge-dot="true" /></view>
+        <view class="lab__avatar-item"><em-avatar name="UIKit" :size="32" /></view>
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">em-icon（vue icons-v2 同款字形全量字体）</text>
+      <view class="lab__icons">
+        <view v-for="icon in iconNames" :key="icon" class="lab__icon-item">
+          <em-icon :name="icon" :size="24" />
+          <text class="lab__icon-name">{{ icon }}</text>
+        </view>
+        <view class="lab__icon-item">
+          <em-icon name="plane" :size="24" color="#07c160" />
+          <text class="lab__icon-name">custom color</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">em-empty（空状态：normal / small / large）</text>
+      <em-empty icon="list-bullet" :description="t('conversation.empty')" />
+      <em-empty icon="search" size="small" :description="t('conversation.searchEmpty')" />
+      <em-empty icon="bubble-rect-2" size="large" :title="t('chat.title')" :description="t('chat.noMessages')" />
+    </view>
+
+    <view class="lab__section">
+      <text class="lab__section-title">em-skeleton（骨架屏：静态灰块）</text>
+      <view class="lab__skeleton-item">
+        <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
+        <view class="lab__skeleton-lines">
+          <em-skeleton width="40%" />
+          <em-skeleton class="lab__skeleton-line-sub" width="70%" />
+        </view>
+      </view>
+      <em-skeleton class="lab__skeleton-block" />
+      <em-skeleton variant="paragraph" :rows="3" />
+    </view>
+</scroll-view>
+</template>
+
+<script setup lang="ts">
+import { useLocale } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+const { t } = useLocale()
+
+// 与 vue icons-v2 同名的规范键（非旧版 uni-icons 别名），用于字体走查
+const iconNames: EmIconName[] = [
+  'chevron-left', 'search', 'plus', 'mic', 'rect-img', 'camera', 'doc', 'plane',
+  'speaker-wave', 'video', 'check-single', 'circle-bang', 'arrow-down-tray', 'circle-ellipsis', 'trash', 'arrow-lft-uturn'
+]
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.lab {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--em-bg-base);
+}
+
+.lab__section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-border-light);
+}
+
+.lab__section-title {
+  font-size: var(--em-font-size-13);
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-tertiary);
+  margin-bottom: var(--em-spacing-3);
+}
+
+.lab__avatars {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* 徽标负偏移探出头像盒：蒸汽端祖先 view 默认 overflow:hidden 会把探出部分切成平顶（em-avatar 根本身已显式放行） */
+  overflow: visible;
+}
+
+.lab__avatar-item {
+  margin-right: var(--em-spacing-4);
+  overflow: visible;
+}
+
+.lab__icons {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.lab__icon-item {
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--em-spacing-3);
+}
+
+.lab__icon-name {
+  font-size: var(--em-font-size-10);
+  color: var(--em-text-tertiary);
+  margin-top: var(--em-spacing-1);
+}
+
+.lab__skeleton-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: var(--em-spacing-4);
+}
+
+.lab__skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--em-spacing-3);
+}
+
+.lab__skeleton-line-sub {
+  margin-top: var(--em-spacing-2);
+}
+
+.lab__skeleton-block {
+  margin-bottom: var(--em-spacing-4);
+}
+</style>

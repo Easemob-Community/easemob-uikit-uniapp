@@ -1,7 +1,29 @@
 <template>
   <view class="page" :class="themeClass">
+    <!-- 整栏自绘演示（?inputbar=custom）：#input-bar 插槽整栏替换默认输入栏，结构/样式全自绘，
+         但键盘避让/面板互斥/录音/禁言/@/草稿链全部经 scope 契约由库内保持。
+         插槽有无必须在页面实例创建时确定（composer 在 setup 实例化），故用查询参数 + redirectTo 重进切换 -->
     <em-chat-page
-      v-if="conversationId !== ''"
+      v-if="conversationId !== '' && useCustomInputBar"
+      :conversation-id="conversationId"
+      :chat-type="chatType"
+      :title="sceneTitle"
+      :show-action="!sceneHideAction"
+      :quick-replies="sceneQuickReplies"
+      :quick-reply-mode="sceneQuickReplyMode"
+      :extra-message-menus="sceneExtraMenus"
+      @open-info="onOpenInfo"
+      @message-menu="onSceneMessageMenu"
+    >
+      <template #custom-message="{ message }">
+        <demo-card :message="message" fallback-text="[自定义消息]" @action="onCardAction" />
+      </template>
+      <template #input-bar="scope">
+        <demo-custom-inputbar :scope="scope" />
+      </template>
+    </em-chat-page>
+    <em-chat-page
+      v-else-if="conversationId !== ''"
       :conversation-id="conversationId"
       :chat-type="chatType"
       :title="sceneTitle"
@@ -43,8 +65,9 @@
 
     </em-chat-page>
 
-    <!-- Demo 能力入口：向当前会话注入 mock AI 流式回复（真实链路由 SDK onStreamMessage 驱动） -->
-    <view class="ai-demo" @click="onAiDemo">
+    <!-- Demo 能力入口：向当前会话注入 mock AI 流式回复（真实链路由 SDK onStreamMessage 驱动）；
+         显隐由 demo/common/ai-stream-demo.ts 的 AI_STREAM_FAB_VISIBLE 控制 -->
+    <view v-if="AI_STREAM_FAB_VISIBLE" class="ai-demo" @click="onAiDemo">
       <text class="ai-demo__text">AI 演示</text>
     </view>
 
@@ -109,7 +132,12 @@
             <text class="scene-panel__btn-text">未注册事件</text>
           </view>
         </view>
-        <text class="scene-panel__hint">卡片只发 event/params/ext；聊天页把 #custom-message 交给 demo-card（宿主组件）渲染，UIKit 不含卡片样式。输入栏上方的「发订单/发病例/换手机号」等入口同样由宿主经 #input-toolbar 注入，点一下即发。未知事件走宿主兜底。</text>
+        <view class="scene-panel__actions">
+          <view class="scene-panel__btn" @click="onToggleCustomInputBar">
+            <text class="scene-panel__btn-text">{{ useCustomInputBar ? '恢复默认输入栏' : '整栏自绘输入栏' }}</text>
+          </view>
+        </view>
+        <text class="scene-panel__hint">卡片只发 event/params/ext；聊天页把 #custom-message 交给 demo-card（宿主组件）渲染，UIKit 不含卡片样式。输入栏上方的「发订单/发病例/换手机号」等入口同样由宿主经 #input-toolbar 注入，点一下即发。未知事件走宿主兜底。「整栏自绘输入栏」演示 #input-bar 插槽：demo-custom-inputbar 全自绘结构，键盘/面板/录音/禁言/@ 行为经 scope 契约由库内保持（重进页面生效）。</text>
       </view>
     </em-popup>
   </view>
@@ -124,9 +152,10 @@ import { scenarioOf, type ScenarioCard, type ScenarioKey } from '@/common/scenar
 import { DEMO_UNKNOWN_EVENT, demoCardOf } from '@/common/demo-card-data'
 import DemoCard from '@/components/demo-card/demo-card.vue'
 import DemoComposerBar from '@/components/demo-composer-bar/demo-composer-bar.vue'
+import DemoCustomInputbar from '@/components/demo-custom-inputbar/demo-custom-inputbar.vue'
 import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
 import { useDemoTheme } from '@/common/theme'
-import { AI_STREAM_DEMO_CONTENT, AI_STREAM_ERROR_CONTENT, runMockAiStream } from '@/common/ai-stream-demo'
+import { AI_STREAM_DEMO_CONTENT, AI_STREAM_ERROR_CONTENT, AI_STREAM_FAB_VISIBLE, runMockAiStream } from '@/common/ai-stream-demo'
 
 const { themeClass } = useDemoTheme()
 
@@ -147,6 +176,10 @@ interface SceneOption {
 
 const isDemo = ref(false)
 const panelVisible = ref(false)
+// 整栏自绘演示（?inputbar=custom）：#input-bar 插槽整栏替换默认输入栏。
+// 插槽有无必须在页面实例创建时确定（chat-page 在 setup 检测并实例化 composer），
+// 故不走场景开关的实时 toggle，用查询参数 + redirectTo 重进页面切换
+const useCustomInputBar = ref(false)
 
 const sceneFlags = reactive<Record<SceneFlagKey, boolean>>({
   banner: true,
@@ -200,7 +233,14 @@ onLoad((options) => {
   chatType.value = type === CONVERSATION_TYPE.GROUP_CHAT ? CONVERSATION_TYPE.GROUP_CHAT : CONVERSATION_TYPE.SINGLE_CHAT
   scenarioKey.value = (options?.['scenario'] ?? 'trade') as ScenarioKey
   isDemo.value = options?.['scene'] === '1' || (options?.['scenario'] ?? '') !== ''
+  useCustomInputBar.value = options?.['inputbar'] === 'custom'
 })
+
+// 整栏自绘演示切换：redirectTo 重进当前页（插槽有无必须页面级静态确定，见上注释）
+function onToggleCustomInputBar(): void {
+  const base = `/sub-im/pages/chat/chat?conversationId=${conversationId.value}&chatType=${chatType.value}&scenario=${scenarioKey.value}&scene=1`
+  uni.redirectTo({ url: useCustomInputBar.value ? base : `${base}&inputbar=custom` })
+}
 
 // 聊天详情入口（em-chat-page 自绘 header 右上角 more 按钮）
 function onOpenInfo(id: string) {
@@ -354,11 +394,11 @@ onUnload(() => {
   background-color: var(--em-chat-bg);
 }
 
-/* Demo 能力入口：悬浮在输入栏上方（仅 demo 工程，不进 UIKit 组件） */
+/* Demo 能力入口：悬浮在引用条/快捷回复条之上、消息列表右下角（仅 demo 工程，不进 UIKit 组件） */
 .ai-demo {
   position: absolute;
   right: 12px;
-  bottom: 96px;
+  bottom: 150px;
   z-index: 20;
   display: flex;
   flex-direction: row;
@@ -381,7 +421,7 @@ onUnload(() => {
 .scene-fab {
   position: absolute;
   right: 12px;
-  bottom: 140px;
+  bottom: 194px;
   z-index: 21;
   display: flex;
   flex-direction: row;

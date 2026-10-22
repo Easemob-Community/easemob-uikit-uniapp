@@ -7,6 +7,7 @@
       @back="onBack"
       @deleted="onExitToConversation"
       @leaved="onExitToConversation"
+      @contact-deleted="onExitToConversation"
       @chat-member="onChatMember"
     />
   </view>
@@ -35,7 +36,7 @@ onLoad((options) => {
   chatType.value = type === CONVERSATION_TYPE.GROUP_CHAT ? CONVERSATION_TYPE.GROUP_CHAT : CONVERSATION_TYPE.SINGLE_CHAT
 })
 
-// 删除会话/退群/解散后退回会话列表（聊天详情 ← 聊天页 ← 会话列表，delta 2）
+// 删除会话/退群/解散/删除好友后退回会话列表（聊天详情 ← 聊天页 ← 会话列表，delta 2）
 function onExitToConversation() {
   uni.navigateBack({ delta: 2 })
 }
