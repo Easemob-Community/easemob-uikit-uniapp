@@ -23,7 +23,7 @@ export const uiConfig = reactive<EmUiConfig>({
   timeDividerInterval: TIME_DIVIDER_INTERVAL,
   enableStreamMessage: true,
   streamThrottle: STREAM_FLUSH_INTERVAL,
-  inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true },
+  inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true, sendOnReturn: true },
   messageMenuKeys: [MESSAGE_MENU_KEY.COPY, MESSAGE_MENU_KEY.QUOTE, MESSAGE_MENU_KEY.RECALL, MESSAGE_MENU_KEY.DELETE],
   conversationMenuKeys: [CONVERSATION_MENU_KEY.PIN, CONVERSATION_MENU_KEY.MUTE, CONVERSATION_MENU_KEY.DELETE],
   emojiList: DEFAULT_EMOJI_LIST,

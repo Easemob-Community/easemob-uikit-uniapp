@@ -28,6 +28,12 @@ export interface EmInputFeatures {
   camera: boolean
   video: boolean
   file: boolean
+  /**
+   * 回车键发送（对齐微信「回车键发送消息」）：
+   * true（默认）= 键盘回车发送，多行内容靠粘贴；false = 换行输入模式，
+   * 输入框生长为多行（封顶 5 行），回车=换行，发送走输入栏纸飞机
+   */
+  sendOnReturn: boolean
 }
 
 /** 附件选择上下文：聊天页调起宿主附件能力时透传；resolve 外部 URI 时可只带 mimeTypes */
@@ -385,3 +391,85 @@ export interface EmQuickReply {
 
 /** 快捷回复点击行为：fill=替换当前草稿（默认，用户可编辑后再发）；send=直接发送 */
 export type EmQuickReplyMode = 'fill' | 'send'
+
+/** 输入栏底部面板态（none=收起；emoji/media 互斥，useChatComposer / #input-bar 插槽共用） */
+export type EmChatComposerPanel = 'none' | 'emoji' | 'media'
+
+/** 可切换的面板种类（收起走 collapsePanel） */
+export type EmChatComposerPanelKind = 'emoji' | 'media'
+
+/** 录音手势触摸事件的最小结构（不引 DOM lib 的 TouchEvent；各端原生 TouchEvent 结构兼容） */
+export interface EmChatComposerTouchEvent {
+  touches: Array<{ clientY: number }>
+}
+
+/** textarea @linechange 事件的最小结构（生长输入封顶用；官方 detail：height / heightRpx / lineCount） */
+export interface EmTextareaLineChangeEvent {
+  detail: { lineCount: number, height: number, heightRpx: number }
+}
+
+/**
+ * em-chat-page `#input-bar` 整栏自绘插槽的 scope 契约（M2.16）。
+ * 约束式替换：结构/样式可任意自绘，但必须经这里的动作函数驱动行为——
+ * 键盘避让（页面壳承担）、键盘↔面板互斥、录音状态机、禁言禁用态、@ 提及、草稿持久化、
+ * 引用链路由库内保持运作；绕过 setDraft/send 自行发消息将丢失上述链路。
+ */
+export interface EmChatInputBarScope {
+  /** 当前草稿（写入走 setDraft，直接改不会触发草稿持久化/typing/@ 检测） */
+  draft: string
+  /** 写入草稿（草稿持久化、typing 信号、@ 尾部触发检测自动生效） */
+  setDraft: (v: string) => void
+  /** 当前引用目标（选择引用后由页面持有，自绘引用条展示用） */
+  quote: EmQuoteInfo | null
+  /** 关闭引用条 */
+  closeQuote: () => void
+  /** 禁用态（全员禁言且非群主/管理员）：输入/发送/语音/面板应全部禁用 */
+  disabled: boolean
+  /** 禁用态下任何操作尝试统一上报（页面 toast 提示），不上报则用户无感知 */
+  notifyDisabledTap: () => void
+  /** placeholder 覆盖建议值（禁用态为「全员禁言中」；空串可回落自绘文案） */
+  placeholder: string
+  /** 输入栏功能集开关（voice/emoji/image/camera/video/file，经 uiConfig.inputFeatures 配置） */
+  features: EmInputFeatures
+  /** emoji 字符集（uiConfig.emojiList），自绘 emoji 面板数据源 */
+  emojis: string[]
+  /** 快捷回复常用语（em-chat-page quickReplies 透传） */
+  quickReplies: EmQuickReply[]
+  /** 上推口径键盘高度（页面壳已做键盘顶起，自绘栏一般无需使用） */
+  keyboardLift: number
+  /** 当前底部面板态 */
+  panel: EmChatComposerPanel
+  /** 自绘面板的内联样式（高度跟随最近键盘高度 + safe-bottom padding），直接绑到面板根节点 */
+  panelStyle: string
+  /** 开/关指定面板（开面板前自动收键盘，键盘位与面板位不叠加） */
+  togglePanel: (kind: EmChatComposerPanelKind) => void
+  /** 收起面板 + 收键盘 */
+  collapsePanel: () => void
+  /** 输入框 :focus 建议绑定值（开面板/收键盘时为 false） */
+  inputFocus: boolean
+  /** 主动收起软键盘 */
+  closeKeyboard: () => void
+  /** 自绘输入框 focus 事件上报（聚焦即收面板；不上报则面板/键盘可能叠加） */
+  notifyInputFocus: () => void
+  /** 自绘输入框 blur 事件上报（清零键盘高度兜底） */
+  notifyInputBlur: () => void
+  /** 语音模式（按住说话条替换输入框） */
+  voiceMode: boolean
+  /** 录音中（按住未松手） */
+  recording: boolean
+  /** 上滑越过取消阈值（松手将取消本次录音，自绘取消态提示用） */
+  willCancel: boolean
+  /** 切换语音模式 */
+  toggleVoiceMode: () => void
+  /** 自绘「按住说话」按钮的 touchstart/touchmove/touchend/touchcancel 绑定 */
+  onVoiceTouchStart: (e: EmChatComposerTouchEvent) => void
+  onVoiceTouchMove: (e: EmChatComposerTouchEvent) => void
+  onVoiceTouchEnd: () => void
+  onVoiceTouchCancel: () => void
+  /** 发送当前草稿（禁言防御/引用/@ext/清草稿/滚底内置；空草稿为空操作） */
+  send: () => void
+  /** 媒体动作（key 取 MEDIA_PANEL_KEY.ALBUM/CAMERA/VIDEO/FILE；选择器与发送内置） */
+  selectMedia: (key: string) => void
+  /** 快捷回复点选（按 quickReplyMode 填草稿或直接发送） */
+  selectQuickReply: (item: EmQuickReply) => void
+}

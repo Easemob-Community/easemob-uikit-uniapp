@@ -1,9 +1,10 @@
 <template>
-  <view :class="ns.b()" :style="rootStyle">
+  <view :class="[ns.b(), customClass]" :style="rootStyle + customStyle">
     <!-- 快捷回复条（M2.12）：常用语胶囊，点选事件交给父组件（填草稿/直接发送）；禁言态自动隐藏 -->
     <em-quick-reply-bar
       v-if="quickReplies.length > 0 && !disabled"
       :items="quickReplies"
+      :disabled="submitting"
       @select="onQuickReply"
     />
 
@@ -40,6 +41,29 @@
       >
         <text :class="ns.e('record-text')">{{ recording ? t('chat.voice.releaseEnd') : t('chat.voice.holdTalk') }}</text>
       </view>
+      <!-- 输入区三态（微信「回车键发送」语义）：
+           ① 换行输入模式（sendOnReturn=false，全端）：生长 textarea，回车=换行，发送走栏上纸飞机；
+           ② iOS 回车发送：生长 textarea + confirm-type=send——UITextView 粘贴保留换行（单行 input 会剥掉），键盘仍是发送键；
+           ③ 单行 input（sendOnReturn=true 的其余端）：零回归，回车发送 -->
+      <view v-else-if="growingInput" :class="ns.e('multiline-wrap')" :style="growWrapStyle">
+        <textarea
+          :class="[ns.e('multiline-input'), disabled && ns.m('input-disabled')]"
+          :style="growTextareaStyle"
+          v-model="text"
+          :focus="inputFocus"
+          :placeholder="placeholder !== '' ? placeholder : t('chat.placeholder')"
+          :disabled="disabled"
+          :auto-height="!growCapped"
+          :confirm-type="features.sendOnReturn ? 'send' : 'return'"
+          :adjust-position="false"
+          :show-confirm-bar="false"
+          :disable-default-padding="true"
+          @confirm="onComposerConfirm"
+          @linechange="onGrowLineChange"
+          @focus="onInputFocus"
+          @blur="onInputBlur"
+        />
+      </view>
       <input
         v-else
         :class="[ns.e('input'), disabled && ns.m('input-disabled')]"
@@ -56,15 +80,21 @@
       <view v-if="features.emoji" :class="[ns.e('tool'), !showVoice && ns.m('tool-first'), panel === 'emoji' && ns.m('tool-active')]" @click="onToggleEmoji">
         <EmIcon name="circle-face" :size="24" />
       </view>
+      <!-- 发送位与「+」互斥同槽（对齐微信手机版：不常驻文字发送按钮，把宽度留给输入区）：
+           有可发送草稿 = 纸飞机（品牌色）；草稿为空 =「+」媒体面板入口 -->
       <view
-        v-if="hasMediaFeatures"
+        v-if="hasSendableDraft"
+        :class="[ns.e('tool'), !showVoice && !features.emoji && ns.m('tool-first')]"
+        @click="onSend"
+      >
+        <EmIcon name="plane" :size="24" color="var(--em-primary-color)" />
+      </view>
+      <view
+        v-else-if="hasMediaFeatures"
         :class="[ns.e('tool'), !showVoice && !features.emoji && ns.m('tool-first'), panel === 'media' && ns.m('tool-active')]"
         @click="onToggleMedia"
       >
         <EmIcon name="circle-plus" :size="24" />
-      </view>
-      <view :class="ns.e('send')" @click="onSend">
-        <text :class="ns.e('send-text')">{{ t('chat.send') }}</text>
       </view>
     </view>
 
@@ -92,17 +122,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import EmQuickReplyBar from '../em-quick-reply-bar/em-quick-reply-bar.vue'
 import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
-import { DEFAULT_EMOJI_LIST, MEDIA_PANEL_KEY, PANEL_MIN_HEIGHT } from '../../libs/constants'
-import { cancelRecord, isRecording, startRecord, stopRecord } from '../../libs/platform'
+import { DEFAULT_EMOJI_LIST, MEDIA_PANEL_KEY } from '../../libs/constants'
 import { canPickAttachment } from '../../libs/attachment'
-import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
-import { useKeyboardHeight } from '../../libs/use/useKeyboardHeight'
-import type { EmInputFeatures, EmQuickReply, EmQuoteInfo } from '../../libs/types'
+import { useChatComposer } from '../../libs/use/useChatComposer'
+import type { EmInputFeatures, EmQuickReply, EmQuoteInfo, EmTextareaLineChangeEvent } from '../../libs/types'
 import { quoteIconNameOf, quoteSuffixOf } from '../../libs/utils/quote'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLocale } from '../../libs/use/useLocale'
@@ -116,6 +144,8 @@ interface Props {
   emojis?: string[]
   /** 禁用态（全员禁言等）：输入/发送/语音/面板全断，交互尝试统一 emit disabled-tap 由父组件提示 */
   disabled?: boolean
+  /** 文本/直发快捷回复提交中：拦截重复 send 与快捷回复点选，默认 false */
+  submitting?: boolean
   /** placeholder 覆盖（空串回落内置 chat.placeholder 文案；禁用态父组件传入「全员禁言中」等） */
   placeholder?: string
   /** 快捷回复常用语（M2.12；空数组不渲染，禁用态隐藏）；点击仅 emit，填草稿/发送由父组件决定 */
@@ -123,16 +153,21 @@ interface Props {
   /** 外部收起信号：数值变化即收起 emoji/媒体面板并隐藏软键盘（聊天页点击消息区时递增）。
    *  面板状态归组件内部，父级不持有，故用递增信号而非 $refs 调组件实例方法——蒸汽端/小程序/H5 行为一致 */
   collapseSignal?: number
+  customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
+  customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   quote: null,
-  features: () => ({ voice: true, emoji: true, image: true, camera: true, video: true, file: true }),
+  features: () => ({ voice: true, emoji: true, image: true, camera: true, video: true, file: true, sendOnReturn: true }),
   emojis: () => DEFAULT_EMOJI_LIST,
   disabled: false,
+  submitting: false,
   placeholder: '',
   quickReplies: () => [],
-  collapseSignal: 0
+  collapseSignal: 0,
+  customClass: '',
+  customStyle: ''
 })
 
 defineOptions({ styleIsolation: 'app-and-page' })
@@ -170,16 +205,119 @@ const { t } = useLocale()
 
 const showVoice = computed(() => props.features.voice && VOICE_SUPPORTED)
 
+// 发送位显隐：草稿 trim 后非空才显示纸飞机发送键，空草稿仍显示「+」媒体入口。
+// 两者同槽互斥，收起态不再常驻文字「发送」按钮——省出的宽度全部给输入框，
+// 也避免空草稿时挂一个点了没反应的蓝色发送键（发送语义与 onSend 的空值拦截保持一致）
+const hasSendableDraft = computed(() => props.modelValue.trim() !== '')
+
 const text = computed({
   get: () => props.modelValue,
   set: (v: string) => emit('update:modelValue', v)
 })
 
 // @ 触发检测：草稿变长且新值以 @ 结尾（尾部追加形态，含粘贴结尾为 @ 的情况；删除到 @ 结尾不触发）
+// 注：em-chat-page 的 #input-bar 整栏自绘时该检测由页面侧承担（watch draft 同款逻辑），
+// 本 emit 服务默认输入栏与 inputbar 独立使用场景
 watch(() => props.modelValue, (v, old) => {
   if (v.length > (old ?? '').length && v.endsWith('@')) {
     emit('mention-trigger')
   }
+})
+
+// ========== 行为核心：键盘避让 / 键盘↔面板互斥 / 录音手势状态机 / 禁用守卫 ==========
+// 单一实现在 libs/use/useChatComposer（em-chat-page 的 #input-bar 整栏自绘插槽复用同一 composable）；
+// 本组件只保留渲染与草稿/引用条/媒体项展示逻辑，对外 props/emits 契约不变
+const {
+  panel,
+  inputFocus,
+  voiceMode,
+  recording,
+  willCancel,
+  rootStyle,
+  panelStyle,
+  guardDisabled,
+  togglePanel,
+  collapse,
+  onInputFocus,
+  onInputBlur,
+  toggleVoiceMode: onToggleVoiceMode,
+  onRecordTouchStart,
+  onRecordTouchMove,
+  onRecordTouchEnd,
+  onRecordTouchCancel
+} = useChatComposer({
+  disabled: toRef(props, 'disabled'),
+  onDisabledTap: () => emit('disabled-tap'),
+  onVoiceSend: (path, duration) => emit('voice-send', path, duration)
+})
+
+function onToggleEmoji(): void {
+  togglePanel('emoji')
+}
+
+function onToggleMedia(): void {
+  togglePanel('media')
+}
+
+// 生长输入（textarea 替代单行 input）生效条件：
+// - sendOnReturn=false（换行输入模式）：全端生长 textarea，回车=换行，发送走栏上纸飞机；
+// - sendOnReturn=true 且 iOS：textarea + confirm-type=send（UITextView 粘贴保留换行、键盘仍是发送键；
+//   Android 系统限制 textarea 键盘恒为换行无法发送，故其余端保持单行 input 零回归）
+// #ifdef APP-IOS
+const GROWING_INPUT_ON_SEND_RETURN = true
+// #endif
+// #ifndef APP-IOS
+const GROWING_INPUT_ON_SEND_RETURN = false
+// #endif
+const growingInput = computed(() => !props.features.sendOnReturn || GROWING_INPUT_ON_SEND_RETURN)
+
+// 生长输入封装：蒸汽端原生 textarea 布局/事件值不可靠（文字绘制高度 ≠ 布局高度、v-model 可能不回传 \n），
+// 全部改 JS 驱动——包裹层高度跟 linechange 上报值走，行数用来封顶 5 行（不信草稿 \n）
+const GROW_MAX_LINES = 5
+const growLineCount = ref(1)
+const growWrapHeight = ref(0) // 最近一次 ≤ 封顶行数的文本高度（px），包裹层高度 = 它 + 包裹层竖直 padding
+const growCappedHeight = ref(0) // 封顶后冻结的文本高度（超过 5 行时取最近 ≤5 行的值）
+
+function onGrowLineChange(e: EmTextareaLineChangeEvent): void {
+  const lineCount = e.detail?.lineCount ?? 0
+  const height = e.detail?.height ?? 0
+  if (lineCount > 0) growLineCount.value = lineCount
+  if (height > 0 && lineCount <= GROW_MAX_LINES) {
+    growWrapHeight.value = height
+    growCappedHeight.value = height
+  }
+}
+
+// 草稿清空时复位生长态（linechange 在删空时可能不回调）
+watch(() => props.modelValue, (v) => {
+  if (v === '') {
+    growLineCount.value = 1
+    growWrapHeight.value = 0
+    growCappedHeight.value = 0
+  }
+})
+
+const growCapped = computed(() => growLineCount.value > GROW_MAX_LINES)
+// 包裹层高度：未封顶跟内容；封顶冻结在 5 行高度（超出部分 textarea 内部滚动）
+const growWrapStyle = computed(() => {
+  const h = growCapped.value ? growCappedHeight.value : growWrapHeight.value
+  return h > 0 ? `height: ${h}px;` : ''
+})
+// 封顶后关 auto-height（auto-height 下 style.height 不生效，反过来固定高度才生效）并写死文本高度
+const growTextareaStyle = computed(() => {
+  if (!growCapped.value || growCappedHeight.value <= 0) return ''
+  return `height: ${growCappedHeight.value}px;`
+})
+
+// 生长输入的键盘右下角键：回车发送档（iOS）发送；换行输入档不处理（换行键只插换行，发送走栏上纸飞机）
+function onComposerConfirm(): void {
+  if (!props.features.sendOnReturn) return
+  onSend()
+}
+
+// 外部收起（聊天页点击消息区递增 collapseSignal）：面板 + 键盘一起收
+watch(() => props.collapseSignal, () => {
+  collapse()
 })
 
 // ========== 引用条显示 ==========
@@ -193,120 +331,10 @@ const quoteFrom = computed(() => {
 const quoteSuffix = computed(() => quoteSuffixOf(props.quote, t))
 const quoteIcon = computed<EmIconName>(() => quoteIconNameOf(props.quote?.type))
 
-// ========== 键盘/面板互斥（对齐 vue 版 h5-input：none/emoji/media 三态，开面板收键盘，聚焦收面板） ==========
-
-const inputFocus = ref(false)
-const panel = ref<'none' | 'emoji' | 'media'>('none')
-// 输入框真实聚焦态：H5 没有键盘高度监听（useKeyboardHeight 在 WEB 不注册），
-// 且部分端键盘已弹起但高度事件未回，收起键盘时需靠它判定是否真要收（见 closeKeyboardIfVisible）
-const focused = ref(false)
-
-// 禁言翻转瞬间复位面板/语音/焦点（禁用态 guard 只拦新操作，已开的面板/语音模式需主动收）
-watch(() => props.disabled, (v) => {
-  if (v) {
-    panel.value = 'none'
-    exitVoiceMode()
-    inputFocus.value = false
-  }
-})
-
-// 禁用态守卫：任何交互尝试统一 emit disabled-tap（父组件 toast），不改动内部状态
-function guardDisabled(): boolean {
-  if (props.disabled) {
-    emit('disabled-tap')
-    return true
-  }
-  return false
-}
-
-// 快捷回复点选：禁用态兜底拦截，其余情况原样上抛（是否发送由父组件 quickReplyMode 决定）
-function onQuickReply(item: EmQuickReply): void {
-  if (guardDisabled()) return
-  emit('quick-reply', item)
-}
-
-function onToggleEmoji(): void {
-  if (guardDisabled()) return
-  const open = panel.value !== 'emoji'
-  // 开面板前先收键盘（对齐 vue 版 h5-input：togglePanel 先 blur textarea 再开面板，键盘位与面板位不叠加）
-  if (open) closeKeyboardIfVisible()
-  panel.value = open ? 'emoji' : 'none'
-  if (open) {
-    inputFocus.value = false
-  }
-}
-
-function onInputFocus(): void {
-  focused.value = true
-  panel.value = 'none'
-}
-
-// 手动避让（对齐 hello-uni-app-x keyboard-adjust 示例）：adjust-position 关系统默认上推后，
-// 输入栏以 margin-bottom = 键盘实际上推高度顶到键盘上方；blur 清零兜底部分端收起不补发 0 高度事件
-function onInputBlur(): void {
-  focused.value = false
-  resetKeyboardHeight()
-}
-
-// 面板高度 = max(最近键盘本体高度, 280px)：真实键盘高于兜底值时面板跟随键盘（对齐 vue 版 panelHeightVar，
-// 键盘↔面板互切无跳变）；键盘未弹过则恒为 280，对应 css 中 --em-chat-panel-height 一档已被内联覆盖。
-// 注意面板用 keyboardHeight（面板口径）、输入栏上推用 keyboardLift（上推口径：iOS/鸿蒙都用上报值原值，
-// 不扣安全区），两者口径不同，见 useKeyboardHeight 文件头
-const { keyboardHeight, keyboardLift, resetKeyboardHeight } = useKeyboardHeight()
-
-// 面板底部安全区（对齐 vue 版 panel 的 safe-bottom padding）
-const panelStyle = computed(() => {
-  const bottom = getSafeAreaBottom()
-  const pad = bottom > 0 ? `padding-bottom: ${bottom}px;` : ''
-  return `height: ${Math.max(keyboardHeight.value, PANEL_MIN_HEIGHT)}px;${pad}`
-})
-
-// 无面板时输入栏自身贴底，需让出 Home 指示条安全区；面板打开时安全区由面板承担，避免双重间距。
-// 键盘弹起时：以键盘实际上推高度顶起（键盘区已覆盖安全区，不再叠加安全区 padding；
-// 面板口径与上推口径的差异收口在 useKeyboardHeight 的 keyboardHeight / keyboardLift）
-const rootStyle = computed(() => {
-  if (keyboardLift.value > 0) return `margin-bottom: ${keyboardLift.value}px;`
-  if (panel.value !== 'none') return ''
-  const bottom = getSafeAreaBottom()
-  return bottom > 0 ? `padding-bottom: ${bottom}px;` : ''
-})
-
-// ========== 收起键盘 / 面板 ==========
-
-// 键盘是否可能弹起：上推高度 > 0 是直接证据；H5 不监听键盘高度（见 useKeyboardHeight），靠 focused 兜底
-function keyboardMaybeOpen(): boolean {
-  return focused.value || keyboardLift.value > 0
-}
-
-// 收键盘：先主动清零键盘高度（部分端收起后不补发 0 高度事件，口径同 onInputBlur），再调原生收起。
-// uni.hideKeyboard 在 App（含鸿蒙）/H5/微信小程序均实现；H5 实现为 blur 当前 input/DOM 焦点
-function closeKeyboard(): void {
-  inputFocus.value = false
-  focused.value = false
-  resetKeyboardHeight()
-  uni.hideKeyboard()
-}
-
-// 仅在键盘可能弹起时收：面板展开态点工具按钮切换时调用，避免每次开面板都空调一次 hideKeyboard
-function closeKeyboardIfVisible(): void {
-  if (!keyboardMaybeOpen()) return
-  closeKeyboard()
-}
-
-// 外部收起（聊天页点击消息区，对齐 vue 版 chat__content 的点击 blur 输入框）：
-// 面板 + 键盘一起收；面板本就收起且键盘未弹起时为空操作
-function collapseInput(): void {
-  panel.value = 'none'
-  closeKeyboardIfVisible()
-}
-
-watch(() => props.collapseSignal, () => {
-  collapseInput()
-})
-
 // ========== 发送 ==========
 
 function onSend(): void {
+  if (props.submitting) return
   if (guardDisabled()) return
   if (props.modelValue.trim() === '') return
   panel.value = 'none'
@@ -351,116 +379,17 @@ const mediaItems = computed<MediaItem[]>(() => {
 // 四个媒体项全关时「+」入口整体隐藏
 const hasMediaFeatures = computed(() => mediaItems.value.length > 0)
 
-function onToggleMedia(): void {
-  if (guardDisabled()) return
-  const open = panel.value !== 'media'
-  // 开面板前先收键盘（同 onToggleEmoji 口径）
-  if (open) closeKeyboardIfVisible()
-  panel.value = open ? 'media' : 'none'
-  if (open) {
-    inputFocus.value = false
-  }
-}
-
 function onMediaItem(key: string): void {
   panel.value = 'none'
   emit('media-select', key)
 }
 
-// ========== 语音：按住说话 + 上滑取消（微信手势） ==========
-
-const voiceMode = ref(false)
-const recording = ref(false)
-const willCancel = ref(false)
-const CANCEL_THRESHOLD = 60
-let recordStartY = 0
-
-function onToggleVoiceMode(): void {
+// 快捷回复点选：提交中/禁用态兜底拦截，其余情况原样上抛（是否发送由父组件 quickReplyMode 决定）
+function onQuickReply(item: EmQuickReply): void {
+  if (props.submitting) return
   if (guardDisabled()) return
-  if (voiceMode.value) {
-    exitVoiceMode()
-  } else {
-    voiceMode.value = true
-    inputFocus.value = false
-    panel.value = 'none'
-  }
+  emit('quick-reply', item)
 }
-
-function exitVoiceMode(): void {
-  if (recording.value) {
-    cancelRecord()
-    recording.value = false
-    willCancel.value = false
-  }
-  voiceMode.value = false
-}
-
-// 录音结果统一出口：手动松开与 60s 自动停止共用（自动停止不再静默丢音频）
-function onRecordResult(res: { path: string, duration: number }): void {
-  if (res.path === '' || res.duration < 1) {
-    uni.showToast({ title: t('chat.voice.tooShort'), icon: 'none' })
-    return
-  }
-  emit('voice-send', res.path, res.duration)
-}
-
-function onRecordError(): void {
-  recording.value = false
-  willCancel.value = false
-  voiceMode.value = false
-  uni.showToast({ title: t('chat.voice.recordFailed'), icon: 'none' })
-}
-
-function onRecordTouchStart(e: TouchEvent): void {
-  if (guardDisabled()) return
-  if (recording.value) return
-  try {
-    startRecord({
-      onError: onRecordError,
-      onAutoStop: (res) => {
-        // 到达 60s 上限由 SDK 自动停：复位手势态并按正常语音发送
-        recording.value = false
-        willCancel.value = false
-        onRecordResult(res)
-      }
-    })
-  } catch (err) {
-    onRecordError()
-    return
-  }
-  recordStartY = e.touches[0].clientY
-  willCancel.value = false
-  recording.value = true
-}
-
-function onRecordTouchMove(e: TouchEvent): void {
-  if (!recording.value) return
-  willCancel.value = recordStartY - e.touches[0].clientY > CANCEL_THRESHOLD
-}
-
-function onRecordTouchEnd(): void {
-  if (!recording.value) return
-  recording.value = false
-  if (willCancel.value) {
-    willCancel.value = false
-    cancelRecord()
-    return
-  }
-  stopRecord().then(onRecordResult).catch(onRecordError)
-}
-
-function onRecordTouchCancel(): void {
-  if (!recording.value) return
-  recording.value = false
-  willCancel.value = false
-  cancelRecord()
-}
-
-onUnmounted(() => {
-  if (isRecording()) {
-    cancelRecord()
-  }
-})
 </script>
 
 <style>

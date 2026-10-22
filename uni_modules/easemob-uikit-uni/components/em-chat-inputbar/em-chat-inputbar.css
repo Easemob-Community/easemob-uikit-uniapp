@@ -85,6 +85,31 @@
   padding: var(--em-spacing-2) var(--em-spacing-4);
 }
 
+/* 生长输入（textarea 替代单行 input）：原生组件尺寸/背景由包裹层承担（§5l），textarea 自身 100% 宽、auto-height 生长 */
+/* 生长输入（textarea 替代单行输入）：原生组件布局不可靠（§5l），固定高度与灰底由包裹层承担——
+   高度跟 linechange 上报值走，textarea 100% 宽、padding 归包裹层；多行用小圆角（对齐 vue 多行输入卡 6px，
+   不用单行胶囊的 999px，多行撑大后胶囊显臃肿） */
+.em-chat-inputbar__multiline-wrap {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--em-spacing-2) var(--em-spacing-3);
+  background-color: var(--em-control-bg);
+  border-radius: var(--em-component-radius);
+  overflow: hidden;
+}
+
+.em-chat-inputbar__multiline-input {
+  width: 100%;
+  padding: 0;
+  font-size: var(--em-font-size-14);
+  color: var(--em-text-primary);
+  background-color: transparent;
+}
+
 .em-chat-inputbar__tool {
   display: flex;
   align-items: center;
@@ -147,23 +172,6 @@
 .em-chat-inputbar__record-text {
   font-size: var(--em-font-size-14);
   color: var(--em-text-primary);
-}
-
-.em-chat-inputbar__send {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  padding: 0 var(--em-spacing-4);
-  margin-left: var(--em-spacing-2);
-  border-radius: var(--em-input-radius);
-  background-color: var(--em-primary-color);
-  flex-shrink: 0;
-}
-
-.em-chat-inputbar__send-text {
-  font-size: var(--em-font-size-14);
-  color: var(--em-text-inverse);
 }
 
 /* 底部面板：emoji / 媒体同高（与常见键盘高度接近；不插虚拟键盘占位），高度收口 token */
