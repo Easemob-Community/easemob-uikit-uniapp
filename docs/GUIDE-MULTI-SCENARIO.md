@@ -416,7 +416,7 @@ markdown 等富格式气泡由 `#stream-message` 插槽接管（不接管时回�
 | 场景 | 推荐组合 | 多人服务形态 |
 |---|---|---|
 | 客服 | `title="在线客服"` + `:show-action="false"` + `sendText` ext 带来源/订单 + `sendCustom('serviceTicket' / 'refundReview')` 工单与退款卡 + `quickReplies` 话术 + `insertLocalNotice` 转接提示 + AI 流式回复 | 共享客服账号单聊；需要区分坐席时用群聊（见下行） |
-| 医疗 | `#banner` 病情摘要 + 图片/文件（H5、小程序）报告 + `sendCustom('medicalCase' / 'prescription')` 病例与处方卡 + 已读回执 + `extraMessageMenus`「查看处方」 | 真群，保留昵称行区分主治与助手 |
+| 医疗 | `#banner` 病情摘要 + 图片/文件报告（App 需注册附件能力）+ `sendCustom('medicalCase' / 'prescription')` 病例与处方卡 + 已读回执 + `extraMessageMenus`「查看处方」 | 真群，保留昵称行区分主治与助手 |
 | 招聘 | `#banner` 职位条 + 简历文件 + `sendCustom('interviewInvite' / 'phoneExchange')` 邀约与手机号交换卡 + `quickReplies` 常用语 | 单聊即可 |
 | 二手交易 | `#banner` 商品条 + `sendCustom('productCard' / 'priceOffer')` + `insertLocalNotice` 交易状态 + `extraMessageMenus`「查看订单」 | 买卖单聊；平台仲裁可用三人群 |
 
@@ -427,13 +427,13 @@ markdown 等富格式气泡由 `#stream-message` 插槽接管（不接管时回�
 | 能力 | H5 移动端 | 微信小程序 | App |
 |---|---|---|---|
 | 图片/拍照 | 可用 | 可用 | 可用 |
-| 文件（PDF / 简历）发送 | 可用 | 可用 | 入口隐藏（无通用文件选择器） |
+| 文件（PDF / 简历）发送 | 可用 | 可用 | 需宿主注册附件 provider 且当前可用；未注册或不可用时入口隐藏 |
 | 文件打开 / 下载 | 未接入，文件气泡为纯展示 | 同左 | 同左 |
 | 录音与语音消息 | 仅接收播放（录音入口隐藏） | 可用 | 可用 |
 | 视频消息 | 可发送与播放（浏览器文件选择，宽高与时长由浏览器解析） | 可发送与播放（内置全屏播放器） | 同小程序 |
 | 软键盘避让 | 浏览器自管 | 输入栏按键盘高度上推 | 输入栏按键盘高度上推 |
 
-- 平台能力差异由 `PLATFORM_CAPABILITIES`（`videoPreview` / `filePick` / `fileOpen`）集中判定，组件据此显隐入口；宿主可用同一份常量给自己的入口做分支。
+- 平台能力差异由 `PLATFORM_CAPABILITIES`（`videoPreview` / `filePick` / `fileOpen`）集中判定，其中 `PLATFORM_CAPABILITIES.filePick` 只表示是否有内置选择器。宿主判断当前能否选择文件应使用 `EmKit.canPickAttachment`（或响应式 `canPickAttachment()`）：App 注册且 provider 可用时为 true，未注册或不可用时为 false；不要只依据常量隐藏自己的入口。
 - 位置消息未内置类型：把经纬度放进 `sendCustom` 的 `ext`，由宿主卡片渲染。
 - 需要更细的端间差异与替代方案，见 [平台能力与差异](./PLATFORM.md)。
 

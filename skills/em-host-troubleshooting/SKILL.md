@@ -95,7 +95,7 @@ console.log('im state', {
 
 | 症状 | 根因 | 修复 |
 |---|---|---|
-| 会话列表空 | 未登录 / 未同步 / `autoSync=false` 且没手动同步 | onShow 调 `EmKit.syncConversations()` |
+| 会话列表空 | 未登录 / 未同步 / `autoSync=false` 且没手动同步 | onShow 调 `EmKit.syncConversations()`；真实 `refreshSessionList` 失败会显示重试，不以内存快照冒充成功 |
 | 从聊天页返回不刷新 | 只在 onLoad 同步 | 改到 onShow |
 | 未读不消 | 未进会话 / 宿主自建入口没清 | 聊天页会自动清；自建入口调 `clearConversationUnread` |
 | 未读又复活 | 只清了本地没清服务端 | 用 `clearConversationUnread`（本地+服务端） |
@@ -107,9 +107,11 @@ console.log('im state', {
 
 | 症状 | 根因 | 修复 |
 |---|---|---|
-| 好友列表空 | SDK 后台同步未完成 / `enableSyncData` 缺 contact | 等几秒重试；不要覆盖 UIKit 的 enableSyncData |
+| 好友列表空 | 后台同步未完成或失败 / `enableSyncData` 缺 contact | 看 `syncFailed` 并重试，`syncContacts()` 会调用 SDK 受控刷新；不要覆盖 UIKit 的 enableSyncData |
 | 新请求不显示 | 邀请事件未到 / 本地缓存未持久化 | 重进页面；查 `contactStore.invites` |
+| 已是好友的申请仍显示 pending | 旧持久化数据或漏 roster 事件 | 好友快照加载会自动收敛 accepted 与未读角标，不需要再点接受 |
 | 接受好友申请后列表不更新 | 同步延迟 | onShow 调 `syncContacts()` |
+| 群列表同步失败 | 后台群同步失败 | SDK 无群全量手动重启 API；恢复连接或重新登录，内存重读不会被当作成功 |
 | 群邀请接受后没群 | 群快照未刷新 | 组件内部会刷新；重进群列表 |
 | 建群后进不去聊天 | `created` 未接线 / chatType 错 | `created` 里 `navigateTo` 且 `chatType=groupChat` |
 | 群公告/成员管理不显示 | 当前用户角色不足 | 组件按角色显隐；用 owner/admin 验证 |
@@ -154,17 +156,17 @@ console.log('im state', {
 | 语音发送 | ❌（入口隐藏，仅接收播放） | ✅ | ✅ |
 | 视频发送 | ✅ | ✅ | ✅ |
 | 视频播放 | ✅（内置全屏播放器） | ✅（内置全屏播放器） | ✅（内置全屏播放器，先下载后播） |
-| 文件发送 | ✅ | ✅ | ❌（入口隐藏） |
+| 文件发送 | ✅ | ✅ | 需宿主注册附件 provider 且当前可用；未注册或不可用时入口隐藏 |
 | 文件打开/下载 | ❌（仅展示） | ❌（仅展示） | ❌（仅展示） |
 | 软键盘避让 | 浏览器自管 | ✅ | ✅（手动顶起） |
 | 宽屏/多栏 | ❌（移动端布局） | — | — |
 
-不支持的能力已直接隐藏入口，不会出现「点一下只弹暂不支持」。
+不支持的能力已直接隐藏入口，不会出现「点一下只弹暂不支持」。App 文件入口是否显示用 `EmKit.canPickAttachment`（或响应式 `canPickAttachment()`）判断，不要只看 `PLATFORM_CAPABILITIES.filePick`。
 
 ## 11. 一期已知限制
 
 - `@` 提及为**追加式插入**（uni `<input>` 无光标位置 API）；
-- App 视频先整包下载再播（chatfiles 直链不支持 Range），大视频需等待；文件打开全端未接；App 端不能选文件；
+- App 视频先整包下载再播（chatfiles 直链不支持 Range），大视频需等待；文件打开全端未接；App 文件选择需宿主注册附件 provider，未注册或不可用时入口隐藏；
 - 录音 60s 自动发送，麦克风权限失败只 toast，不跳系统设置；
 - 日志原始 payload 默认关闭；开启后可能含 userId/昵称/群名；
 - 非当前会话只保留最近 100 条内存消息；

@@ -184,21 +184,21 @@ AI 流式输出通过 SDK 的 `onStreamMessage` 驱动：
 
 ### 删除与复制
 
-- `EmKit.deleteMessage(message)` 对有服务端 ID 的消息先删除漫游历史，成功后再删除本地消息；无服务端 ID 的本地消息不调用 SDK。
-- 漫游删除失败会抛错并保留本地气泡。聊天页删除前需要确认，成功后通过气泡消失反馈并派发 `delete`，失败显示提示。
-- 删除后按剩余的最后一条消息校正会话摘要与时间；仅需显式本地删除时可调用 `EmKit.deleteLocalMessage(conversationId, localId)`。
+- `EmKit.deleteMessage(message)` 对有服务端 ID 的消息先删除当前账号的漫游历史，成功后再删除本地消息；无服务端 ID 的本地消息不调用 SDK。它不是撤回，不会删除接收方已经收到的消息。
+- 漫游删除失败会抛错并保留本地气泡。聊天页删除前需要确认，取消确认不执行请求；成功后通过气泡消失反馈并派发 `delete`，失败显示提示。
+- 删除后按剩余的最后一条消息校正会话摘要与时间；若剩余最新的是撤回消息，摘要仍显示撤回提示，不恢复原文。仅需显式本地删除时可调用 `EmKit.deleteLocalMessage(conversationId, localId)`，本地删除不等待 SDK，未命中时不改摘要或缓存。
 - `copyText(text)` 返回 `Promise<void>`，空文本或系统剪贴板失败会 reject；聊天页据此显示复制成功或失败提示，并关闭剪贴板原生提示以避免重复反馈。
 
 ### 撤回
 
-- 仅本人消息、且在 `recallTimeLimit`（默认 2 分钟）内显示撤回菜单。
-- 撤回后消息变为 `recalled`，列表显示居中提示。
+- 仅本人消息、且在 `recallTimeLimit`（默认 2 分钟）内显示撤回菜单；执行时再次检查时间窗，不额外弹确认框。
+- 同一 `localId` 的撤回完成前会拦截重复提交；撤回后消息变为 `recalled`，列表显示居中提示。
 - `EmKit.recallMessage(conversationId, chatType, messageId)` 可由宿主自绘菜单调用。
 
 ### 失败重发
 
-- 失败消息保留原位，显示红色感叹号。
-- 点击重发调用 `EmKit.resendMessage`。
+- 失败消息保留原位，显示红色感叹号；domain 按 `conversationId + localId` 共享在途重发 Promise，页面实例或宿主重复调用都会得到同一实际成功/失败结果，失败后仍可重试。
+- 点击重发调用 `EmKit.resendMessage`；锁在等待 SDK 就绪前占有，页面防重仍保留。
 - 媒体消息按原类型重建；本地临时文件缺失时会明确报错，不会退化成空文本。
 
 ### 已读回执

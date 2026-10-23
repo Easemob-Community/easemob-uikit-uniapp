@@ -104,7 +104,7 @@ function onSelect(action: EmActionSheetAction): void {
 
 ## em-button
 
-按钮：四档类型、两档尺寸，支持胶囊、通栏与禁用。
+按钮：四档类型、两档尺寸，支持胶囊、通栏、禁用与加载态。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
@@ -114,10 +114,11 @@ function onSelect(action: EmActionSheetAction): void {
 | `pill` | `boolean` | `false` | 全圆角胶囊形态 |
 | `block` | `boolean` | `false` | 通栏占满父容器宽度 |
 | `disabled` | `boolean` | `false` | 禁用：置灰且不派发 `click` |
+| `loading` | `boolean` | `false` | 加载态：显示旋转图标且不派发 `click` |
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `click` | — | 点击，`disabled` 为 `true` 时不派发 |
+| `click` | — | 点击；`disabled` 或 `loading` 为 `true` 时不派发 |
 
 | 插槽 | 作用域 | 说明 |
 |---|---|---|
@@ -128,7 +129,7 @@ function onSelect(action: EmActionSheetAction): void {
 <em-button type="outline" size="medium" text="取消" :disabled="saving" @click="onCancel" />
 ```
 
-**行为与平台**：文字颜色与字号通过独立的元素修饰类下发，不依赖后代选择器（uni-app x 的 ucss 只保证类选择器行为）。禁用态在点击处理里直接返回，宿主不会收到事件；如果需要"点了给个提示"，用 `em-chat-inputbar` 的 `disabled-tap` 那种显式事件模式，或在宿主侧包一层。
+**行为与平台**：文字颜色与字号通过独立的元素修饰类下发，不依赖后代选择器（uni-app x 的 ucss 只保证类选择器行为）。`disabled` 与 `loading` 都在点击处理里直接返回，宿主不会收到事件；`loading` 使用 `loading-arc-normal` 图标，由 JS 逐帧驱动旋转，不依赖 CSS 关键帧动画。如果需要"点了给个提示"，用 `em-chat-inputbar` 的 `disabled-tap` 那种显式事件模式，或在宿主侧包一层。
 
 ## em-empty
 
@@ -179,15 +180,15 @@ function onSelect(action: EmActionSheetAction): void {
 
 ## em-load-more
 
-触底加载 footer：加载中 / 点击加载更多 / 没有更多三种状态。
+触底加载 footer：加载中 / 点击加载更多 / 没有更多 / 加载失败四种状态。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `state` | `LoadMoreStateValue` | 必填 | `loading` / `button` / `noMore`，常量见 `LOAD_MORE_STATE` |
+| `state` | `LoadMoreStateValue` | 必填 | `loading` / `button` / `noMore` / `error`，常量见 `LOAD_MORE_STATE` |
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `load` | — | 仅 `button` 态点击时派发 |
+| `load` | — | `button` 或 `error` 态点击时派发 |
 
 无插槽。
 
@@ -200,7 +201,7 @@ function onSelect(action: EmActionSheetAction): void {
 </template>
 ```
 
-**行为与平台**：`loading` 态显示静态 spinner 图标与"加载中"，不做关键帧动画（uni-app x 蒸汽端不跑 `@keyframes`，静态图标在各端表现一致）。`button` 态是可点的"加载更多"文字，点击派发 `load`；`noMore` 态只显示"没有更多"。组件不自带 `hasMore` 与 loading 锁，消费方需要在 `scroll-view` 的 `@scrolltolower` 与 `load` 事件里自行判断，否则会重复请求。
+**行为与平台**：`loading` 态显示"加载中"与由 JS 逐帧驱动旋转的 spinner，不依赖 CSS 关键帧动画。`button` 态显示可点的"加载更多"，`error` 态显示"加载失败，点击重试"，两者点击都派发 `load`；`noMore` 态只显示"没有更多"。组件不自带 `hasMore` 与 loading 锁，也不会自行清除 `error`，消费方需要在 `scroll-view` 的 `@scrolltolower` 与 `load` 事件里防重并在重试时切换状态。
 
 ## em-nav-bar
 

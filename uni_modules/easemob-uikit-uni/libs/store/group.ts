@@ -12,6 +12,7 @@ export const groupStore = reactive({
   items: [] as EmGroup[],
   loaded: false,
   syncing: false,
+  syncFailed: false,
   infoByGroupId: {} as Record<string, EmGroup>,
   memberMapByGroupId: {} as Record<string, EmGroupMember[]>,
   announcementByGroupId: {} as Record<string, string | undefined>,
@@ -36,12 +37,12 @@ export function groupMemberDisplayNameOf(groupId: string, userId: string): strin
 }
 
 // 已加入群整量回写：同时并入详情缓存（回写落 reactive 代理：整表替换即可）
-export function setJoinedGroups(groups: EmGroup[]): void {
+export function setJoinedGroups(groups: EmGroup[], authoritative = true): void {
   groupStore.items = groups
   groups.forEach((g) => {
     groupStore.infoByGroupId[g.groupId] = g
   })
-  groupStore.loaded = true
+  if (authoritative) groupStore.loaded = true
 }
 
 // 单群详情合并：items 有则原位更新（代理上 patch 字段），无则追加；详情缓存恒整对象替换；
@@ -199,6 +200,7 @@ export function clearGroups(): void {
   groupStore.items = []
   groupStore.loaded = false
   groupStore.syncing = false
+  groupStore.syncFailed = false
   groupStore.infoByGroupId = {}
   groupStore.memberMapByGroupId = {}
   groupStore.announcementByGroupId = {}

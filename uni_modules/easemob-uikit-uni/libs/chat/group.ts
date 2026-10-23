@@ -36,8 +36,9 @@ import {
 } from '../store/group'
 import { createLogger, logPayload } from '../utils/logger'
 import { useLocale } from '../use/useLocale'
-import type { CreateGroupParams, EmContactInvite, EmGroup, EmGroupMember } from '../types'
+import type { CreateGroupParams, EmContactInvite, EmGroup, EmGroupMember, EmGroupMemberListResult } from '../types'
 import { ensureUserInfos } from './user-info'
+import { getAccountEpoch, invalidateAccountEpoch, isAccountEpochCurrent, throwIfAccountChanged } from './account'
 
 const logger = createLogger('group')
 
@@ -67,6 +68,7 @@ export class EmGroupDomain {
   private announcementPromiseByGroupId: Record<string, Promise<string>> = {}
   private adminPromiseByGroupId: Record<string, Promise<void>> = {}
   private adminRequestIdByGroupId: Record<string, number> = {}
+  private syncRequestId = 0
 
   bind(client: ChatClient, waitOnline: () => Promise<void>, hooks: EmGroupHooks): void {
     if (this.client != null) {
@@ -75,20 +77,27 @@ export class EmGroupDomain {
     this.client = client
     this.waitOnline = waitOnline
     this.hooks = hooks
+    const syncHandlerEpoch = getAccountEpoch()
     // 群自动同步由 SDK 后台完成（enableSyncData 'group'），同步完成后重读快照自愈（同 contact 套路）
     client.addEventHandler('emkit-group-sync', {
+      onSyncDataStart: (payload) => {
+        if (!isAccountEpochCurrent(syncHandlerEpoch) || payload.dataType !== 'group') return
+        this.syncRequestId += 1
+        groupStore.syncing = true
+        groupStore.syncFailed = false
+      },
       onSyncDataFinished: (payload) => {
         logPayload(logger, 'onSyncDataFinished:', payload)
+        if (!isAccountEpochCurrent(syncHandlerEpoch) || payload.dataType !== 'group') return
+        this.syncRequestId += 1
+        groupStore.syncing = false
         if (payload.status === 'failed') {
-          if (payload.dataType === 'group') {
-            logger.warn('group sync failed:', payload.error?.stage, payload.error?.message)
-          }
+          logger.warn('group sync failed:', payload.error?.stage, payload.error?.message)
+          groupStore.syncFailed = true
           return
         }
-        if (payload.dataType === 'group') {
-          logger.info('group sync finished, refreshing snapshot')
-          this.refresh()
-        }
+        logger.info('group sync finished, refreshing snapshot')
+        this.refresh(syncHandlerEpoch, true)
       }
     })
     const mgr = this.manager()
@@ -243,20 +252,45 @@ export class EmGroupDomain {
     })
   }
 
-  // 读内存快照整量回写（幂等）；群同步由 SDK 后台做，这里只读本地
-  async getJoinedGroups(): Promise<EmGroup[]> {
-    await this.readyGroupManager()
-    groupStore.syncing = true
-    try {
-      this.refresh()
-    } finally {
-      groupStore.syncing = false
+  unbind(): void {
+    if (this.client != null) {
+      this.client.removeEventHandler('emkit-group-sync')
+      this.manager()?.removeEventHandler('emkit-group')
     }
-    return groupStore.items
+    this.client = null
+    this.waitOnline = null
+    this.hooks = null
+  }
+
+  // SDK 没有已加入群全量手动重启同步 API；失败后重读缓存仍明确拒绝，不伪造权威成功。
+  async getJoinedGroups(expectedEpoch = getAccountEpoch()): Promise<EmGroup[]> {
+    const requestId = this.syncRequestId + 1
+    this.syncRequestId = requestId
+    throwIfAccountChanged(expectedEpoch)
+    const wasFailed = groupStore.syncFailed
+    groupStore.syncing = true
+    groupStore.syncFailed = false
+    const isCurrent = (): boolean => isAccountEpochCurrent(expectedEpoch) && requestId === this.syncRequestId
+    try {
+      await this.readyGroupManager()
+      throwIfAccountChanged(expectedEpoch)
+      if (!isCurrent()) return groupStore.items
+      this.refresh(expectedEpoch, false)
+      if (wasFailed) {
+        throw new Error('joined-group sync restart unavailable; reconnect or login again')
+      }
+      return groupStore.items
+    } catch (e) {
+      if (isCurrent()) groupStore.syncFailed = true
+      throw e
+    } finally {
+      if (isCurrent()) groupStore.syncing = false
+    }
   }
 
   // 单群详情：普通调用飞行中去重；force 用于移除后的权威重读，旧请求不得覆盖新请求或清理其 pending。
-  async getGroupInfo(groupId: string, force = false): Promise<EmGroup> {
+  async getGroupInfo(groupId: string, force = false, expectedEpoch = getAccountEpoch()): Promise<EmGroup> {
+    throwIfAccountChanged(expectedEpoch)
     const existing = this.infoPromiseByGroupId[groupId]
     if (existing != null && !force) {
       return existing
@@ -265,9 +299,11 @@ export class EmGroupDomain {
     this.infoRequestIdByGroupId[groupId] = requestId
     const promise = (async () => {
       const mgr = await this.readyGroupManager()
+      throwIfAccountChanged(expectedEpoch)
       const detail = await mgr.getGroupInfo({ groupId })
+      throwIfAccountChanged(expectedEpoch)
       const group = this.toEmGroup(detail)
-      if (requestId === this.infoRequestIdByGroupId[groupId]) {
+      if (requestId === this.infoRequestIdByGroupId[groupId] && isAccountEpochCurrent(expectedEpoch)) {
         upsertGroup(group)
       }
       return group
@@ -283,31 +319,44 @@ export class EmGroupDomain {
   }
 
   // 成员游标分页：首页整量回写 + 补拉 admin 合并角色；仅最新请求可写成员/游标，防旧预拉重加已移除成员。
-  async getGroupMemberList(groupId: string, cursor?: string, pageSize = GROUP_MEMBER_PAGE_SIZE): Promise<{ items: EmGroupMember[], cursor: string, hasMore: boolean }> {
+  // applied 向所有调用方报告响应归属：当前成功且实际写入=true；陈旧成功 resolve=false；
+  // 陈旧失败 reject 结构化结果（applied=false），当前真实失败保留原始 error/rejection。
+  async getGroupMemberList(groupId: string, cursor?: string, pageSize = GROUP_MEMBER_PAGE_SIZE, expectedEpoch = getAccountEpoch()): Promise<EmGroupMemberListResult> {
+    throwIfAccountChanged(expectedEpoch)
     const requestId = (this.memberRequestIdByGroupId[groupId] ?? 0) + 1
     this.memberRequestIdByGroupId[groupId] = requestId
-    const mgr = await this.readyGroupManager()
-    const page = await mgr.getGroupMemberList({ groupId, cursor, pageSize })
-    const members = page.items.map((e) => this.toEmGroupMember(e))
-    const result = { items: members, cursor: page.cursor ?? '', hasMore: page.hasMore ?? false }
-    if (requestId !== this.memberRequestIdByGroupId[groupId]) {
-      return result
+    try {
+      const mgr = await this.readyGroupManager()
+      throwIfAccountChanged(expectedEpoch)
+      const page = await mgr.getGroupMemberList({ groupId, cursor, pageSize })
+      throwIfAccountChanged(expectedEpoch)
+      const members = page.items.map((e) => this.toEmGroupMember(e))
+      const result = { items: members, cursor: page.cursor ?? '', hasMore: page.hasMore ?? false, applied: false }
+      if (requestId !== this.memberRequestIdByGroupId[groupId] || !isAccountEpochCurrent(expectedEpoch)) {
+        return result
+      }
+      if (cursor == null || cursor === '') {
+        setGroupMembers(groupId, members)
+        // 首屏后补拉管理员合并角色；失败不阻塞成员列表展示
+        this.syncGroupAdmins(groupId, expectedEpoch).catch(() => {})
+      } else {
+        appendGroupMembers(groupId, members)
+      }
+      groupStore.memberCursorByGroupId[groupId] = result.cursor
+      groupStore.memberHasMoreByGroupId[groupId] = result.hasMore
+      ensureUserInfos(members.map((m) => m.userId))
+      return { ...result, applied: true }
+    } catch (e) {
+      if (requestId !== this.memberRequestIdByGroupId[groupId] || !isAccountEpochCurrent(expectedEpoch)) {
+        throw { items: [], cursor: '', hasMore: false, applied: false } as EmGroupMemberListResult
+      }
+      throw e
     }
-    if (cursor == null || cursor === '') {
-      setGroupMembers(groupId, members)
-      // 首屏后补拉管理员合并角色；失败不阻塞成员列表展示
-      this.syncGroupAdmins(groupId).catch(() => {})
-    } else {
-      appendGroupMembers(groupId, members)
-    }
-    groupStore.memberCursorByGroupId[groupId] = result.cursor
-    groupStore.memberHasMoreByGroupId[groupId] = result.hasMore
-    ensureUserInfos(members.map((m) => m.userId))
-    return result
   }
 
   // 群公告：飞行中去重；undefined=未拉取、空串=已拉无公告
-  async getGroupAnnouncement(groupId: string): Promise<string> {
+  async getGroupAnnouncement(groupId: string, expectedEpoch = getAccountEpoch()): Promise<string> {
+    throwIfAccountChanged(expectedEpoch)
     const cached = groupStore.announcementByGroupId[groupId]
     if (cached !== undefined) {
       return cached
@@ -318,7 +367,9 @@ export class EmGroupDomain {
     }
     const promise = (async () => {
       const mgr = await this.readyGroupManager()
+      throwIfAccountChanged(expectedEpoch)
       const result = await mgr.getGroupAnnouncement({ groupId })
+      throwIfAccountChanged(expectedEpoch)
       const announcement = result.announcement ?? ''
       setGroupAnnouncement(groupId, announcement)
       return announcement
@@ -327,7 +378,9 @@ export class EmGroupDomain {
     try {
       return await promise
     } finally {
-      delete this.announcementPromiseByGroupId[groupId]
+      if (this.announcementPromiseByGroupId[groupId] === promise) {
+        delete this.announcementPromiseByGroupId[groupId]
+      }
     }
   }
 
@@ -368,7 +421,7 @@ export class EmGroupDomain {
     await mgr.inviteUsersToGroup({ groupId, userIds })
   }
 
-  // 接受群邀请（group kind 申请链路）：SDK acceptInvitation → 置 accepted + 刷新群快照（新群入列表）
+  // 接受成功与后续快照恢复分离：群同步不可用不能把已接受申请翻成失败。
   async acceptGroupInvite(invite: EmContactInvite): Promise<void> {
     if (invite.groupId == null || invite.groupId === '') {
       throw new Error('group invite missing groupId')
@@ -376,7 +429,7 @@ export class EmGroupDomain {
     const mgr = await this.readyGroupManager()
     await mgr.acceptInvitation({ groupId: invite.groupId })
     updateInviteStatus(invite.id, CONTACT_INVITE_STATUS.ACCEPTED)
-    await this.getJoinedGroups()
+    this.getJoinedGroups().catch(() => {})
   }
 
   // 拒绝群邀请：SDK rejectInvitation → 置 declined
@@ -467,11 +520,20 @@ export class EmGroupDomain {
   }
 
   reset(): void {
+    this.syncRequestId += 1
+    invalidateAccountEpoch()
+    this.infoPromiseByGroupId = {}
+    this.infoRequestIdByGroupId = {}
+    this.memberRequestIdByGroupId = {}
+    this.announcementPromiseByGroupId = {}
+    this.adminPromiseByGroupId = {}
+    this.adminRequestIdByGroupId = {}
     clearGroups()
   }
 
   // 拉取并合并群管理员到成员缓存；普通首屏复用在途请求，只有最新一代可写角色/成员并清理自身 pending。
-  private async syncGroupAdmins(groupId: string): Promise<void> {
+  private async syncGroupAdmins(groupId: string, expectedEpoch = getAccountEpoch()): Promise<void> {
+    throwIfAccountChanged(expectedEpoch)
     if (groupStore.adminSyncedByGroupId[groupId]) {
       return
     }
@@ -483,8 +545,9 @@ export class EmGroupDomain {
     this.adminRequestIdByGroupId[groupId] = requestId
     const promise = (async () => {
       const mgr = await this.readyGroupManager()
+      if (!isAccountEpochCurrent(expectedEpoch)) return
       const admins = await mgr.getGroup(groupId).getAdmins()
-      if (requestId !== this.adminRequestIdByGroupId[groupId]) {
+      if (requestId !== this.adminRequestIdByGroupId[groupId] || !isAccountEpochCurrent(expectedEpoch)) {
         return
       }
       const adminMembers = (admins ?? []).map((u) => this.toGroupMemberFromUser(u, GROUP_MEMBER_ROLE.ADMIN))
@@ -502,15 +565,18 @@ export class EmGroupDomain {
     }
   }
 
-  private refresh(): void {
+  private refresh(expectedEpoch = getAccountEpoch(), authoritative = false): void {
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     const mgr = this.manager()
     if (mgr == null) {
       return
     }
     const raw = mgr.getJoinedGroupList()
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     logPayload(logger, 'getJoinedGroupList:', raw)
     logger.info('joined group snapshot refreshed, count:', raw.length)
-    setJoinedGroups(raw.map((g) => this.toEmGroup(g)))
+    setJoinedGroups(raw.map((g) => this.toEmGroup(g)), authoritative)
+    if (authoritative) groupStore.syncFailed = false
   }
 
   // 群事件系统通知（M2.9 Phase 5b）：本地插入群消息列表灰条（不落服务端），
@@ -546,11 +612,12 @@ export class EmGroupDomain {
       return t(singleKey, { name: this.noticeNameOf(members[0]) })
     }
     const nonSelf = members.find((m) => m.userId !== connectionStore.userId) ?? members[0]
-    return t(multipleKey, {
+    const params = {
       name: this.noticeNameOf(nonSelf),
       count: members.length,
       othersCount: members.length - 1
-    })
+    }
+    return members.length === 2 ? t(`${multipleKey}OneOther`, params) : t(multipleKey, params)
   }
 
   // 通知展示名：自己显示「你」，其余昵称 > userStore 展示名（userId 兜底）

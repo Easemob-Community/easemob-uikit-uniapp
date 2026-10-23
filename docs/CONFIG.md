@@ -178,9 +178,9 @@ console.log(config.recallTimeLimit)
 输入栏功能集会受平台能力二次裁剪：
 
 - H5 不显示语音入口（录音未接入浏览器）。
-- App 不显示文件选择入口（无通用文件选择器）。
+- App 的文件入口由宿主附件能力决定：注册附件 provider 且当前可用时显示；未注册或不可用时隐藏。
 
-因此即使 `inputFeatures.file=true`，App 端也不会出现文件按钮。完整矩阵见 [平台能力与差异](./PLATFORM.md)。
+因此 `inputFeatures.file=true` 只是开启文件功能，App 仍需满足附件能力条件。宿主自己的入口也应使用 `EmKit.canPickAttachment`（或响应式 `canPickAttachment()`）判断，不要只看 `PLATFORM_CAPABILITIES.filePick`。完整矩阵见 [平台能力与差异](./PLATFORM.md)。
 
 ## 6. 示例：按业务场景关闭不需要的能力
 

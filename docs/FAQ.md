@@ -89,7 +89,7 @@ EmKit.init({
 
 ### 好友/群列表为空
 
-登录后 SDK 会后台同步联系人/群。等待同步完成，或在页面 `onShow` 调 `EmKit.syncContacts()` / `EmKit.getJoinedGroups()`。如果长期为空，检查网络与 SDK 连接状态；H5 清缓存后重试。
+登录后 SDK 会后台同步联系人/群。列表通过 `loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表；失败时先检查网络与 SDK 连接状态。`EmKit.syncContacts()` 会调用 SDK 受控刷新；`EmKit.getJoinedGroups()` 只读群快照，SDK 没有群全量手动重启同步 API，群同步失败后需恢复连接或重新登录，不能把内存重读当作同步成功。
 
 ### 未读清零后回列表又出现
 
@@ -132,9 +132,9 @@ EmKit.clearConversationUnread(conversationId, chatType)
 
 当前版本 H5 不支持录音，语音入口自动隐藏。文本、图片、视频选择、文件发送可用；详见 [平台能力与差异](./PLATFORM.md)。
 
-### App 没有文件按钮
+### App 文件按钮的显示条件
 
-App 端没有通用文件选择器，文件发送入口隐藏。小程序与 H5 支持文件选择。
+App 未内置通用文件选择器。宿主注册附件 provider 且当前可用时，输入栏显示「文件」入口；未注册或 provider 不可用时入口隐藏。可用 `EmKit.canPickAttachment`（或响应式 `canPickAttachment()`）检查当前状态。小程序与 H5 使用内置文件选择。
 
 ### 视频点击没有播放 / App 播放器黑屏
 

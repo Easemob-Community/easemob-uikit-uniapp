@@ -18,6 +18,7 @@ import { bindUserInfo, ensureUserInfos } from './user-info'
 import { EmConversationDomain } from './conversation'
 import { EmMessageDomain } from './message'
 import type { EmChatContext } from './message'
+import { getAccountEpoch, isAccountEpochCurrent } from './account'
 
 const logger = createLogger('chat')
 
@@ -34,6 +35,7 @@ export class EmChat {
     this.bound = true
     this.ctx.client = client
     this.ctx.waitOnline = waitOnline
+    const syncHandlerEpoch = getAccountEpoch()
     this.messages.readReceiptOn = config?.enableReadReceipt !== false
     bindUserInfo(client)
     client.chatManager.addEventHandler('emkit-message', {
@@ -88,6 +90,19 @@ export class EmChat {
         })
       }
     })
+    client.addEventHandler('emkit-conversation-sync', {
+      onSyncDataStart: (payload) => {
+        if (!isAccountEpochCurrent(syncHandlerEpoch)) return
+        if (payload.dataType === 'conversation') this.conversations.onSyncDataStart()
+      },
+      onSyncDataFinished: (payload) => {
+        if (!isAccountEpochCurrent(syncHandlerEpoch) || payload.dataType !== 'conversation') return
+        if (payload.status === 'failed') {
+          logger.warn('conversation sync failed:', payload.error?.stage, payload.error?.message)
+        }
+        this.conversations.onSyncDataFinished(payload.status === 'failed')
+      }
+    })
     // 多设备会话事件（ChatClient 级）：其他端切免打扰后本端列表 icon 同步；
     // 会话列表快照不携带该状态，多设备事件是运行期唯一实时来源（轮询校正见 syncConversationMuteStates）
     client.addEventHandler('emkit-multi-device', {
@@ -97,6 +112,18 @@ export class EmChat {
         this.conversations.applyMuteInfoChanged(event.conversationId, event.remindType)
       }
     })
+  }
+
+  unbind(): void {
+    const client = this.ctx.client
+    if (client != null) {
+      client.chatManager.removeEventHandler('emkit-message')
+      client.removeEventHandler('emkit-conversation-sync')
+      client.removeEventHandler('emkit-multi-device')
+    }
+    this.bound = false
+    this.ctx.client = null
+    this.ctx.waitOnline = null
   }
 
   get readReceiptEnabled(): boolean {
@@ -146,8 +173,8 @@ export class EmChat {
     return this.messages.loadHistory(conversationId, chatType, pageSize)
   }
 
-  async syncConversations(): Promise<void> {
-    return this.conversations.syncConversations()
+  async syncConversations(expectedEpoch?: number): Promise<void> {
+    return this.conversations.syncConversations(expectedEpoch)
   }
 
   async enterConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
@@ -226,8 +253,8 @@ export class EmChat {
     }
   }
 
-  async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {
-    return this.messages.resendMessage(conversationId, chatType, localId)
+  async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string, expectedEpoch?: number): Promise<void> {
+    return this.messages.resendMessage(conversationId, chatType, localId, expectedEpoch)
   }
 
   async sendTyping(conversationId: string, chatType: ConversationTypeValue): Promise<void> {

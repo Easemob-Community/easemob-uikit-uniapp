@@ -316,7 +316,7 @@ import type { EmIconName } from '../../em-icon/em-icons'
 import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
 import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
-import type { EmCameraAuthorizeState } from '../../../libs'
+import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
 import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
@@ -871,7 +871,7 @@ function onQuoteClick(m: EmMessageItem): void {
 // 首次历史加载 / 失败重试共用：historySettled 是空态的唯一开关；
 // 失败保留已缓存消息并给 toast + 顶部「点击重试」，不再静默只写 logger
 async function loadInitialHistory(): Promise<void> {
-  if (historyLoading.value) return
+  if (historyLoading.value || loadingMore.value) return
   historyLoading.value = true
   historyFailed.value = false
   historySettled.value = false
@@ -965,6 +965,7 @@ watch(() => {
 })
 
 onUnmounted(() => {
+  pageGeneration += 1
   unsubscribeMessages?.()
   unsubscribeMessages = null
   // 离页兜底清未读：会话内收到的消息服务端未读可能已累加，不清会随下一次 refreshSessionList 复活
@@ -995,8 +996,11 @@ watch(draft, (v) => {
   }
 })
 
-// 切换会话清掉引用条与 mention state
-watch(() => props.conversationId, () => {
+// 切换会话使旧发送/选择完成回调失效，并允许新会话独立提交。
+watch(() => [props.conversationId, props.chatType], () => {
+  pageGeneration += 1
+  sendingText.value = false
+  pickingFile.value = false
   quoteInfo.value = null
   mentionVisible.value = false
   mentionedContacts.value = []
@@ -1009,7 +1013,7 @@ watch(() => props.conversationId, () => {
 })
 
 async function onLoadMore(): Promise<void> {
-  if (loadingMore.value) return
+  if (loadingMore.value || historyLoading.value) return
   loadingMore.value = true
   loadMoreFailed.value = false
   // 锚点保位（对齐 TUIKit uniapp 版）：prepend 前记录当前首条消息，加载后 scroll-into-view 回位，
@@ -1038,6 +1042,35 @@ async function onLoadMore(): Promise<void> {
 }
 
 const sendingText = ref(false)
+let pageGeneration = 0
+
+interface ChatPageRequest {
+  conversationId: string
+  chatType: ConversationTypeValue
+  generation: number
+}
+
+function capturePageRequest(): ChatPageRequest {
+  return { conversationId: props.conversationId, chatType: props.chatType, generation: pageGeneration }
+}
+
+function isPageRequestCurrent(request: ChatPageRequest): boolean {
+  return request.generation === pageGeneration
+    && request.conversationId === props.conversationId
+    && request.chatType === props.chatType
+}
+
+function releaseUnsentFiles(files: EmPickedFile[], start = 0): void {
+  for (let i = start; i < files.length; i++) {
+    const file = files[i]
+    if (file.temporary !== true || file.release == null) continue
+    try {
+      file.release(file.path)
+    } catch (e) {
+      logger.warn('release unsent attachment failed:', file.path, e)
+    }
+  }
+}
 
 async function onSend(): Promise<void> {
   if (sendingText.value) return
@@ -1046,29 +1079,36 @@ async function onSend(): Promise<void> {
     onMuteAllTap()
     return
   }
-  const text = draft.value.trim()
+  const sourceDraft = draft.value
+  const text = sourceDraft.trim()
   if (text === '') return
-  const quote = quoteInfo.value != null ? quoteInfo.value : undefined
+  const sourceQuote = quoteInfo.value
+  const sourceMentions = mentionedContacts.value
+  const request = capturePageRequest()
   // 发送前过滤已失效的 @（用户删掉了某个 @名字 则不挂）；非空才挂 ext.em_at_list（单聊恒空）
-  const mentionIds = isGroupChat.value
-    ? filterActiveMentions(text, mentionedContacts.value).map((c) => c.userId)
+  const mentionIds = request.chatType === CONVERSATION_TYPE.GROUP_CHAT
+    ? filterActiveMentions(text, sourceMentions).map((c) => c.userId)
     : []
   sendingText.value = true
   try {
-    const item = await EmKit.sendText(props.conversationId, props.chatType, text, quote, mentionIds.length > 0 ? mentionIds : undefined)
-    draft.value = ''
-    // 发送成功才清引用条与 mention state，失败保留供重发
-    quoteInfo.value = null
-    mentionedContacts.value = []
-    mentionVisible.value = false
-    scrollToBottom()
+    const item = await EmKit.sendText(request.conversationId, request.chatType, text, sourceQuote ?? undefined, mentionIds.length > 0 ? mentionIds : undefined)
+    if (isPageRequestCurrent(request)) {
+      // 仅原始输入未被编辑时整体清理；发送期间的新草稿/引用/@选择必须保留。
+      if (draft.value === sourceDraft && quoteInfo.value === sourceQuote && mentionedContacts.value === sourceMentions) {
+        draft.value = ''
+        quoteInfo.value = null
+        mentionedContacts.value = []
+        mentionVisible.value = false
+      }
+      scrollToBottom()
+    }
     emit('send', item)
   } catch (e) {
     logger.error('sendText fail:', e)
     // 未连上/超时等失败可能根本没进消息列表（没有 FAILED 气泡），必须给用户一个提示
     uni.showToast({ title: t('message.send.failed'), icon: 'none' })
   } finally {
-    sendingText.value = false
+    if (isPageRequestCurrent(request)) sendingText.value = false
   }
 }
 
@@ -1095,20 +1135,22 @@ function onQuickReply(item: EmQuickReply): void {
 
 async function sendQuickReplyText(text: string): Promise<void> {
   if (sendingText.value) return
+  const request = capturePageRequest()
   sendingText.value = true
   try {
-    const item = await EmKit.sendText(props.conversationId, props.chatType, text)
-    scrollToBottom()
+    const item = await EmKit.sendText(request.conversationId, request.chatType, text)
+    if (isPageRequestCurrent(request)) scrollToBottom()
     emit('send', item)
   } catch (e) {
     logger.error('sendQuickReply fail:', e)
     uni.showToast({ title: t('message.send.failed'), icon: 'none' })
   } finally {
-    sendingText.value = false
+    if (isPageRequestCurrent(request)) sendingText.value = false
   }
 }
 
 async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<void> {
+  const request = capturePageRequest()
   // iOS 相机权限被拒后，uni.chooseImage 仍会拉起拍摄页并停在纯黑画面（系统不再弹窗）；
   // 拍摄前先查授权，denied/config error 直接引导去系统设置，不进入黑屏拍摄页。
   // H5/小程序/基座缺模块时 getCameraAuthorizeState() 返回 unknown，行为与原来一致。
@@ -1127,10 +1169,10 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
     uni.showToast({ title: t('error.imagePickFailed'), icon: 'none' })
     return null
   })
-  if (images == null || images.length === 0) return
+  if (images == null || images.length === 0 || !isPageRequestCurrent(request)) return
   try {
-    const item = await EmKit.sendImage(props.conversationId, props.chatType, images[0])
-    scrollToBottom()
+    const item = await EmKit.sendImage(request.conversationId, request.chatType, images[0])
+    if (isPageRequestCurrent(request)) scrollToBottom()
     emit('send', item)
   } catch (e) {
     logger.error('sendImage fail:', e)
@@ -1168,15 +1210,16 @@ async function onMediaSelect(key: string): Promise<void> {
 }
 
 async function onPickVideo(): Promise<void> {
+  const request = capturePageRequest()
   const video = await chooseVideo().catch((e) => {
     logger.error('chooseVideo fail:', e)
     uni.showToast({ title: t('error.videoPickFailed'), icon: 'none' })
     return null
   })
-  if (video == null) return
+  if (video == null || !isPageRequestCurrent(request)) return
   try {
-    const item = await EmKit.sendVideo(props.conversationId, props.chatType, video)
-    scrollToBottom()
+    const item = await EmKit.sendVideo(request.conversationId, request.chatType, video)
+    if (isPageRequestCurrent(request)) scrollToBottom()
     emit('send', item)
   } catch (e) {
     logger.error('sendVideo fail:', e)
@@ -1189,21 +1232,30 @@ const pickingFile = ref(false)
 async function onPickFile(): Promise<void> {
   // 能力门控：内置 H5/小程序选择器或宿主注入的 App 附件 provider；pickingFile 防连点并发
   if (!canPickAttachment() || pickingFile.value) return
+  const request = capturePageRequest()
   pickingFile.value = true
   try {
     // 通知宿主选择附件（带会话上下文）；用户取消统一返回 []，不提示
     const files = await pickAttachments({
-      conversationId: props.conversationId,
-      chatType: props.chatType,
+      conversationId: request.conversationId,
+      chatType: request.chatType,
       multiple: true
     })
     if (files.length === 0) return
+    if (!isPageRequestCurrent(request)) {
+      releaseUnsentFiles(files)
+      return
+    }
     let failed = false
-    // 多选按顺序逐条发送：任一失败只影响该条，其余继续（失败条目保留临时文件供重发）
+    // 多选按顺序逐条发送；切会话后未开始发送的临时文件立即释放。
     for (let i = 0; i < files.length; i++) {
+      if (!isPageRequestCurrent(request)) {
+        releaseUnsentFiles(files, i)
+        return
+      }
       try {
-        const item = await EmKit.sendFile(props.conversationId, props.chatType, files[i])
-        scrollToBottom()
+        const item = await EmKit.sendFile(request.conversationId, request.chatType, files[i])
+        if (isPageRequestCurrent(request)) scrollToBottom()
         emit('send', item)
       } catch (e) {
         failed = true
@@ -1216,14 +1268,15 @@ async function onPickFile(): Promise<void> {
     logger.error('pick file fail:', e)
     uni.showToast({ title: t('error.filePickFailed'), icon: 'none' })
   } finally {
-    pickingFile.value = false
+    if (isPageRequestCurrent(request)) pickingFile.value = false
   }
 }
 
 async function onVoiceSend(path: string, duration: number): Promise<void> {
+  const request = capturePageRequest()
   try {
-    const item = await EmKit.sendAudio(props.conversationId, props.chatType, path, duration)
-    scrollToBottom()
+    const item = await EmKit.sendAudio(request.conversationId, request.chatType, path, duration)
+    if (isPageRequestCurrent(request)) scrollToBottom()
     emit('send', item)
   } catch (e) {
     logger.error('sendAudio fail:', e)

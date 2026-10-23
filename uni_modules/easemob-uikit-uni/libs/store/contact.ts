@@ -29,7 +29,8 @@ export const contactStore = reactive({
   items: [] as EmContactItem[],
   invites: loadInvites() as EmContactInvite[],
   loaded: false,
-  syncing: false
+  syncing: false,
+  syncFailed: false
 })
 
 function persistInvites(): void {
@@ -48,9 +49,28 @@ export function contactDisplayNameOf(userId: string): string {
   return displayNameOf(userId)
 }
 
+export function isPendingContactInviteForFriend(invite: EmContactInvite): boolean {
+  return invite.kind === CONTACT_INVITE_KIND.CONTACT
+    && !invite.outgoing
+    && invite.status === CONTACT_INVITE_STATUS.PENDING
+    && contactStore.items.some((item) => item.userId === invite.from)
+}
+
+// 好友快照是申请终态的兜底权威：漏事件或旧持久化 pending 均在快照加载后收敛。
+export function convergeContactInvites(): void {
+  let changed = false
+  contactStore.invites.forEach((invite) => {
+    if (isPendingContactInviteForFriend(invite)) {
+      invite.status = CONTACT_INVITE_STATUS.ACCEPTED
+      changed = true
+    }
+  })
+  if (changed) persistInvites()
+}
+
 // 待处理申请数（新请求入口红点）
 export function pendingInviteCount(): number {
-  return contactStore.invites.filter((i) => !i.outgoing && i.status === CONTACT_INVITE_STATUS.PENDING).length
+  return contactStore.invites.filter((i) => !i.outgoing && i.status === CONTACT_INVITE_STATUS.PENDING && !isPendingContactInviteForFriend(i)).length
 }
 
 /**
@@ -100,5 +120,6 @@ export function clearContacts(): void {
   contactStore.invites = []
   contactStore.loaded = false
   contactStore.syncing = false
+  contactStore.syncFailed = false
   persistInvites()
 }

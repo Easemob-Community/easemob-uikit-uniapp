@@ -26,6 +26,7 @@ import { createLogger } from '../utils/logger'
 import { useLocale } from '../use/useLocale'
 import { displayNameOf } from '../store/user'
 import { ensureUserInfos } from './user-info'
+import { getAccountEpoch, invalidateAccountEpoch, isAccountEpochCurrent, throwIfAccountChanged } from './account'
 
 const logger = createLogger('message')
 
@@ -179,6 +180,7 @@ export class EmMessageDomain {
   private releaseByPath: Record<string, (path: string) => void> = {}
   // 历史加载飞行中去重（会话页预热 + 聊天页 mount 会并发调用同一会话）
   private historyPromiseByConversationId: Record<string, Promise<void>> = {}
+  private resendPromiseByKey: Record<string, Promise<void>> = {}
   // 会话代次：登出/换账号时自增，飞行中的历史请求回来后据此丢弃，避免把旧账号消息写进新会话缓存
   private sessionEpoch = 0
   // 流式消息索引：`<conversationId>|<msgServerId>` → store 响应式代理。
@@ -203,6 +205,8 @@ export class EmMessageDomain {
     Object.keys(this.releaseByPath).forEach((path) => this.releaseTemporary(path))
     this.releaseByPath = {}
     this.historyPromiseByConversationId = {}
+    this.resendPromiseByKey = {}
+    invalidateAccountEpoch()
     Object.keys(this.streamTimerByKey).forEach((key) => clearTimeout(this.streamTimerByKey[key]))
     this.streamTimerByKey = {}
     this.pendingStreamByKey = {}
@@ -901,11 +905,31 @@ export class EmMessageDomain {
     return true
   }
 
+  // domain 级重发共享：页面实例与宿主调用方得到同一实际结果，锁在就绪等待前占有。
+  async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string, expectedEpoch = getAccountEpoch()): Promise<void> {
+    throwIfAccountChanged(expectedEpoch)
+    const key = `${conversationId}|${localId}`
+    const existing = this.resendPromiseByKey[key]
+    if (existing != null) {
+      await existing
+      return
+    }
+    const promise = this.performResendMessage(conversationId, chatType, localId, expectedEpoch)
+    this.resendPromiseByKey[key] = promise
+    try {
+      await promise
+    } finally {
+      if (this.resendPromiseByKey[key] === promise) {
+        delete this.resendPromiseByKey[key]
+      }
+    }
+  }
+
   // 失败重发：原 Message 对象不入 store，用 item 上留存的内容重建消息再投递；
   // item 原位复用（只改状态/回填 serverId 与 time），列表位置与 quote 快照不动。
-  // 注意：图片重发依赖 item.url 里的本地临时路径，跨会话过期后重发会再次失败
-  async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {
+  private async performResendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string, expectedEpoch: number): Promise<void> {
     const chatManager = await this.readyChatManager()
+    throwIfAccountChanged(expectedEpoch)
     const list = messageStore.messagesByConversationId[conversationId]
     const item = list != null ? list.find((m) => m.localId === localId) : undefined
     if (item == null) {
@@ -1003,9 +1027,11 @@ export class EmMessageDomain {
       // 自定义/系统通知没有重建通道：明确失败，避免旧实现把它们退化成一条空文本
       throw new Error(`resend unsupported message type: ${item.type}`)
     }
+    throwIfAccountChanged(expectedEpoch)
     item.status = MESSAGE_STATUS.SENDING
     try {
       const sent = await chatManager.sendMessage(message)
+      if (!isAccountEpochCurrent(expectedEpoch)) return
       item.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
       item.time = sent.timestamp
       item.status = MESSAGE_STATUS.SENT
@@ -1014,7 +1040,7 @@ export class EmMessageDomain {
       this.releaseTemporary(item.url)
       this.applyMediaBody(item, sent)
     } catch (e) {
-      item.status = MESSAGE_STATUS.FAILED
+      if (isAccountEpochCurrent(expectedEpoch)) item.status = MESSAGE_STATUS.FAILED
       throw e
     }
   }

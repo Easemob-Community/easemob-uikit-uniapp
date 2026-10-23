@@ -34,7 +34,7 @@
             <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
           </em-empty>
         </view>
-        <view v-else-if="items.length === 0">
+        <view v-else-if="conversationStore.loaded && items.length === 0">
           <slot name="empty">
             <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText" />
           </slot>
@@ -147,20 +147,18 @@ const { themeClass } = useTheme()
 const { t } = useLocale()
 const { config } = useConfig()
 
-const syncFailed = ref(false)
+const syncFailed = computed(() => conversationStore.syncFailed)
 const syncPending = ref(false)
 const syncing = computed(() => conversationStore.syncing || syncPending.value)
 const keyword = ref('')
 
-// 首次挂载与失败重试共用锁；有缓存时失败只记录状态，不用全屏错误遮住列表。
+// 首次挂载与失败重试共用锁；后台同步结果也由 domain 写入同一 store。
 async function syncList(): Promise<void> {
   if (syncPending.value) return
   syncPending.value = true
-  syncFailed.value = false
   try {
     await EmKit.syncConversations()
   } catch (e) {
-    syncFailed.value = true
   } finally {
     syncPending.value = false
   }

@@ -32,7 +32,7 @@
             <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
           </em-empty>
           <em-empty
-            v-else-if="groups.length === 0"
+            v-else-if="contactStore.loaded && groups.length === 0"
             icon="person-single"
             :description="keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty')"
           />
@@ -138,7 +138,7 @@ const { t } = useLocale()
 // H5 长按后仍会补发 click：长按删除菜单与点击进会话会同时触发，这里吞掉长按抬手那一次 click
 const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
-const syncFailed = ref(false)
+const syncFailed = computed(() => contactStore.syncFailed)
 const syncPending = ref(false)
 const syncing = computed(() => contactStore.syncing || syncPending.value)
 const keyword = ref('')
@@ -146,11 +146,9 @@ const keyword = ref('')
 async function syncList(): Promise<void> {
   if (syncPending.value) return
   syncPending.value = true
-  syncFailed.value = false
   try {
     await EmKit.syncContacts()
   } catch (e) {
-    syncFailed.value = true
   } finally {
     syncPending.value = false
   }

@@ -21,6 +21,7 @@ import {
 } from './attachment'
 import { clearLogBuffer, createLogger, getLogText } from './utils/logger'
 import { getLocale as getActiveLocale, setLocale as setActiveLocale } from './use/useLocale'
+import { getAccountEpoch, invalidateAccountEpoch } from './chat/account'
 import type { ConversationTypeValue } from './constants'
 import type {
   CreateGroupParams,
@@ -29,7 +30,7 @@ import type {
   EmAttachmentProvider,
   EmContactInvite,
   EmGroup,
-  EmGroupMember,
+  EmGroupMemberListResult,
   EmKitConfig,
   EmLoginOptions,
   EmLocaleName,
@@ -78,8 +79,10 @@ class EmKitImpl {
   private chat = new EmChat()
   private contact = new EmContact()
   private group = new EmGroupDomain()
+  private kitConfig: EmKitConfig | null = null
 
   init(config: EmKitConfig): void {
+    this.kitConfig = config
     this.client.init(config)
     // bind 推迟到 client 就绪后（小程序分包场景 SDK 模块异步到达）；
     // 就绪门在 init 内已挂上，先于业务后续调用的续体，bind 时序稳定。
@@ -113,8 +116,15 @@ class EmKitImpl {
   }
 
   async login(options: EmLoginOptions): Promise<void> {
-    await this.client.whenReady()
+    const client = await this.client.whenReady()
     await this.client.login(options)
+    this.chat.bind(client, () => this.client.waitOnline(), this.kitConfig ?? undefined)
+    this.contact.bind(client, () => this.client.waitOnline())
+    this.group.bind(client, () => this.client.waitOnline(), {
+      removeConversationLocal: (conversationId) => this.chat.removeConversationLocal(conversationId),
+      updateConversationName: (conversationId, name) => this.chat.updateConversationName(conversationId, name),
+      insertGroupNotice: (groupId, text) => this.chat.insertGroupNotice(groupId, text)
+    })
     // 登录成功即拉取自己的昵称/头像（会话页、聊天页己方气泡、demo mine 页回显）
     ensureUserInfos([options.userId])
     // 好友快照读内存（SDK 后台同步），失败不阻塞登录链路
@@ -128,12 +138,15 @@ class EmKitImpl {
     return this.client.renewToken(token)
   }
 
-  // 登出：先退出当前会话，再断开 SDK，最后清空所有账号私有状态。
-  // 不清的话，同一设备换账号会看到上一个账号的会话/消息/联系人/草稿/邀请（联调双账号时必踩）。
+  // 登出先失效账号代次并注销旧 handler，再断开 SDK 和清空私有状态。
   async logout(): Promise<void> {
+    invalidateAccountEpoch()
     try {
       this.chat.leaveConversation()
     } catch (e) {}
+    this.chat.unbind()
+    this.contact.unbind()
+    this.group.unbind()
     try {
       await this.client.logout()
     } finally {
@@ -212,8 +225,9 @@ class EmKitImpl {
   }
 
   async syncConversations(): Promise<void> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    return this.chat.syncConversations()
+    return this.chat.syncConversations(expectedEpoch)
   }
 
   async enterConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
@@ -268,8 +282,9 @@ class EmKitImpl {
   }
 
   async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    return this.chat.resendMessage(conversationId, chatType, localId)
+    return this.chat.resendMessage(conversationId, chatType, localId, expectedEpoch)
   }
 
   async sendTyping(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
@@ -301,8 +316,9 @@ class EmKitImpl {
   }
 
   async syncContacts(): Promise<void> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    return this.contact.syncContacts()
+    return this.contact.syncContacts(expectedEpoch)
   }
 
   async addContact(userId: string, message = ''): Promise<void> {
@@ -334,30 +350,35 @@ class EmKitImpl {
 
   // 已加入群快照整量回写（SDK 后台同步，读本地快照）
   async getJoinedGroups(): Promise<EmGroup[]> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    return this.group.getJoinedGroups()
+    return this.group.getJoinedGroups(expectedEpoch)
   }
 
   // 进群预热（对齐 enterConversation 的 fire-and-forget 用法）：拉群详情 + 成员首屏，失败静默
   async enterGroup(groupId: string): Promise<void> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    this.group.getGroupInfo(groupId).catch(() => {})
-    this.group.getGroupMemberList(groupId).catch(() => {})
+    this.group.getGroupInfo(groupId, false, expectedEpoch).catch(() => {})
+    this.group.getGroupMemberList(groupId, undefined, undefined, expectedEpoch).catch(() => {})
   }
 
   async getGroupInfo(groupId: string, force = false): Promise<EmGroup> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    return this.group.getGroupInfo(groupId, force)
+    return this.group.getGroupInfo(groupId, force, expectedEpoch)
   }
 
-  async getGroupMemberList(groupId: string, cursor?: string, pageSize?: number): Promise<{ items: EmGroupMember[], cursor: string, hasMore: boolean }> {
+  async getGroupMemberList(groupId: string, cursor?: string, pageSize?: number): Promise<EmGroupMemberListResult> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    return this.group.getGroupMemberList(groupId, cursor, pageSize)
+    return this.group.getGroupMemberList(groupId, cursor, pageSize, expectedEpoch)
   }
 
   async getGroupAnnouncement(groupId: string): Promise<string> {
+    const expectedEpoch = getAccountEpoch()
     await this.client.whenReady()
-    return this.group.getGroupAnnouncement(groupId)
+    return this.group.getGroupAnnouncement(groupId, expectedEpoch)
   }
 
   async createGroup(params: CreateGroupParams): Promise<string> {

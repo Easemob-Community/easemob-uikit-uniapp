@@ -46,7 +46,7 @@
         <!-- footer 胶囊按钮（em-button pill+block，对齐 vue 版：42px 高、圆角 999、灰底、15px/500） -->
         <view :class="ns.e('footer')">
           <em-button :text="t('chat.info.clearHistory')" pill block :loading="clearingHistory" :disabled="clearingHistory" :class="ns.e('footer-btn')" @click="onClearHistory" />
-          <em-button :text="t('chat.info.deleteConversation')" pill block :loading="deletingConversation" :disabled="deletingConversation || exitCompleted" :class="ns.e('footer-btn')" @click="onDelete" />
+          <em-button :text="t('chat.info.deleteConversation')" pill block :loading="deletingConversation" :disabled="exitPending || exitCompleted" :class="ns.e('footer-btn')" @click="onDelete" />
           <!-- 单聊红色区：删除好友（danger = 灰底红字档，与退群/解散同档）；仅对方已是好友时显示 -->
           <em-button
             v-if="!isGroupChat && isContact"
@@ -55,7 +55,7 @@
             pill
             block
             :loading="deletingContact"
-            :disabled="deletingContact || contactDeleted"
+            :disabled="exitPending || exitCompleted"
             :class="ns.e('footer-btn')"
             @click="onDeleteContact"
           />
@@ -67,7 +67,7 @@
             pill
             block
             :loading="leavingGroup"
-            :disabled="leavingGroup || exitCompleted"
+            :disabled="exitPending || exitCompleted"
             :class="ns.e('footer-btn')"
             @click="onLeaveOrDestroy"
           />
@@ -215,9 +215,9 @@ const muting = ref(false)
 const pinning = ref(false)
 const clearingHistory = ref(false)
 const deletingConversation = ref(false)
+const exitPending = ref(false)
 const exitCompleted = ref(false)
 const deletingContact = ref(false)
-const contactDeleted = ref(false)
 const leavingGroup = ref(false)
 
 // 删除好友按钮仅对已是好友的单聊对方显示（好友快照由 SDK 登录后自动同步进 contactStore）
@@ -409,43 +409,49 @@ function onClearHistory(): void {
   })
 }
 
+function completeExit(): boolean {
+  if (exitCompleted.value) return false
+  exitCompleted.value = true
+  return true
+}
+
 function onDelete(): void {
-  if (deletingConversation.value || exitCompleted.value) return
+  if (exitPending.value || exitCompleted.value) return
   uni.showModal({
     title: t('chat.info.deleteConversation'),
     content: t('conversation.deleteConfirm'),
     success: (res) => {
-      if (!res.confirm || deletingConversation.value || exitCompleted.value) return
+      if (!res.confirm || exitPending.value || exitCompleted.value) return
+      exitPending.value = true
       deletingConversation.value = true
       EmKit.deleteConversation(props.conversationId, chatType.value)
         .then(() => {
-          if (exitCompleted.value) return
-          exitCompleted.value = true
-          emit('deleted', props.conversationId)
+          if (completeExit()) emit('deleted', props.conversationId)
         })
         .catch(() => {
           uni.showToast({ title: t('error.unknown'), icon: 'none' })
         })
         .finally(() => {
+          exitPending.value = false
           deletingConversation.value = false
         })
     }
   })
 }
 
-// 删除好友：二次确认 → EmKit.deleteContact（内部刷新好友快照）→ 成功 toast + emit contact-deleted（只发一次）；
-// 不连带删会话/清消息，会话去留由宿主在 contact-deleted 里决定
+// 删除好友与删除会话/退群共用退出锁；成功事件和 toast 均只发生一次。
 function onDeleteContact(): void {
-  if (deletingContact.value || contactDeleted.value) return
+  if (exitPending.value || exitCompleted.value) return
   uni.showModal({
     title: t('chat.info.deleteFriend'),
     content: t('chat.info.deleteFriendConfirm'),
     success: (res) => {
-      if (!res.confirm || deletingContact.value || contactDeleted.value) return
+      if (!res.confirm || exitPending.value || exitCompleted.value) return
+      exitPending.value = true
       deletingContact.value = true
       EmKit.deleteContact(props.conversationId)
         .then(() => {
-          contactDeleted.value = true
+          if (!completeExit()) return
           uni.showToast({ title: t('chat.info.deleteFriendSuccess'), icon: 'success' })
           emit('contact-deleted', props.conversationId)
         })
@@ -453,6 +459,7 @@ function onDeleteContact(): void {
           uni.showToast({ title: t('chat.info.deleteFriendFailed'), icon: 'none' })
         })
         .finally(() => {
+          exitPending.value = false
           deletingContact.value = false
         })
     }
@@ -461,13 +468,14 @@ function onDeleteContact(): void {
 
 // 退群/解散：二次确认 → domain 退群/解散（内部清群缓存）→ 复用删除会话链路（清消息+删会话）→ emit leaved
 function onLeaveOrDestroy(): void {
-  if (leavingGroup.value || exitCompleted.value) return
+  if (exitPending.value || exitCompleted.value) return
   const destroy = isOwner.value
   uni.showModal({
     title: destroy ? t('group.destroy') : t('group.leave'),
     content: destroy ? t('group.destroyConfirm') : t('group.leaveConfirm'),
     success: (res) => {
-      if (!res.confirm || leavingGroup.value || exitCompleted.value) return
+      if (!res.confirm || exitPending.value || exitCompleted.value) return
+      exitPending.value = true
       leavingGroup.value = true
       const req = destroy ? EmKit.destroyGroup(props.conversationId) : EmKit.leaveGroup(props.conversationId)
       req
@@ -476,8 +484,7 @@ function onLeaveOrDestroy(): void {
           return EmKit.deleteConversation(props.conversationId, chatType.value).catch(() => {})
         })
         .then(() => {
-          if (exitCompleted.value) return
-          exitCompleted.value = true
+          if (!completeExit()) return
           uni.showToast({ title: destroy ? t('group.destroySuccess') : t('group.leaveSuccess'), icon: 'success' })
           emit('leaved', props.conversationId)
         })
@@ -485,6 +492,7 @@ function onLeaveOrDestroy(): void {
           uni.showToast({ title: destroy ? t('group.destroyFailed') : t('group.leaveFailed'), icon: 'none' })
         })
         .finally(() => {
+          exitPending.value = false
           leavingGroup.value = false
         })
     }

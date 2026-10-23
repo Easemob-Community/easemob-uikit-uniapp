@@ -32,7 +32,7 @@ interface Props {
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   customClass: '',
   customStyle: ''
 })

@@ -279,12 +279,15 @@ easemob-uikit-uniapp/
 
 ### M2.17：交互一致性批次——通用提交态与错误态原子能力（2026-10-22 立项）
 
-- **范围（均为非 breaking 扩展，默认值保持现有调用方行为）**：`em-button` 新增 `loading?: boolean = false`，loading 与 disabled 均拦截 click，loading 显示既有 `loading-arc-normal` 静态图标；`em-select-contact` 新增 `submitting?: boolean = false`，提交中禁确认、切换选择、关闭按钮和遮罩关闭，`confirm` 不重复派发；`LOAD_MORE_STATE` 新增 `ERROR = 'error'`，`em-load-more` 显示「加载失败，点击重试」并继续 emit `load`。
+- **范围（均为非 breaking 扩展，默认值保持现有调用方行为）**：`em-button` 新增 `loading?: boolean = false`，loading 与 disabled 均拦截 click，loading 显示 `loading-arc-normal` 并由 `useSpinRotation` 驱动旋转；`em-select-contact` 新增 `submitting?: boolean = false`，提交中禁确认、切换选择、关闭按钮和遮罩关闭，`confirm` 不重复派发；`LOAD_MORE_STATE` 新增 `ERROR = 'error'`，`em-load-more` 显示「加载失败，点击重试」并继续 emit `load`。
 - **消息交互一致性**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删漫游再删本地，无服务端 ID 仅本地删除，失败保留气泡并抛错；保留 `deleteLocalMessage` 为显式本地删除 API，删除后由会话域按剩余消息校正摘要/时间。聊天页删除先确认、成功才 emit `delete`，按 localId 防重；复制统一走 Promise 结果与成功/失败提示，空文本按失败处理并屏蔽剪贴板原生提示；`em-chat-inputbar.submitting` 与 `em-quick-reply-bar.disabled` 默认 false，文本发送、直发快捷回复、重发与撤回均防重复提交，撤回执行时重查时间窗，不新增撤回确认。
 - **会话与联系人操作闭环**：会话列表删除先原生确认；删除、置顶、免打扰按会话与动作防重，会话域对同一会话的 pin/mute 分别串行并以最新请求回写/回滚。chat-info 开关直接以会话 store 为数据源，请求中禁用；清空、删除、退群/解散及删除好友增加提交锁，成功事件只发一次。`removeConversationLocal` 同步清理持久化草稿；`onContactAdded` 将匹配且收到的 pending 好友申请置 accepted 并持久化，联动申请页操作态与未读角标。demo 添加好友弹层保留在宿主侧，补发送中禁用及表单代次保护，旧请求不得关闭后来重开的新表单。
 - **群管理确认、权限与提交反馈**：新增 `canRemoveGroupMember` 共享权限判定，owner 可移除非自己且非 owner 的成员，admin 仅可移除普通成员；单成员菜单、批量候选与提交载荷共用并在确认时重验。设/撤管理员确认带成员姓名，转让确认说明转让后自己成为普通成员；邀请/建群/批量移除不增加确认。邀请、批量移除、建群接入 `em-select-contact.submitting`，成员写操作使用单一可 await pending 链防重；移除成功重拉群详情与成员首屏，失败保留选择及弹层。群名/公告保存中禁止关闭，设撤管理员/转让/移出使用独立成功/失败文案；英文多人进出通知的 others 使用剩余人数，中文总人数口径不变。
-- **选择异常与列表失败恢复**：平台层统一区分用户取消与图片/视频/内置文件选择失败，取消静默、其他异常 reject 并由聊天页提示选择/读取失败。会话、联系人、群列表记录 autoSync/onMounted 失败，只有成功且为空才显示原空态；无缓存失败显示错误与重试，后台刷新失败保留缓存列表，重试复用同一 loading 锁。群成员首屏失败可重试，分页失败进入 `LOAD_MORE_STATE.ERROR`，搜索无结果与真正空列表文案不变；聊天加载更多保留错误/重试态，首次历史骨架与既有错误恢复不变。
-- **实现约束**：复用现有原子组件与 style-lab 演示页，不新增组件、不连接 store、不引入运行时依赖；蒸汽端继续使用静态 spinner，不写 CSS 动画；错误文案同步维护 zh-CN/en。
+- **选择异常与列表失败恢复**：平台层统一区分用户取消与图片/视频/内置文件选择失败，取消静默、其他异常 reject 并由聊天页提示选择/读取失败。会话、联系人、群列表记录 autoSync/onMounted 失败，只有成功且为空才显示原空态；无缓存失败显示错误与重试，后台刷新失败保留缓存列表，重试复用同一 loading 锁。群成员首屏失败可重试，分页失败进入 `LOAD_MORE_STATE.ERROR`，搜索无结果与真正空列表文案不变；聊天加载更多保留错误/重试态，首次历史骨架与既有错误恢复不变。群成员分页结果在既有 `{ items, cursor, hasMore }` 上增加 `applied`：当前成功且实际写入 store 时 resolve true，陈旧成功 resolve false；陈旧失败仍以结构化结果 reject（`applied=false`），当前真实失败保留原始 error/rejection。视图据此协调 enterGroup/邀请/父页刷新等外部请求归属，无缓存的陈旧首屏结果必须保留可重试态；所有结果消费方必须忽略 `applied=false` 的 resolved/rejected 载荷。
+- **实现约束**：复用现有原子组件与 style-lab 演示页，不新增组件、不连接 store、不引入运行时依赖；spinner 使用 `useSpinRotation` 的 JS 逐帧旋转，不写 CSS 动画；错误文案同步维护 zh-CN/en。
+- **终审时序与恢复收口**：会话/联系人/群读取在公共门面等待 SDK 就绪前捕获账号代次，reset 失效在途与 pending；会话快照按同账号请求序号只让最新结果落 store。chat-info 删除会话、删除好友、退群/解散共享 exitPending/exitCompleted；重发在 domain 按 conversationId+localId 共享在途 Promise。聊天页按会话与页面代次保护发送、草稿/引用/@清理及选择器完成回调，未发送的宿主临时文件按 release 契约清理。
+- **同步状态与恢复能力边界**：store 以 loaded/syncing/syncFailed 区分未加载、加载中、失败与权威空列表；`onSyncDataFinished(failed)` 直接驱动失败态且保留缓存。会话重试只走真实 `refreshSessionList`，不再以内存快照伪装成功；联系人重试调用 SDK 当前提供的 `refreshContactSnapshot` 受控刷新。SDK 没有已加入群全量手动重启同步 API，`getJoinedGroups` 在后台同步失败后明确拒绝并提示恢复连接/重新登录，不把内存重读标记为权威成功。
+- **终审展示一致性**：好友快照加载时把已是好友的历史 received pending 申请收敛为 accepted，申请按钮与未读角标同步收敛，processInvite 再作同源守卫；两人英文群通知使用 `1 other`，中文仍为总人数。`delete` 事件文档明确漫游与本地删除均完成后才透出。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200；默认可选/可点行为不变。
 
 ### M2.18：输入栏多行输入（生长 + 回车/换行档）（2026-10-22 立项）

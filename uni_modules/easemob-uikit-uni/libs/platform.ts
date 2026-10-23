@@ -159,18 +159,22 @@ export function chooseImage(count = 1, sourceType: 'album' | 'camera' = 'album')
       count,
       sourceType: [sourceType],
       success: (res) => {
-        const paths = res.tempFilePaths as string[]
-        const files = (res.tempFiles ?? []) as Array<{ path?: string, size?: number, name?: string }>
-        resolve(paths.map((p, i) => {
-          const f = files[i]
-          // #ifdef WEB
-          // H5 的 tempFiles 是 File 对象，SDK 上传直接用它
-          return { path: p, name: f?.name ?? fileNameOf(p), size: f?.size ?? 0, webFile: f ?? null }
-          // #endif
-          // #ifndef WEB
-          return { path: p, name: fileNameOf(f?.path ?? p), size: f?.size ?? 0, webFile: null }
-          // #endif
-        }))
+        try {
+          const paths = res.tempFilePaths as string[]
+          const files = (res.tempFiles ?? []) as Array<{ path?: string, size?: number, name?: string }>
+          resolve(paths.map((p, i) => {
+            const f = files[i]
+            // #ifdef WEB
+            // H5 的 tempFiles 是 File 对象，SDK 上传直接用它
+            return { path: p, name: f?.name ?? fileNameOf(p), size: f?.size ?? 0, webFile: f ?? null }
+            // #endif
+            // #ifndef WEB
+            return { path: p, name: fileNameOf(f?.path ?? p), size: f?.size ?? 0, webFile: null }
+            // #endif
+          }))
+        } catch (e) {
+          reject(e)
+        }
       },
       fail: (e) => {
         if (isUserCancellation(e)) {
@@ -321,14 +325,18 @@ export function chooseVideo(): Promise<EmPickedVideo | null> {
     uni.chooseVideo({
       sourceType: ['album'],
       success: (res) => {
-        resolve({
-          path: res.tempFilePath,
-          name: fileNameOf(res.tempFilePath),
-          duration: Math.round(res.duration ?? 0),
-          width: res.width ?? 0,
-          height: res.height ?? 0,
-          size: res.size ?? 0
-        })
+        try {
+          resolve({
+            path: res.tempFilePath,
+            name: fileNameOf(res.tempFilePath),
+            duration: Math.round(res.duration ?? 0),
+            width: res.width ?? 0,
+            height: res.height ?? 0,
+            size: res.size ?? 0
+          })
+        } catch (e) {
+          reject(e)
+        }
       },
       fail: (e) => {
         if (isUserCancellation(e)) {
@@ -353,8 +361,12 @@ export function chooseFile(): Promise<EmPickedFile | null> {
       count: 1,
       type: 'file',
       success: (res) => {
-        const f = res.tempFiles[0]
-        resolve({ path: f.path, name: f.name, size: f.size, webFile: null })
+        try {
+          const f = res.tempFiles[0]
+          resolve({ path: f.path, name: f.name, size: f.size, webFile: null })
+        } catch (e) {
+          reject(e)
+        }
       },
       fail: (e) => {
         if (isUserCancellation(e)) {
@@ -369,13 +381,17 @@ export function chooseFile(): Promise<EmPickedFile | null> {
     const input = document.createElement('input')
     input.type = 'file'
     input.onchange = () => {
-      const files = input.files
-      if (files == null || files.length === 0) {
-        resolve(null)
-        return
+      try {
+        const files = input.files
+        if (files == null || files.length === 0) {
+          resolve(null)
+          return
+        }
+        const f = files[0]
+        resolve({ path: '', name: f.name, size: f.size, webFile: f })
+      } catch (e) {
+        reject(e)
       }
-      const f = files[0]
-      resolve({ path: '', name: f.name, size: f.size, webFile: f })
     }
     input.oncancel = () => {
       resolve(null)

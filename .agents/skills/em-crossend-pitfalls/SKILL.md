@@ -181,6 +181,14 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **排查口径**：先确认文件可解（`AVAssetImageGenerator` 抽两帧对比）；若时间不自己走，是起播问题；若时间走画面不动，按本节处理；仍不动时点原生全屏按钮——全屏能播说明内联层问题，可 `requestFullScreen` 兜底，全屏也黑才是播放器缺陷。
 - **纪律**：不要用 `autoplay=true` + 延迟 `play()` 混用（会双起播/丢事件）；`poster` 只用于加载态，不要让它盖在播放层上。视频源链路（下载本地）见 §5o。
 
+### 5q. 弹层「挂载了但看不见」：v-if 新建分支的渲染会整条丢失（Android 真机实测 2026-10-23，两轮定案）
+- **症状**：会话列表右上角「+」偶发只收起底部 tabBar、action sheet 不出来；整页点击被吞（有全屏透明命中区），再点「+」只会把弹层关掉。约 3/12 概率，与点击位置无关。同类弹层（长按会话、选人、@提及、聊天页长按菜单）同源。
+- **根因（两轮插桩结论）**：① 第一轮：`v-if` 新建分支时，**该子树的动态 class 写入会整条丢失/回落到旧值**（`watch`/渲染 effect 日志全对，原生仍是隐藏态）。② 第二轮（真机给根节点/面板打内联绿色/红色标记）：失败时**连内联背景色都不落笔**，说明不是 class 级联问题，而是**新分支的视觉节点整批没建出来**——只建出命中区，所以弹层不可见但仍吃点击；而 `holdTabBar()` 已先隐藏原生 tabBar，于是「tabBar 没了、弹层也没出来」。
+- **已排除**：页面状态互斥（失败时 JS 状态完全正确）、`hideTabBar` 干扰（关掉仍失败）、点击坐标（固定点可复现）、延迟补写 class（80/240ms 补写仍 2/10）、延时 50ms 挂载（仍 4/10）、把显示态写死进挂载（仍 2/6）。
+- **定案解法**：**弹层树常驻挂载，不在打开时建节点**——`em-popup` 去掉 `v-if`，页面挂载时就把 root/遮罩/面板建好；关闭态用根节点内联 `top: 200%` 把整棵移到视口下方（不绘制、不吃点击），打开/关闭只改这一个内联样式（节点早已附着，写不会丢）。默认态即最终态：遮罩默认不透明、面板默认在最终位置（不依赖 `--show` 类）。真机 14/14 次开合全通过、每次 tabBar 如实归还（改前 3/12 失败）。
+- **代价**：去掉 250ms 进出场动画；弹层内容（如选人列表）会在页面挂载时就建好（不再等首次打开）。
+- **纪律**：蒸汽端凡「打开时才建起来」的 UI（弹层/浮层/面板）都不要依赖新分支的首次渲染；要么常驻挂载 + 只改样式，要么接受它偶发不出现。要动画用 JS 逐帧写内联样式（同 `useSpinRotation`），并保证任意一帧丢写时终态仍可见。
+
 ## 小程序（mp-weixin）
 
 ### 6. 原生事件穿组件边界冒泡
@@ -231,6 +239,7 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 | 发送中 spinner 动画 | ✅ JS 定时器驱动 `useSpinRotation` 逐帧旋转（em-button / em-load-more）；chat-page 发送中仍为 keyframes（H5/mp 转、蒸汽静态） |
 | for-of / for-in（App 编译降级） | ⚠️ 生成 `__values` 等 helper 并提升到任意 chunk；**libs 内禁用**（会造成 `libs → components/pages` 循环依赖，首屏 `Xxx is not initialized` 白屏） |
 | `<text>` 内 v-if 增删子 text | ❌ 移除子节点后父 text 字形丢失（气泡空白但高度保留）；改常驻子节点换内容 |
+| v-if 新建分支（弹层/浮层） | ❌ 新分支的视觉节点会偶发整批不建（只剩命中区）：弹层「看不见但仍吃点击」，约 3/12；改常驻挂载 + 只改内联样式（§5q） |
 | `box-shadow` 的 `inset` | ⚠️ iOS 丢 alpha，低透明度高光会被画成实色白线；装饰改用 border/渐变 |
 | `uni.getNetworkType` / `uni.onNetworkStatusChange` | ⚠️ 同属可选 UTS 模块 `uni-getNetworkType`；自定义基座可能没有，且 SDK 变量调用不会进基座 `duts` 清单 |
 | `uni.onNetworkStatusChange`（有模块的基座） | ✅ 支持，`onXxx` 返回 id、`offXxx(id)` 反注册 |

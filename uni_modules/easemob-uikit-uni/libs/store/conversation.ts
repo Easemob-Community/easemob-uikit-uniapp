@@ -5,7 +5,9 @@ import type { EmConversationItem } from '../types'
 // atMeByConversationId 为「群里有人@我」未读标记（ext em_at_list 驱动，进入会话清除）
 export const conversationStore = reactive({
   items: [] as EmConversationItem[],
+  loaded: false,
   syncing: false,
+  syncFailed: false,
   atMeByConversationId: {} as Record<string, boolean>
 })
 
@@ -40,6 +42,8 @@ export function conversationUnreadCountOf(conversationId: string): number {
 // 登出/换账号清空（会话列表与 @我 标记都是账号私有状态）
 export function clearConversations(): void {
   conversationStore.items = []
+  conversationStore.loaded = false
   conversationStore.syncing = false
+  conversationStore.syncFailed = false
   conversationStore.atMeByConversationId = {}
 }

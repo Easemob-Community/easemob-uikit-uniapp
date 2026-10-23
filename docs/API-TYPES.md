@@ -212,6 +212,17 @@ import {
 | `nick` | `string` | 群昵称（可选） |
 | `avatar` | `string` | 头像（可选） |
 
+### `EmGroupMemberListResult`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `items` | `EmGroupMember[]` | 本页成员；`applied=false` 时不得消费 |
+| `cursor` | `string` | 下一页游标；`applied=false` 时不得消费 |
+| `hasMore` | `boolean` | 是否还有更多；`applied=false` 时不得消费 |
+| `applied` | `boolean` | 当前成功且已写入 store 时 resolve `true`；陈旧成功 resolve `false`，陈旧失败 reject 同类型结构化结果（`false`） |
+
+调用方必须同时处理 resolve 与 catch：陈旧成功 resolve `applied=false`，陈旧失败 reject 结构化结果（`applied=false`），两者的 `items/cursor/hasMore` 都不得消费；当前真实失败 reject 原始错误，不包装为该结果类型。
+
 ### `CreateGroupParams`
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -239,6 +250,13 @@ import {
 - `CONTACT_INVITE_KIND`：`CONTACT='contact'`、`GROUP='group'`。
 - `CONTACT_MENU_KEY`：`DELETE='delete'`。
 - `ALPHABET_KEYS`：`A`–`Z` + `#`。
+
+### 列表加载常量
+
+- `LOAD_MORE_STATE.LOADING='loading'`：加载中。
+- `LOAD_MORE_STATE.BUTTON='button'`：点击加载更多。
+- `LOAD_MORE_STATE.NO_MORE='noMore'`：没有更多。
+- `LOAD_MORE_STATE.ERROR='error'`：加载失败，点击重试；`LoadMoreStateValue` 由该常量派生。
 
 ## 4. 组件公共类型
 

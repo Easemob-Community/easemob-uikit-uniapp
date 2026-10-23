@@ -80,7 +80,7 @@ await EmKit.logout()
 // 退出当前会话、断开 SDK，并清空会话/消息/联系人/群/草稿/邀请等账号私有状态
 ```
 
-登录后的数据同步由 SDK 事件驱动，页面组件读取 reactive store 即可自动更新。会话列表页默认在首次挂载时拉一次快照；从二级页返回时，宿主可在 `onShow` 再调 `EmKit.syncConversations()` 补刷新。
+登录后的数据同步由 SDK 事件驱动，页面组件读取 reactive store 即可自动更新；`loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表，后台失败不会清掉缓存。会话列表页默认在首次挂载时调用真实 `refreshSessionList`；从二级页返回时，宿主可在 `onShow` 再调 `EmKit.syncConversations()` 补刷新。联系人重试使用 SDK 受控刷新；群快照只读，群后台同步失败后需恢复连接或重新登录。
 
 ### 3.4 页面生命周期与事件订阅
 

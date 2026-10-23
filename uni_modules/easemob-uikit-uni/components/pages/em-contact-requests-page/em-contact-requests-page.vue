@@ -56,7 +56,7 @@ import EmIcon from '../../em-icon/em-icon.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import { EmKit } from '../../../libs'
 import { CONTACT_INVITE_KIND, CONTACT_INVITE_STATUS } from '../../../libs/constants'
-import { contactStore } from '../../../libs/store/contact'
+import { contactStore, convergeContactInvites, isPendingContactInviteForFriend } from '../../../libs/store/contact'
 import { primaryColorStyle } from '../../../libs/store/config'
 import { groupDisplayNameOf } from '../../../libs/store/group'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
@@ -147,7 +147,7 @@ function statusTextOf(invite: EmContactInvite): string {
 }
 
 function isActionable(invite: EmContactInvite): boolean {
-  return !invite.outgoing && invite.status === CONTACT_INVITE_STATUS.PENDING
+  return !invite.outgoing && invite.status === CONTACT_INVITE_STATUS.PENDING && !isPendingContactInviteForFriend(invite)
 }
 
 // 对方拒绝通知（我方发出、已被对方拒绝）：头像位换 dspntd（对齐 vue isDeclinedByPeer）
@@ -163,7 +163,11 @@ function isProcessing(id: string): boolean {
 }
 
 function processInvite(invite: EmContactInvite, kind: 'accept' | 'decline'): void {
-  if (isProcessing(invite.id)) return
+  if (isPendingContactInviteForFriend(invite)) {
+    convergeContactInvites()
+    return
+  }
+  if (!isActionable(invite) || isProcessing(invite.id)) return
   processingIds.value.push(invite.id)
   // group kind 走群邀请接受/拒绝 API（接受成功内部刷新群快照），contact kind 维持好友语义
   const action = isGroup(invite)

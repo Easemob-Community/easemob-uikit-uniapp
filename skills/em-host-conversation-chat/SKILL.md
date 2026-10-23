@@ -104,6 +104,7 @@ function onMenu(key: string): void {
 |---|---|---|---|
 | `showSearch` | `boolean` | `true` | 顶部搜索条 |
 | `tabs` | `ConversationTabKeyValue[]` | 全部五项 | 传 `[]` 隐藏筛选栏；项：`all/unread/atMe/single/group` |
+| `showTabs` | `boolean` | `true` | 筛选栏显隐；`false` 时无论 `tabs` 为何都不渲染 |
 | `emptyText` | `string` | `''` | 空列表文案；空串走 i18n |
 | `autoSync` | `boolean` | `true` | 首次挂载自动 `syncConversations` |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条 |
@@ -117,7 +118,7 @@ function onMenu(key: string): void {
 |---|---|
 | `#empty` | 整体替换空态（搜索无结果与空列表共用一个插槽） |
 
-组件内置：搜索、五类筛选、6 条骨架、置顶/免打扰/删除（长按）、「+」发起单聊（内置选人并 emit `select`）、连接状态条。
+组件内置：搜索、五类筛选、6 条骨架、置顶/免打扰/删除（长按）、「+」发起单聊（内置选人并 emit `select`）、连接状态条。删除会话先二次确认；pin/mute/delete 按会话与动作防重，pin/mute 各自串行并以最新意图为准。`loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表；无缓存失败显示重试，有缓存时保留列表。重试真实调用 `refreshSessionList`，不会用内存快照伪装成功。
 
 ## 4. 聊天页
 
@@ -226,10 +227,12 @@ function onOpenInfo(id: string): void {
 
 ### 4.6 组件已经替你做的事（不要重复）
 
-- `enterConversation` / 拉历史 / 首屏滚底 / 加载更多；
+- `enterConversation` / 拉历史 / 首屏滚底 / 加载更多；首屏与分页互斥，各自失败可重试且保留缓存；
 - 未读清零（进会话、收消息、离页兜底，含服务端异步清零）；
 - 草稿保存与恢复、typing 发送/展示、单聊已读回执（可配置关闭）；
-- 键盘避让、面板互斥、引用条、撤回/失败重发、时间分隔条；
+- 键盘避让、面板互斥、引用条、撤回/失败重发、时间分隔条；文本与直发快捷回复共享提交锁，重发/撤回/删除按 `localId` 防重，domain 重发 Promise 跨页面实例共享；
+- 消息删除确认与复制结果提示：`deleteMessage` 有服务端 ID 时先删当前账号漫游历史再删本地，本地消息仅本地删除；`copyText` 返回 Promise，空文本/原生失败会 reject；
+- 图片、视频与文件选择的取消静默、真实失败提示；发送/选择按发起会话与页面代次完成，旧回调不会误清新会话编辑或解锁新请求，未发送临时附件会 release；
 - 连接状态条、首屏骨架、历史失败重试、空态。
 
 宿主只需路由与事件；额外调 `loadHistory` 只用于**预加载**，不是必须。
@@ -305,6 +308,8 @@ function onBack(): void {
 | `contact-deleted` | 删除好友成功（不删会话，单聊分支且对方已是好友时有该按钮） | 退场 |
 | `invite` / `remove-members` / `open-members` | 群管理内部已闭环，仅通知 | 一般无需处理 |
 | `chat-member` | 成员宫格点私聊 | `addConversation` + 跳聊天页 |
+
+详情页开关直接读会话 store，pin/mute 请求中禁用并按各自队列保护最新意图。删除会话/删除好友/退群/解散共享 exitPending/exitCompleted，确认后、SDK 写操作前占锁且按钮同时禁用，只发出一次成功事件，避免交叉操作重复退场。群名/公告保存中不能取消或关闭；邀请与批量移除不额外确认，选人提交中不能改选或关闭。设撤管理员、转让、移除会在确认时重验角色，移除后强制刷新群详情与成员首屏。
 
 ## 6. 定制顺序（从轻到重）
 

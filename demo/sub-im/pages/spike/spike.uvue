@@ -217,10 +217,18 @@ async function onTestMemberPages() {
       return
     }
     const p1 = await EmKit.getGroupMemberList(first.groupId)
+    if (!p1.applied) {
+      logGroup('成员第 1 页结果已陈旧，已忽略')
+      return
+    }
     logGroup(`成员第 1 页: ${p1.items.length} 人, cursor='${p1.cursor}', hasMore=${p1.hasMore}`)
     p1.items.slice(0, 3).forEach((m) => logGroup(`  ${m.userId} | role=${m.role} | joinedAt=${m.joinedAt}`))
     if (p1.hasMore && p1.cursor !== '') {
       const p2 = await EmKit.getGroupMemberList(first.groupId, p1.cursor)
+      if (!p2.applied) {
+        logGroup('成员第 2 页结果已陈旧，已忽略')
+        return
+      }
       logGroup(`成员第 2 页: ${p2.items.length} 人, cursor='${p2.cursor}', hasMore=${p2.hasMore}（cursor: '${p1.cursor}' → '${p2.cursor}'）`)
       p2.items.slice(0, 3).forEach((m) => logGroup(`  ${m.userId} | role=${m.role}`))
     } else {
@@ -262,6 +270,10 @@ async function onTestGroupLifecycle() {
     const info = await EmKit.getGroupInfo(groupId)
     logGroup(`  详情: name=${info.name} owner=${info.owner} 成员=${info.memberCount}/${info.maxUsers}`)
     const members = await EmKit.getGroupMemberList(groupId)
+    if (!members.applied) {
+      logGroup('  成员结果已陈旧，已忽略')
+      return
+    }
     logGroup(`  成员: ${members.items.length} 人（${members.items.map((m) => `${m.userId}/${m.role}`).join(', ')}）`)
     const announcement = `spike 公告 ${Date.now()}`
     await EmKit.updateGroupAnnouncement(groupId, announcement)

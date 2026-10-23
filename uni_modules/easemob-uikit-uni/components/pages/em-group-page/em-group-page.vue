@@ -28,10 +28,10 @@
           icon="circle-bang"
           :description="t('common.syncFailed')"
         >
-          <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
+          <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList(true)" />
         </em-empty>
         <em-empty
-          v-else-if="items.length === 0"
+          v-else-if="groupStore.loaded && items.length === 0"
           icon="person-double"
           :description="keyword.trim() !== '' ? t('group.noSearchResult') : t('group.empty')"
         />
@@ -149,19 +149,18 @@ const { t } = useLocale()
 
 const nameTextStyle = TEXT_STYLE_NAME
 
-const syncFailed = ref(false)
+const syncFailed = computed(() => groupStore.syncFailed)
 const syncPending = ref(false)
 const syncing = computed(() => groupStore.syncing || syncPending.value)
 const keyword = ref('')
 
-async function syncList(): Promise<void> {
+async function syncList(manual = false): Promise<void> {
   if (syncPending.value) return
   syncPending.value = true
-  syncFailed.value = false
   try {
     await EmKit.getJoinedGroups()
   } catch (e) {
-    syncFailed.value = true
+    if (manual) uni.showToast({ title: t('group.syncRetryUnavailable'), icon: 'none' })
   } finally {
     syncPending.value = false
   }

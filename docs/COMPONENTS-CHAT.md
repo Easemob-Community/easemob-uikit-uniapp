@@ -12,7 +12,7 @@
 |---|---|---|---|
 | `modelValue` | `string` | 必填 | 草稿内容，配合 `v-model` 使用 |
 | `quote` | `EmQuoteInfo \| null` | 必填 | 当前引用消息；`null` 时引用条不渲染 |
-| `features` | `EmInputFeatures` | 六项全开 | 功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` |
+| `features` | `EmInputFeatures` | 工具项全开、`sendOnReturn=true` | 功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` / `sendOnReturn` |
 | `emojis` | `string[]` | 内置 96 个 | emoji 面板字符集 |
 | `disabled` | `boolean` | `false` | 禁用态（如全员禁言）：输入、发送、语音、面板全部拦截 |
 | `submitting` | `boolean` | `false` | 文本或直发快捷回复提交中：拦截重复 `send` 与快捷回复点选，不影响草稿编辑 |
@@ -23,13 +23,13 @@
 | 事件 | 载荷 | 说明 |
 |---|---|---|
 | `update:modelValue` | `value: string` | 草稿变化（输入、点 emoji） |
-| `send` | — | 点击纸飞机发送键或键盘回车；草稿全为空白时不派发 |
+| `send` | — | 点击纸飞机发送键或键盘回车；草稿全为空白或 `submitting=true` 时不派发 |
 | `quote-close` | — | 点击引用条右侧关闭 |
 | `media-select` | `key: string` | 媒体面板点选，key 见 `MEDIA_PANEL_KEY`：`album` / `camera` / `video` / `file` |
 | `voice-send` | `path: string, duration: number` | 录音完成；`duration` 单位为秒 |
 | `mention-trigger` | — | 草稿变长且以 `@` 结尾时派发，是否进入 @ 选人由宿主门控 |
 | `disabled-tap` | — | 禁用态下的任何操作尝试，宿主据此提示 |
-| `quick-reply` | `item: EmQuickReply` | 点选快捷回复；填草稿还是直接发送由宿主决定 |
+| `quick-reply` | `item: EmQuickReply` | 点选快捷回复；填草稿还是直接发送由宿主决定；`submitting=true` 时不派发 |
 
 无插槽。
 
@@ -43,6 +43,7 @@
 | `camera` | `boolean` | 媒体面板的"拍摄"项 |
 | `video` | `boolean` | 媒体面板的"视频"项 |
 | `file` | `boolean` | 媒体面板的"文件"项 |
+| `sendOnReturn` | `boolean` | 默认 `true`：回车发送；`false`：生长 textarea、回车换行，封顶 5 行 |
 
 `EmQuoteInfo` 的字段：
 
@@ -137,7 +138,7 @@ function onQuickReply(item: EmQuickReply): void {
 
 **发送键布局**：右侧的发送位与"+"同槽互斥——草稿为空时显示"+"媒体入口，草稿有内容时在同一位换成品牌色纸飞机发送键（对应 `send` 事件）。因此输入栏不再常驻文字发送按钮，省出的宽度给输入框；空草稿也不会出现点了没反应的发送键。草稿只剩空白字符时仍视作空，不显示纸飞机。
 
-**行为与平台**：H5 不渲染语音入口——浏览器端没有录音能力，显示麦克风只会得到"按住 → 不支持 → 退出语音模式"的体验；App 与小程序仍按 `features.voice` 生效。媒体面板的"文件"项在 App 端隐藏（没有跨端通用文件选择器），小程序与 H5 显示，判断依据是平台能力表；四项功能全关时"+"入口整体隐藏。设备软键盘与面板互斥：打开 emoji 或媒体面板前会先收起键盘，点击输入框聚焦时收起面板；面板高度取 `max(最近一次键盘高度, 280px)`，开过键盘后面板与键盘等高，来回切换不跳变。输入栏用下外边距顶到键盘上方，没有面板时自己承担底部安全区，面板打开时安全区改由面板承担，避免双重间距。emoji 与 @ 都只能追加在草稿末尾（uni 的 `input` 没有光标位置 API）；`@` 的判定是"草稿变长且新值以 `@` 结尾"，删除到 `@` 结尾不会触发。录音手势上滑超过 60px 切为取消文案，松手取消；不足 1 秒按过短提示，不派发 `voice-send`。`disabled` 翻转时组件会主动收起面板、退出语音模式与焦点，避免禁言后还停留在半开状态。
+**行为与平台**：H5 不渲染语音入口——浏览器端没有录音能力，显示麦克风只会得到"按住 → 不支持 → 退出语音模式"的体验；App 与小程序仍按 `features.voice` 生效。小程序与 H5 使用内置文件选择；App 注册附件能力后显示"文件"项，未注册时隐藏。四项媒体功能全关或当前端均不可用时"+"入口整体隐藏。设备软键盘与面板互斥：打开 emoji 或媒体面板前会先收起键盘，点击输入框聚焦时收起面板；面板高度取 `max(最近一次键盘高度, 280px)`，开过键盘后面板与键盘等高，来回切换不跳变。输入栏用下外边距顶到键盘上方，没有面板时自己承担底部安全区，面板打开时安全区改由面板承担，避免双重间距。emoji 与 @ 都只能追加在草稿末尾（uni 的 `input` 没有光标位置 API）；`@` 的判定是"草稿变长且新值以 `@` 结尾"，删除到 `@` 结尾不会触发。录音手势上滑超过 60px 切为取消文案，松手取消；不足 1 秒按过短提示，不派发 `voice-send`。`disabled` 翻转时组件会主动收起面板、退出语音模式与焦点，避免禁言后还停留在半开状态。`submitting` 只拦截发送与快捷回复，不会清空草稿或禁用编辑。
 
 **行为核心复用**：上述键盘避让、键盘↔面板互斥、录音手势与禁用守卫的单一实现是 `useChatComposer` composable（从 `libs` 导出），本组件与 `em-chat-page` 的 `#input-bar` 整栏自绘插槽消费同一份逻辑。想在 `em-chat-page` 里整栏替换输入栏时优先用 `#input-bar` 插槽（见 [聊天页](./PAGES-CHAT.md)「整栏自绘输入栏」）；完全自研聊天页、只想要这套键盘/面板/录音行为时，可直接 `import { useChatComposer } from '@/uni_modules/easemob-uikit-uni/libs'`。
 

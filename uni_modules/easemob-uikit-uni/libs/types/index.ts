@@ -332,6 +332,15 @@ export interface EmGroupMember {
   avatar?: string
 }
 
+/** 群成员分页结果；applied=false 表示响应已陈旧并被忽略，resolved/rejected 载荷均不得消费或改写页面错误态 */
+export interface EmGroupMemberListResult {
+  items: EmGroupMember[]
+  cursor: string
+  hasMore: boolean
+  /** 当前成功且实际写入 store 时 resolve true；陈旧成功 resolve false；陈旧失败 reject 同类型结构化结果（false） */
+  applied: boolean
+}
+
 /** 创建群组参数（群 domain createGroup 入参，wire 映射在 domain 边界完成） */
 export interface CreateGroupParams {
   name: string

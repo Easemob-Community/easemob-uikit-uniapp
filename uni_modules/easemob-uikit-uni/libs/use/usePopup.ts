@@ -25,7 +25,10 @@ export function holdTabBar(): void {
 
 export function releaseTabBar(): void {
   // #ifdef MP-WEIXIN || APP
-  tabBarHoldCount = Math.max(0, tabBarHoldCount - 1)
+  // 没人持锁时直接返回：不能用 Math.max(0, n-1) 兜底——那会在计数为 0 时也调 showTabBar，
+  // 把「另一个弹层仍开着」的 tabBar 提前放回来（弹层组件初次挂载时最容易踩到）
+  if (tabBarHoldCount === 0) return
+  tabBarHoldCount -= 1
   if (tabBarHoldCount === 0) {
     uni.showTabBar({ animation: false, fail: () => {} })
   }

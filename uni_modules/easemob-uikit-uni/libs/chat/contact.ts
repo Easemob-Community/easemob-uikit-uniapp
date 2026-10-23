@@ -10,21 +10,23 @@ import {
   addInvite,
   clearContacts,
   contactStore,
+  convergeContactInvites,
   removeInviteByFrom,
   updateInviteStatus
 } from '../store/contact'
 import { mergeUserInfo } from '../store/user'
 import { createLogger, logPayload } from '../utils/logger'
 import type { EmContactInvite } from '../types'
+import { getAccountEpoch, invalidateAccountEpoch, isAccountEpochCurrent } from './account'
 
 const logger = createLogger('contact')
 
 // 好友关系与申请（5.x ContactManager 封装）：
-// 登录后好友同步由 SDK 后台自动进行，getContacts() 读内存快照；
-// UI 刷新全部由 roster 事件驱动 + 写操作后主动 refresh
+// 后台同步事件给出权威状态；主动重试走 SDK 受控刷新，不以内存空快照冒充成功。
 export class EmContact {
   private client: ChatClient | null = null
   private waitOnline: (() => Promise<void>) | null = null
+  private syncRequestId = 0
 
   bind(client: ChatClient, waitOnline: () => Promise<void>): void {
     if (this.client != null) {
@@ -32,22 +34,29 @@ export class EmContact {
     }
     this.client = client
     this.waitOnline = waitOnline
+    const syncHandlerEpoch = getAccountEpoch()
     // 好友自动同步由 SDK 后台异步完成，getContacts() 首次可能读到空快照
     // （实测坑：小程序端缓存加载慢于 H5 localStorage，登录后即读必空）——
     // 必须挂 ChatClient 级统一同步事件，contact 同步完成后重读快照自愈
     client.addEventHandler('emkit-contact-sync', {
+      onSyncDataStart: (payload) => {
+        if (!isAccountEpochCurrent(syncHandlerEpoch) || payload.dataType !== 'contact') return
+        this.syncRequestId += 1
+        contactStore.syncing = true
+        contactStore.syncFailed = false
+      },
       onSyncDataFinished: (payload) => {
         logPayload(logger, 'onSyncDataFinished:', payload)
-        // 对齐 vue 版 D124：失败轮次不能用不完整内存回填；contact 无主动重同步接口，
-        // 只能告警 + 等下次连接/登录自动同步
+        if (!isAccountEpochCurrent(syncHandlerEpoch) || payload.dataType !== 'contact') return
+        this.syncRequestId += 1
+        contactStore.syncing = false
         if (payload.status === 'failed') {
           logger.warn('contact sync failed:', payload.error?.stage, payload.error?.message)
+          contactStore.syncFailed = true
           return
         }
-        if (payload.dataType === 'contact') {
-          logger.info('contact sync finished, refreshing snapshot')
-          this.refresh()
-        }
+        logger.info('contact sync finished, refreshing snapshot')
+        this.refresh(syncHandlerEpoch, true)
       }
     })
     const mgr = this.manager()
@@ -117,14 +126,37 @@ export class EmContact {
     })
   }
 
-  // 拉取好友快照到 store（幂等）；同步由 SDK 后台做，这里只读内存快照
-  async syncContacts(): Promise<void> {
-    await this.readyContactManager()
+  unbind(): void {
+    if (this.client != null) {
+      this.client.removeEventHandler('emkit-contact-sync')
+      this.manager()?.removeEventHandler('emkit-contact')
+    }
+    this.client = null
+    this.waitOnline = null
+  }
+
+  async syncContacts(expectedEpoch = getAccountEpoch()): Promise<void> {
+    const requestId = this.syncRequestId + 1
+    this.syncRequestId = requestId
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     contactStore.syncing = true
+    contactStore.syncFailed = false
+    const isCurrent = (): boolean => isAccountEpochCurrent(expectedEpoch) && requestId === this.syncRequestId
     try {
-      this.refresh()
+      await this.readyContactManager()
+      if (!isCurrent()) return
+      const client = this.client as unknown as { refreshContactSnapshot?: () => Promise<void> } | null
+      if (client == null || typeof client.refreshContactSnapshot !== 'function') {
+        throw new Error('contact sync restart unavailable; reconnect or login again')
+      }
+      await client.refreshContactSnapshot()
+      if (!isCurrent()) return
+      this.refresh(expectedEpoch, true)
+    } catch (e) {
+      if (isCurrent()) contactStore.syncFailed = true
+      throw e
     } finally {
-      contactStore.syncing = false
+      if (isCurrent()) contactStore.syncing = false
     }
   }
 
@@ -159,21 +191,29 @@ export class EmContact {
   }
 
   reset(): void {
+    this.syncRequestId += 1
+    invalidateAccountEpoch()
     clearContacts()
   }
 
-  // 读内存快照整量回写（回写落 reactive 代理：整表替换即可）
-  private refresh(): void {
+  private refresh(expectedEpoch = getAccountEpoch(), authoritative = false): void {
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     const mgr = this.manager()
     if (mgr == null) {
       return
     }
     const raw = mgr.getContacts()
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     logPayload(logger, 'getContacts:', raw)
     logger.info('contact snapshot refreshed, count:', raw.length)
     const items = raw.map((c) => this.toContactItem(c))
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     contactStore.items = items
-    contactStore.loaded = true
+    convergeContactInvites()
+    if (authoritative) {
+      contactStore.loaded = true
+      contactStore.syncFailed = false
+    }
   }
 
   // SDK wire 边界：Contact.userInfo 的 nickname/avatarUrl 归一（兼容 4.x 小写 avatarurl 遗风），

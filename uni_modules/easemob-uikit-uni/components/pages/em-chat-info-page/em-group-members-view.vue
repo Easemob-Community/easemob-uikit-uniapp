@@ -131,18 +131,66 @@ function memberAvatar(m: EmGroupMember): string {
   return m.avatar ?? avatarOf(m.userId)
 }
 
+const loadingMore = ref(false)
+const loadMoreFailed = ref(false)
+const hasMore = computed(() => groupStore.memberHasMoreByGroupId[props.groupId] === true)
+
+// 与 domain 最新请求写保护配套：首屏、分页和移除后强制首屏共享视图代次。
+// 新请求接管 loading；旧成功/失败不得清除或创建当前错误，旧 finally 不得释放新请求状态。
+let memberRequestGeneration = 0
+
+function beginMemberRequest(): number {
+  memberRequestGeneration += 1
+  initialLoading.value = false
+  loadingMore.value = false
+  return memberRequestGeneration
+}
+
+function isCurrentMemberRequest(generation: number): boolean {
+  return generation === memberRequestGeneration
+}
+
+function isStaleMemberRejection(error: unknown): boolean {
+  if (error == null || typeof error !== 'object') return false
+  return (error as { applied?: unknown }).applied === false
+}
+
 // 首屏：无缓存时拉第一页（enterGroup 预热通常已就位，此处兜底）；失败保留可重试状态。
-async function loadInitialMembers(): Promise<void> {
-  if (initialLoading.value) return
+// 移除后强制刷新传 force=true，绕过普通首屏锁并提升代次；notifyFailure=false 保留 best-effort 提示语义。
+async function loadInitialMembers(force = false, notifyFailure = true): Promise<void> {
+  if (initialLoading.value && !force) return
+  const generation = beginMemberRequest()
   initialLoading.value = true
+  loadMoreFailed.value = false
   try {
-    await EmKit.getGroupMemberList(props.groupId)
+    const outcome = await EmKit.getGroupMemberList(props.groupId)
+    if (!isCurrentMemberRequest(generation)) return
+    if (!outcome.applied) {
+      // 外部更新也可能使本请求失效；若没有更新的缓存，必须留下可重试态而非空白。
+      if (groupStore.memberMapByGroupId[props.groupId] == null) {
+        initialLoadFailed.value = true
+      }
+      return
+    }
     initialLoadFailed.value = false
+    loadMoreFailed.value = false
   } catch (e) {
+    if (!isCurrentMemberRequest(generation)) return
+    if (isStaleMemberRejection(e)) {
+      if (groupStore.memberMapByGroupId[props.groupId] == null) {
+        initialLoadFailed.value = true
+      }
+      return
+    }
     initialLoadFailed.value = true
-    uni.showToast({ title: t('group.memberLoadFailed'), icon: 'none' })
+    loadMoreFailed.value = false
+    if (notifyFailure) {
+      uni.showToast({ title: t('group.memberLoadFailed'), icon: 'none' })
+    }
   } finally {
-    initialLoading.value = false
+    if (isCurrentMemberRequest(generation)) {
+      initialLoading.value = false
+    }
   }
 }
 
@@ -154,10 +202,6 @@ onMounted(() => {
 
 // ========== 游标翻页（domain 内部回写 store 游标/hasMore，这里维护 loading 锁与失败重试态） ==========
 
-const loadingMore = ref(false)
-const loadMoreFailed = ref(false)
-const hasMore = computed(() => groupStore.memberHasMoreByGroupId[props.groupId] === true)
-
 const loadMoreState = computed<LoadMoreStateValue>(() => {
   if (loadingMore.value) return LOAD_MORE_STATE.LOADING
   if (loadMoreFailed.value) return LOAD_MORE_STATE.ERROR
@@ -168,18 +212,27 @@ function onScrollToLower(): void {
   onLoadMore()
 }
 
-function onLoadMore(): void {
-  if (loadingMore.value || !hasMore.value) return
+async function onLoadMore(): Promise<void> {
+  if (loadingMore.value || (!hasMore.value && !loadMoreFailed.value)) return
+  const generation = beginMemberRequest()
   loadingMore.value = true
+  initialLoadFailed.value = false
   loadMoreFailed.value = false
-  EmKit.getGroupMemberList(props.groupId, groupStore.memberCursorByGroupId[props.groupId])
-    .catch(() => {
-      loadMoreFailed.value = true
-      uni.showToast({ title: t('group.memberLoadFailed'), icon: 'none' })
-    })
-    .finally(() => {
+  try {
+    const outcome = await EmKit.getGroupMemberList(props.groupId, groupStore.memberCursorByGroupId[props.groupId])
+    if (!isCurrentMemberRequest(generation)) return
+    if (!outcome.applied) return
+    loadMoreFailed.value = false
+  } catch (e) {
+    if (!isCurrentMemberRequest(generation)) return
+    if (isStaleMemberRejection(e)) return
+    loadMoreFailed.value = true
+    uni.showToast({ title: t('group.memberLoadFailed'), icon: 'none' })
+  } finally {
+    if (isCurrentMemberRequest(generation)) {
       loadingMore.value = false
-    })
+    }
+  }
 }
 
 // ========== 角色判定（memberMap 为准，owner 字段兜底，与 chat-info-page 同口径） ==========
@@ -262,7 +315,7 @@ function revalidateTarget(actionKey: string, userId: string, failureKey: string)
 async function refreshAfterRemoval(): Promise<void> {
   await Promise.all([
     EmKit.getGroupInfo(props.groupId, true).catch(() => {}),
-    EmKit.getGroupMemberList(props.groupId).catch(() => {})
+    loadInitialMembers(true, false)
   ])
 }
 

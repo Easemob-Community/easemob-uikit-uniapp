@@ -4,16 +4,23 @@
 
 ### 修复
 
+- **App 端弹层偶发「底部 tabBar 收起但弹层不出现」**：蒸汽端（uni-app x App）新建 `v-if` 分支时，新分支的视觉节点会偶发整批不建（只建出命中区），表现为「底部 tabBar 已被收起、弹层却看不见，且整页点击被透明命中区吞掉」（Android 真机实测约 3/12，与点击位置、tabBar 隐藏、延迟补写无关）。`em-popup` 改为**常驻挂载**：去掉 `v-if`，页面挂载时就把 root/遮罩/面板建好；关闭态用根节点内联 `top: 200%` 移到视口下方（不绘制、不吃点击），打开/关闭只改这一个内联样式，不再创建/销毁节点。同时默认态即最终态（遮罩默认不透明、面板默认在最终位置，去掉 `--show` 类与 250ms 进出场动画）。真机 14/14 次开合全部正常、每次 tabBar 如实归还（改前 3/12 失败）。同类弹层（长按会话菜单、选人、@提及、聊天页长按菜单）一并修复；原生 tabBar 持锁同时改为实例级「谁持有谁释放」，`releaseTabBar()` 在计数为 0 时不再调 `showTabBar`。
+
 - **iOS 拍摄黑屏**：iOS 相机授权被拒绝后，`uni.chooseImage` 仍会打开系统拍摄页并停在纯黑画面且不再弹窗。`em-chat-page` 在调起相机前用 `uni.getAppAuthorizeSetting` 预检 `cameraAuthorized`：`denied` 弹窗引导到系统设置（`uni.openAppAuthorizeSetting`），`config error` 提示安装包缺少权限描述；`not determined` 仍交给系统首次弹窗。新增 `getCameraAuthorizeState` / `openAppAuthorizeSetting` 从 `libs` 透出；H5/小程序/未知基座跳过预检，行为不变。示例工程在 `app-ios.distribute.privacyDescription` 补齐相机/相册/麦克风用途描述（改后需重新云打包或重打自定义基座生效）。
 - **`primaryColor` 在 App 端不生效**：页面级组件根节点同时绑定主题 class 与内联品牌色变量，而 App（uni-app x）端同一节点上 class 规则定义的 CSS 变量会顶掉内联同名变量，导致 `EmKit.init({ primaryColor })` / `setConfig({ primaryColor })` 在 App 端一直被主题值覆盖。七个页面级组件统一新增品牌作用域内层节点，内联品牌色变量下沉一层（与主题 class 分节点），App 端品牌色恢复正常。
 - **App 视频播放页黑屏（自定义基座缺 `uni-video` 模块）**：视频组件属于 uni-app x 内置模块 `uni-video`，会按代码用量摇树。基座如果是在接入视频组件之前打的，`<video>` 会被降级成 `<view>`，表现为点开播放器后全屏黑屏、无控制条。示例工程在 `manifest.json` 的 `app` / `app-android` / `app-ios` / `app-harmony` → `distribute.modules` 显式声明 `"uni-video": {}`；宿主接入视频后需重新打一次自定义基座，JS 热更不包含原生模块。
 - **iOS 视频一直转圈 `00:00`**：EaseMob chatfiles 直链无扩展名且不支持 HTTP Range（带 `Range` 仍返回 200 全量），iOS AVPlayer 远程渐进播放会卡死。App 端改为 `uni.downloadFile` 整包下载 → 复制为本地 `.mp4` → 播放；下载期显示进度，关闭时中止，同一 URL 会话内缓存。
 - **iOS 视频进度条在走但画面不动**：原生 `autoplay` 会在 `<video>` 事件绑定前起播，`play` 事件丢失后组件一直保留首帧/封面层。改为 `autoplay=false`、挂载后显式 `createVideoContext().play()`（未收到 `@play` 每 500ms 重试），且不再把 `poster` 传给 `<video>`（封面只用于下载 loading 背景）。iOS 真机已验证画面随进度更新。
+- **账号切换与异步时序一致性**：会话、联系人、群读取增加账号代次与请求顺序保护，登出后的旧响应不能恢复已清状态或复用旧 pending；同账号旧会话快照不覆盖新快照。会话刷新失败不再回退为内存空成功，联系人重试使用 SDK 受控刷新；后台同步失败直接进入列表重试态并保留缓存。SDK 没有群全量手动重启同步 API，群列表在失败后明确提示恢复连接或重新登录，不把内存重读当作同步成功。
+- **操作与编辑并发一致性**：删除会话、删除好友、退群/解散共享提交与完成锁，只产生一次成功事件。失败重发在 domain 按会话与消息共享实际结果；切换会话或编辑输入期间，旧发送/选择器完成回调不会误清新草稿、引用、@选择或解锁新请求，未发送的宿主临时附件会按 `release` 契约清理。好友快照会把历史 pending 申请收敛为已接受并同步未读角标；两人英文群通知修正为 `1 other`。
 
 ### 新增
 
 - **聊天详情页删除好友**：`em-chat-info-page` 单聊分支新增「删除好友」按钮（红色字档），仅对方已是好友时显示；二次确认后删除，带提交锁，成功 toast 并新增 `contact-deleted` 事件通知宿主退场（不连带删除会话与本地消息），失败 toast 停留当前页。
-- **消息删除、复制与提交防重**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删漫游再删本地，失败保留气泡，删除后校正会话摘要与时间；保留 `deleteLocalMessage` 作为显式本地删除入口。聊天页删除增加确认与失败提示，复制按系统结果提示成功或失败。`em-chat-inputbar` 新增 `submitting`，`em-quick-reply-bar` 新增 `disabled`，文本发送、直发快捷回复、失败重发与撤回均拦截重复提交，撤回执行时重新检查时间窗。
+- **消息删除、复制与提交防重**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删当前账号的漫游历史再删本地，失败保留气泡，删除后校正会话摘要与时间；保留 `deleteLocalMessage` 作为显式本地删除入口。聊天页删除增加确认与失败提示，复制按系统结果提示成功或失败。`em-chat-inputbar` 新增 `submitting`，`em-quick-reply-bar` 新增 `disabled`，文本发送、直发快捷回复、失败重发与撤回均拦截重复提交，撤回执行时重新检查时间窗。
+- **通用提交态与加载失败重试**：`em-button` 新增 `loading`（默认 `false`），加载中显示 JS 驱动的旋转图标并拦截点击；`em-select-contact` 新增 `submitting`（默认 `false`），提交中禁止选择、重复确认与关闭；`LOAD_MORE_STATE` 新增 `ERROR`，加载失败可点击重试。
+- **会话与群管理操作闭环**：会话置顶/免打扰按会话与设置项独立串行并保护最新意图；删除会话、清空记录、删除好友、退群/解散增加确认与提交锁。群管理补设撤管理员/转让/移除确认、权限重验、保存中关闭保护；移除后强制刷新群详情与成员首屏，`getGroupMemberList` 以 `applied` 标识响应是否实际写入 store。
+- **选择异常与列表失败恢复**：图片、视频与内置文件选择区分用户取消和真实失败，取消静默、失败提示；会话、好友、群列表及聊天/群成员分页在无缓存失败时提供重试，有缓存时保留列表。
 - **输入栏多行输入**：新增 `inputFeatures.sendOnReturn`（默认 `true`，对齐微信「回车键发送消息」）：置 `false` 进入换行输入模式，输入框随打字生长（封顶 5 行，超出内部滚动），回车换行、发送走输入栏右侧的纸飞机发送键；`true` 时回车发送（iOS 上输入框仍可随粘贴内容生长，Android 保持单行输入）。
 - **视频消息全端播放**：新增 `em-video-preview` 全屏播放器（原生 `video` + 安全区关闭键 + 加载失败提示），聊天页点击视频消息即播放；`PLATFORM_CAPABILITIES.videoPreview` 全端 `true`，App/小程序不再隐藏播放入口，H5 由新窗口改为内置播放。App 端会先把视频下载到本地再播放（EaseMob chatfiles 直链不支持 Range，iOS 直接远程播放会卡 loading），下载期显示进度、关闭时中止；点击前会停掉正在播放的语音，关闭或离开页面时释放原生播放器。
 - **组件样式透出**：所有页面组件与原子组件新增 `custom-class` / `custom-style` 属性，用于在组件根节点追加宿主 class 与内联样式。`custom-style` 拼接到根节点内联样式末尾，五端生效且支持 `var()`；弹层类组件（`em-action-sheet`、`em-select-contact`、`em-mention-picker`）两属性落在最外层遮罩容器上。

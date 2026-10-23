@@ -198,7 +198,7 @@ EmKit.setAttachmentProvider({
 
 - 注册后输入栏「文件」格自动出现；`setAttachmentProvider(null)` 注销。H5/小程序不需要注册，继续使用内置选择器。
 - `pick` 的 `ctx` 带 `conversationId` / `chatType` / `mimeTypes` / `multiple`，宿主可据此做业务 UI。
-- `temporary: true` + `release(path)`：UIKit 在发送成功、重发成功、删除消息或登出时调用，失败消息保留文件供重发。同一路径最多调用一次。
+- `temporary: true` + `release(path)`：UIKit 在发送成功、重发成功、删除消息或登出时调用，失败消息保留文件供重发；选择完成后若因切换会话而不再发送，也会释放未发送的临时文件。同一路径最多调用一次。
 - `resolve(uri, ctx)`（可选）：把分享进入/open-with 等外部 URI 转换为可发送附件；也可直接调用 `EmKit.resolveAttachment(uri)`。
 - App 端附件发送不依赖 SDK 的 md5 预检：宿主返回的路径即使位于系统缓存目录（不在 uni 文件系统可读范围内），UIKit 也会自动降级为「不携带 md5」继续上传，不会阻断发送。建议仍把临时副本放在 `uni.env.CACHE_PATH` 等 uni 目录内，便于后续读写。
 - `pickAttachments(options)` 与 `resolveAttachment(uri, options?)` 是低层入口，供宿主自定义附件面板或分享前置流程使用；聊天页内置流程不需要手动调用。
@@ -230,15 +230,15 @@ onUnmounted(off)
 
 ### `EmKit.resendMessage(conversationId, chatType, localId)`
 
-重发失败消息。按原消息类型重建（文本/图片/语音/视频/文件/自定义）；本地临时文件缺失时会抛错。返回 `Promise<void>`。
+重发失败消息。按原消息类型重建（文本/图片/语音/视频/文件/自定义）；本地临时文件缺失时会抛错。返回 `Promise<void>`。domain 按 `conversationId + localId` 共享在途 Promise，等待 SDK 就绪前即占锁；不同页面实例或宿主的重复调用得到同一实际结果，失败后可重新发起。
 
 ### `EmKit.deleteMessage(message)`
 
-删除单条消息。`message.id` 非空时先删除服务端漫游消息，成功后再删除本地消息；`message.id` 为空时仅删除本地消息，不调用 SDK。漫游删除失败会保留本地消息并抛错。删除成功后按剩余消息校正会话摘要与时间，返回 `Promise<void>`。
+删除当前账号的单条消息。`message.id` 非空时先删除当前账号的服务端漫游历史，成功后再删除本地消息；`message.id` 为空时仅删除本地消息，不调用 SDK。漫游删除失败会保留本地消息并抛错。删除成功后按剩余消息校正会话摘要与时间，返回 `Promise<void>`。该操作不是撤回，不会删除接收方已经收到的消息。
 
 ### `EmKit.deleteLocalMessage(conversationId, localId)`
 
-仅删除本地消息，不影响服务端，也不等待 SDK 就绪；删除后同样校正会话摘要与时间。返回 `void`。
+仅删除本地消息，不影响服务端，也不等待 SDK 就绪；只有实际命中并删除时才校正会话摘要与时间，未加载列表或陈旧 `localId` 的空调用不改数据。返回 `void`。
 
 ### `EmKit.sendTyping(conversationId, chatType)`
 
@@ -260,7 +260,7 @@ onUnmounted(off)
 
 ### `EmKit.syncConversations()`
 
-拉取会话快照并回写 store。返回 `Promise<void>`。
+调用 SDK `refreshSessionList` 拉取权威会话快照并回写 store，返回 `Promise<void>`。失败会 reject 并保留 `syncFailed`，不会用 `getConversationList` 内存快照伪装成功；同账号只让最新请求写快照，登出后的旧响应不会落盘。`loaded / syncing / syncFailed` 分别用于判断已权威加载、同步中与同步失败。
 
 ### `EmKit.enterConversation(conversationId, chatType)`
 
@@ -272,11 +272,11 @@ onUnmounted(off)
 
 ### `EmKit.pinConversation(conversationId, chatType, pinned)`
 
-置顶/取消置顶。返回 `Promise<void>`。
+置顶/取消置顶。返回 `Promise<void>`。同一会话的置顶请求按调用顺序串行，与免打扰队列互不影响；调用时乐观展示最新意图，旧响应不覆盖新意图，最新请求失败回滚到最新已确认状态。
 
 ### `EmKit.setConversationMuted(conversationId, chatType, muted)`
 
-会话免打扰开关，乐观更新、失败回滚。返回 `Promise<void>`。
+会话免打扰开关，乐观更新、失败回滚。返回 `Promise<void>`。同一会话的免打扰请求独立串行，遵循与置顶相同的最新意图保护；多设备或批量校正带来的新权威状态会更新回滚基线，但不会覆盖在途乐观状态。
 
 ### `EmKit.deleteConversation(conversationId, chatType)`
 
@@ -298,7 +298,7 @@ onUnmounted(off)
 
 ### `EmKit.syncContacts()`
 
-拉取好友快照。返回 `Promise<void>`。
+调用当前 SDK 提供的 `refreshContactSnapshot` 受控刷新，再读取好友快照并回写 store，返回 `Promise<void>`。后台 `onSyncDataFinished(status='failed')` 会保留 `syncFailed`；重试真实发起受控刷新，若当前 SDK 不提供该能力则明确 reject，不以内存快照伪装成功。好友快照加载后，已是好友的历史 received pending 申请会收敛为 accepted 并同步未读角标。
 
 ### `EmKit.addContact(userId, message?)`
 
@@ -324,19 +324,19 @@ onUnmounted(off)
 
 ### `EmKit.getJoinedGroups()`
 
-拉取已加入群快照。返回 `Promise<EmGroup[]>`。
+读取 SDK 已加入群快照并回写 store，返回 `Promise<EmGroup[]>`。`loaded` 只在后台群同步成功或已有权威状态时成立，内存重读本身不会制造权威空列表。当前 SDK 没有已加入群全量手动重启同步 API；后台同步失败后调用会明确 reject，需恢复连接或重新登录让 SDK 重新执行后台同步，已有缓存不会因此清空。
 
 ### `EmKit.enterGroup(groupId)`
 
 进群预热：拉群详情 + 成员首屏，失败静默。返回 `Promise<void>`。
 
-### `EmKit.getGroupInfo(groupId)`
+### `EmKit.getGroupInfo(groupId, force?)`
 
-返回 `Promise<EmGroup>`。
+返回 `Promise<EmGroup>`。`force` 默认 `false`，普通调用复用在途请求；`force=true` 强制发起新读取。群详情按 groupId 只接收最新响应，旧请求不会覆盖新资料或清理新请求的 pending；移除成员后的权威刷新使用强制读取。
 
 ### `EmKit.getGroupMemberList(groupId, cursor?, pageSize?)`
 
-游标分页拉群成员。返回 `Promise<{ items: EmGroupMember[], cursor: string, hasMore: boolean }>`。默认每页 20（`GROUP_MEMBER_PAGE_SIZE`）。
+游标分页拉群成员。返回 `Promise<EmGroupMemberListResult>`，默认每页 20（`GROUP_MEMBER_PAGE_SIZE`）。当前请求成功且已写入 store 时 resolve `applied=true`；陈旧成功 resolve `applied=false`；陈旧失败 reject 结构化 `EmGroupMemberListResult`（`applied=false`）；当前真实失败 reject 原始错误。调用方在 resolve 和 catch 中都不得消费 `applied=false` 的分页载荷，尤其不得把空载荷当作成功空页。
 
 ### `EmKit.getGroupAnnouncement(groupId)`
 
@@ -362,7 +362,7 @@ EmKit.addConversation(groupId, 'groupChat')
 
 ### `EmKit.acceptGroupInvite(invite)` / `EmKit.declineGroupInvite(invite)`
 
-接受/拒绝群邀请，参数为 `EmContactInvite`（`kind='group'`）。返回 `Promise<void>`。
+接受/拒绝群邀请，参数为 `EmContactInvite`（`kind='group'`）。返回 `Promise<void>`。接受成功并更新申请状态后，群快照刷新为独立 best-effort 操作；后续群同步不可用或失败不会把已接受的申请翻成失败。
 
 ### `EmKit.leaveGroup(groupId)` / `EmKit.destroyGroup(groupId)`
 

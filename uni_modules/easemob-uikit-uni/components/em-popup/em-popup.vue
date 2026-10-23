@@ -1,12 +1,17 @@
 <template>
+  <!-- 常驻挂载（无 v-if）：蒸汽端新建 v-if 分支时，节点可能只建出命中区、不建视觉节点
+       （Android 真机插桩实测约 3/12：JS 侧 watch/渲染 effect 全部正常、连内联背景色都不落笔），
+       表现为「底部 tabBar 已收起、弹层却看不见，且全屏点击被吞掉」。
+       改为页面挂载时就把弹层树建好，打开/关闭只切根节点的 top（关闭=移出视口下方 200%），
+       不再创建/销毁节点，也就没有「新分支丢渲染」的可能。详见坑集 §5q。
+       注意：默认态即最终态——遮罩默认不透明、面板默认在最终位置，不要再用 class 翻转控制可见性。 -->
   <view
-    v-if="rendered"
     :class="[ns.b(), themeClass, position === 'center' ? 'em-popup--center' : '', customClass]"
-    :style="`z-index: ${zIndex};` + customStyle"
+    :style="rootStyle"
   >
-    <view :class="[ns.e('overlay'), shown ? 'em-popup__overlay--show' : '']" @click="onMaskClick"></view>
+    <view :class="ns.e('overlay')" @click="onMaskClick"></view>
     <view
-      :class="[ns.e('panel'), position === 'center' ? 'em-popup__panel--center' : '', fullscreen ? 'em-popup__panel--full' : '', shown ? 'em-popup__panel--show' : '']"
+      :class="[ns.e('panel'), position === 'center' ? 'em-popup__panel--center' : '', fullscreen ? 'em-popup__panel--full' : '']"
       :style="panelStyle"
     >
       <slot />
@@ -15,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { holdTabBar, nextZIndex, releaseTabBar } from '../../libs/use/usePopup'
 import { getSafeAreaBottom } from '../../libs/use/useSafeArea'
 import { useNamespace } from '../../libs/use/useNamespace'
@@ -51,44 +56,43 @@ const emit = defineEmits<{
 const ns = useNamespace('popup')
 const { themeClass } = useTheme()
 
-const rendered = ref(props.visible)
-const shown = ref(false)
 const zIndex = ref(2000)
 
-// 打开时先挂载隐藏态，下一帧再切 --show，让 transform/opacity transition 有起点；
-// 若某端 transition 不生效，退化为无动画显隐，交互不受影响
-let hideTimer: ReturnType<typeof setTimeout> | null = null
+// 关闭态：整棵弹层移到视口下方（position: fixed 的 top 百分比按视口高算），既不绘制也不接收点击。
+// 只改这一个内联样式（节点早已挂载），不涉及 v-if 建树。
+const CLOSED_STYLE = 'top: 200%;'
+
+// 原生 tabBar 持锁：实例级配对（持有才释放），避免把别的弹层的锁放掉
+let tabBarHeld = false
+
+function acquireTabBar(): void {
+  if (tabBarHeld) return
+  tabBarHeld = true
+  holdTabBar()
+}
+
+function releaseTabBarOfInstance(): void {
+  if (!tabBarHeld) return
+  tabBarHeld = false
+  releaseTabBar()
+}
+
 watch(() => props.visible, (v) => {
   if (v) {
-    // 260ms 内快速重开：取消挂起的卸载，否则 stale 定时器会把已打开的弹层摘掉
-    if (hideTimer != null) {
-      clearTimeout(hideTimer)
-      hideTimer = null
-    }
     zIndex.value = nextZIndex()
-    holdTabBar()
-    rendered.value = true
-    nextTick(() => {
-      setTimeout(() => {
-        shown.value = true
-      }, 30)
-    })
-  } else {
-    shown.value = false
-    releaseTabBar()
-    hideTimer = setTimeout(() => {
-      hideTimer = null
-      if (!props.visible) {
-        rendered.value = false
-      }
-    }, 260)
+    acquireTabBar()
+    return
   }
+  releaseTabBarOfInstance()
 }, { immediate: true })
 
 onUnmounted(() => {
-  if (props.visible) {
-    releaseTabBar()
-  }
+  releaseTabBarOfInstance()
+})
+
+const rootStyle = computed(() => {
+  const closed = props.visible ? '' : CLOSED_STYLE
+  return `z-index: ${zIndex.value};` + closed + props.customStyle
 })
 
 const panelStyle = computed(() => {

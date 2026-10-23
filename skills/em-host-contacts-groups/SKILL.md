@@ -113,7 +113,8 @@ function onBack(): void {
 | `menuKeys` | `ContactMenuKeyValue[]` | `['delete']` | 条目长按菜单；一期只有删除好友 |
 | `autoSync` | `boolean` | `true` | 首次挂载读好友快照 |
 
-- 内置：A–Z + `#` 字母分组、右侧索引条、搜索、长按删除好友、空态。
+- 内置：A–Z + `#` 字母分组、右侧索引条、搜索、长按删除好友、空态；`loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表，无缓存失败显示重试，有缓存时保留列表。重试调用 SDK `refreshContactSnapshot` 受控刷新。
+- 删除好友先二次确认并按 userId 防重，取消不发请求，失败保留状态；只解除好友关系，不删除会话与消息。
 - 条目展示名回落：备注 > 昵称 > userId。
 - 拼音分组默认按昵称首字符；需要多音字/自定义拼音时用 `setPinyinAdapter` 注入，零依赖降级。
 - 点击条目默认不跳资料页（一期无联系人详情），宿主可改为跳自己的业务资料页，再提供「发消息」按钮。
@@ -129,7 +130,7 @@ function onBack(): void {
 ```
 
 - 好友申请与群邀请**同表展示**，按 `invite.kind`（`contact` / `group`）区分。
-- pending 态显示「接受/拒绝」，点击后组件内部调 `acceptContactInvite` / `declineContactInvite` / `acceptGroupInvite` / `declineGroupInvite`，并做幂等防重复点击。
+- pending 态显示「接受/拒绝」，点击后组件内部调 `acceptContactInvite` / `declineContactInvite` / `acceptGroupInvite` / `declineGroupInvite`，并做幂等防重复点击；若好友快照证明对方已是好友，旧 pending 会直接收敛 accepted，不再显示按钮，未读角标同步减少。
 - 已处理态只显示状态文字；我方发出后被处理的通知也在此展示。
 - 邀请持久化在本地（`emkit.contact.invites`），重进不丢。
 - 宿主只接 `back`；**不需要**自己调接受/拒绝 API。
@@ -173,7 +174,8 @@ function onBack(): void {
 | `showNameInput` | `boolean` | `false` | 建群面板是否显示群名称；false 时自动取前 3 名成员昵称 |
 | `showSettings` | `boolean` | `false` | 是否显示公开群/允许邀请开关 |
 
-- 内置：已加入群列表、建群面板（选人、名称、设置）、空态。
+- 内置：已加入群列表、建群面板（选人、名称、设置）、空态；无缓存同步失败显示重试，有缓存时保留列表。SDK 无群全量手动重启同步 API，失败后需恢复连接或重新登录，内存重读不会被当作成功。
+- 建群不增加二次确认；创建中禁止更改选择、重复确认与关闭，失败保留选择和表单，成功才关闭。
 - 建群成功后组件**已经**：`createGroup` → upsert 群 store → `addConversation` → 插入建群系统灰条 → toast → emit `created`。
 - 宿主在 `created` 里只需跳聊天页；**不要再调一次 `addConversation` / `insertGroupNotice`**。
 - 群条目点击与 `created` 可以共用同一个 handler。
@@ -220,9 +222,11 @@ EmKit.addConversation(groupId, CONVERSATION_TYPE.GROUP_CHAT)
 
 | 角色 | 典型能力 |
 |---|---|
-| owner | 改名/公告/管理员/转让/移除/禁言/解散 |
-| admin | 改名/公告/移除普通成员/禁言（以组件显隐为准） |
+| owner | 改名/公告/管理员/转让/移除管理员与普通成员/解散 |
+| admin | 公告/移除普通成员 |
 | member | 查看、邀请（若群允许）、退群 |
+
+设撤管理员、转让与单成员移除先确认并在确认时重验角色；邀请与批量移除不额外确认。群名/公告保存中不能取消或关闭，选人提交中不能改选或关闭；移除后强制刷新群详情与成员首屏。全员禁言的开关走 API，页面只负责按群状态禁输入。
 
 群管理 API（自定义 UI 时用）：
 
@@ -241,6 +245,8 @@ await EmKit.destroyGroup(groupId)   // 仅群主
 ```
 
 > 这些写操作成功后，UIKit 内部会同步群 store、会话名与系统灰条；宿主不要重复写。
+
+自定义详情/成员列表时：`getGroupInfo(groupId, force?)` 默认复用在途请求，`force=true` 强制新读且只有最新响应写 store。`getGroupMemberList` 返回 `EmGroupMemberListResult`：当前成功写入为 `applied=true`；陈旧成功 resolve `applied=false`，陈旧失败 reject 同类型结构化结果，当前真实失败保留原始 error。resolve 与 catch 中都不能消费 `applied=false` 的 `items/cursor/hasMore`。
 
 ## 7. 数据层与响应式
 
@@ -265,8 +271,8 @@ import {
 ## 8. 同步时机与「列表为空」
 
 - 登录后 UIKit 会异步 `syncContacts()` + `getJoinedGroups()`，失败不阻塞登录。
-- 好友/群数据来自 **SDK 后台同步**；刚登录的几秒内为空是正常的。
-- 页面 `onShow` 再调一次 `EmKit.syncContacts()` 是安全的；群列表组件自身也会读快照。
+- 好友/群数据来自 **SDK 后台同步**；刚登录的几秒内为空是正常的。`loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表。
+- 页面 `onShow` 再调一次 `EmKit.syncContacts()` 会真实调用受控刷新；群列表组件自身只读快照，群后台失败后需恢复连接或重新登录。
 - SDK 的 `enableSyncData` 必须包含 `'contact'`，否则好友同步不启动（UIKit 已默认开启，宿主不要覆盖）。
 - H5 清缓存/换浏览器后首次登录，等同步完成或手动重试。
 - 如果登录很久仍为空：查 `EmKit.state` 是否 online、token 是否有效、AppKey 是否正确。

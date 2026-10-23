@@ -825,3 +825,71 @@
 - **保留的兜底**：下载→本地 `.mp4`（解决 chatfiles 不支持 Range + 无后缀）；`normalizeVideoUrl`（iOS http→https）；全屏按钮可继续用原生全屏。
 - **验证**：`build web` ✓；`build mp-weixin` 11 项全绿（主包 924KB / 分包 1422KB）；**iOS 真机已验**。**待验**：Android/鸿蒙同链路、微信小程序真机、H5 远程播放回归。
 - **复盘（按症状分层）**：点开黑屏/无控制条 → 基座缺 `uni-video`；卡 `00:00` 一直转圈 → chatfiles 无 Range/无后缀；有进度没画面 → autoplay 抢跑或封面层盖住播放层。三者可能叠加，按此顺序排查。
+
+## 2026-10-23 选择异常与列表恢复审查修复（Task 5 Fix Round 1）
+
+- **聊天历史互斥**：`loadInitialHistory` 与 `onLoadMore` 互相检查对方 loading，页面级请求不再共享同一 domain Promise 后分别写两个错误态；重试只清当前拥有者的错误，首屏骨架和分页 prepend 锚点不变。
+- **成员视图代次**：首屏、分页、移除后强制首屏共享 `memberRequestGeneration`；新请求接管 loading，陈旧成功/失败和 finally 不改当前状态。`refreshAfterRemoval` 仍强制首屏并等待详情/成员两个尝试，保留 best-effort 提示语义；分页 ERROR 即使 `hasMore=false` 也可发起重试。
+- **选择处理异常**：图片、视频、MP 文件和 H5 文件的 success 映射均加 try/catch，畸形载荷或处理异常 reject 到既有选择失败 toast；用户取消仍静默。
+- **验证**：真实页面函数 + deferred 检查 RED 1/9（8 项目标失败）→ GREEN 9/9；原 Task 5 focused 11/11 ✓；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 928KB / 分包合计 1422KB）；H5 静态伺服 200 ✓。**待验**：真实 SDK 反序、原生畸形回调和五端交互仍未做人工回归。
+
+## 2026-10-23 群成员外部请求归属修复（Task 5 Fix Round 2）
+
+- **共享契约**：`getGroupMemberList` 保留 `items/cursor/hasMore` 并新增 `applied`；当前成功且实际写 store 返回 true，陈旧成功/失败返回 false，当前失败仍 reject。facade 同步透出 `EmGroupMemberListResult`，spike 既有分页字段读取不变。
+- **视图恢复**：成员视图除本地代次外按 domain `applied` 处理 enterGroup/邀请/父页刷新造成的陈旧结果；陈旧首屏结果后无缓存则显示重试，陈旧失败不得在外部成功缓存上创建 ERROR。
+- **兼容性**：Task 4 requestId、强制详情、admin resync 与普通 dedupe 未改；API-KIT/API-TYPES 与内部架构契约同步。
+- **验证**：真实 domain + 视图 deferred 外部顺序 RED 1/5 → GREEN 5/5；Fix Round 1 9/9、原 focused 11/11 ✓；`check-docs` ✓；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 928KB / 分包合计 1422KB）；H5 静态伺服 200 ✓。**待验**：真实 enterGroup/邀请/父页刷新反序与五端人工恢复。
+
+## 2026-10-23 群成员陈旧失败兼容性修复（Task 5 Fix Round 3）
+
+- **rejection 兼容**：陈旧失败不再 resolve 空页，改为 reject 结构化 `EmGroupMemberListResult`（`applied=false`）；当前真实失败继续抛原始错误。陈旧成功仍 resolve `applied=false`。
+- **视图/消费方**：成员视图区分结构化陈旧拒绝与真实失败，外部成功缓存上不创建 ERROR，无缓存仍保留重试。spike 的 p1/p2/建群成员三处在读取 `items/cursor/hasMore` 前忽略 `applied=false`，不再把陈旧成功当空页成功。
+- **文档**：PLAN、API-KIT、API-TYPES、公开类型注释与内部架构 skill 同步精确 resolve/reject 语义；Task 4 requestId/force/admin 保护不变。
+- **验证**：真实 domain + 视图 + spike 源码契约 RED 7/9（stale rejection 与 spike 两项失败）→ GREEN 9/9；Fix Round 2 5/5、Round 1 9/9、原 focused 11/11 ✓；`check-docs` ✓；App 模块图 ✓；`build web` ✓；`build mp-weixin` 11 项全绿（主包 928KB / 分包合计 1422KB）；H5 静态伺服 200 ✓。**待验**：真实 SDK 陈旧拒绝和 spike 端侧展示仍未人工回归。
+
+## 2026-10-23 契约文档与整体验收（M2.17 Task 6）
+
+- **文档终审**：按最终源码校正 `em-button.loading`、`em-select-contact.submitting`、四态 `LOAD_MORE_STATE` 与 JS spinner；补全 `deleteMessage` 当前账号漫游/本地顺序、`deleteLocalMessage` 本地 no-op、Promise `copyText`、输入栏/快捷回复提交锁、会话 pin/mute 队列、群管理确认与提交中关闭、选择取消/失败、列表与分页重试、`getGroupInfo(force?)` 和 `getGroupMemberList.applied` 的 resolve/reject 语义。同步公开页面、API/类型、changelog、宿主 skills、内部组件/架构契约与 PLAN；未把内部待验口径写入公开页。
+- **自审修复**：`em-load-more` 在 `useSpinRotation` computed 中读取 `props.state`，但 props 声明未保存为变量；已补 `const props = withDefaults(...)`，避免组件 setup 运行时 ReferenceError。仅静态/编译验证，未宣称端侧点击已验。
+- **通过的静态与构建门禁**：`node scripts/check-docs.mjs` ✓（28 页 / 34 组件 / 72 方法 / 24 配置字段）；`node scripts/check-skills.mjs` ✓（8 个宿主技能）；`scripts/uni.sh build web` ✓（仅既有编译告警）；`scripts/uni.sh build mp-weixin` ✓（11 项防回归全绿，主包 **928KB** ≤ 1.5MB，分包合计 1422KB）；H5 产物静态 GET / **HTTP 200**；`node scripts/check-app-module-graph.mjs` ✓（现有鸿蒙产物 131 模块，无 libs→components 反向依赖、无 libs/index 循环）；`git diff --check` ✓。
+- **本次未执行的运行时验收（全部保留待验，不由上述静态/构建结果替代）**：当前没有可用真实账号、微信开发者工具会话或 Android/iOS/鸿蒙设备矩阵，未进行真实 IM 操作、原生弹层/toast/剪贴板或端侧点击。
+
+| 未验证范围 | 需要补验的实际交互 | 当前状态 |
+|---|---|---|
+| H5 真实账号 | 漫游/本地删除成功与失败、复制、撤回、重发与连点；会话/好友删除；pin/mute 最新意图；owner/admin/member 三角色群操作与刷新反序；断网首进/缓存/分页失败恢复 | 未验证；仅构建与静态 200 通过 |
+| 微信小程序（开发者工具及真机） | 同 H5 全矩阵，另含原生确认/toast/剪贴板、选人提交态、`applied=false` 消费与 ERROR 点击重试 | 未验证；仅 mp 构建和 11 项防回归通过 |
+| Android / iOS / 鸿蒙 | 真实账号删除/复制/撤回/重发、会话与好友删除、三角色群操作、断网恢复；原生 modal/toast/剪贴板、弹层提交中禁关闭、键盘与安全区、选择取消/权限或读取失败 | 未验证；仅现有 App 产物模块图通过，未重新做 GUI App 构建或真机运行 |
+| `em-load-more` 自审修复 | ERROR 展示、点击重试、LOADING 旋转与状态切换 | 未做端侧交互；源码复核与 web/mp 编译通过 |
+
+完整命令、文件清单与自审记录见 `.superpowers/sdd/gorgon-blue-devil-thor/task-6-report.md`。
+
+## 2026-10-23 修复：App 端弹层偶发「tabBar 收起但 action sheet 不出现」（P0）
+
+- **现象**：Android 10 真机，会话列表右上角「+」偶发只收起底部 tabBar、action sheet 不出来；此时整页点击被吞，再点「+」只会把弹层关掉（看起来「卡死」）。
+- **复现**：Redmi Note 7 Pro / Android 10，`adb shell input tap` 固定点图标中心即可复现，10 次开合失败 2–4 次；与点击坐标无关；长按会话菜单、选人、@提及同源。
+- **插桩定位**（改 debug 基座已编译 bundle，logcat 取 `console.log`）：失败那次的 `em-popup` `watch`/渲染 effect 日志与成功完全一致（`shown=true`），JS 状态与逻辑正确；失败视图停在关闭态——遮罩 `opacity: 0`（不可见但仍全屏吃点击）、面板 `translateY(100%)`（屏外），而 `holdTabBar()` 已先隐藏原生 tabBar。
+- **对照实验**（全部真机 A/B，12 次/组）：关掉 `hideTabBar` 仍 4/10 失败（排除 tabBar 干扰）；「挂载即写死显示态」仍 2/6；+80/240ms 补写 class 仍 2/10；延时 50ms 挂载仍 4/10 → 补写与延后都无效，根因是**蒸汽端 v-if 新分支的动态 class 写入会偶发整条丢失并回落旧值**。
+- **修复**：`em-popup` 改「默认态即最终态」——`.em-popup__overlay` 默认不透明、`.em-popup__panel` 默认在最终位置，去掉 `--show` 类与 250ms 进出场动画，显隐只靠 `v-if` 挂载/卸载；`usePopup` 的 tabBar 持锁改实例级配对，`releaseTabBar()` 计数为 0 时直接返回（避免初次挂载误放别人的锁）。
+- **修复验证（真机）**：把面板类改成「常量类即最终位置」后同一脚本 **12/12 全部弹出**（改前 8/12～6/12），确认「可见性不能依赖挂载后 class 翻转」这一结论。
+- **门禁**：`check-docs` ✓（28 页 / 34 组件 / 72 方法 / 24 配置）；`check-skills` ✓；App 模块图 ✓（131 模块，无反向依赖/循环）；`build web` ✓；`build mp-weixin` 11 项全绿（主包 928KB / 分包合计 1422KB）。坑集新增 §5q + 能力表条目，changelog 已记。
+- **待验**：本次 CLI 不能出 App 包，修复后的最终源码需用 HBuilderX 重新运行/打自定义基座后回归——「+」连点 10 次开合（应 10/10 弹出且 tabBar 每次归还）、长按会话菜单、选人弹层、聊天页长按菜单、群公告弹层；另确认去掉进出场动画后的观感可接受。
+
+## 2026-10-23 IM 交互一致性终审修复（8 项）
+
+- **账号切换与读取顺序**：新增共享 account epoch，公共门面在 `whenReady()` 前捕获，conversation/contact/group 在 readiness 后、pending 复用和 store 写前校验；logout/reset 失效旧代次并清空 info/member/admin 等 pending。会话快照按同账号 requestId 只接收最新响应，mute 批量校正也校验代次。
+- **真实同步状态与恢复**：三类 store 以 `loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表；`onSyncDataStart/Finished` 直接驱动状态，失败保留缓存。会话只以真实 `refreshSessionList` 成功为完成，不再回退内存快照；联系人重试调用 SDK `refreshContactSnapshot`。SDK 无已加入群全量手动重启 API，群同步失败后 `getJoinedGroups` 明确 reject 并提示恢复连接/重新登录，不伪造权威成功。
+- **并发操作**：chat-info 删除会话、删除好友、退群/解散共享 `exitPending / exitCompleted`，确认后、SDK 写操作前占锁且按钮同时禁用，只发一次成功事件。domain 重发按 conversationId+localId 共享在途 Promise，所有调用方得到同一结果，finally 仅清自身 map 项。
+- **发送与选择器**：chat-page 按发起 conversationId/chatType + pageGeneration 保护文本、快捷回复、图片/视频/文件/语音完成回调；旧完成不清新会话或发送期间的新编辑，旧 finally 不解新锁，未发送临时附件按 release 清理。
+- **展示一致性**：好友快照加载把历史 received pending 好友申请收敛 accepted 并持久化，按钮/processInvite/未读角标同源收敛；两人英文通知改为 `1 other`，中文总人数不变。`delete` 事件文档明确漫游与本地删除均完成后透出。
+- **验证**：一次性 deferred RED domain 0/9、真实组件 0/8 → 最终 GREEN domain **10/10**、组件 **8/8**（含 facade logout during readiness、反序快照、三类后台失败/重试、两个重发调用方、交叉退出、发送/选择切会话、历史 pending 好友）。`check-docs` ✓（28 页 / 34 组件 / 72 方法 / 24 配置）；`check-skills` ✓（8 技能）；`build web` ✓（仅既有 demo-custom-inputbar 告警）；`build mp-weixin` ✓（11 项全绿，主包 **935KB** / 分包合计 1422KB）；H5 静态 GET / **HTTP 200**；App 模块图 ✓（131 模块）；`git diff --check` ✓。
+- **待验**：未使用真实账号、微信开发者工具或 Android/iOS/鸿蒙设备验证上述交互；deferred fake SDK/真实 setup 检查不替代真实后台同步、账号切换、网络失败、原生选择器与导航回归。完整文件与命令见 `.superpowers/sdd/gorgon-blue-devil-thor/final-fix-report.md`。
+- **终审残余修复**：群公告读取补齐账号代次与 pending identity/finally 保护，facade 同样提前捕获代次。三类后台同步 handler 在 logout 时实际 `removeEventHandler` 并解绑，login 重新注册；回调同时带 bind-time epoch，旧回调即使出队也不写新账号，新账号回调不被禁用。`acceptGroupInvite` 在 SDK 接受与申请状态成功后即返回，后续群快照刷新独立 best-effort，不再把接受成功翻成失败。专项 deferred RED 0/3 → GREEN **3/3**，原 domain 回归 **10/10**。
+
+## 2026-10-23 弹层修复第二轮（真机复现后改结构，14/14 通过）
+
+- **第一轮修复不足**：用户按其构建（含第一轮 CSS 默认态修复）连点仍复现 3–5/12。真机重测确认：`watch`/渲染 effect 日志与成功完全一致，但失败时视图仍不可见。
+- **第二轮定位（可视化标记）**：给弹层根节点/面板分别注入内联 `background-color` 标记后，失败时**连内联背景色都不落笔** → 不是 class 级联，而是 **v-if 新建分支的视觉节点整批没建出来，只建出命中区**（因此「看不见但吃点击」）。补充排除：延时 50ms 挂载仍 4/10；挂载即写死显示态仍 2/6；80/240ms 补写 class 仍 2/10。
+- **定案修复**：`em-popup` 改**常驻挂载**——去掉 `v-if`，页面挂载时建好整棵弹层；关闭态根节点内联 `top: 200%` 移出视口（不绘制、不吃点击），打开/关闭只改这一个内联样式。默认态即最终态（遮罩不透明、面板在最终位置，无 `--show`、无 250ms 动画）。`usePopup` tabBar 持锁为实例级配对。
+- **真机验证（Redmi Note 7 Pro / Android 10，app-android 5.26 vapor+bytecode）**：同一 adb 脚本 14 次开合 **14/14 弹出、14/14 关闭后 tabBar 如实归还**（改前 3/12 失败）；长按会话菜单、选人弹层（em-select-contact）回归正常。
+- **门禁**：`check-docs` ✓ / `check-skills` ✓ / App 模块图 ✓ / `build web` ✓ / `build mp-weixin` 11 项全绿。
+- **代价与待验**：去掉了弹层进出场动画；弹层内容改为页面挂载时创建（选人列表等不再等首次打开）。待验：iOS / 鸿蒙真机、聊天页长按菜单与群公告弹层、宿主自定义 `custom-style` 覆盖观感。

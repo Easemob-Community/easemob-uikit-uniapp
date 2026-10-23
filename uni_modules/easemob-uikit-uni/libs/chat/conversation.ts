@@ -18,6 +18,7 @@ import { ensureUserInfos } from './user-info'
 import type { EmChatContext } from './message'
 import { mapWireChatType } from './message'
 import type { EmMessageDomain } from './message'
+import { getAccountEpoch, invalidateAccountEpoch, isAccountEpochCurrent } from './account'
 
 const logger = createLogger('chat')
 
@@ -50,12 +51,16 @@ export class EmConversationDomain {
   private muteQueueByConversationId: Record<string, ConversationSettingQueue<boolean>> = {}
   private settingGenerationByConversationId: Record<string, number> = {}
   private accountGeneration = 0
+  private syncRequestId = 0
 
   constructor(private ctx: EmChatContext, private messages: EmMessageDomain) {}
 
-  async syncConversations(): Promise<void> {
-    const chatManager = await this.messages.readyChatManager()
+  async syncConversations(expectedEpoch = getAccountEpoch()): Promise<void> {
+    const requestId = this.syncRequestId + 1
+    this.syncRequestId = requestId
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     conversationStore.syncing = true
+    conversationStore.syncFailed = false
     const pinRequestIdByConversationId: Record<string, number> = {}
     const pinSettlementRevisionByConversationId: Record<string, number> = {}
     conversationStore.items.forEach((c) => {
@@ -63,30 +68,52 @@ export class EmConversationDomain {
       pinRequestIdByConversationId[c.conversationId] = queue?.latestRequestId ?? 0
       pinSettlementRevisionByConversationId[c.conversationId] = queue?.settlementRevision ?? 0
     })
+    const isCurrent = (): boolean => isAccountEpochCurrent(expectedEpoch) && requestId === this.syncRequestId
     try {
-      let items: ReadonlyArray<ConversationItem> = []
-      try {
-        items = await chatManager.refreshSessionList()
-        logger.debug('syncConversations via refreshSessionList, count:', items.length)
-      } catch (e) {
-        items = chatManager.getConversationList()
-        logger.debug('syncConversations via getConversationList, count:', items.length)
-      }
+      const chatManager = await this.messages.readyChatManager()
+      if (!isCurrent()) return
+      const items = await chatManager.refreshSessionList()
+      if (!isCurrent()) return
       logger.info('syncConversations done, count:', items.length)
-      // 群聊会话不再过滤：chatType 由 wire conversationType 映射填充；
-      // 用户资料补拉仅针对单聊会话（群会话名/头像由群数据层供给）
       conversationStore.items = items.map((c) => this.toConversationItem(
         c,
         pinRequestIdByConversationId[c.conversationId] ?? 0,
         pinSettlementRevisionByConversationId[c.conversationId] ?? 0
       ))
+      conversationStore.loaded = true
       ensureUserInfos(conversationStore.items.filter((c) => c.chatType === CONVERSATION_TYPE.SINGLE_CHAT).map((c) => c.conversationId))
-      // 会话列表快照不携带免打扰状态（见 toConversationItem 注释）：快照回填后异步批量校正，
-      // 不阻塞列表首屏；本地状态已在 toConversationItem 中保留，查询失败只影响跨端/冷启动校正
-      this.syncConversationMuteStates()
+      this.syncConversationMuteStates(expectedEpoch)
+    } catch (e) {
+      if (isCurrent()) conversationStore.syncFailed = true
+      throw e
     } finally {
-      conversationStore.syncing = false
+      if (isCurrent()) conversationStore.syncing = false
     }
+  }
+
+  onSyncDataStart(): void {
+    this.syncRequestId += 1
+    conversationStore.syncing = true
+    conversationStore.syncFailed = false
+  }
+
+  onSyncDataFinished(failed: boolean): void {
+    this.syncRequestId += 1
+    conversationStore.syncing = false
+    if (failed) {
+      conversationStore.syncFailed = true
+      return
+    }
+    const manager = this.ctx.client?.chatManager
+    if (manager == null) {
+      conversationStore.syncFailed = true
+      return
+    }
+    const items = manager.getConversationList()
+    conversationStore.items = items.map((c) => this.toConversationItem(c))
+    conversationStore.loaded = true
+    conversationStore.syncFailed = false
+    this.syncConversationMuteStates()
   }
 
   async enterConversation(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
@@ -145,6 +172,8 @@ export class EmConversationDomain {
   reset(): void {
     this.currentConversationId = ''
     this.accountGeneration += 1
+    this.syncRequestId += 1
+    invalidateAccountEpoch()
     this.lastUnreadClearAtByConversationId = {}
     this.pinQueueByConversationId = {}
     this.muteQueueByConversationId = {}
@@ -410,7 +439,8 @@ export class EmConversationDomain {
   // 以 PushManager 批量查询作为权威来源：单次最多 20 条，分片查询后逐条回写 store。
   // DURATION 规则无 remindType，按 expireTimestamp 未过期判定免打扰中（对齐 vue 版）。
   // 失败只告警：本地状态已由 toConversationItem 保留，不因一次网络失败把 icon 抹掉。
-  async syncConversationMuteStates(): Promise<void> {
+  async syncConversationMuteStates(expectedEpoch = getAccountEpoch()): Promise<void> {
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     const client = this.ctx.client as unknown as { pushManager?: PushManager } | null
     const push = client?.pushManager
     if (push == null) return
@@ -431,7 +461,9 @@ export class EmConversationDomain {
         const result = await push.getConversationSilentModes({
           conversationList: batch
         })
+        if (!isAccountEpochCurrent(expectedEpoch)) return
         result.conversations.forEach((r) => {
+          if (!isAccountEpochCurrent(expectedEpoch)) return
           const queue = this.muteQueueByConversationId[r.conversationId]
           const requestId = requestIdByConversationId[r.conversationId] ?? 0
           const latestRequestId = queue?.latestRequestId ?? 0
