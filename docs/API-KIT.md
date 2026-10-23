@@ -60,6 +60,9 @@ import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 | `config.appkey` | `string` | 是 | 环信 AppKey |
 | `config.onTokenWillExpire` | `() => string \| Promise<string>` | 否 | Token 约 80% 生命周期时触发，返回新 token 后 UIKit 自动续期 |
 | `config.onTokenExpired` | `() => void` | 否 | Token 已过期、SDK 已断开时触发；UIKit 同时把状态置为 `closed` |
+| `config.enableDeviceInfo` | `boolean` | 否 | 设备信息注入总开关，默认 `true`；`false` 时 init 完全不附加设备字段，SDK 退回默认设备行为 |
+| `config.deviceId` | `string` | 否 | 显式指定设备标识（透传 SDK `deviceId`），原样使用、不加段；不传则自动派生并持久化（App 端机型齐备时六段式含机型+系统版本，其余端三段式；注入时 UIKit 同步关闭 SDK `useFixedDeviceId`，避免本地历史值覆盖），见 [配置参考](./CONFIG.md#设备信息) |
+| `config.devicePlatform` | `number` | 否 | 显式指定自定义平台编号（透传 SDK `customOSPlatform`，需为 1–100 整数、向环信申请注册的编号）；不传则不注入 |
 | 其他字段 | — | 否 | 见 [配置参考](./CONFIG.md) |
 
 返回 `void`。初始化是幂等的：重复调用不会重复创建客户端。

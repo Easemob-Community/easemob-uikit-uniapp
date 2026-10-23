@@ -8,6 +8,7 @@ import { subscribeNetworkStatus, checkNetworkOnce } from '../platform'
 import { createLogger, setLogLevel } from '../utils/logger'
 import type { EmKitConfig, EmLoginOptions, EmTokenRenewalResult } from '../types'
 import { ensureSdkModule, setSdkLoader, setSdkModule } from './sdk'
+import { resolveDeviceInfo } from './device'
 
 const logger = createLogger('client')
 // SDK onLog 转发出口（ns 独立，方便单独过滤 SDK 侧日志）
@@ -141,6 +142,9 @@ export class EmClient {
       sdk.setConsoleLogEnabled(config.sdkConsoleLog !== false)
       const client = sdk.ChatClient.init({
         appKey: config.appkey,
+        // 固定设备标识注入：deviceId 派生值持久化、会话内稳定，注入时同步关 SDK useFixedDeviceId
+        // （避免 SDK 本地历史值覆盖注入值）；解析细节见 ./device.ts
+        ...resolveDeviceInfo(config),
         // 登录后自动同步会话 + 联系人 + 群（SDK 默认只同步 conversation，contact/group 需显式选择——
         // 未选时 getContacts()/getJoinedGroupList() 只能读到本地缓存残留，小程序端即「永远空」的根因；
         // 对齐 vue 版 uikit-im 场景默认 ['conversation','contact','group']）。

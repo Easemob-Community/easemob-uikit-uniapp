@@ -112,6 +112,33 @@ EmKit.init({
 
 正常 `EmKit.logout()` 会清空账号私有状态。如果宿主自己管理登录态，请确保退出时调用 `await EmKit.logout()`，不要只跳登录页。
 
+## 设备标识
+
+### 设备标识（deviceId）是怎么生成和持久化的
+
+UIKit 默认在 `EmKit.init()` 时向 SDK 注入固定 deviceId（`enableDeviceInfo` 总开关，默认开启，关闭则完全不注入、SDK 用默认行为）。自动派生的格式与优先级：
+
+- **格式**：App 端（android / ios / harmonyos）且能取到设备品牌、型号、系统版本时，为六段式 `Platform_uikitVersion_brand_model_system_uuid`（例 `android_1.0.0-rc.1_Xiaomi_23127PN0CC_Android15_<uuid>`，机型/系统段不含空白字符）；机型信息任一缺失，以及 H5 / 微信小程序，退回三段式 `Platform_uikitVersion_uuid`（例 `web_1.0.0-rc.1_<uuid>`）。
+- **优先级**：已持久化值（本地存储 key `emkit.device.id`）→ `uni.getDeviceInfo()` 框架设备标识 → 自生成 UUID。一经得出即持久化，跨启动保持稳定。
+- **显式覆盖**：宿主传入 `config.deviceId` 时原样使用、不加任何段；`devicePlatform` 是向环信申请注册的 1–100 编号，传入后 SDK 会把 resource 改写为 `custom<N>_` 形态。
+
+相关配置见 [配置参考 · 设备信息](./CONFIG.md#设备信息)。
+
+### 控制台里的 resourceId 和注入值对不上
+
+环信控制台设备列表的 resourceId 不是 UIKit 注入值的原样展示，差异来自 SDK 侧两步处理：
+
+1. websdk 会给注入的 deviceId 再拼一层 `webim_${平台}_` 前缀——看到的 `webim_web_...` 开头是 SDK 拼的，不是 UIKit 产生的；UIKit 注入值位于尾部。
+2. SDK 的 `useFixedDeviceId` 默认开启且**本地历史值优先**（浏览器 localStorage key `websdk2:device-info`）：老用户浏览器里已有历史值时，init 传入的 deviceId 会被忽略，表现为 resourceId 出现双层前缀、注入不生效。UIKit 注入 deviceId 时会同步关闭该开关，无需宿主处理。
+
+**确认本机当前 deviceId**：读本地存储 key `emkit.device.id`（H5 在浏览器 DevTools 的 localStorage 里看；App/小程序经各自调试工具查看），或登录后在环信控制台设备列表看 resourceId 尾段。
+
+### 升级 UIKit 后设备列表多了一台设备
+
+自动派生的 deviceId 带 UIKit 版本段，升级 UIKit 后版本段变化，服务端会视为新设备，旧记录会随登出/超时消失。这是设计行为：版本段让服务端可以区分不同 UIKit 版本的接入。已持久化的旧格式值会在下次启动时自动按新格式重新派生，无需手动清理。
+
+**想强制重新生成 deviceId**：删除本地存储 key `emkit.device.id`（H5 清 localStorage；小程序/ App 清除应用缓存）后重启应用即可。
+
 ## 会话与消息
 
 ### 会话列表为空

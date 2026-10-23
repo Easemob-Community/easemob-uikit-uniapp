@@ -31,6 +31,28 @@ EmKit.init({
 | `onTokenWillExpire` | `() => string \| Promise<string>` | 无 | Token 约 80% 生命周期时触发，返回新 token 后自动续期 |
 | `onTokenExpired` | `() => void` | 无 | Token 已过期、SDK 断开时触发；通常跳登录页 |
 
+### 设备信息
+
+UIKit 在初始化 SDK 时默认注入固定设备标识，让服务端的多端登录查询与互踢能按设备与平台维度区分。总开关 `enableDeviceInfo` 默认开启，传 `false` 则完全不注入，SDK 退回默认设备行为。
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `enableDeviceInfo` | `boolean` | `true` | 设备信息注入总开关；`false` 时 `deviceId` / `devicePlatform` 均不生效 |
+| `deviceId` | `string` | 自动派生 | 显式指定设备标识（透传 SDK `deviceId`），**原样使用、不加任何段**。不传时按以下优先级自动派生：① 此前持久化的设备标识；② `uni.getDeviceInfo()` 框架设备标识；③ 自生成 UUID。后两者一经得出即拼上平台/版本段并写入本地存储，跨启动保持稳定。**格式**：App 端（android / ios / harmonyos）且 `uni.getDeviceInfo()` 取到非空设备品牌、型号、系统版本时，为六段式 `Platform_uikitVersion_brand_model_system_uuid`（例 `android_1.0.0-rc.1_Xiaomi_23127PN0CC_Android15_b3fdc46-...`），机型/系统段已剔除空白字符；机型信息任一缺失，以及 H5 / 微信小程序（无可靠机型信息），退回三段式 `Platform_uikitVersion_uuid`（例 `web_1.0.0-rc.1_b3fdc46-...`）。注意：**UIKit 升级后版本段变化，服务端会视为新设备**（旧格式持久化值会自动按新格式重新派生，无需手动清理） |
+| `devicePlatform` | `number` | 不注入 | 显式指定自定义平台编号（透传 SDK `customOSPlatform`）。SDK 要求 1–100 的整数，且是向环信申请注册过的编号；不传时不注入，平台维度由 `deviceId` 前缀承担 |
+
+注入 `deviceId` 时，UIKit 会同步关闭 SDK 的 `useFixedDeviceId`：该开关默认开启且 SDK 本地历史设备值（浏览器 localStorage）优先，不关闭会导致老用户设备上注入值被历史值覆盖、不生效。该行为不影响 UIKit 自身的设备标识持久化。
+
+```ts
+EmKit.init({
+  appkey: 'your-appkey',
+  deviceId: 'pos-terminal-01', // 宿主显式值：原样使用，不加前缀
+  devicePlatform: 42 // 向环信申请注册后的自定义平台编号
+})
+```
+
+注意：SDK 客户端是单例，初始化配置会参与一致性比对，重复初始化时传入的 `deviceId` / `devicePlatform` 必须与首次一致，否则 SDK 会抛配置冲突错误。
+
 ### 日志
 
 | 字段 | 类型 | 默认值 | 说明 |

@@ -957,3 +957,41 @@
 - **对外透出**：`EmKit.state.networkOnline` 自动可见；文档 API-KIT（state 表）/ API-TYPES（`ERROR_CODE`）/ changelog（未发布-新增）已登记。
 - **门禁**：`check-docs` ✓（28 页 / 35 组件 / 79 方法 / 27 配置）；`build web` ✓（仅既有 demo-custom-inputbar 告警）；`build mp-weixin` ✓ 11 项防回归全绿（主包 980KB ≤ 1.5MB）；H5 产物静态伺服 / **HTTP 200**。
 - **待验（真机）**：App 旧自定义基座缺 `uni-getNetworkType` 模块时降级链路（warn 日志 + 不预判）；断网/恢复过程中 banner 的显示与消隐时序（H5 devtools Network offline 可手测）；离线时发送/重发的 FAILED 气泡与「网络异常」toast。
+
+## 2026-10-23 SDK init 注入固定 deviceId + 设备平台信息
+
+- **实现**：新增 `libs/client/device.ts` 导出 `resolveDeviceInfo(config)`（同步纯函数）；`EmClient.doInit` 的 `ChatClient.init` 入参展开其结果。`EmKitConfig` 增四字段：`enableDeviceInfo`（总开关，默认 true）、`deviceId` / `deviceName` / `devicePlatform`（显式覆盖）。
+- **deviceId 优先级（代码注释与公开文档同口径）**：`config.deviceId` → 持久化值（key `emkit.device.id`，platform.ts 存储收口）→ `uni.getDeviceInfo().deviceId` → 自生成 UUID（无依赖）；后两者一经得出即持久化，下次启动直接读回，跨启动稳定（满足 ChatClient 单例配置比对的会话内稳定性要求）。
+- **customDeviceName**：`config.deviceName` ?? 「品牌 型号 (系统)」，逐级回落系统名/osName/平台名。
+- **customOSPlatform 的偏差说明（重要）**：websdk 5.1.3 对该字段做 zod 校验——**必须 1–100 整数**（登录 proto 的 `osCustomValue`，属向环信注册过的业务自定义平台编号），与计划书假设的字符串平台名不符（照传字符串会 init 抛错）。定案：`devicePlatform?: number` 显式透传，非法值本地跳过并告警（不拖死 init）；UIKit 不自动派生该平台编号，平台维度由 `customDeviceName` 承担。vue 版 uikit 同样只透传 `deviceId`、不自动传 `customOSPlatform`。
+- **文档**：API-KIT（init 配置表四行）、CONFIG（新增「设备信息」小节）、changelog 未发布段同步；`check-docs` ✓（28 页 / 35 组件 / 81 方法 / 34 配置字段）。
+- **门禁**：`build web` ✓；`build mp-weixin` ✓ 11 项防回归全绿（主包 1002KB ≤ 1.5MB，分包合计 1425KB）；H5 产物静态伺服 200 ✓（产物 JS 含 `emkit.device.id` / `customOSPlatform` 注入代码）。
+- **待验（真实账号/真机）**：H5 登录后抓 init 入参确认三字段注入与两次启动 deviceId 一致（localStorage 未清时）；`enableDeviceInfo: false` 时 init 入参不含任何设备字段；App（iOS/Android/鸿蒙 4.61+ 基线）与微信小程序真机的 deviceId 跨启动稳定性（鸿蒙需 4.61+ 才有 `uni.getDeviceInfo`，旧基座走 UUID 兜底分支）。
+
+
+## 2026-10-23 SDK init 设备信息两处设计调整（同日修订）
+
+- **deviceId 加平台前缀**：自动派生路径最终格式定稿为 `Platform_<稳定id>`（Platform = 归一平台名 android/ios/harmonyos/web/mp-weixin，小程序走 `#ifdef MP-WEIXIN` 直出，其余端由 `uni.getDeviceInfo()` 的 platform/osName 归一，未识别值原样小写兜底）。宿主显式传入的 `config.deviceId` **原样使用、不加前缀**。持久化存拼好前缀的最终值（key `emkit.device.id` 不变），读回即用，跨启动稳定。
+- **移除 customDeviceName**：该字段是环信服务端按 appKey 开启的能力（默认关闭），UIKit 不做设置——`device.ts` 删除设备名组装、`SdkDeviceInfo` 删 `customDeviceName`、`EmKitConfig` 删 `deviceName` 字段；平台/版本维度由 deviceId 前缀承担，uikit 版本不注入任何 SDK 字段（零侵入）。
+- **EmKitConfig 定稿四字段（实际三个）**：`enableDeviceInfo`（总开关）、`deviceId`、`devicePlatform`（number，1–100，透传 customOSPlatform，本地预校验非法值跳过+告警）。
+- 文档同步：API-KIT（删 deviceName 行、deviceId 行改写）、CONFIG「设备信息」小节重写、changelog 未发布段改写。
+
+## 2026-10-23 deviceId 自动派生改三段式 Platform_uikitVersion_uuid
+
+- **格式**：自动派生最终值由 `Platform_<id>` 两段式升级为 `Platform_uikitVersion_uuid` 三段式（例 `web_1.0.0-rc.1_b3fdc46-...`）。版本段来源：新增 `UIKIT_VERSION` 常量（`libs/constants/index.ts`，注释约定与 `uni_modules/easemob-uikit-uni/package.json` 的 version 同步，不运行时读 json——小程序端不可靠）。
+- **升级即新设备的落地机制**：持久化读回时校验「平台段 = 当前平台 且 版本段 = UIKIT_VERSION」，不满足（旧两段式值、异版本值）即按当前格式重新派生并覆盖写入——无需迁移逻辑，与公开文档「UIKit 升级后服务端视为新设备」口径一致。宿主显式 `config.deviceId` 仍原样使用、不加前缀。
+- **控制台 resourceId 组成调查结论（websdk 5.1.3 buildDeviceInfo 实测）**：控制台/服务端看到的 resourceId = SDK 包装后的最终 deviceId——SDK 对任何注入的 deviceId 再拼 `webim_${platform}_` 前缀（字面 "webim" + 内置平台段 "web"），login 时 `clientResource = 该最终值`。即 UIKit 注入值位于 resourceId 尾部；注入 `web_1.0.0-rc.1_xxx` 后控制台将显示 `webim_web_web_1.0.0-rc.1_xxx`。用户实测的 `webim_webim_web_<uuid>` 说明该次会话的注入尾段是 `webim_web_<uuid>`（SDK `useFixedDeviceId` 默认开启时优先读 SDK 自己 localStorage `websdk2:device-info` 里既有的固定值，而非本次注入值）。
+- **文档**：API-KIT（deviceId 行）、CONFIG「设备信息」表（三段式 + 升级视为新设备说明）、changelog 未发布段同步。
+
+## 2026-10-23 修正：注入 deviceId 时同步关闭 SDK useFixedDeviceId
+
+- **反编译结论（websdk 5.1.3 buildDeviceInfo，已核实）**：`useFixedDeviceId` 缺省 true，开启时优先读 SDK 自己的 localStorage（key `websdk2:device-info`），**有历史值则完全忽略 init 传入的 deviceId**——H5 老用户注入不生效，控制台 resourceId 出现 `webim_webim_web_` 双前缀即此因（SDK 给注入值拼 `webim_${平台}_` 包装时，注入值本身已是 SDK 历史持久化的 `webim_web_xxx`）。另：customOSPlatform 非空时 resource 会被改写为 `custom<N>_<uuid>` 形态（UIKit 默认不注入该字段，不影响默认路径）。
+- **落地**：`SdkDeviceInfo` 增 `useFixedDeviceId` 字段——`resolveDeviceInfo` 解析出非空 deviceId 时恒带 `useFixedDeviceId: false`，doInit 随展开一并传入（init 组装仍收敛在 ./device.ts 一处）；`enableDeviceInfo: false` 时不出现该字段，保持 SDK 默认行为。我们自己的 `emkit.device.id` 持久化读回不受影响。
+- **文档**：CONFIG「设备信息」补说明段、API-KIT deviceId 行、changelog 条目同步。
+
+## 2026-10-23 deviceId App 端扩六段式（机型 + 系统版本上报）
+
+- **格式**：App 端（platform 归一为 android/ios/harmonyos）且 `uni.getDeviceInfo()` 取到非空 `deviceBrand`/`deviceModel`/`system` 时，自动派生为 `${platform}_${UIKIT_VERSION}_${brand}_${model}_${system}_${stableId}` 六段式（例 `android_1.0.0-rc.1_Xiaomi_23127PN0CC_Android15_b3fdc46-...`）；机型段任一缺失退回三段式。H5/微信小程序无可靠机型信息（UA 不可信），恒三段式。
+- **取舍记录**：各段剔除全部空白字符（resource 里不允许空格）；机型/系统段不参与持久化读回校验（校验仍只看平台段+版本段）——同一台机器这两个值不变；用户系统升级后沿用旧系统段也可接受（代价仅是控制台展示旧版本串），不强求重派生。宿主显式 `config.deviceId` 仍原样、不加任何段。
+- **实现**：device.ts 内 `sanitizeSegment()` + `resolveModelSegments()`（仅 App 平台调用）；无新增条件编译，平台判断复用现有 `resolvePlatformName()` 归一结果。
+- **文档**：API-KIT deviceId 行、CONFIG「设备信息」表、changelog 未发布段同步。

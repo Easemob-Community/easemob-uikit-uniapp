@@ -4,6 +4,8 @@
 
 ### 新增
 
+- **SDK 初始化注入固定设备标识**：`EmKit.init()` 默认向 SDK 注入稳定的 `deviceId`，服务端的多端登录查询与互踢可以按设备、平台、机型与 UIKit 版本维度区分。自动派生的 `deviceId`：App 端机型信息齐备时为六段式 `Platform_uikitVersion_brand_model_system_uuid`（机型/系统段剔除空白字符），其余端或机型信息缺失时为三段式 `Platform_uikitVersion_uuid`（Platform 取归一平台名 `android` / `ios` / `harmonyos` / `web` / `mp-weixin`，uikitVersion 为 UIKit 版本段）：优先复用此前持久化的设备标识，其次取 `uni.getDeviceInfo()` 框架设备标识，最后自生成 UUID；一经得出即写入本地存储，跨启动保持稳定。UIKit 升级后版本段变化，服务端会视为新设备。宿主显式传入的 `deviceId` 原样使用、不加段；注入时 UIKit 同步关闭 SDK 的 `useFixedDeviceId`（SDK 本地历史设备值优先，不关闭会导致老用户注入不生效）。新增 `EmKitConfig` 配置项：`enableDeviceInfo`（总开关，默认开启，关闭后完全不注入）、`deviceId`（显式覆盖自动派生值）、`devicePlatform`（自定义平台编号，透传 SDK `customOSPlatform`，需为向环信申请注册的 1–100 整数，不传则不注入）。显式传入的值在重复初始化时必须与首次一致（SDK 单例配置比对）。
+
 - **网络状态预检测与断网警示提示**：UIKit 在 `EmKit.init()` 时订阅系统网络状态写入 `EmKit.state.networkOnline`（`true` 在线 / `false` 离线 / `null` 未知，基座未提供网络探测能力时为 `null`、不预判）。系统报告离线时，会话页/聊天页顶部的连接提示条立即显示红色「网络异常，请检查网络情况」，不再停留在黄色「连接中/重连中」，也不等 SDK 走完重连循环。发送消息前做预检测：确定性离线时不再触达 SDK，消息按失败落库保留红叹号重发，并提示「网络异常，请稍后重试」（其余失败仍提示「发送失败」）；重发同样生效。新增业务错误码常量 `ERROR_CODE`（`NETWORK_OFFLINE` / `NETWORK_TIMEOUT`，挂在 `Error.code` 上）供发送失败归因；登录失败日志带系统离线标记，便于排查「是断网还是 SDK 问题」。
 
 - **消息编辑**：长按自己发送的文本消息选「编辑」，输入栏上方出现编辑条（原文截断预览），修改后发送复用原消息 id（`EmKit.modifyTextMessage`），气泡尾部显示「已编辑」标记；单条消息最多编辑 10 次，达到上限后菜单项置灰，编辑失败保留编辑态供重试。通过 `uiConfig.messageMenuKeys` 移除 `edit` 可禁用。

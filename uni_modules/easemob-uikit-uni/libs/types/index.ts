@@ -117,6 +117,20 @@ export interface EmUiConfig {
 
 export interface EmKitConfig {
   appkey: string
+  /** SDK 设备信息注入总开关，默认 true；false 时 ChatClient.init 完全不附加
+   *  deviceId / customOSPlatform，退回 SDK 默认设备行为 */
+  enableDeviceInfo?: boolean
+  /** 显式指定设备标识（透传 SDK deviceId），原样使用、不加任何段。不传时自动派生并持久化：
+   *  App 端机型信息齐备时为 `Platform_uikitVersion_brand_model_system_<框架deviceId或UUID>` 六段式，
+   *  其余端/机型信息缺失时为 `Platform_uikitVersion_<框架deviceId或UUID>` 三段式
+   *  （Platform 取归一平台名 android/ios/harmonyos/web/mp-weixin，uikitVersion 为 UIKit 版本段），
+   *  优先级：已持久化值 → uni.getDeviceInfo().deviceId → 自生成 UUID。
+   *  UIKit 升级后版本段变化，服务端会视为新设备。
+   *  ChatClient 为单例且按配置逐字段比对，同一会话内传入值必须保持稳定 */
+  deviceId?: string
+  /** 显式指定自定义平台编号（透传 SDK customOSPlatform，需为 1–100 整数、向环信申请注册的编号）；
+   *  不传则不注入，SDK 按默认平台类型上报。同 deviceId，同一会话内传入值必须保持稳定 */
+  devicePlatform?: number
   /** 单聊已读回执开关，默认 true */
   enableReadReceipt?: boolean
   /** uikit 内置 logger 级别，默认 'info'；'silent' 全关 */
