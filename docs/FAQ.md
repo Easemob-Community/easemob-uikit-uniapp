@@ -2,6 +2,14 @@
 
 这页按“症状 → 优先检查 → 处理”组织。接入步骤见 [快速开始](./QUICKSTART.md)，平台差异见 [平台能力与差异](./PLATFORM.md)。
 
+## 环境与接入范围
+
+### 能在经典 uni-app 或 uni-app x vdom 模式工程里使用本插件吗
+
+不能。本插件仅支持 **uni-app x 蒸汽模式（Vapor）**：页面需 `.uvue` + `main.uts` 入口，`manifest.json` 开启 `uni-app-x.vapor`，并要求 HBuilderX 5.21+。经典 uni-app（Vue2/Vue3、nvue）与 uni-app x 的 vdom 模式均不提供兼容。
+
+背景与升级路径：DCloud 官方已于 2024 年停止 nvue 与 5+ 的维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台的维护；uni-app x 蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可方便升级。依据见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)，升级指引见官方「uni-app 升级 uni-app x」专题。
+
 ## 页面与布局
 
 ### 页面白屏 / 列表或输入栏高度为 0
@@ -41,6 +49,32 @@
 ### 键盘弹起把导航栏顶飞
 
 UIKit 的输入栏使用手动避让：输入框 `adjust-position=false`，按键盘高度顶起输入栏，导航栏不动。宿主页面如果自己包了一层输入框，需要采用同样策略；不要让页面整体被系统推上去。平台细节见 [平台能力与差异](./PLATFORM.md)。
+
+### App 端页面白屏且控制台没有任何报错
+
+真机整页白屏、控制台没有任何报错时，优先怀疑「组件渲染期抛了异常被引擎吞掉」，而不是样式/布局问题：蒸汽端（uni-app x App）不冒泡组件 setup / 首次渲染期的 `ReferenceError`，页面白屏且控制台干净。
+
+**排查**：diff 最近改过的组件，检查 `<script setup>` 作用域里新引用的标识符是否都有定义——尤其注意模板自动暴露的 props 名在 script 里不可用（要写 `props.xxx`）。CLI 构建不做这类检查，构建成功不代表运行正常。
+
+**预防**：给组件加新的计算属性/方法后，自查一遍标识符定义；H5 上不报错也不等于 App 端安全（桌面端可能被重渲染掩盖）。
+
+### App 端自绘弹层偶发不出现、整页点击被吞
+
+仅在宿主**自己用 `v-if` 实现弹层/浮层**时出现：打开弹层时新建分支的视觉节点偶发整批不建（只建出命中区），表现为弹层不可见、整页点击被透明层吞掉，再点一次只是把弹层关掉。UIKit 内置弹层（action sheet、选人、@提及、长按菜单）已改为常驻挂载，不受此影响。
+
+**规避**：弹层树常驻挂载——页面挂载时就把节点建好，关闭态用根节点内联样式（如 `top: 200%`）把整棵树移到视口下方（不绘制、不吃点击），打开/关闭只改这一个内联样式。进场动画用 JS 逐帧写内联位移，并保证任意一帧写入丢失时终态仍可见；不要依赖「隐藏初始态 + 挂载后翻 class」的 CSS 动画写法（App 端 CSS 动画不执行，见 [平台能力与差异](./PLATFORM.md)）。
+
+**全屏弹层的顶部安全区**：由内容节点自己注入 `padding-top: getSafeAreaTop()`（`getSafeAreaTop` 见 [EmKit API](./API-KIT.md)），内容高度同步扣除同一值；iOS 蒸汽端全屏弹层容器的 padding 不参与布局，不能靠弹层容器承载顶部安全区，否则底部确认键会被顶出屏。
+
+### App 端多行输入框（textarea）不生长 / 无底色无占位符
+
+App 端 `textarea` 是原生组件（iOS 为 UITextView）：`flex:1` 不生效，背景、圆角等装饰样式渲染不可靠，表现为多行输入区整体不可见。自绘输入栏（`#input-bar` 插槽）或业务页面里用到 textarea 时：
+
+- 尺寸与装饰（高度、灰底、圆角、裁切）由外层包裹 `view` 承担，高度跟随业务上报的行高变化；
+- textarea 自身只设 `width/height: 100%`，不设背景；
+- iOS 另设 `disable-default-padding` 去掉默认内边距。
+
+UIKit 内置输入栏的生长输入区已按此实现，可直接参考其结构（自绘输入栏契约见 [聊天页](./PAGES-CHAT.md)）。
 
 ### H5 刷新 404
 
@@ -159,6 +193,12 @@ App 未内置通用文件选择器。宿主注册附件 provider 且当前可用
 ### 长按菜单弹出后又进入了会话/播放了语音
 
 UIKit 已处理 H5 长按后补发 click 的冲突。如果宿主自定义了长按区域，需要自行吞掉长按抬手时的 click，避免同时触发点击行为。
+
+### App 端触摸拖拽没有反应（点按也无响应）
+
+如果拖拽/滑动定位依赖 `uni.createSelectorQuery().boundingClientRect()` 查询节点位置：蒸汽端（App）该查询可能拿不到有效矩形，就绪标记永不置位，touch 事件被静默跳过且控制台无任何报错。
+
+**规避**：几何可推导的位置同步计算——例如通栏拖拽条用 `uni.getWindowInfo().windowWidth` 减已知页面边距，`touchstart` 时即可用，不做异步查询；`createSelectorQuery` 只作增强/兜底。scroll-view 页面里拖拽期间用 `:scroll-y="!dragging"` 锁定滚动，防止手势被滚动接管。
 
 ## 主题与图标
 

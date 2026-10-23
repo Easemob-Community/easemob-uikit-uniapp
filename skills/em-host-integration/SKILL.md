@@ -13,7 +13,7 @@ description: Use when 要把 easemob-uikit-uni 接入宿主 uni-app x 工程（�
 **适用**：宿主已有（或即将创建）一个 uni-app x 工程，用现成 `em-*` 组件收发 IM 消息，**不改 UIKit 源码**。
 
 **不适用**：
-- 经典 uni-app（Vue2 / 非 x 编译器）——本插件是 uni-app x 插件，页面需 `.uvue`；
+- 经典 uni-app（Vue2 / 非 x 编译器）——本插件是 uni-app x 插件，页面需 `.uvue`；DCloud 2024 年已停 nvue/5+ 维护、2027 年初停 App 平台与 vdom 平台维护，老工程请升级蒸汽模式（见 https://doc.dcloud.net.cn/uni-app-x/ 的 FAQ「老 uni-app 还维护吗？」）；
 - 要新增/修改 UIKit 组件、libs、样式——那是在开发 UIKit，读仓库根 `AGENTS.md` 的 `.agents/skills/`；
 - 只想接环信 SDK、不用 UIKit UI——用 `easemob-websdk` 官方文档即可。
 

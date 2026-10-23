@@ -10,7 +10,7 @@
 
 | # | 决策点 | 结论 | 依据 |
 |---|---|---|---|
-| D1 | 目标框架 | **uni-app x 蒸汽模式（vapor-only）**；代码守纯 ts 纪律，老 uni-app Vue3「能用算白捡，不做官方承诺」 | 老 uni-app App 端 2027 年初停维护；蒸汽模式是 DCloud 明示的未来；双兼容正式版成本 +30~50%，一期不背 |
+| D1 | 目标框架 | **仅支持 uni-app x 蒸汽模式（vapor-only）**，不兼容经典 uni-app（Vue2/Vue3、nvue）与 vdom 模式；代码守纯 ts 纪律。2026-10-23 起对外文档公开声明此口径（原口径「老 uni-app Vue3 能用算白捡」收回，不再做任何非蒸汽模式兼容努力） | 老 uni-app App 端与 uni-app x vdom 平台 2027 年初停维护（DCloud 官方公告，https://doc.dcloud.net.cn/uni-app-x/ FAQ「老 uni-app 还维护吗？」）；蒸汽模式是 DCloud 明示的未来；双兼容正式版成本 +30~50%，一期不背 |
 | D2 | 目标平台 | Android / iOS / 鸿蒙（蒸汽原生渲染）+ H5 + 微信小程序（后两者当前走 VDOM 管线编译，属正常） | 一期五端，对齐 RiceUI 已验证矩阵 |
 | D3 | Vue 版本 | 仅 Vue3 组合式 API；**不支持 Vue2**（uni-app x 无 Vue2，Vue2 已 EOL） | 蒸汽模式强制组合式 |
 | D4 | 一期范围 | **最小闭环**：登录接入 + 会话列表页 + 聊天页（文本/图片/语音/视频/文件 5 种气泡、长按四菜单）+ demo 工程 | 社区路径是「扫码体验 → 导入 → 5 分钟跑通」，demo 闭环先于一切抽象 |
@@ -303,6 +303,13 @@ easemob-uikit-uniapp/
 - **范围**：新增原子组件 `em-video-preview`（fixed 全屏黑底 + 原生 `video` + 安全区关闭键 + 失败提示，App/H5/小程序共用）；`em-chat-page` 点击视频消息先停语音再打开播放器，切会话/卸载时关闭；`PLATFORM_CAPABILITIES.videoPreview` 全端 `true`（字段保留，便于后续按端裁剪）；i18n 增播放失败文案，token 增 `--em-video-viewer-bg`。
 - **明确不做**：自研手势层/播放进度条（使用各端原生 `video` 控件）；视频下载/保存到相册；列表内联自动播放。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；iOS 真机已验证播放/声音/退出释放（含 chatfiles 下载本地与显式起播修复），Android/鸿蒙/小程序真机待验（见 STATUS.md）。
+
+### M2.20：消息增强五能力——群名修改/撤回重编辑/撤回者昵称/消息编辑/置顶消息（2026-10-23 立项）
+
+- **背景**：群名修改链路在 M2.9 已随 `em-chat-info-page` 落地（owner 笔入口 → `updateGroupInfo` → 会话名同步 + 灰条），本轮补配置开关并端到端验证；撤回重编辑/撤回者昵称/消息编辑/置顶消息为新增能力，全部对齐 vue 版权威实现（AGENTS.md 硬约束 #2）。
+- **范围**：websdk 5.1.3 API 齐备（`modifyMessage` 编辑上限 10 次、`pinMessage/unpinMessage/getPinnedMessageList` ≤20 条、事件 `onMessageUpdated/onPinnedMessageChanged`）。撤回条展示原发送者昵称（SDK `onMessageRecalled` payload 无操作者字段，vue 同款语义）+ 自己撤回的文本墓碑可「重新编辑」回显输入框（发新消息）；长按菜单新增 `edit`/`pin` 内置 key（走 `uiConfig.messageMenuKeys`，删 key 即禁用），输入栏新增编辑条（对齐 vue `editing-bar`），文本气泡加「已编辑」标记；新组件 `em-pinned-bar`（折叠态 + 多条下拉展开，点击定位复用引用定位机制）；新配置 `enableReEdit`/`enableGroupNameEdit`（默认开）；好友备注编辑（联系人列表长按菜单 `remark` 项 + 居中弹层，走既有 `EmKit.setContactRemark`，展示链备注 > 昵称 > userId 联动聊天页标题/撤回条/引用卡，`uiConfig.contactMenuKeys` 默认 remark/delete）。
+- **明确不做**：群主/管理员撤回他人消息（vue `enableRecallOther`，SDK 支持但不在本轮）；编辑时间窗口（vue 无此限制，仅次数上限）；会话列表撤回摘要改动（现有 `message.recalledPreview` 保持）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；蒸汽端真机待验项记 STATUS.md。
 
 ### M3：组件沉淀与发布
 

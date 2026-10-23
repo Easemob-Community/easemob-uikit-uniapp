@@ -4,12 +4,14 @@
 
 > 相关页面：[快速开始](./QUICKSTART.md) · [设计变量](./DESIGN-TOKENS.md) · [主题与国际化](./THEME-I18N.md) · [聊天与消息组件](./COMPONENTS-CHAT.md) · [示例工程](./DEMO.md) · [常见问题](./FAQ.md)
 
+> **仅支持 uni-app x 蒸汽模式（Vapor）**：DCloud 官方已于 2024 年停止 nvue 与 5+ 的维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台的维护（见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可方便升级。本插件不提供经典 uni-app（Vue2/Vue3、nvue）与 vdom 模式的兼容，下表环境要求以蒸汽编译目标为准。
+
 ## 环境要求
 
 | 项 | 要求 | 说明 |
 |---|---|---|
 | HBuilderX | 5.21+（建议 5.26+） | 蒸汽模式（Vapor）的编译与真机运行依赖较新版本 |
-| uni-app x | HBuilderX 4.71+，Vue 3 组合式 API | 仅支持 uni-app x；经典 uni-app（vue2 / vue3）不在支持范围 |
+| uni-app x | HBuilderX 4.71+，Vue 3 组合式 API | 仅支持蒸汽模式；经典 uni-app（vue2 / vue3）与 vdom 模式不提供兼容（DCloud 2024 年已停 nvue/5+，2027 年初停 App 平台与 vdom 平台维护，见上文公告） |
 | Node.js | 18+ | 仅在 CLI 编译、分包后处理、体积校验时需要 |
 | 环信 SDK | `easemob-websdk` 5.1.3（peer 依赖） | 精确锁版；升级前先看更新日志 |
 | 渲染模式 | uni-app x 蒸汽模式（`manifest.json` 开 `vapor`） | `.uvue` 页面 + `main.uts` 入口 |
@@ -177,6 +179,8 @@ bash scripts/uni.sh dev mp-weixin
 - **小程序主包体积**：平台 2MB，仓库门禁 1.5MB；新增业务页面优先放分包。
 - **H5 未做 PC 宽屏**：布局按移动端设计，桌面浏览器建议限制视口宽度。
 - **主题必须绑根节点**：App 端没有 `:root`，页面根节点要绑定 `themeClass`，否则明暗变量不下行。
+- **App 端 `v-if` 新建分支的浮层会偶发整批不渲染**：弹层/浮层类 UI 常驻挂载，开合只改内联样式；详见 [常见问题](./FAQ.md)。
+- **App 端原生组件只保证内容区**：`textarea`、`button` 的 flex 尺寸与背景/圆角等装饰渲染不可靠，由外层包裹节点承担；详见 [常见问题](./FAQ.md)。
 
 ## 平台差异在库内的位置
 

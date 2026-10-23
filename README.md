@@ -2,6 +2,8 @@
 
 环信 IM 的 uni-app 版 UIKit（uni-app x 蒸汽模式），面向 DCloud 插件市场社区分发。MIT 开源。
 
+> **仅支持 uni-app x 蒸汽模式（Vapor）**：DCloud 官方已于 2024 年停止 nvue 与 5+ 维护，并将于 2027 年初停止 uni-app App 平台与 uni-app x vdom 平台维护（依据见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；uni-app x 蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可直接升级。本插件不提供经典 uni-app（Vue2/Vue3、nvue、vdom 模式）兼容，五端均基于 uni-app x 蒸汽编译目标。详见 [docs/PLATFORM.md](./docs/PLATFORM.md)。
+
 > 当前版本：**1.0.0-rc.1**（1.0 候选）。单聊、群聊、联系人、多场景扩展与 AI 流式消息已落地；能力边界与已知限制见下文。接入步骤见 [docs/QUICKSTART.md](./docs/QUICKSTART.md)，发布操作见 [docs/RELEASE-1.0.md](./docs/RELEASE-1.0.md)，逐日进度与各端实测状态见 [docs/STATUS.md](./docs/STATUS.md)。
 
 ## 兼容性

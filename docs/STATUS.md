@@ -900,3 +900,38 @@
 - **做法**：`em-popup` 进场改 JS 逐帧写内联 `transform: translateY(100% → 0%)`（约 200ms、ease-out、16ms/帧，同 `useSpinRotation` 思路）；尾段（>85%）直接写 0%，最后一帧清掉内联 transform。退场保持瞬隐（若做退场，收尾那次"隐藏"写入被丢会留下幽灵弹层）。
 - **真机验证**（Redmi Note 7 Pro / Android 10）：慢放（2s 时长）实测面板 top 2200→1967→1856→1817→1812，确认是渐进滑动；恢复 200ms 后连点 20 次开合 **20/20 全部正常**（改前 3/12 失败），长按会话菜单回归正常。
 - **门禁**：`build web` ✓ / `build mp-weixin` 11 项全绿；坑集 §5q 补「动画只能做附加位移」纪律与退场禁令。
+
+## 2026-10-23 踩坑实录补充进对外文档
+
+- **范围**：近两天坑集（`em-crossend-pitfalls` §5m/5q/5l/5j 及 §5a iOS 口径）中尚未公开的部分补进对外文档。视频三连坑（§5n/5o/5p）、变量覆盖漂移（§5i/5k）、附件 md5（§5h）此前已有公开覆盖，本次不重复。
+- **FAQ.md 新增 4 条**：「App 端页面白屏且控制台没有任何报错」（§5m，setup 期 ReferenceError 被蒸汽引擎吞掉）；「App 端自绘弹层偶发不出现、整页点击被吞」（§5q，v-if 新分支视觉节点整批不建 → 常驻挂载 + 只改内联样式 + JS 逐帧动画；附 §5a iOS 全屏弹层 padding 不参与布局的安全区口径，引用公开 API `getSafeAreaTop`）；「App 端多行输入框（textarea）不生长 / 无底色无占位符」（§5l，装饰与尺寸落包裹层）；「App 端触摸拖拽没有反应」（§5j，createSelectorQuery 拿不到 rect 静默失效，几何同步推导）。
+- **PLATFORM.md**「其他约束」补两条交叉提示（v-if 浮层、原生组件只保证内容区）；**PAGES-CHAT.md** 整栏自绘输入栏节补 textarea 包裹层提示并链回 FAQ。
+- **校验**：`check-docs` ✓（28 页 / 34 组件 / 72 方法 / 24 配置）；门户 `content:sync` + `content:check` + `test`（17/17）+ `build` 全绿；preview 走查 FAQ 四个新条目目录与正文渲染正常。
+
+## 2026-10-23 消息增强五能力 + 好友备注（PLAN M2.20）
+
+- **范围**：群名修改开关（链路 M2.9 已存在，`em-group-info-blocks` 笔入口新增 `uiConfig.enableGroupNameEdit` 门控）、撤回消息「重新编辑」（自己撤回的文本墓碑，`enableReEdit` 默认开，回显输入框发新消息）、撤回条昵称展示（原发送者昵称，群成员名片 > 单聊备注 > 昵称链；SDK `onMessageRecalled` payload 无操作者字段，与 vue 版同款语义）、消息编辑（`modifyMessage` 复用原消息 id，上限 10 次置灰，输入栏编辑条优先引用条，失败保留编辑态）、置顶消息（`em-pinned-bar` 折叠态 + 多条下拉展开，定位复用引用高亮 + 翻页 3 页兜底）、好友备注（联系人列表长按菜单 `remark` 项 + 居中弹层，`EmKit.setContactRemark` 早封装无调用方首次接线；聊天页单聊标题/撤回条/引用卡改 `contactDisplayNameOf` 备注链）。
+- **配置**：`messageMenuKeys` 默认插入 `edit`/`pin`（删 key 即禁用，置顶条随之不渲染）；新增 `enableReEdit` / `enableGroupNameEdit` / `contactMenuKeys`（默认 remark/delete，em-contact-list-page 的 `menuKeys` prop 缺省回落 uiConfig）。i18n 中英同步 12+3 个 key。
+- **libs**：`EmMessageItem` 增 `modifiedInfo`/`pinned`/`recalledBy`；新类型 `EmMessageModifiedInfo`/`EmPinnedMessageItem`/`EmPinnedRow`；message 域新增 `modifyTextMessage`（ext 原值写回防引用被清空）/`pinMessage`/`unpinMessage`/`refreshPinnedMessages`（epoch 防护、pinnedAt 降序、已加载消息打标）/`applyMessageUpdated`；事件 `onMessageUpdated`/`onPinnedMessageChanged` 接线；门面新增 4 方法（`modifyTextMessage` 成功同步会话摘要）。
+- **门禁**：`build web` ✓（仅既有 demo-custom-inputbar 告警）；`build mp-weixin` ✓ 11 项防回归全绿（主包 966KB ≤ 1.5MB）；H5 产物静态 GET / **HTTP 200**；`check-docs` ✓（28 页 / 35 组件 / 79 方法 / 27 配置字段）。
+- **待验（真机/真实账号）**：蒸汽端输入框回填长文本后的多行高度重算（linechange 依赖键盘 focus）；置顶条展开列表滚动与点击定位；编辑/置顶/撤回重编辑在 H5 + 微信开发者工具的真实账号链路；好友备注保存后三端展示联动；群名片 vs 好友备注的群场景优先级（当前群成员链保持群名片优先，vue 语义为备注优先，差异待产品裁决）。
+
+## 2026-10-23 公开宣布仅支持 uni-app x 蒸汽模式
+
+- **决策**：不再考虑兼容老模式（经典 uni-app Vue2/Vue3、nvue、vdom），公开口径统一为「仅支持 uni-app x 蒸汽模式（Vapor）」。依据 DCloud 官方公告（https://doc.dcloud.net.cn/uni-app-x/ FAQ「老 uni-app 还维护吗？」）：2024 年已停 nvue/5+ 维护，2027 年初停 uni-app App 平台与 uni-app x vdom 平台维护；蒸汽模式已兼容 js/ts，老工程可升级。PLAN D1 同步改口（原「老 uni-app Vue3 能用算白捡」收回）。
+- **波及页面（醒目声明 + 原址引用）**：README 顶部 callout；HOME 新增「支持范围」节；QUICKSTART 首段支持范围声明；PLATFORM 环境要求上方 callout + uni-app x 行扩写；FAQ 新增「环境与接入范围」节第一条（经典 uni-app / vdom 能否使用）；changelog rc.2「变更」段首条。宿主 skill `em-host-integration` 不适用场景补公告背景；AGENTS.md 项目一句话改「蒸汽优先 → 仅蒸汽模式」。
+- **校验**：`check-docs` ✓（28 页 / 35 组件 / 79 方法 / 27 配置）；`check-skills` ✓（8 技能）；门户 `content:sync` + `content:check` + `build` 全绿（`.content` 五处新文案核对到位：index / quickstart / platform / faq / changelog）。
+
+## 2026-10-23 业务资料注入能力（set*Presentation 三件套）
+
+- **背景**：此前宿主想替换昵称/头像/群名只能靠 `mergeUserInfo` 或裸写 store，SDK 资料回推与会话快照刷新会冲掉注入值；群名加业务标签无渲染出口。
+- **覆盖层**（与 SDK 数据分层存储，回推冲不掉；logout 随账号清空，login 后需重新注入）：
+  - `libs/store/user.ts`：`overrideByUserId` + `setUserPresentation(userId, patch|null)`；`displayNameOf`/`avatarOf` 回落链最优先读注入（联系人备注仍最优先）。
+  - `libs/store/conversation.ts`：`overrideByConversationId` + `setConversationPresentation`；会话页条目/长按菜单标题/chat-page 标题回落链接入（name/avatar 最优先，ext 随插槽透出）。
+  - `libs/store/group.ts`：`overrideByGroupId` + `setGroupPresentation`；`groupDisplayNameOf` 接入注入，新增 `groupAvatarOf`（会话页/群列表群头像走此链）。
+  - patch 语义：按字段合并（undefined 不动现有值），null 清除该对象全部注入。
+- **门面**：`EmKit.setUserPresentation` / `setConversationPresentation` / `setGroupPresentation`；类型 `EmUserPresentation`/`EmConversationPresentation`/`EmGroupPresentation`（后两者含 `ext` 业务载荷）。
+- **渲染出口**：`em-conversation-item` 新增 `#title`/`#title-extra`/`#avatar` 作用域插槽 + `ext` prop；`em-conversation-page` 透传 `#title-extra`；`em-chat-page` 新增 `#title`（scope name/ext/conversationId，fallback 内联样式双通道，nav-bar 未改动）；`em-group-info-blocks` 新增 `#name-extra`，`em-chat-info-page` 透传为 `#group-name-extra`。
+- **demo**：场景实验室聊天页「业务资料注入」开关（`demo/common/presentation-demo.ts`：单聊注昵称+会话 ext 标签，群聊注群 ext 标签，关=传 null 还原）；会话列表页 `#title-extra` 渲染同一 ext 标签（返回列表可见）。
+- **文档**：API-KIT（三 API 条目）/ API-TYPES（三类型）/ GUIDE-MULTI-SCENARIO（5.7 业务资料注入）/ PAGES-CHAT（#title）/ PAGES-CONVERSATION（#title-extra）/ PAGES-CHAT-INFO（#group-name-extra）/ COMPONENTS-CONVERSATION（ext + 三插槽）；`check-docs` ✓。
+- **待验（真机）**：mp/App 端嵌套作用域插槽转发（conversation-page→item、chat-info-page→group-info-blocks、chat-page→nav-bar）真机渲染；注入值在 SDK onUserInfoUpdated 回推后的留存（H5 可手测）。
