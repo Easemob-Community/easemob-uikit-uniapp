@@ -1,15 +1,32 @@
 import { computed, reactive } from 'vue'
-import type { EmConversationItem } from '../types'
+import type { EmConversationItem, EmConversationPresentation } from '../types'
 
 // 会话列表全局唯一 store（裸 reactive，零依赖）：
-// atMeByConversationId 为「群里有人@我」未读标记（ext em_at_list 驱动，进入会话清除）
+// atMeByConversationId 为「群里有人@我」未读标记（ext em_at_list 驱动，进入会话清除）；
+// overrideByConversationId 为宿主业务注入（EmKit.setConversationPresentation）：name/avatar 优先于 SDK 会话快照，
+// ext 随插槽 scope 透出；快照整量回写只重建 items，永不触碰 override
 export const conversationStore = reactive({
   items: [] as EmConversationItem[],
+  overrideByConversationId: {} as Record<string, EmConversationPresentation>,
   loaded: false,
   syncing: false,
   syncFailed: false,
   atMeByConversationId: {} as Record<string, boolean>
 })
+
+// 宿主业务注入：patch 按字段合并（undefined 不动现有值），null 清除该会话全部注入；空 id 忽略
+export function setConversationPresentation(conversationId: string, patch: EmConversationPresentation | null): void {
+  if (conversationId === '') return
+  if (patch == null) {
+    delete conversationStore.overrideByConversationId[conversationId]
+    return
+  }
+  const next: EmConversationPresentation = { ...conversationStore.overrideByConversationId[conversationId] }
+  if (patch.name !== undefined) next.name = patch.name
+  if (patch.avatar !== undefined) next.avatar = patch.avatar
+  if (patch.ext !== undefined) next.ext = patch.ext
+  conversationStore.overrideByConversationId[conversationId] = next
+}
 
 /**
  * 会话总未读数（底部 tabbar 角标等场景的响应式数据源）。
@@ -39,9 +56,10 @@ export function conversationUnreadCountOf(conversationId: string): number {
   return item != null && item.unreadCount > 0 ? item.unreadCount : 0
 }
 
-// 登出/换账号清空（会话列表与 @我 标记都是账号私有状态）
+// 登出/换账号清空（会话列表、@我 标记与业务注入都是账号私有状态）
 export function clearConversations(): void {
   conversationStore.items = []
+  conversationStore.overrideByConversationId = {}
   conversationStore.loaded = false
   conversationStore.syncing = false
   conversationStore.syncFailed = false

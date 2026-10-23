@@ -14,8 +14,9 @@ import { connectionStore } from '../../libs/store/connection'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLocale } from '../../libs/use/useLocale'
 
-// 连接状态条（P1-3）：重连中/首次连接/断开/被踢时在页面顶部给一条轻量提示。
+// 连接状态条（P1-3 + 网络调优）：重连中/首次连接/断开/被踢/系统离线时在页面顶部给一条提示。
 // 只消费 connectionStore，不参业务；宿主可用页面级 showConnectionBanner=false 关闭。
+// 系统离线（networkOnline===false）先决显示红色断网提示，不等 SDK 走完重连循环。
 interface Props {
   /** 是否允许展示（页面级透传），默认 true */
   show?: boolean
@@ -42,22 +43,32 @@ interface BannerState {
 
 const state = computed<BannerState | null>(() => {
   const status = connectionStore.status
-  if (status === CONNECTION_STATUS.ONLINE || status === CONNECTION_STATUS.IDLE) return null
+  if (status === CONNECTION_STATUS.ONLINE || status === CONNECTION_STATUS.IDLE) {
+    // 在线/未连接时，系统网络是唯一离线信号源（SDK 事件此时不可信：启动即无网时连接循环可能还没走完）
+    if (connectionStore.networkOnline === false) {
+      return { tone: 'error', icon: 'circle-bang', text: t('status.networkError') }
+    }
+    return null
+  }
+  // CLOSED：按 SDK 断开原因区分被踢/Token 过期/普通网络异常
+  if (status === CONNECTION_STATUS.CLOSED) {
+    const reason = connectionStore.reason
+    if (reason === 'token-expired') {
+      return { tone: 'error', icon: 'circle-bang', text: t('status.tokenExpired') }
+    }
+    if (reason === 'limit') {
+      return { tone: 'error', icon: 'circle-bang', text: t('status.kickedDeviceLimit') }
+    }
+    return { tone: 'error', icon: 'circle-bang', text: t('status.networkError') }
+  }
+  // CONNECTING / RECONNECTING：系统离线先决显示红色断网提示，不等 SDK 走完重连循环
+  if (connectionStore.networkOnline === false) {
+    return { tone: 'error', icon: 'circle-bang', text: t('status.networkError') }
+  }
   if (status === CONNECTION_STATUS.CONNECTING) {
     return { tone: 'warning', icon: 'loading-arc-normal', text: t('status.connecting') }
   }
-  if (status === CONNECTION_STATUS.RECONNECTING) {
-    return { tone: 'warning', icon: 'loading-arc-normal', text: t('status.reconnecting') }
-  }
-  // CLOSED：按 SDK 断开原因区分被踢/Token 过期/普通网络异常
-  const reason = connectionStore.reason
-  if (reason === 'token-expired') {
-    return { tone: 'error', icon: 'circle-bang', text: t('status.tokenExpired') }
-  }
-  if (reason === 'limit') {
-    return { tone: 'error', icon: 'circle-bang', text: t('status.kickedDeviceLimit') }
-  }
-  return { tone: 'error', icon: 'circle-bang', text: t('status.networkError') }
+  return { tone: 'warning', icon: 'loading-arc-normal', text: t('status.reconnecting') }
 })
 
 const visible = computed(() => props.show && state.value != null)

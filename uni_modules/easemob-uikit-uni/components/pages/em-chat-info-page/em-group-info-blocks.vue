@@ -42,7 +42,9 @@
       <text :class="ns.e('field-label')">{{ t('group.name') }}</text>
       <view :class="ns.e('field-main')">
         <em-text :text="groupName" :text-class="ns.e('field-value')" :text-style="fieldValueTextStyle" :class="ns.e('field-value-host')" />
-        <EmIcon v-if="isOwner" name="rect-notched-pen" :size="22" :class="ns.e('field-action-icon')" />
+        <!-- 群名扩展位（标签/业务徽标）：宿主经 EmKit.setGroupPresentation 注入 ext 后自绘，缺省不渲染不占位 -->
+        <slot name="name-extra" :group-id="groupId" :name="groupName" :ext="groupExt" />
+        <EmIcon v-if="canEditName" name="rect-notched-pen" :size="22" :class="ns.e('field-action-icon')" />
       </view>
     </view>
 
@@ -66,6 +68,7 @@ import { GROUP_MEMBER_GRID_COUNT } from '../../../libs/constants'
 import type { EmGroupMember } from '../../../libs/types'
 import { groupDisplayNameOf, groupMemberDisplayNameOf, groupStore, sortGroupMembers } from '../../../libs/store/group'
 import { avatarOf } from '../../../libs/store/user'
+import { useConfig } from '../../../libs/store/config'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useLocale } from '../../../libs/use/useLocale'
 
@@ -107,6 +110,7 @@ const emit = defineEmits<{
 
 const ns = useNamespace('group-info-blocks')
 const { t } = useLocale()
+const { config } = useConfig()
 
 // ========== 成员宫格 ==========
 
@@ -147,11 +151,17 @@ const gridNameTextStyle =
 
 const groupName = computed(() => groupDisplayNameOf(props.groupId))
 
+// 群业务载荷（宿主 EmKit.setGroupPresentation 注入），随 #name-extra 插槽 scope 透出
+const groupExt = computed(() => groupStore.overrideByGroupId[props.groupId]?.ext)
+
 const fieldValueTextStyle =
   'font-family: var(--em-font-family); font-size: var(--em-font-size-15); line-height: 22px; font-weight: var(--em-font-weight-medium); color: var(--em-text-primary); white-space: nowrap;'
 
+// 群名称可编辑：owner 且 uiConfig.enableGroupNameEdit（M2.20，默认开；宿主删配置即隐藏笔入口，行仍只读展示）
+const canEditName = computed(() => props.isOwner && config.enableGroupNameEdit)
+
 function onNameFieldClick(): void {
-  if (!props.isOwner) return
+  if (!canEditName.value) return
   emit('edit-name', props.groupId)
 }
 

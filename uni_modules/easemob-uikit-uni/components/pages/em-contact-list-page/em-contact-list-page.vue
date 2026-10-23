@@ -14,14 +14,20 @@
           :scroll-into-view="scrollIntoId"
           :scroll-with-animation="scrollAnim"
         >
-          <!-- 好友同步骨架（对齐 vue 版 contact-list：8 条条目占位） -->
+          <!-- 好友同步骨架：分组头 + 单行名字条目（对齐真实字母分组列表；真实条目仅一行名字），逐行变宽 -->
           <view v-if="syncing && groups.length === 0" :class="ns.e('skeleton')">
-            <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
-              <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
-              <view :class="ns.e('skeleton-lines')">
-                <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
-                <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
-              </view>
+            <view
+              v-for="(row, index) in SKELETON_ROWS"
+              :key="index"
+              :class="[ns.e('skeleton-row'), row.kind === 'header' && ns.m('skeleton-row-header')]"
+            >
+              <view v-if="row.kind === 'header'" :class="ns.e('skeleton-header-bar')" />
+              <template v-else>
+                <em-skeleton variant="avatar" shape="circle" width="48px" height="48px" />
+                <view :class="ns.e('skeleton-lines')">
+                  <em-skeleton :width="row.width" height="16px" />
+                </view>
+              </template>
             </view>
           </view>
           <em-empty
@@ -76,6 +82,28 @@
         @select="onItemAction"
         @update:visible="itemSheetVisible = $event"
       />
+
+      <!-- 好友备注编辑弹层（M2.20，弹层挂页面根）：回填当前备注，空串即清除；
+           保存走 EmKit.setContactRemark（域层成功即刷新快照，展示链自动联动），失败 toast 保留弹层 -->
+      <em-popup :visible="remarkVisible" position="center" @update:visible="remarkVisible = $event">
+        <view :class="ns.e('dialog')">
+          <text :class="ns.e('dialog-title')">{{ t('contact.remark') }}</text>
+          <input
+            :class="ns.e('dialog-input')"
+            v-model="remarkInput"
+            :placeholder="t('contact.remarkPlaceholder')"
+            :disabled="activeContact != null && isRemarkSaving(activeContact.userId)"
+          />
+          <view :class="ns.e('dialog-actions')">
+            <view :class="[ns.e('dialog-btn'), ns.m('dialog-btn-divider')]" @click="closeRemarkDialog">
+              <text :class="ns.e('dialog-btn-text')">{{ t('button.cancel') }}</text>
+            </view>
+            <view :class="ns.e('dialog-btn')" @click="onSaveRemark">
+              <text :class="[ns.e('dialog-btn-text'), ns.m('dialog-btn-text-primary')]">{{ activeContact != null && isRemarkSaving(activeContact.userId) ? t('common.loading') : t('button.confirm') }}</text>
+            </view>
+          </view>
+        </view>
+      </em-popup>
     </view>
   </view>
 </template>
@@ -91,11 +119,12 @@ import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
 import EmLoadMore from '../../em-load-more/em-load-more.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
+import EmPopup from '../../em-popup/em-popup.vue'
 import { EmKit } from '../../../libs'
 import { ALPHABET_KEYS, CONTACT_MENU_KEY, LOAD_MORE_STATE } from '../../../libs/constants'
 import type { ContactMenuKeyValue } from '../../../libs/constants'
 import { contactStore } from '../../../libs/store/contact'
-import { primaryColorStyle } from '../../../libs/store/config'
+import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { EmActionSheetAction, EmContactItem } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
@@ -109,7 +138,7 @@ import { TEXT_STYLE_NAME } from '../../../libs/style/textStyles'
 defineOptions({ styleIsolation: 'app-and-page' })
 
 interface Props {
-  /** 条目长按菜单项与顺序（默认仅删除好友全量）；联系人详情/拉黑仍留二期 */
+  /** 条目长按菜单项与顺序（默认 uiConfig.contactMenuKeys 全量：备注/删除好友）；联系人详情/拉黑仍留二期 */
   menuKeys?: ContactMenuKeyValue[]
   /** 首次挂载自动读好友快照，默认 true；宿主可关闭后自行控制同步时机 */
   autoSync?: boolean
@@ -118,7 +147,6 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  menuKeys: () => [CONTACT_MENU_KEY.DELETE],
   autoSync: true,
   customClass: '',
   customStyle: ''
@@ -135,6 +163,9 @@ const emit = defineEmits<{
 const ns = useNamespace('contact-list-page')
 const { themeClass } = useTheme()
 const { t } = useLocale()
+const { config } = useConfig()
+// 菜单项：props.menuKeys 显式传入优先，缺省回落 uiConfig.contactMenuKeys（运行时 setConfig 可禁用备注入口）
+const resolvedMenuKeys = computed<ContactMenuKeyValue[]>(() => props.menuKeys ?? config.contactMenuKeys)
 // H5 长按后仍会补发 click：长按删除菜单与点击进会话会同时触发，这里吞掉长按抬手那一次 click
 const { onTouchStart, shouldSkipClick } = useLongPressClickGuard()
 
@@ -161,8 +192,21 @@ onMounted(() => {
 })
 
 // 好友同步骨架：条数与行宽对齐 vue 版 contact-list（8 条、35%/65% 两行）
-const SKELETON_COUNT = 8
-const SKELETON_LINE_WIDTHS = ['35%', '65%']
+// 骨架行预设：字母分组头与单行名字条目交替（8 条目 + 3 分组头，对齐真实分组列表），名字宽度逐行变化
+type ContactSkeletonRow = { kind: 'header' } | { kind: 'item'; width: string }
+const SKELETON_ROWS: ContactSkeletonRow[] = [
+  { kind: 'header' },
+  { kind: 'item', width: '32%' },
+  { kind: 'item', width: '46%' },
+  { kind: 'header' },
+  { kind: 'item', width: '38%' },
+  { kind: 'item', width: '55%' },
+  { kind: 'item', width: '28%' },
+  { kind: 'header' },
+  { kind: 'item', width: '44%' },
+  { kind: 'item', width: '36%' },
+  { kind: 'item', width: '50%' }
+]
 
 // 展示名回落链（对齐 vue 版 contact-display）：remark > userStore nickname > userId；
 // 名字一次算成 nameByUserId，分组/排序/搜索三处共用同一口径，避免分组函数内反复 find
@@ -247,9 +291,11 @@ function isDeletingContact(userId: string): boolean {
 
 const itemActions = computed<EmActionSheetAction[]>(() => {
   const candidates: EmActionSheetAction[] = [
+    // 备注（M2.20）：编辑好友备注（空串即清除），保存走 EmKit.setContactRemark（域层成功即刷新快照）
+    { key: CONTACT_MENU_KEY.REMARK, text: t('contact.remark'), icon: 'rect-notched-pen' },
     { key: CONTACT_MENU_KEY.DELETE, text: t('contact.delete'), icon: 'trash', danger: true, disabled: activeContact.value != null && isDeletingContact(activeContact.value.userId) }
   ]
-  return props.menuKeys
+  return resolvedMenuKeys.value
     .map((key) => candidates.find((a) => a.key === key))
     .filter((a): a is EmActionSheetAction => a != null)
 })
@@ -262,6 +308,10 @@ function onLongPress(c: EmContactItem): void {
 function onItemAction(action: EmActionSheetAction): void {
   const c = activeContact.value
   if (c == null || isDeletingContact(c.userId)) return
+  if (action.key === CONTACT_MENU_KEY.REMARK) {
+    openRemarkDialog(c)
+    return
+  }
   if (action.key === CONTACT_MENU_KEY.DELETE) {
     uni.showModal({
       title: '',
@@ -282,6 +332,43 @@ function onItemAction(action: EmActionSheetAction): void {
       }
     })
   }
+}
+
+// ========== 好友备注编辑（M2.20）：长按菜单入口，居中弹层（对齐 em-group-field-dialog 范式） ==========
+// 无长度上限、无输入校验（空串即清除备注，vue 版同款语义）；域层成功即全量刷新联系人快照，
+// 展示链 contactDisplayNameOf（备注 > 昵称 > userId）自动联动；失败 toast 保留弹层供重试
+const remarkVisible = ref(false)
+const remarkInput = ref('')
+const remarkSavingIds = ref<string[]>([])
+
+function isRemarkSaving(userId: string): boolean {
+  return remarkSavingIds.value.indexOf(userId) >= 0
+}
+
+function openRemarkDialog(c: EmContactItem): void {
+  remarkInput.value = c.remark
+  remarkVisible.value = true
+}
+
+function closeRemarkDialog(): void {
+  remarkVisible.value = false
+}
+
+function onSaveRemark(): void {
+  const c = activeContact.value
+  if (c == null || isRemarkSaving(c.userId)) return
+  remarkSavingIds.value.push(c.userId)
+  EmKit.setContactRemark(c.userId, remarkInput.value)
+    .then(() => {
+      uni.showToast({ title: t('contact.remarkSaveSuccess'), icon: 'none' })
+      closeRemarkDialog()
+    })
+    .catch(() => {
+      uni.showToast({ title: t('contact.remarkSaveFailed'), icon: 'none' })
+    })
+    .finally(() => {
+      remarkSavingIds.value = remarkSavingIds.value.filter((id) => id !== c.userId)
+    })
 }
 </script>
 

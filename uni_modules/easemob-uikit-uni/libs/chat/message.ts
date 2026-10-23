@@ -14,14 +14,15 @@ import type {
   VideoMessageBody,
   VoiceMessageBody
 } from 'easemob-websdk'
-import { CMD_ACTION, CONVERSATION_MESSAGE_RETAIN_LIMIT, CONVERSATION_TYPE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
+import { CMD_ACTION, CONVERSATION_MESSAGE_RETAIN_LIMIT, CONVERSATION_TYPE, ERROR_CODE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
 import type { ConversationTypeValue, MessageTypeValue, StreamMessageStatusValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { uiConfig } from '../store/config'
 import { getMessages, messageStore } from '../store/message'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
-import type { EmMessageHandler, EmMessageItem, EmQuoteInfo, EmStreamInfo } from '../types'
+import type { EmMessageHandler, EmMessageItem, EmMessageModifiedInfo, EmPinnedMessageItem, EmQuoteInfo, EmStreamInfo } from '../types'
 import { isStreamTerminal } from '../utils/stream'
+import { errorWithCode } from '../utils/error'
 import { createLogger } from '../utils/logger'
 import { useLocale } from '../use/useLocale'
 import { displayNameOf } from '../store/user'
@@ -193,6 +194,8 @@ export class EmMessageDomain {
   // P1-10 内存上限：只对非当前会话裁剪；当前会话离开时再裁，回会话由 trimmed 标记触发重拉最新页
   private activeConversationId = ''
   private trimmedByConversationId: Record<string, boolean> = {}
+  // 置顶拉取会话级序号（I-1）：同会话并发拉取只采纳最新一次，防旧回包覆盖乐观打标
+  private pinnedEpochByConversationId: Record<string, number> = {}
 
   constructor(private ctx: EmChatContext) {}
 
@@ -213,6 +216,7 @@ export class EmMessageDomain {
     this.streamItemByKey = {}
     this.activeConversationId = ''
     this.trimmedByConversationId = {}
+    this.pinnedEpochByConversationId = {}
     this.sessionEpoch += 1
   }
 
@@ -676,6 +680,11 @@ export class EmMessageDomain {
     // 真机上会卡在 sending 态。getMessages 经 reactive 数组读取，返回的是代理。
     const stored = getMessages(to).find((m) => m.localId === item.localId) ?? item
     try {
+      // 发送预检测：系统网络离线时直接拦截（不触达 SDK），消息按 FAILED 落库保留红叹号重发；
+      // networkOnline 为 null（未知/基座缺模块）一律放行原路径，宁可少拦不误拦
+      if (connectionStore.networkOnline === false) {
+        throw errorWithCode(ERROR_CODE.NETWORK_OFFLINE, 'system offline')
+      }
       const sent = await chatManager.sendMessage(message)
       stored.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
       stored.time = sent.timestamp
@@ -861,10 +870,12 @@ export class EmMessageDomain {
   async recallMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
     const chatManager = await this.readyChatManager()
     await chatManager.recallMessage({ conversationId, conversationType: chatType, messageId })
-    this.markRecalled(conversationId, messageId)
+    // 本地撤回：操作者即当前用户；远程 onMessageRecalled payload 无 operator 字段（SDK 限制），
+    // 撤回条展示名取消息原发送者昵称（vue 版同款语义），recalledBy 仅本地撤回有值
+    this.markRecalled(conversationId, messageId, connectionStore.userId)
   }
 
-  markRecalled(conversationId: string, messageId: string): void {
+  markRecalled(conversationId: string, messageId: string, operatorId?: string): void {
     const list = messageStore.messagesByConversationId[conversationId]
     if (list == null) {
       return
@@ -872,7 +883,127 @@ export class EmMessageDomain {
     const target = list.find((m) => m.id === messageId)
     if (target != null) {
       target.status = MESSAGE_STATUS.RECALLED
+      if (operatorId != null && operatorId !== '') {
+        target.recalledBy = operatorId
+      }
     }
+  }
+
+  // ========== 消息编辑（M2.20）：SDK modifyMessage，仅文本/自定义，单条上限见 constants MESSAGE_MODIFY_COUNT_LIMIT ==========
+
+  private toModifiedInfo(info: Message['modifiedInfo']): EmMessageModifiedInfo | undefined {
+    if (info == null) return undefined
+    return { operatorId: info.operatorId ?? '', operationCount: info.operationCount ?? 0, operationTime: info.operationTime ?? 0 }
+  }
+
+  // 编辑结果本地 patch：成功回包与远程 onMessageUpdated 事件共用（SDK 均不替本端改内存态）
+  private patchModifiedMessage(
+    conversationId: string,
+    messageId: string,
+    patch: { text?: string; ext?: Record<string, unknown>; modifiedInfo?: EmMessageModifiedInfo }
+  ): void {
+    const list = messageStore.messagesByConversationId[conversationId]
+    if (list == null) return
+    const target = list.find((m) => m.id === messageId)
+    if (target == null) return
+    if (patch.text != null) target.text = patch.text
+    if (patch.ext != null) {
+      target.ext = { ...patch.ext }
+      target.quote = parseQuote(patch.ext)
+    }
+    if (patch.modifiedInfo != null) target.modifiedInfo = { ...patch.modifiedInfo }
+  }
+
+  async modifyTextMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string, text: string): Promise<void> {
+    const chatManager = await this.readyChatManager()
+    // ext 透传当前本地 ext（引用/mention 等内部 key 原值写回，避免编辑清空扩展）
+    const target = getMessages(conversationId).find((m) => m.id === messageId)
+    const updated = await chatManager.modifyMessage({
+      conversationId,
+      conversationType: chatType,
+      messageId,
+      message: { type: 'text', body: { content: text }, ext: target != null ? { ...target.ext } : {} }
+    })
+    this.patchModifiedMessage(conversationId, messageId, {
+      text: (updated.body as TextMessageBody).content,
+      ext: (updated.ext ?? {}) as Record<string, unknown>,
+      modifiedInfo: this.toModifiedInfo(updated.modifiedInfo)
+    })
+  }
+
+  // 远程编辑事件（SDK onMessageUpdated）：载荷为消息子集（该类型未在 SDK 根导出，按消费字段结构收口），
+  // 按 id 命中本地消息 patch；消息未加载的会话忽略。SDK 支持文本与自定义消息编辑：
+  // 文本 patch 新内容，自定义消息只 patch ext/modifiedInfo（text 保持 undefined 不动现有值）
+  applyMessageUpdated(payload: {
+    conversationId: string
+    messageId: string
+    message: Pick<Message, 'type' | 'body' | 'ext' | 'modifiedInfo'>
+  }): void {
+    const isText = (payload.message.type as string) === 'text'
+    const body = payload.message.body as TextMessageBody
+    this.patchModifiedMessage(payload.conversationId, payload.messageId, {
+      text: isText ? body.content : undefined,
+      ext: (payload.message.ext ?? {}) as Record<string, unknown>,
+      modifiedInfo: this.toModifiedInfo(payload.message.modifiedInfo)
+    })
+  }
+
+  // ========== 置顶消息（M2.20）：SDK pinMessage/unpinMessage/getPinnedMessageList（不分页，上限 20 条） ==========
+
+  async pinMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
+    const chatManager = await this.readyChatManager()
+    await chatManager.pinMessage({ conversationId, conversationType: chatType, messageId })
+    this.setMessagePinned(conversationId, messageId, true)
+    // SDK 不本端回推置顶列表（vue 对齐）：成功后主动重拉，失败仅告警
+    void this.refreshPinnedMessages(conversationId, chatType).catch((e) => logger.warn('refreshPinnedMessages fail:', e))
+  }
+
+  async unpinMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
+    const chatManager = await this.readyChatManager()
+    await chatManager.unpinMessage({ conversationId, conversationType: chatType, messageId })
+    this.setMessagePinned(conversationId, messageId, false)
+    void this.refreshPinnedMessages(conversationId, chatType).catch((e) => logger.warn('refreshPinnedMessages fail:', e))
+  }
+
+  setMessagePinned(conversationId: string, messageId: string, pinned: boolean): void {
+    const list = messageStore.messagesByConversationId[conversationId]
+    const target = list?.find((m) => m.id === messageId)
+    if (target != null) {
+      target.pinned = pinned
+    }
+  }
+
+  // 拉取置顶列表：pinnedAt 降序写 store（最新置顶在前，对齐 vue 版），并同步已加载消息的 pinned 标记（气泡角标消费）。
+  // 会话级序号防同会话并发乱序：进会话的首拉与置顶/取消置顶触发的重拉互相覆盖时，只采纳最新一次
+  async refreshPinnedMessages(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
+    const epoch = this.sessionEpoch
+    const pinnedEpoch = (this.pinnedEpochByConversationId[conversationId] ?? 0) + 1
+    this.pinnedEpochByConversationId[conversationId] = pinnedEpoch
+    const chatManager = await this.readyChatManager()
+    const result = await chatManager.getPinnedMessageList({ conversationId, conversationType: chatType })
+    // 登出/换账号后的旧请求回包，或已被更新一次拉取取代的旧回包：丢弃不写 store
+    if (epoch !== this.sessionEpoch || pinnedEpoch !== this.pinnedEpochByConversationId[conversationId]) return
+    const pinnedIds: Record<string, boolean> = {}
+    const items: EmPinnedMessageItem[] = result.items
+      .map((s) => {
+        pinnedIds[s.messageId] = true
+        return { message: this.toMessageItem(s.message), pinnedAt: s.pinnedAt, operatorId: s.operatorId ?? '' }
+      })
+      .sort((a, b) => b.pinnedAt - a.pinnedAt)
+    messageStore.pinnedByConversationId[conversationId] = items
+    const list = messageStore.messagesByConversationId[conversationId]
+    if (list != null) {
+      list.forEach((m) => {
+        m.pinned = pinnedIds[m.id] === true
+      })
+    }
+  }
+
+  // 置顶变更事件（SDK onPinnedMessageChanged）：操作设备经 Promise 拿结果不走事件，
+  // 收到的都是远端/其他设备变更，统一重拉该会话置顶列表
+  onPinnedMessageChanged(conversationId: string, conversationType: string): void {
+    const chatType = mapWireChatType(conversationType)
+    void this.refreshPinnedMessages(conversationId, chatType).catch((e) => logger.warn('refreshPinnedMessages fail:', e))
   }
 
   // 有服务端 ID 时先删漫游，成功后才删本地；本地消息不等待 SDK 就绪，也不发服务端请求
@@ -1030,6 +1161,10 @@ export class EmMessageDomain {
     throwIfAccountChanged(expectedEpoch)
     item.status = MESSAGE_STATUS.SENDING
     try {
+      // 重发同样走发送预检测（离线直接拦截，FAILED 保留可再重发）
+      if (connectionStore.networkOnline === false) {
+        throw errorWithCode(ERROR_CODE.NETWORK_OFFLINE, 'system offline')
+      }
       const sent = await chatManager.sendMessage(message)
       if (!isAccountEpochCurrent(expectedEpoch)) return
       item.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
@@ -1179,6 +1314,10 @@ export class EmMessageDomain {
     // 宿主经 #stream-message 插槽接管 markdown 等富格式；普通消息保持 undefined
     if (message.stream != null) {
       item.stream = this.toStreamInfo(message.stream)
+    }
+    // 编辑标记（M2.20）：历史/接收/编辑回包均可能携带，透传为中立结构（存在即「已编辑」）
+    if (message.modifiedInfo != null) {
+      item.modifiedInfo = this.toModifiedInfo(message.modifiedInfo)
     }
     return item
   }

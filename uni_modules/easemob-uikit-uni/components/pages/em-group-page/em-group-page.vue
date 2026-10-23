@@ -13,14 +13,14 @@
       <em-search-bar v-model="keyword" :placeholder="t('group.searchPlaceholder')" />
 
       <scroll-view :class="ns.e('scroll')" scroll-y @scrolltolower="onScrollToLower">
-        <!-- 群同步骨架（对齐 vue 版 group-list：8 条条目占位、35%/65% 两行） -->
+        <!-- 群同步骨架：条目形态对齐真实群条目（方形头像 + 群名 + 右侧人数，部分群无人数），逐行变宽 -->
         <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
-          <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
-            <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
+          <view v-for="(nameWidth, index) in SKELETON_NAME_WIDTHS" :key="index" :class="ns.e('skeleton-item')">
+            <em-skeleton variant="avatar" shape="square" width="48px" height="48px" />
             <view :class="ns.e('skeleton-lines')">
-              <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
-              <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+              <em-skeleton :width="nameWidth" height="16px" />
             </view>
+            <em-skeleton v-if="SKELETON_COUNT_ROWS[index]" width="28px" height="12px" :class="ns.e('skeleton-count')" />
           </view>
         </view>
         <em-empty
@@ -107,7 +107,7 @@ import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmText from '../../em-text/em-text.vue'
 import { EmKit } from '../../../libs'
 import { CONVERSATION_TYPE, GROUP_NAME_MAX_LENGTH, LOAD_MORE_STATE, SELECT_CONTACT_MODE } from '../../../libs/constants'
-import { groupDisplayNameOf, groupStore } from '../../../libs/store/group'
+import { groupAvatarOf, groupDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { contactDisplayNameOf, contactStore } from '../../../libs/store/contact'
 import { primaryColorStyle } from '../../../libs/store/config'
 import { avatarOf } from '../../../libs/store/user'
@@ -167,8 +167,9 @@ async function syncList(manual = false): Promise<void> {
 }
 
 // 群同步骨架：条数与行宽对齐 vue 版 group-list（8 条、35%/65% 两行）
-const SKELETON_COUNT = 8
-const SKELETON_LINE_WIDTHS = ['35%', '65%']
+// 骨架行宽预设：群名宽度逐行变化；成员数仅部分行（memberCount > 0 才渲染，对齐真实条目）
+const SKELETON_NAME_WIDTHS = ['42%', '56%', '34%', '62%', '48%', '38%', '52%', '30%']
+const SKELETON_COUNT_ROWS = [true, true, false, true, false, true, true, false]
 
 interface Entry {
   group: EmGroup
@@ -185,7 +186,7 @@ const items = computed<Entry[]>(() => {
     .map((group) => {
       const displayName = groupDisplayNameOf(group.groupId)
       const name = displayName !== group.groupId ? displayName : (group.name !== '' ? group.name : group.groupId)
-      return { group, name, avatar: group.avatar ?? '' }
+      return { group, name, avatar: groupAvatarOf(group.groupId) }
     })
     .filter((entry) => {
       if (kw === '') return true

@@ -79,6 +79,33 @@
   flex-shrink: 0;
 }
 
+/* 首屏成员骨架：行几何对齐真实 __item（padding/底部分隔线/40 圆头像），名单行逐行变宽，角色角标偶现行 */
+.em-group-members-view__skeleton-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px var(--em-spacing-4);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.em-group-members-view__skeleton-main {
+  flex: 1;
+  margin-left: var(--em-spacing-3);
+  margin-right: var(--em-spacing-2);
+}
+
+/* 角色角标占位（对齐真实 __role 尺寸档） */
+.em-group-members-view__skeleton-role {
+  width: 28px;
+  height: 14px;
+  border-radius: 4px;
+  background-color: var(--em-bg-hover);
+  margin-left: var(--em-spacing-2);
+  flex-shrink: 0;
+}
+
 .em-group-members-view__more-icon {
   color: var(--em-text-tertiary);
 }

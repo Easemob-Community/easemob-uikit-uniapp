@@ -104,6 +104,7 @@ function onMenu(key: string) {
 | 插槽 | 作用域 | 说明 |
 |---|---|---|
 | `empty` | 无 | 列表为空（含搜索无结果）时整体替换默认空态 |
+| `title-extra` | `{ item: EmConversationItem, name: string, ext?: Record<string, unknown> }` | 条目标题旁的扩展位（标签/业务徽标）。`ext` 为 `EmKit.setConversationPresentation` 注入的业务载荷；缺省不渲染不占位 |
 
 ## 宿主接线
 

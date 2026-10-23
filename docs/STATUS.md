@@ -935,3 +935,25 @@
 - **demo**：场景实验室聊天页「业务资料注入」开关（`demo/common/presentation-demo.ts`：单聊注昵称+会话 ext 标签，群聊注群 ext 标签，关=传 null 还原）；会话列表页 `#title-extra` 渲染同一 ext 标签（返回列表可见）。
 - **文档**：API-KIT（三 API 条目）/ API-TYPES（三类型）/ GUIDE-MULTI-SCENARIO（5.7 业务资料注入）/ PAGES-CHAT（#title）/ PAGES-CONVERSATION（#title-extra）/ PAGES-CHAT-INFO（#group-name-extra）/ COMPONENTS-CONVERSATION（ext + 三插槽）；`check-docs` ✓。
 - **待验（真机）**：mp/App 端嵌套作用域插槽转发（conversation-page→item、chat-info-page→group-info-blocks、chat-page→nav-bar）真机渲染；注入值在 SDK onUserInfoUpdated 回推后的留存（H5 可手测）。
+- **终审修复（子代理评审，Critical 0 / Important 2 / Minor 7）**：置顶拉取加会话级序号 `pinnedEpochByConversationId`（防同会话并发拉取旧回包覆盖乐观打标）；`applyMessageUpdated` 放开自定义消息（patch ext/modifiedInfo，远端编辑不再永久陈旧）；「已编辑」标记改常驻子 text 内容切换（鸿蒙 text 子节点增删红线）；重编辑补原文非空校验 + 先退编辑态；置顶条取消置顶补防重；pin 失败 toast 用快照态；备注保存成功补 toast；编辑失败按错误码 `modifiedCountExceedLimit` 精确归类。Minor 遗留：置顶条/编辑条预览文本手写 ellipsis 未走 em-text 收口（deferred）。
+
+## 2026-10-23 全库骨架屏贴真实内容结构改造
+
+- **聊天页首屏骨架**：从「4 行头像+两行横条」（读感像会话列表）改为气泡对话形态——静态行配置（`skeletonRows`，10 行：peer/self 左右交替、1-2 行文字、时间 chip、200rpx 图片块），宽度一律 **rpx 定宽**（百分比宽度链在蒸汽端有「行尾缺字」前科）；气泡壳与真实气泡同源 token（`--em-bubble-radius`/`--em-bubble-padding-*`），对方底 `--em-bubble-bg-other`，己方新增 token `--em-skeleton-bubble-self`（light `rgba(0,158,255,0.16)` / dark `rgba(51,177,255,0.2)`，品牌蓝派生不跟随主色），内行用 `--em-bg-base` 镂空出文字形态。`em-skeleton` 原子不动。
+- **会话页骨架**：条目对齐 `em-conversation-item`——圆 48 头像 + 上排（名字行+右侧 32px 时间块）+ 下排（摘要行+未读圆点，部分行），名字/摘要宽度逐行变化（SKELETON_NAME/SUMMARY_WIDTHS + SKELETON_UNREAD_ROWS），卡片行几何与真实条目一致。
+- **联系人页骨架**：原「两行文字」错误（真实条目仅一行名字）——改为字母分组头（28px 通栏 `--em-conversation-list-bg` + 16px 字母占位条）+ 单行名字条目，3 组 8 条，宽度逐行变化。
+- **群列表页骨架**：方形 48 头像（原误用 rounded）+ 群名行 + 右侧成员数小块（SKELETON_COUNT_ROWS 部分行，对齐 `memberCount>0` 才渲染），宽度逐行变化。
+- **群成员管理视图（em-group-members-view）**：原首屏加载完全空白——补骨架（40 圆头像 + 名单行逐行变宽 + 前两行角色角标占位），行几何（padding/底部分隔线）对齐真实成员行。
+- **文档**：DESIGN-TOKENS 登记新 token；PAGES-CHAT（气泡骨架）/ PAGES-CONTACTS（含分组头）/ PAGES-CHAT-INFO（成员骨架）措辞同步；`check-docs` ✓。
+- **验证**：`build web` ✓、`build mp-weixin` ✓（含 11 项分包防回归）、H5 产物静态伺服 200。**待验**：骨架视觉真机走查（H5 断网慢速进聊天页/会话页/联系人页/群页/群成员视图，明暗两主题）。
+
+## 2026-10-23 网络调优：无网警示提示 + 全链路网络预检测
+
+- **背景**：减少「无网但无提示，被误判为 SDK 内部问题」的投诉。计划见会话 plan（选项 A，未做 vue 版彩底胶囊/点击重连）。
+- **platform**：新增 `checkNetworkOnce()`（一次性探测，`uni.getNetworkType`，基座缺模块同步抛错时 try/catch 降级 `null`=未知不预判；与 `subscribeNetworkStatus` 同一 UTS 模块坑，注释互引）。
+- **store/client**：`connectionStore` 增 `networkOnline: boolean | null`；`EmClient.init()` 挂 UI 侧系统网络监听（幂等单例，与 SDK runtime 那路独立并存），开局 `checkNetworkOnce` 写初值；`login` 失败日志带 `(system offline)` 标记。
+- **banner**：`em-connection-banner` 状态优先级改为 CLOSED 原因档 > **系统离线先决（error 红 + status.networkError，SDK 还在 connecting/reconnecting 也立即显示）** > connecting/reconnecting（warning 黄）；ONLINE/IDLE 仅凭系统信号判定。无网场景恒为警示红，不再停黄色「连接中」。
+- **发送预检测/归因**：新 `ERROR_CODE`（`NETWORK_OFFLINE`/`NETWORK_TIMEOUT`）+ `libs/utils/error.ts`（`errorWithCode`/`errorCodeOf`）；`deliver()` 与新发、重发两条路径离线先拦（不触达 SDK，FAILED 落库保留红叹号）；`waitOnline` 超时抛带 code 错误；`em-chat-page` 7 处发送 catch 统一 `toastSendFailed(e)` 归因（网络类 → `error.network`「网络异常，请稍后重试」，其余 → `message.send.failed`；i18n 双语 key 原已存在，零新增）。
+- **对外透出**：`EmKit.state.networkOnline` 自动可见；文档 API-KIT（state 表）/ API-TYPES（`ERROR_CODE`）/ changelog（未发布-新增）已登记。
+- **门禁**：`check-docs` ✓（28 页 / 35 组件 / 79 方法 / 27 配置）；`build web` ✓（仅既有 demo-custom-inputbar 告警）；`build mp-weixin` ✓ 11 项防回归全绿（主包 980KB ≤ 1.5MB）；H5 产物静态伺服 / **HTTP 200**。
+- **待验（真机）**：App 旧自定义基座缺 `uni-getNetworkType` 模块时降级链路（warn 日志 + 不预判）；断网/恢复过程中 banner 的显示与消隐时序（H5 devtools Network offline 可手测）；离线时发送/重发的 FAILED 气泡与「网络异常」toast。

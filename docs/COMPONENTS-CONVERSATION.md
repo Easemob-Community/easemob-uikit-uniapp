@@ -16,13 +16,18 @@
 | `timeText` | `string` | 必填 | 已格式化的时间文本（今天显示时刻、更早显示日期），草稿时间也由页面侧并入 |
 | `draft` | `{ text: string, time: number } \| null` | 必填 | 草稿；`null` 时展示 `item.lastMessageText` |
 | `hasAtMe` | `boolean` | `false` | 群聊"有人@我"未读标记：名称主色高亮，摘要前加"有人@我"前缀 |
+| `ext` | `Record<string, unknown>` | — | 宿主业务载荷（`EmKit.setConversationPresentation` 注入），随 `#title` / `#title-extra` / `#avatar` 插槽作用域透出 |
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
 | `click` | `conversationId: string` | 点击整行 |
 | `long-press` | `conversationId: string` | 长按整行，宿主据此弹动作菜单 |
 
-无插槽。
+| 插槽 | 作用域 | 说明 |
+|---|---|---|
+| `title` | `{ item, name, ext? }` | 整标题自绘（替换默认名称文本与@我高亮）；缺省回落内置标题 |
+| `title-extra` | `{ item, name, ext? }` | 标题旁的扩展位（标签/业务徽标），缺省不渲染不占位 |
+| `avatar` | `{ item, avatar, ext? }` | 整头像自绘；缺省回落内置 `em-avatar` |
 
 `EmConversationItem` 的字段：
 

@@ -12,6 +12,7 @@
 |---|---|---|---|
 | `modelValue` | `string` | 必填 | 草稿内容，配合 `v-model` 使用 |
 | `quote` | `EmQuoteInfo \| null` | 必填 | 当前引用消息；`null` 时引用条不渲染 |
+| `editing` | `{ preview: string } \| null` | `null` | 编辑态（消息编辑）：非空时输入栏上方展示编辑条（铅笔图标 + "编辑消息" + 原文单行截断），优先于引用条 |
 | `features` | `EmInputFeatures` | 工具项全开、`sendOnReturn=true` | 功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` / `sendOnReturn` |
 | `emojis` | `string[]` | 内置 96 个 | emoji 面板字符集 |
 | `disabled` | `boolean` | `false` | 禁用态（如全员禁言）：输入、发送、语音、面板全部拦截 |
@@ -25,6 +26,7 @@
 | `update:modelValue` | `value: string` | 草稿变化（输入、点 emoji） |
 | `send` | — | 点击纸飞机发送键或键盘回车；草稿全为空白或 `submitting=true` 时不派发 |
 | `quote-close` | — | 点击引用条右侧关闭 |
+| `edit-close` | — | 点击编辑条右侧关闭（取消消息编辑） |
 | `media-select` | `key: string` | 媒体面板点选，key 见 `MEDIA_PANEL_KEY`：`album` / `camera` / `video` / `file` |
 | `voice-send` | `path: string, duration: number` | 录音完成；`duration` 单位为秒 |
 | `mention-trigger` | — | 草稿变长且以 `@` 结尾时派发，是否进入 @ 选人由宿主门控 |
@@ -144,7 +146,7 @@ function onQuickReply(item: EmQuickReply): void {
 
 ## em-text-message
 
-文本气泡：@ 片段高亮、流式打字机光标与生成异常提示。
+文本气泡：@ 片段高亮、流式打字机光标与生成异常提示、消息编辑后的「已编辑」标记。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
@@ -338,9 +340,37 @@ function onMentionSelect(contact: MentionContact): void {
 
 **行为与平台**：弹层是底部形态，高度取窗口高的 60%（打开时刻的快照，弹层存续期间不跟随旋转）。搜索同时匹配展示名与 `userId`，空结果用 `em-empty` 显示"未找到联系人"。选中会先派发 `select` 再派发 `update:show(false)`，宿主只需处理选择结果；清除、点关闭、点遮罩三条关闭路径都只是改 `show`，组件在 `show` 变 `false` 时统一清空搜索框，重开不会残留上次关键字。成员行在展示名与原 `userId` 不同时会多显示一行 userId（群名片与账号不同的场景）。
 
+## em-pinned-bar
+
+置顶消息条：折叠态显示最新一条置顶预览，多条时点击计数下拉展开完整列表（最大高度 240px 内滚动）。纯展示组件，数据与动作全部交回 `em-chat-page`。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `rows` | `EmPinnedRow[]` | 必填 | 置顶行（`em-chat-page` 预计算预览文本，按置顶时间倒序，`rows[0]` 为最新置顶） |
+| `expanded` | `boolean` | `false` | 展开态（多条下拉列表） |
+| `customClass` / `customStyle` | `string` | `''` | 宿主自定义类 / 内联样式 |
+
+| 事件 | 载荷 | 说明 |
+|---|---|---|
+| `toggle-expand` | `expanded: boolean` | 折叠/展开切换 |
+| `locate` | `messageId: string` | 点击置顶行定位到原消息 |
+| `unpin` | `row: EmPinnedRow` | 点击行尾取消置顶 |
+
+无插槽。在 `em-chat-page` 中默认渲染于群公告条与消息列表之间；宿主提供 `#pinned-bar` 插槽即可整栏接管（作用域：`rows` / `expanded` / `toggle-expand` / `locate` / `unpin`）。
+
+```vue
+<em-pinned-bar
+  :rows="pinnedRows"
+  :expanded="expanded"
+  @toggle-expand="expanded = $event"
+  @locate="locateMessage"
+  @unpin="unpinMessage"
+/>
+```
+
 ## 页面组件：em-chat-page
 
-聊天整页：消息列表（含时间分隔、失败重发、已读回执、正在输入）、五种气泡与自定义消息、输入栏、引用/撤回/复制、@ 提及、历史加载与键盘避让。
+聊天整页：消息列表（含时间分隔、失败重发、已读回执、正在输入）、五种气泡与自定义消息、输入栏、引用/撤回/编辑/置顶、@ 提及、历史加载与键盘避让。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
@@ -372,6 +402,7 @@ function onMentionSelect(contact: MentionContact): void {
 | 插槽 | 作用域 | 说明 |
 |---|---|---|
 | `banner` | — | 导航栏与群公告条之间的固定业务区（订单条、病例摘要条等），不随消息滚动 |
+| `pinned-bar` | `rows: EmPinnedRow[]`、`expanded: boolean`、`toggle-expand(expanded)`、`locate(messageId)`、`unpin(row)` | 置顶消息条整体接管（默认渲染 `em-pinned-bar`） |
 | `empty` | — | 首次历史请求成功且消息为空时显示的内容 |
 | `stream-message` | `message: EmMessageItem` | 富格式流式消息整条接管 |
 | `custom-message` | `message: EmMessageItem` | 自定义消息整卡渲染 |

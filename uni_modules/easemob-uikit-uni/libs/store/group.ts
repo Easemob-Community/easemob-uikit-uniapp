@@ -1,15 +1,17 @@
 import { reactive } from 'vue'
 import { GROUP_MEMBER_ROLE } from '../constants'
 import type { GroupMemberRoleValue } from '../constants'
-import type { EmGroup, EmGroupMember } from '../types'
+import type { EmGroup, EmGroupMember, EmGroupPresentation } from '../types'
 import { displayNameOf } from './user'
 
 // 群数据 store（裸 reactive，零依赖）：
 // items 为已加入群快照（SDK 后台同步 + getJoinedGroupList 整量回写）；
 // infoByGroupId 为群详情缓存（含 items 全量 + getGroupInfo 单群详情合并）；
-// memberMapByGroupId 为成员游标分页累积缓存；announcementByGroupId undefined=未拉取、空串=已拉无公告。
+// memberMapByGroupId 为成员游标分页累积缓存；announcementByGroupId undefined=未拉取、空串=已拉无公告；
+// overrideByGroupId 为宿主业务注入（EmKit.setGroupPresentation）：name/avatar 优先于 SDK 群资料，ext 随插槽 scope 透出
 export const groupStore = reactive({
   items: [] as EmGroup[],
+  overrideByGroupId: {} as Record<string, EmGroupPresentation>,
   loaded: false,
   syncing: false,
   syncFailed: false,
@@ -22,10 +24,33 @@ export const groupStore = reactive({
   adminSyncedByGroupId: {} as Record<string, boolean>
 })
 
-/** 群展示名回落链：infoByGroupId.name > groupId */
+// 宿主业务注入：patch 按字段合并（undefined 不动现有值），null 清除该群全部注入；空 id 忽略
+export function setGroupPresentation(groupId: string, patch: EmGroupPresentation | null): void {
+  if (groupId === '') return
+  if (patch == null) {
+    delete groupStore.overrideByGroupId[groupId]
+    return
+  }
+  const next: EmGroupPresentation = { ...groupStore.overrideByGroupId[groupId] }
+  if (patch.name !== undefined) next.name = patch.name
+  if (patch.avatar !== undefined) next.avatar = patch.avatar
+  if (patch.ext !== undefined) next.ext = patch.ext
+  groupStore.overrideByGroupId[groupId] = next
+}
+
+/** 群展示名回落链：业务注入 name > infoByGroupId.name > groupId */
 export function groupDisplayNameOf(groupId: string): string {
+  const override = groupStore.overrideByGroupId[groupId]?.name
+  if (override != null && override !== '') return override
   const name = groupStore.infoByGroupId[groupId]?.name
   return name != null && name !== '' ? name : groupId
+}
+
+/** 群头像回落链：业务注入 avatar > infoByGroupId.avatar > 空串（缺失走 em-avatar 文字占位） */
+export function groupAvatarOf(groupId: string): string {
+  const override = groupStore.overrideByGroupId[groupId]?.avatar
+  if (override != null && override !== '') return override
+  return groupStore.infoByGroupId[groupId]?.avatar ?? ''
 }
 
 // 群消息发送者昵称回落链（气泡上方昵称行）：群成员名片 > userStore 昵称 > userId
@@ -198,6 +223,7 @@ export function setGroupAnnouncement(groupId: string, announcement: string): voi
 
 export function clearGroups(): void {
   groupStore.items = []
+  groupStore.overrideByGroupId = {}
   groupStore.loaded = false
   groupStore.syncing = false
   groupStore.syncFailed = false

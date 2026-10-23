@@ -72,3 +72,10 @@
 .em-text-message--stream-error-self {
   color: var(--em-bubble-text-self);
 }
+
+/* 「已编辑」标记（M2.20）：文本尾部灰字，对齐 vue 版 text-message__edited */
+.em-text-message__edited {
+  color: var(--em-text-tertiary);
+  font-size: var(--em-font-size-11);
+  margin-left: 4px;
+}

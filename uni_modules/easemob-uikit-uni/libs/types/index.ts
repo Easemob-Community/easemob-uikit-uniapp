@@ -2,6 +2,7 @@ import type {
   ConnectionStatusValue,
   ContactInviteKindValue,
   ContactInviteStatusValue,
+  ContactMenuKeyValue,
   ConversationMenuKeyValue,
   ConversationTypeValue,
   GroupMemberRoleValue,
@@ -81,6 +82,10 @@ export interface EmUiConfig {
   enableDraft: boolean
   /** typing 信令（发送节流 + 接收展示），默认 true */
   enableTyping: boolean
+  /** 撤回消息「重新编辑」按钮（自己撤回的文本墓碑），默认 true */
+  enableReEdit: boolean
+  /** 群信息页群名修改入口（仅群主可见），默认 true */
+  enableGroupNameEdit: boolean
   /** 撤回时间窗口（毫秒），默认 120000（2 分钟） */
   recallTimeLimit: number
   /** typing 发送节流间隔（毫秒），默认 5000 */
@@ -100,6 +105,8 @@ export interface EmUiConfig {
   messageMenuKeys: MessageMenuKeyValue[]
   /** 会话长按菜单项与顺序，默认 pin/mute/delete 全量 */
   conversationMenuKeys: ConversationMenuKeyValue[]
+  /** 联系人条目长按菜单项与顺序，默认 remark/delete 全量（M2.20） */
+  contactMenuKeys: ContactMenuKeyValue[]
   /** emoji 面板字符集，默认内置 96（constants DEFAULT_EMOJI_LIST） */
   emojiList: string[]
   /** 品牌色覆盖（init 时落 --em-primary-color），空串 = 用 token 默认 */
@@ -126,6 +133,10 @@ export interface EmKitConfig {
   enableDraft?: boolean
   /** typing 信令开关，默认 true */
   enableTyping?: boolean
+  /** 撤回消息「重新编辑」按钮，默认 true */
+  enableReEdit?: boolean
+  /** 群信息页群名修改入口，默认 true */
+  enableGroupNameEdit?: boolean
   /** 撤回时间窗口（毫秒），默认 120000 */
   recallTimeLimit?: number
   /** typing 发送节流间隔（毫秒），默认 5000 */
@@ -144,6 +155,8 @@ export interface EmKitConfig {
   messageMenuKeys?: MessageMenuKeyValue[]
   /** 会话长按菜单项与顺序，默认 pin/mute/delete 全量 */
   conversationMenuKeys?: ConversationMenuKeyValue[]
+  /** 联系人条目长按菜单项与顺序，默认 remark/delete 全量（M2.20） */
+  contactMenuKeys?: ContactMenuKeyValue[]
   /** emoji 面板字符集注入，默认内置 96 */
   emojiList?: string[]
   /** 品牌色（合法 CSS 颜色值），init 时写 --em-primary-color；不传用 token 默认 */
@@ -188,6 +201,13 @@ export interface EmQuoteInfo {
   thumbUrl?: string
 }
 
+/** 消息编辑元信息（SDK MessageModifiedInfo 的中立子集）：存在即视为「已编辑」，编辑次数上限见 constants MESSAGE_MODIFY_COUNT_LIMIT */
+export interface EmMessageModifiedInfo {
+  operatorId: string
+  operationCount: number
+  operationTime: number
+}
+
 export interface EmMessageItem {
   id: string
   localId: string
@@ -221,6 +241,32 @@ export interface EmMessageItem {
   /** 流式消息元信息（M2.13）：仅 SDK 流式消息 / 历史中的流式终态消息携带；
    *  普通消息为 undefined。渲染层按 status 展示打字机光标 / 终态收敛 / 异常提示 */
   stream?: EmStreamInfo
+  /** 消息编辑元信息（M2.20）：被编辑过（含历史拉取）即存在；未编辑为 undefined */
+  modifiedInfo?: EmMessageModifiedInfo
+  /** 消息是否被置顶（M2.20）：由置顶列表同步打标，气泡角标消费 */
+  pinned?: boolean
+  /** 撤回操作者 userId（M2.20）：本地撤回恒有值；远程撤回事件 SDK payload 无 operator 字段，保持 undefined。
+   *  撤回条展示名取消息原发送者（vue 版同款语义），本字段供宿主扩展使用 */
+  recalledBy?: string
+}
+
+/** 置顶消息条目（M2.20；SDK PinnedMessageSummary 的中立子集，message 已过 toMessageItem 归一） */
+export interface EmPinnedMessageItem {
+  message: EmMessageItem
+  /** 置顶时间戳（毫秒），列表按降序排（最新置顶在前，对齐 vue 版） */
+  pinnedAt: number
+  /** 置顶操作者 userId（SDK 缺省为空串） */
+  operatorId: string
+}
+
+/** 置顶条展示行（M2.20）：页面侧预计算预览文本（发送者展示名 + 类型摘要/截断，i18n 已展开），
+ *  em-pinned-bar 纯展示组件消费；item 原样透出供 unpin 定位 */
+export interface EmPinnedRow {
+  /** 被置顶消息的服务端 id（locate 用） */
+  id: string
+  /** 预计算预览文本（「发送者：摘要」形态） */
+  preview: string
+  item: EmPinnedMessageItem
 }
 
 /** 流式消息元信息（SDK StreamMessageMeta 的中立子集，字段名与 wire 对齐便于宿主迁移） */
@@ -242,6 +288,27 @@ export interface EmStreamInfo {
 }
 
 export type EmMessageHandler = (msg: EmMessageItem) => void
+
+/** 用户展示注入（宿主业务资料，如 CRM 昵称/员工头像）：优先于 SDK 资料参与回落链，传 null 清除 */
+export interface EmUserPresentation {
+  nickname?: string
+  avatarUrl?: string
+}
+
+/** 会话展示注入（宿主业务资料）：name/avatar 优先于 SDK 会话名/头像；ext 为业务载荷（标签/订单态等），
+ *  随 #title / #title-extra / #avatar 插槽 scope 透出供宿主自绘；传 null 清除 */
+export interface EmConversationPresentation {
+  name?: string
+  avatar?: string
+  ext?: Record<string, unknown>
+}
+
+/** 群展示注入（宿主业务资料）：name/avatar 优先于 SDK 群名/群头像；ext 随 #name-extra / #title 插槽 scope 透出；传 null 清除 */
+export interface EmGroupPresentation {
+  name?: string
+  avatar?: string
+  ext?: Record<string, unknown>
+}
 
 export interface EmConversationItem {
   conversationId: string

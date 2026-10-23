@@ -23,6 +23,7 @@ import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 | `errorCode` | `number` | 最近一次断开/重连失败错误码，0 表示无 |
 | `reconnecting` | `boolean` | 是否处于自动重连 |
 | `reconnectAttempt` | `number` | 当前重连尝试次数 |
+| `networkOnline` | `boolean \| null` | 系统网络是否可用（先于 SDK 连接事件感知）：`true` 在线 / `false` 离线 / `null` 未知（基座未提供网络探测能力） |
 
 判断是否登录请用 `EmKit.state.userId === ''`，不要用 `status !== 'online'`：断网重连时 `status` 会短暂离开 `online`，但用户并没有退出登录。
 
@@ -228,6 +229,18 @@ onUnmounted(off)
 
 撤回消息。默认窗口 2 分钟，超出后长按菜单不显示撤回项；窗口可通过 `recallTimeLimit` 配置。返回 `Promise<void>`。
 
+### `EmKit.modifyTextMessage(conversationId, chatType, messageId, text)`
+
+编辑已发送的文本消息，复用原消息 id，对方与其他设备经服务端事件同步更新。单条消息最多编辑 10 次，超限后再次调用会失败（长按菜单在达到上限时置灰编辑项）。仅文本消息可编辑，消息的扩展字段（引用等）随编辑保留。返回 `Promise<void>`。
+
+### `EmKit.pinMessage(conversationId, chatType, messageId)` / `EmKit.unpinMessage(conversationId, chatType, messageId)`
+
+置顶 / 取消置顶一条消息。成功后本地立即打标并重新拉取该会话置顶列表；远端成员的变更经服务端事件自动同步。返回 `Promise<void>`。
+
+### `EmKit.getPinnedMessageList(conversationId, chatType)`
+
+拉取会话置顶消息列表（服务端上限 20 条，按置顶时间倒序），写入 `messageStore.pinnedByConversationId`，聊天页置顶消息条据此渲染。进会话时自动拉取，宿主也可手动刷新。返回 `Promise<void>`。
+
 ### `EmKit.resendMessage(conversationId, chatType, localId)`
 
 重发失败消息。按原消息类型重建（文本/图片/语音/视频/文件/自定义）；本地临时文件缺失时会抛错。返回 `Promise<void>`。domain 按 `conversationId + localId` 共享在途 Promise，等待 SDK 就绪前即占锁；不同页面实例或宿主的重复调用得到同一实际结果，失败后可重新发起。
@@ -293,6 +306,34 @@ onUnmounted(off)
 ### `EmKit.leaveConversation()`
 
 离开当前会话（清 typing 计时器等）。返回 `void`。聊天页卸载时内部调用。
+
+### `EmKit.setUserPresentation(userId, patch)` / `EmKit.setConversationPresentation(conversationId, patch)` / `EmKit.setGroupPresentation(groupId, patch)`
+
+注入宿主业务展示资料（如 CRM 昵称、员工头像、群标签），注入值**优先于 SDK 资料**参与全库回落链，且 SDK 资料回推、会话快照刷新不会冲掉注入值（两者分层存储）。写入即响应式更新：会话列表、聊天页标题、通讯录、群成员名等所有展示位同步生效。
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `userId` / `conversationId` / `groupId` | `string` | 是 | 目标对象 id；单聊会话 id 即对端 userId |
+| `patch` | `EmUserPresentation` / `EmConversationPresentation` / `EmGroupPresentation` \| `null` | 是 | 按字段合并（`undefined` 的字段不动现有值）；传 `null` 清除该对象全部注入，回落链还原为 SDK 资料 |
+
+- `EmUserPresentation`：`{ nickname?, avatarUrl? }`，作用于昵称/头像回落链（联系人备注仍最优先）。
+- `EmConversationPresentation` / `EmGroupPresentation`：`{ name?, avatar?, ext? }`；`name`/`avatar` 覆盖对应展示位，`ext` 为业务载荷（标签/订单态等），随 `#title`、`#title-extra`、`#avatar`、`#group-name-extra` 插槽作用域透出供宿主自绘。
+- 登出/换账号时注入随账号清空，宿主在 `login` 成功后重新注入。
+- 用法与配方见 [多场景接入](./GUIDE-MULTI-SCENARIO.md)。
+
+```ts
+// 单聊：对端显示业务昵称 + 聊天页标题旁打标签
+EmKit.setUserPresentation(peerId, { nickname: '金牌客服 · 小美' })
+EmKit.setConversationPresentation(peerId, { ext: { tag: '售前咨询' } })
+
+// 群聊：群名旁的业务标签（群详情页 #group-name-extra 与聊天页 #title 均可消费 ext）
+EmKit.setGroupPresentation(groupId, { ext: { tag: 'VIP 专属群' } })
+
+// 还原
+EmKit.setUserPresentation(peerId, null)
+```
+
+返回 `void`。
 
 ## 6. 联系人
 

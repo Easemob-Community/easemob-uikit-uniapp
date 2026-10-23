@@ -6,14 +6,20 @@
     @click="onClick(item.conversationId)"
     @longpress="onLongPress(item.conversationId)"
   >
-    <em-avatar :src="avatar" :name="name" :size="48" />
+    <slot name="avatar" :item="item" :avatar="avatar" :ext="ext">
+      <em-avatar :src="avatar" :name="name" :size="48" />
+    </slot>
     <view :class="ns.e('body')">
       <view :class="ns.e('top')">
         <view :class="ns.e('name-wrap')">
           <!-- 群聊有人@我：名字前 at 14px 主色（对齐 vue conversation-item__at-me-icon） -->
           <EmIcon v-if="hasAtMe" name="at" :size="14" :class="ns.e('at-me-icon')" />
           <!-- hasAtMe 时名字主色高亮（对齐 vue 版 conversation-item__name.is-at-me），text-class/text-style 双通道同步切档 -->
-          <em-text :text="name" :text-class="ns.e('name') + (hasAtMe ? ' ' + ns.m('name-at-me') : '')" :text-style="hasAtMe ? nameAtMeTextStyle : nameTextStyle" :class="ns.e('name-host')" />
+          <slot name="title" :item="item" :name="name" :ext="ext">
+            <em-text :text="name" :text-class="ns.e('name') + (hasAtMe ? ' ' + ns.m('name-at-me') : '')" :text-style="hasAtMe ? nameAtMeTextStyle : nameTextStyle" :class="ns.e('name-host')" />
+          </slot>
+          <!-- 标题扩展位（标签/业务徽标）：宿主经 EmKit.setConversationPresentation 注入 ext 后自绘，缺省不渲染不占位 -->
+          <slot name="title-extra" :item="item" :name="name" :ext="ext" />
           <!-- 置顶/免打扰徽标：12px 弱化图标色（对齐 vue 版 filled/pin、filled/bell-slash）；view 包裹——mp 样式隔离下父组件 wxss 够不到子组件宿主 -->
           <view v-if="item.isPinned" :class="ns.e('flag')"><EmIcon name="pin-filled" :size="12" /></view>
           <view v-if="item.isMuted" :class="ns.e('flag')"><EmIcon name="bell-slash-filled" :size="12" /></view>
@@ -61,12 +67,14 @@ interface Props {
   timeText: string                                  // 五档格式化时间（formatConversationTime，草稿时间优先在页面侧已并入）
   draft: { text: string, time: number } | null      // 草稿态；null 展示最后消息摘要
   hasAtMe?: boolean                                 // 群聊「有人@我」未读标记（摘要主色前缀），默认 false
+  ext?: Record<string, unknown>                     // 宿主业务载荷（EmKit.setConversationPresentation 注入），随 #title/#title-extra/#avatar scope 透出
   customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 withDefaults(defineProps<Props>(), {
   hasAtMe: false,
+  ext: undefined,
   customClass: '',
   customStyle: ''
 })

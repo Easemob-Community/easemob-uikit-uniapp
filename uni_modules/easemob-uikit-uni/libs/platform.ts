@@ -62,6 +62,31 @@ export function isPageVisible(): boolean {
  * 而 SDK 在建连（login）阶段就注册网络监听 → 该异常会直接表现为「登录失败」。
  * 这里再兜一层 try/catch：基座缺模块时降级为不监听（SDK 仍有心跳/重连循环），不让登录被拖死。
  */
+/**
+ * 一次性探测系统网络是否可用，resolve true=在线 / false=离线 / null=未知。
+ *
+ * 与 subscribeNetworkStatus 同踩一个坑：基座缺 `uni-getNetworkType` 模块时调用会**同步抛**
+ * （见上方注释），因此只用于用户触发入口（点发送/点登录）的预检测，绝不进 SDK init 路径；
+ * 任何异常一律降级为 null（不预判、不阻断），调用方对 null 一律放行原路径。
+ */
+export function checkNetworkOnce(): Promise<boolean | null> {
+  return new Promise<boolean | null>((resolve) => {
+    try {
+      uni.getNetworkType({
+        success: (res) => {
+          resolve(res.networkType !== 'none')
+        },
+        fail: () => {
+          resolve(null)
+        }
+      })
+    } catch (e) {
+      logger.warn('checkNetworkOnce: 网络探测不可用（基座可能缺 uni-getNetworkType 模块）', e)
+      resolve(null)
+    }
+  })
+}
+
 export function subscribeNetworkStatus(listener: (online: boolean) => void): () => void {
   try {
     if (typeof uni.onNetworkStatusChange !== 'function') {

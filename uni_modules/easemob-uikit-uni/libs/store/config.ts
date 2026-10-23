@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import {
+  CONTACT_MENU_KEY,
   CONVERSATION_MENU_KEY,
   DEFAULT_EMOJI_LIST,
   MESSAGE_MENU_KEY,
@@ -17,6 +18,8 @@ import type { EmKitConfig, EmUiConfig } from '../types'
 export const uiConfig = reactive<EmUiConfig>({
   enableDraft: true,
   enableTyping: true,
+  enableReEdit: true,
+  enableGroupNameEdit: true,
   recallTimeLimit: RECALL_TIME_LIMIT,
   typingThrottle: TYPING_THROTTLE,
   typingTimeout: TYPING_TIMEOUT,
@@ -24,8 +27,16 @@ export const uiConfig = reactive<EmUiConfig>({
   enableStreamMessage: true,
   streamThrottle: STREAM_FLUSH_INTERVAL,
   inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true, sendOnReturn: true },
-  messageMenuKeys: [MESSAGE_MENU_KEY.COPY, MESSAGE_MENU_KEY.QUOTE, MESSAGE_MENU_KEY.RECALL, MESSAGE_MENU_KEY.DELETE],
+  messageMenuKeys: [
+    MESSAGE_MENU_KEY.COPY,
+    MESSAGE_MENU_KEY.QUOTE,
+    MESSAGE_MENU_KEY.EDIT,
+    MESSAGE_MENU_KEY.PIN,
+    MESSAGE_MENU_KEY.RECALL,
+    MESSAGE_MENU_KEY.DELETE
+  ],
   conversationMenuKeys: [CONVERSATION_MENU_KEY.PIN, CONVERSATION_MENU_KEY.MUTE, CONVERSATION_MENU_KEY.DELETE],
+  contactMenuKeys: [CONTACT_MENU_KEY.REMARK, CONTACT_MENU_KEY.DELETE],
   emojiList: DEFAULT_EMOJI_LIST,
   primaryColor: '',
   logPayload: false
@@ -61,6 +72,8 @@ export function applyKitConfig(kitConfig: EmKitConfig): void {
   const patch: Partial<EmUiConfig> = {}
   if (kitConfig.enableDraft !== undefined) patch.enableDraft = kitConfig.enableDraft
   if (kitConfig.enableTyping !== undefined) patch.enableTyping = kitConfig.enableTyping
+  if (kitConfig.enableReEdit !== undefined) patch.enableReEdit = kitConfig.enableReEdit
+  if (kitConfig.enableGroupNameEdit !== undefined) patch.enableGroupNameEdit = kitConfig.enableGroupNameEdit
   if (kitConfig.recallTimeLimit !== undefined) patch.recallTimeLimit = kitConfig.recallTimeLimit
   if (kitConfig.typingThrottle !== undefined) patch.typingThrottle = kitConfig.typingThrottle
   if (kitConfig.typingTimeout !== undefined) patch.typingTimeout = kitConfig.typingTimeout
@@ -70,6 +83,7 @@ export function applyKitConfig(kitConfig: EmKitConfig): void {
   if (kitConfig.inputFeatures != null) patch.inputFeatures = { ...uiConfig.inputFeatures, ...kitConfig.inputFeatures }
   if (kitConfig.messageMenuKeys != null) patch.messageMenuKeys = [...kitConfig.messageMenuKeys]
   if (kitConfig.conversationMenuKeys != null) patch.conversationMenuKeys = [...kitConfig.conversationMenuKeys]
+  if (kitConfig.contactMenuKeys != null) patch.contactMenuKeys = [...kitConfig.contactMenuKeys]
   if (kitConfig.emojiList != null) patch.emojiList = [...kitConfig.emojiList]
   if (kitConfig.logPayload !== undefined) patch.logPayload = kitConfig.logPayload
   setConfig(patch)

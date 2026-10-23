@@ -13,6 +13,7 @@
   padding: var(--em-spacing-1);
 }
 
+/* 首次同步骨架：条目形态对齐真实 em-conversation-item（卡片行 + 圆头像 + 名字/时间行 + 摘要/未读行） */
 .em-conversation-page__skeleton {
   display: flex;
   flex-direction: column;
@@ -23,18 +24,40 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  margin-bottom: 12px;
+  padding: var(--em-spacing-2) var(--em-spacing-3);
+  background-color: var(--em-bg-base);
+  border-radius: var(--em-radius);
+  margin-bottom: var(--em-spacing-1);
 }
 
-.em-conversation-page__skeleton-lines {
+.em-conversation-page__skeleton-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin-left: 12px;
+  margin-left: var(--em-spacing-3);
 }
 
-.em-conversation-page__skeleton-line-sub {
-  margin-top: 8px;
+/* 名字/摘要行的右侧时间/未读位（space-between 两端对齐，对齐真实 __top/__bottom） */
+.em-conversation-page__skeleton-top,
+.em-conversation-page__skeleton-bottom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.em-conversation-page__skeleton-bottom {
+  margin-top: var(--em-spacing-1);
+}
+
+.em-conversation-page__skeleton-time {
+  margin-left: var(--em-spacing-2);
+  flex-shrink: 0;
+}
+
+.em-conversation-page__skeleton-badge {
+  margin-left: var(--em-spacing-2);
+  flex-shrink: 0;
 }
 
 /* 品牌色内联变量作用域层：接替根的 flex 容器角色（flex:1 + height:0 保持滚动约束链） */

@@ -2,14 +2,22 @@
   <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
     <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
-      <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar -->
+      <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar；
+           #title 插槽：宿主整标题自绘（scope：name/ext/conversationId），缺省回落内置标题（会话注入名 > title prop > 昵称链） -->
       <em-nav-bar
-        :title="title !== '' ? title : peerDisplayName"
+        :title="navTitle"
         :subtitle="headerSubtitle"
         :action-icon="showAction ? 'vertical' : ''"
         @back="onBack"
         @action="onOpenInfo"
-      />
+      >
+        <template #title>
+          <!-- fallback 内联样式双通道：app-and-page 隔离下 nav-bar 组件样式不外泄，缺省标题需自带字重与主题色 -->
+          <slot name="title" :name="peerDisplayName" :ext="titleExt" :conversation-id="conversationId">
+            <text :style="fallbackTitleTextStyle">{{ navTitle }}</text>
+          </slot>
+        </template>
+      </em-nav-bar>
 
       <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
       <em-connection-banner :show="showConnectionBanner" />
@@ -29,6 +37,18 @@
           <EmIcon name="chevron-down" :size="14" :class="ns.e('announcement-toggle-icon')" />
         </view>
       </view>
+
+      <!-- 置顶消息条（M2.20）：折叠态最新一条预览、多条下拉展开；置顶能力开关=messageMenuKeys 含 pin；
+           宿主可经 #pinned-bar 插槽整体接管（scope 同默认数据） -->
+      <slot v-if="showPinnedBar" name="pinned-bar" :rows="pinnedRows" :expanded="pinnedExpanded" :toggle-expand="togglePinnedExpand" :locate="locatePinnedMessage" :unpin="unpinPinnedMessage">
+        <em-pinned-bar
+          :rows="pinnedRows"
+          :expanded="pinnedExpanded"
+          @toggle-expand="togglePinnedExpand"
+          @locate="locatePinnedMessage"
+          @unpin="unpinPinnedMessage"
+        />
+      </slot>
       <scroll-view
         :class="ns.e('scroll')"
         scroll-y
@@ -52,14 +72,29 @@
           <text :class="ns.e('history-text')">{{ t('conversation.noMoreHistory') }}</text>
         </view>
 
-        <!-- 首屏历史未回包：骨架占位；不显示空态，避免「先闪暂无消息再出消息」 -->
+        <!-- 首屏历史未回包：气泡骨架占位（左右交替对话形态，对齐真实消息行布局）；不显示空态，避免「先闪暂无消息再出消息」 -->
         <view v-if="showHistorySkeleton" :class="ns.e('skeleton')">
-          <view v-for="index in 4" :key="index" :class="ns.e('skeleton-row')">
-            <em-skeleton variant="avatar" shape="circle" width="36px" height="36px" :class="ns.e('skeleton-avatar')" />
-            <view :class="ns.e('skeleton-body')">
-              <em-skeleton width="62%" height="14px" :class="ns.e('skeleton-line')" />
-              <em-skeleton width="44%" height="14px" />
-            </view>
+          <view
+            v-for="(row, index) in skeletonRows"
+            :key="index"
+            :class="[ns.e('skeleton-row'), row.self && ns.m('skeleton-row-self'), row.kind === 'chip' && ns.m('skeleton-row-chip')]"
+          >
+            <view v-if="row.kind === 'chip'" :class="ns.e('skeleton-chip')" />
+            <template v-else>
+              <em-skeleton variant="avatar" shape="circle" width="36px" height="36px" :class="ns.e('skeleton-avatar')" />
+              <view
+                :class="[ns.e('skeleton-bubble'), row.self && ns.m('skeleton-bubble-self'), row.kind === 'image' && ns.m('skeleton-bubble-image')]"
+                :style="row.kind === 'image' ? '' : 'width: ' + row.widthRpx + 'rpx'"
+              >
+                <em-skeleton
+                  v-for="n in row.lines"
+                  :key="n"
+                  height="16px"
+                  :class="[ns.e('skeleton-text'), n < row.lines ? ns.e('skeleton-text-gap') : '']"
+                  custom-style="background-color: var(--em-bg-base)"
+                />
+              </view>
+            </template>
           </view>
         </view>
 
@@ -97,7 +132,11 @@
             :class="[ns.e('msg'), m.self && ns.m('msg-self'), (m.status === MESSAGE_STATUS.RECALLED || m.type === MESSAGE_TYPE.NOTICE) && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && highlightPulseOn && ns.m('msg-highlight')]"
           >
           <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
-            <text :class="ns.e('recalled-text')">{{ t('message.recalled') }}</text>
+            <text :class="ns.e('recalled-text')">{{ senderNameOf(m) }} {{ t('message.recalled') }}</text>
+            <!-- 重新编辑（M2.20）：仅自己撤回的文本墓碑（vue 对齐），点击回显输入框、作为新消息发送 -->
+            <view v-if="showReedit(m)" :class="ns.e('recalled-reedit')" @click="onReeditMessage(m)">
+              <text :class="ns.e('recalled-reedit-text')">{{ t('message.reedit') }}</text>
+            </view>
           </view>
           <!-- 群系统通知（本地灰条，不落服务端）：居中 chip 形态同撤回提示条；无头像无气泡，长按菜单禁用 -->
           <view v-else-if="m.type === MESSAGE_TYPE.NOTICE" :class="ns.e('notice')">
@@ -171,6 +210,10 @@
                   </slot>
                 </view>
               </view>
+              <!-- 置顶角标（M2.20）：气泡上方小图钉，覆盖全部消息类型（对齐 vue 版 message-bubble-wrapper） -->
+              <view v-if="m.pinned === true" :class="[ns.e('pin-badge'), m.self && ns.m('pin-badge-self')]">
+                <EmIcon name="pin" :size="10" />
+              </view>
               <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧；点击定位原消息 -->
               <view v-if="m.quote != null" :class="[ns.e('quote'), m.self && ns.m('quote-self')]" @click="onQuoteClick(m)">
                 <view :class="[ns.e('quote-line'), m.self && ns.m('quote-line-self')]"></view>
@@ -226,6 +269,8 @@
           :on-voice-touch-move="composerVoiceTouchMove"
           :on-voice-touch-end="composerVoiceTouchEnd"
           :on-voice-touch-cancel="composerVoiceTouchCancel"
+          :editing="editingInfo"
+          :cancel-edit="onEditClose"
           :send="onSend"
           :select-media="onMediaSelect"
           :select-quick-reply="onQuickReply"
@@ -235,6 +280,7 @@
         v-else
         v-model="draft"
         :quote="quoteInfo"
+        :editing="editingInfo"
         :features="config.inputFeatures"
         :emojis="config.emojiList"
         :quick-replies="quickReplies"
@@ -244,6 +290,7 @@
         :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
         @send="onSend"
         @quote-close="quoteInfo = null"
+        @edit-close="onEditClose"
         @media-select="onMediaSelect"
         @voice-send="onVoiceSend"
         @mention-trigger="onMentionTrigger"
@@ -312,17 +359,21 @@ import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmConnectionBanner from '../../em-connection-banner/em-connection-banner.vue'
 import EmPopup from '../../em-popup/em-popup.vue'
 import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
+import EmPinnedBar from '../../em-pinned-bar/em-pinned-bar.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
-import { CONVERSATION_TYPE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_STATUS, MESSAGE_TYPE } from '../../../libs/constants'
+import { CONVERSATION_TYPE, ERROR_CODE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
 import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
 import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
-import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
+import { errorCodeOf } from '../../../libs/utils/error'
+import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
+import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { clearDraft, getDraft, setDraft } from '../../../libs/store/draft'
-import { avatarOf, displayNameOf } from '../../../libs/store/user'
+import { avatarOf } from '../../../libs/store/user'
+import { contactDisplayNameOf } from '../../../libs/store/contact'
 import { connectionStore } from '../../../libs/store/connection'
 import { groupDisplayNameOf, groupMemberDisplayNameOf, groupStore } from '../../../libs/store/group'
 import { useNamespace } from '../../../libs/use/useNamespace'
@@ -336,6 +387,14 @@ import { quoteHasIcon, quoteIconNameOf, quoteSenderOf, quoteSuffixOf, quoteTextC
 import { createLogger } from '../../../libs/utils/logger'
 
 const logger = createLogger('chat-page')
+
+// 发送失败 toast 归因：网络预检测拦截（EM_NETWORK_OFFLINE）/ 连接等待超时（EM_NETWORK_TIMEOUT）
+// 给「网络异常」文案，其余仍报通用「发送失败」——避免无网时用户误以为是 SDK 内部问题
+function toastSendFailed(e: unknown): void {
+  const code = errorCodeOf(e)
+  const networkRelated = code === ERROR_CODE.NETWORK_OFFLINE || code === ERROR_CODE.NETWORK_TIMEOUT
+  uni.showToast({ title: networkRelated ? t('error.network') : t('message.send.failed'), icon: 'none' })
+}
 
 // scroll-top 初始预置大值：仅作首帧底部方向语义（滚底本体已改走 scroll-into-view 锚点，见 scrollToBottom）
 const SCROLL_BOTTOM_TOP = 999999
@@ -459,6 +518,27 @@ const hasMore = computed(() => messageStore.hasMoreByConversationId[props.conver
 // 首次历史未回包且无缓存时用骨架，不用「暂无消息」占位（避免先闪空态再出消息）
 const showHistorySkeleton = computed(() => !historySettled.value && list.value.length === 0)
 
+// 首屏气泡骨架行配置（静态预设）：形态/方向/宽度/文字行数，布局对齐真实消息行（头像在外侧、己方右对齐、
+// 时间 chip 居中）。宽度一律 rpx 定宽——百分比宽度链在蒸汽端有「行尾缺字」前科（见 __content 宽度注释），骨架同样禁用
+type ChatSkeletonRow = {
+  kind: 'text' | 'image' | 'chip'
+  self: boolean
+  widthRpx: number
+  lines: number
+}
+const skeletonRows: ChatSkeletonRow[] = [
+  { kind: 'chip', self: false, widthRpx: 0, lines: 0 },
+  { kind: 'text', self: false, widthRpx: 420, lines: 1 },
+  { kind: 'text', self: true, widthRpx: 360, lines: 1 },
+  { kind: 'text', self: false, widthRpx: 480, lines: 2 },
+  { kind: 'text', self: true, widthRpx: 240, lines: 1 },
+  { kind: 'image', self: false, widthRpx: 200, lines: 0 },
+  { kind: 'text', self: true, widthRpx: 440, lines: 2 },
+  { kind: 'text', self: false, widthRpx: 300, lines: 1 },
+  { kind: 'text', self: true, widthRpx: 400, lines: 1 },
+  { kind: 'text', self: false, widthRpx: 520, lines: 2 }
+]
+
 // 时间分隔条：首条必显，之后相邻消息间隔超过 uiConfig.timeDividerInterval（默认 5 分钟）在其前插入
 // （对齐 vue 版 shouldShowTimeDivider；间隔可经 EmKitConfig.timeDividerInterval / setConfig 覆盖）
 const dividerBefore = computed<Record<string, boolean>>(() => {
@@ -475,11 +555,22 @@ const dividerBefore = computed<Record<string, boolean>>(() => {
   return flags
 })
 
-// header 标题：单聊——昵称 > conversationId（资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）；
-// 群聊——群数据层 groupDisplayNameOf（拉到即回填，name > groupId）
+// header 标题回落链：宿主会话注入 name > 单聊备注链（contactDisplayNameOf，M2.20 好友备注联动；
+// 资料拉到后自动更新，对齐 vue 版 chat header 标题回落链）/ 群聊群名链（groupDisplayNameOf，含群注入）；
+// ext 供 #title 插槽 scope 透出（会话注入优先，群注入兜底，均为宿主业务载荷）
 const isGroupChat = computed(() => props.chatType === CONVERSATION_TYPE.GROUP_CHAT)
-const peerDisplayName = computed(() =>
-  isGroupChat.value ? groupDisplayNameOf(props.conversationId) : displayNameOf(props.conversationId)
+const peerDisplayName = computed(() => {
+  const override = conversationStore.overrideByConversationId[props.conversationId]?.name
+  if (override != null && override !== '') return override
+  return isGroupChat.value ? groupDisplayNameOf(props.conversationId) : contactDisplayNameOf(props.conversationId)
+})
+const navTitle = computed(() => props.title !== '' ? props.title : peerDisplayName.value)
+// 与 em-nav-bar__title 同档的内联样式（小程序侧父组件样式进不了 nav-bar，text-style 内联不受隔离限制）
+const fallbackTitleTextStyle =
+  'font-family: var(--em-font-family); font-size: var(--em-font-size-16); font-weight: var(--em-font-weight-medium); line-height: 22px; color: var(--em-text-primary);'
+const titleExt = computed(() =>
+  conversationStore.overrideByConversationId[props.conversationId]?.ext
+  ?? groupStore.overrideByGroupId[props.conversationId]?.ext
 )
 
 // header 副标题（两态互斥）：单聊——对端 typing（chat 层 5s 超时自动消失）；
@@ -496,9 +587,10 @@ const headerSubtitle = computed(() => {
   return ''
 })
 
-// 群聊发送者昵称行：群成员名片 > userStore 昵称 > userId（己方消息不显示；单聊不显示）
+// 群聊发送者昵称行：群成员名片 > userStore 昵称 > userId（群名片优先，M2.9 语义）；
+// 单聊/撤回条展示名：备注 > 昵称 > userId（contactDisplayNameOf，M2.20 好友备注联动）
 function senderNameOf(m: EmMessageItem): string {
-  return isGroupChat.value ? groupMemberDisplayNameOf(props.conversationId, m.from) : displayNameOf(m.from)
+  return isGroupChat.value ? groupMemberDisplayNameOf(props.conversationId, m.from) : contactDisplayNameOf(m.from)
 }
 
 const senderNameTextStyle =
@@ -846,6 +938,11 @@ function onQuoteClick(m: EmMessageItem): void {
     uni.showToast({ title: t('message.quote.notFound'), icon: 'none' })
     return
   }
+  highlightMessage(target)
+}
+
+// 定位并高亮消息：引用卡点击与置顶条定位共用（M2.20 抽出，避免双份脉冲/锚点逻辑漂移）
+function highlightMessage(target: EmMessageItem): void {
   const anchor = msgAnchorId(target)
   // 先清再下一帧重设：重复定位同一消息时强制移除/重加高亮类，让脉冲序列重新触发
   highlightId.value = ''
@@ -908,6 +1005,8 @@ onMounted(() => {
   // 进入会话与拉历史并行、不阻塞渲染（对齐 TUIKit：会话页点击时已预热拉取，store 有缓存立即渲染）；
   // 串行 await 是进入停顿的主因，这里只做 fire-and-forget + 完成后滚底
   EmKit.enterConversation(props.conversationId, props.chatType).catch(() => {})
+  // 置顶消息列表（M2.20）：进会话拉取，失败仅告警不阻断（置顶条空则不渲染）
+  EmKit.getPinnedMessageList(props.conversationId, props.chatType).catch((e) => logger.warn('getPinnedMessageList fail:', e))
   // 群聊额外预热：群详情 + 成员首屏（昵称行/标题/成员数用），公告未拉则进会话时拉取
   if (isGroupChat.value) {
     EmKit.enterGroup(props.conversationId).catch(() => {})
@@ -991,7 +1090,7 @@ watch(draft, (v) => {
   if (config.enableDraft) {
     setDraft(props.conversationId, v)
   }
-  if (config.enableTyping && !isGroupChat.value && v.trim() !== '') {
+  if (config.enableTyping && editingMessage.value == null && !isGroupChat.value && v.trim() !== '') {
     EmKit.sendTyping(props.conversationId, props.chatType).catch(() => {})
   }
 })
@@ -1006,6 +1105,11 @@ watch(() => [props.conversationId, props.chatType], () => {
   mentionedContacts.value = []
   // 宿主复用同一聊天页切换会话时，不把上一个会话的视频播放器留在屏幕上
   videoPreviewVisible.value = false
+  // 编辑态/置顶展开态不跨会话残留（vue 对齐 exitEditMode）
+  editingMessage.value = null
+  pinnedExpanded.value = false
+  // 新会话置顶列表随 onMounted 路径拉取（宿主复用页面切会话时此处补拉）
+  EmKit.getPinnedMessageList(props.conversationId, props.chatType).catch((e) => logger.warn('getPinnedMessageList fail:', e))
   // 会话切换：跟随态与滚动基线复位（新会话首屏必须贴底）
   streamFollow = true
   lastScrollTop = -1
@@ -1082,6 +1186,12 @@ async function onSend(): Promise<void> {
   const sourceDraft = draft.value
   const text = sourceDraft.trim()
   if (text === '') return
+  // 编辑态发送分流（M2.20）：复用原消息 id 调 modifyMessage（与撤回重编辑=发新消息本质不同）
+  const editing = editingMessage.value
+  if (editing != null && editing.type === MESSAGE_TYPE.TEXT) {
+    await submitMessageEdit(editing, text, sourceDraft)
+    return
+  }
   const sourceQuote = quoteInfo.value
   const sourceMentions = mentionedContacts.value
   const request = capturePageRequest()
@@ -1106,12 +1216,38 @@ async function onSend(): Promise<void> {
   } catch (e) {
     logger.error('sendText fail:', e)
     // 未连上/超时等失败可能根本没进消息列表（没有 FAILED 气泡），必须给用户一个提示
-    uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    toastSendFailed(e)
   } finally {
     if (isPageRequestCurrent(request)) sendingText.value = false
   }
 }
 
+// 编辑提交（M2.20）：SDK modifyMessage 成功回包由 chat 层本地 patch；成功清输入退编辑；
+// 失败保留编辑态与输入供重试（次数超限与一般失败文案区分，对齐 vue 版）
+async function submitMessageEdit(target: EmMessageItem, text: string, sourceDraft: string): Promise<void> {
+  if (sendingText.value || modifyingByLocalId[target.localId] === true) return
+  const request = capturePageRequest()
+  sendingText.value = true
+  modifyingByLocalId[target.localId] = true
+  try {
+    await EmKit.modifyTextMessage(request.conversationId, request.chatType, target.id, text)
+    if (isPageRequestCurrent(request)) {
+      exitEditMode()
+      // 仅原始输入未被编辑时清空；提交期间的新输入保留
+      if (draft.value === sourceDraft) {
+        draft.value = ''
+      }
+    }
+  } catch (e) {
+    logger.error('modifyTextMessage fail:', e)
+    // 按错误码精确归类（错误文案多语言下靠正则误报率高）：modifiedCountExceedLimit = 编辑次数超限
+    const code = (e as { code?: unknown })?.code
+    uni.showToast({ title: code === 'modifiedCountExceedLimit' ? t('message.edit.limitReached') : t('message.edit.failed'), icon: 'none' })
+  } finally {
+    sendingText.value = false
+    delete modifyingByLocalId[target.localId]
+  }
+}
 // ===== 快捷回复（M2.12）：fill=替换草稿（默认，用户可编辑）；send=直接发送（不挂引用/@链路） =====
 function quickReplyTextOf(item: EmQuickReply): string {
   return item.text != null && item.text !== '' ? item.text : item.label
@@ -1143,7 +1279,7 @@ async function sendQuickReplyText(text: string): Promise<void> {
     emit('send', item)
   } catch (e) {
     logger.error('sendQuickReply fail:', e)
-    uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    toastSendFailed(e)
   } finally {
     if (isPageRequestCurrent(request)) sendingText.value = false
   }
@@ -1176,7 +1312,7 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
     emit('send', item)
   } catch (e) {
     logger.error('sendImage fail:', e)
-    uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    toastSendFailed(e)
   }
 }
 
@@ -1223,7 +1359,7 @@ async function onPickVideo(): Promise<void> {
     emit('send', item)
   } catch (e) {
     logger.error('sendVideo fail:', e)
-    uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    toastSendFailed(e)
   }
 }
 
@@ -1247,6 +1383,7 @@ async function onPickFile(): Promise<void> {
       return
     }
     let failed = false
+    let lastSendError: unknown = null
     // 多选按顺序逐条发送；切会话后未开始发送的临时文件立即释放。
     for (let i = 0; i < files.length; i++) {
       if (!isPageRequestCurrent(request)) {
@@ -1259,10 +1396,11 @@ async function onPickFile(): Promise<void> {
         emit('send', item)
       } catch (e) {
         failed = true
+        lastSendError = e
         logger.error('sendFile fail:', e)
       }
     }
-    if (failed) uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    if (failed) toastSendFailed(lastSendError)
   } catch (e) {
     // provider 选择/读取失败（用户取消不会走这里）
     logger.error('pick file fail:', e)
@@ -1280,7 +1418,7 @@ async function onVoiceSend(path: string, duration: number): Promise<void> {
     emit('send', item)
   } catch (e) {
     logger.error('sendAudio fail:', e)
-    uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    toastSendFailed(e)
   }
 }
 
@@ -1319,9 +1457,145 @@ const activeMessage = ref<EmMessageItem | null>(null)
 // 引用目标快照（选择引用时生成，发送成功/手动关闭/切会话时清除）
 const quoteInfo = ref<EmQuoteInfo | null>(null)
 
+// 编辑态（M2.20）：编辑条优先于引用条展示（对齐 vue 版 editing-bar）；编辑=复用原消息 id（SDK modifyMessage），
+// 与撤回重编辑（发新消息）本质不同；切会话/取消/发送成功时复位
+const editingMessage = ref<EmMessageItem | null>(null)
+const editingInfo = computed<{ preview: string } | null>(() => {
+  const m = editingMessage.value
+  return m != null && m.type === MESSAGE_TYPE.TEXT ? { preview: m.text } : null
+})
+const modifyingByLocalId: Record<string, boolean> = {}
+
+function enterEditMode(m: EmMessageItem): void {
+  if (m.type !== MESSAGE_TYPE.TEXT || m.status === MESSAGE_STATUS.RECALLED) return
+  // 编辑与引用互斥：编辑提交只走 modifyMessage，不挂引用快照
+  quoteInfo.value = null
+  editingMessage.value = m
+  setDraftValue(m.text)
+}
+
+function exitEditMode(): void {
+  editingMessage.value = null
+}
+
+// vue 对齐 handleCancelEdit：取消编辑同时清空输入
+function onEditClose(): void {
+  exitEditMode()
+  setDraftValue('')
+}
+
+// 撤回重编辑（M2.20）：仅自己撤回的文本墓碑且原文非空（vue 对齐：recalled && isSelf && originalMsg），
+// 点击把原文回显输入框，发送走普通 sendText（新消息，不复用原消息 id，可多次）
+function showReedit(m: EmMessageItem): boolean {
+  return m.self && m.type === MESSAGE_TYPE.TEXT && m.text !== '' && config.enableReEdit
+}
+
+// vue 对齐 onReedit：先退出编辑态再回显，避免编辑态残留把提交分流到旧消息
+function onReeditMessage(m: EmMessageItem): void {
+  exitEditMode()
+  setDraftValue(m.text)
+}
+
+// 置顶/取消置顶（M2.20）：成功后 chat 层本地打标并主动重拉置顶列表（SDK 不本端回推），失败 toast 保留原状态
+const pinningByLocalId: Record<string, boolean> = {}
+
+async function togglePinMessage(m: EmMessageItem): Promise<void> {
+  if (pinningByLocalId[m.localId] === true) return
+  // 快照置顶态：catch 读快照而非实时值（刷新可能已改标），toast 文案不张冠李戴
+  const wasPinned = m.pinned === true
+  pinningByLocalId[m.localId] = true
+  try {
+    if (wasPinned) {
+      await EmKit.unpinMessage(m.conversationId, m.chatType, m.id)
+    } else {
+      await EmKit.pinMessage(m.conversationId, m.chatType, m.id)
+    }
+  } catch (e) {
+    logger.error('togglePinMessage fail:', e)
+    uni.showToast({ title: wasPinned ? t('message.unpin.failed') : t('message.pin.failed'), icon: 'none' })
+  } finally {
+    delete pinningByLocalId[m.localId]
+  }
+}
+
+// ========== 置顶消息条（M2.20）==========
+// 置顶能力开关 = 菜单 key 在 messageMenuKeys 中（删 key 即全禁用，置顶条不渲染）
+const pinEnabled = computed(() => config.messageMenuKeys.includes(MESSAGE_MENU_KEY.PIN))
+const pinnedList = computed<EmPinnedMessageItem[]>(() => messageStore.pinnedByConversationId[props.conversationId] ?? [])
+const showPinnedBar = computed(() => pinEnabled.value && pinnedList.value.length > 0)
+const pinnedExpanded = ref(false)
+
+// 置顶条展示行：预览文本页面侧预计算（发送者展示名 + 类型摘要/截断），组件纯展示
+const pinnedRows = computed<EmPinnedRow[]>(() =>
+  pinnedList.value.map((item) => ({
+    id: item.message.id,
+    preview: pinnedPreviewOf(item),
+    item
+  }))
+)
+
+function pinnedPreviewOf(item: EmPinnedMessageItem): string {
+  const m = item.message
+  let text = m.text
+  if (m.type === MESSAGE_TYPE.IMAGE) {
+    text = t('message.image')
+  } else if (m.type === MESSAGE_TYPE.AUDIO) {
+    text = t('message.audio')
+  } else if (m.type === MESSAGE_TYPE.VIDEO) {
+    text = t('message.video')
+  } else if (m.type === MESSAGE_TYPE.FILE) {
+    text = m.fileName !== '' ? m.fileName : t('message.file')
+  } else if (m.type === MESSAGE_TYPE.CUSTOM) {
+    text = t('message.custom')
+  }
+  if (text.length > PINNED_PREVIEW_MAX_LENGTH) {
+    text = `${text.slice(0, PINNED_PREVIEW_MAX_LENGTH)}…`
+  }
+  // 复用引用摘要「发送者：文本」形态（zh/en 分隔符差异已在文案内，i18n 收口）
+  return t('message.quote.summary', { from: senderNameOf(m), text })
+}
+
+function togglePinnedExpand(expanded: boolean): void {
+  pinnedExpanded.value = expanded
+}
+
+async function unpinPinnedMessage(row: EmPinnedRow): Promise<void> {
+  // 复用置顶防重锁（localId 维度）：双击不触发第二次 SDK 调用
+  const localId = row.item.message.localId
+  if (pinningByLocalId[localId] === true) return
+  pinningByLocalId[localId] = true
+  try {
+    await EmKit.unpinMessage(props.conversationId, props.chatType, row.id)
+  } catch (e) {
+    logger.error('unpinPinnedMessage fail:', e)
+    uni.showToast({ title: t('message.unpin.failed'), icon: 'none' })
+  } finally {
+    delete pinningByLocalId[localId]
+  }
+}
+
+// 定位置顶消息：复用引用定位（高亮脉冲 + scroll-into-view 锚点）；
+// 目标未加载时向上翻页加载历史兜底（上限 3 页），仍找不到则提示
+async function locatePinnedMessage(messageId: string): Promise<void> {
+  let target = list.value.find((x) => x.id === messageId)
+  for (let i = 0; target == null && i < 3 && hasMore.value; i++) {
+    try {
+      await onLoadMore()
+    } catch {
+      break
+    }
+    target = list.value.find((x) => x.id === messageId)
+  }
+  if (target == null) {
+    uni.showToast({ title: t('message.locateFailed'), icon: 'none' })
+    return
+  }
+  highlightMessage(target)
+}
+
 // 引用卡展示映射收口 libs/utils/quote.ts（与输入栏引用条共用纯函数；locale/用户信息/类名注入）
 const quoteSuffix = (q: EmQuoteInfo | null): string => quoteSuffixOf(q, t)
-const quoteSender = (m: EmMessageItem): string => quoteSenderOf(m.quote, displayNameOf)
+const quoteSender = (m: EmMessageItem): string => quoteSenderOf(m.quote, contactDisplayNameOf)
 const quoteTextClass = (m: EmMessageItem): string => quoteTextClassOf(m.self, ns.e('quote-text'), ns.m('quote-text-self'))
 const quoteTextStyle = (m: EmMessageItem): string => quoteTextStyleOf(m.self)
 const hasQuoteIcon = (m: EmMessageItem): boolean => quoteHasIcon(m.quote?.type)
@@ -1352,6 +1626,16 @@ const messageActions = computed<EmActionSheetAction[]>(() => {
     candidates.push({ key: MESSAGE_MENU_KEY.COPY, text: t('message.action.copy'), icon: 'rects' })
   }
   candidates.push({ key: MESSAGE_MENU_KEY.QUOTE, text: t('message.action.quote'), icon: 'arrow-turn-left' })
+  // 编辑（M2.20）：仅自己发送的文本消息；达到编辑次数上限（SDK 约束）置灰
+  if (m.self && m.type === MESSAGE_TYPE.TEXT && m.status !== MESSAGE_STATUS.RECALLED) {
+    const count = m.modifiedInfo?.operationCount ?? 0
+    candidates.push({ key: MESSAGE_MENU_KEY.EDIT, text: t('message.action.edit'), icon: 'rect-pencil', disabled: count >= MESSAGE_MODIFY_COUNT_LIMIT })
+  }
+  // 置顶（M2.20）：未撤回消息全类型可置顶；已置顶切换为取消置顶文案/图标
+  if (m.status !== MESSAGE_STATUS.RECALLED) {
+    const pinned = m.pinned === true
+    candidates.push({ key: MESSAGE_MENU_KEY.PIN, text: pinned ? t('message.action.unpin') : t('message.action.pin'), icon: pinned ? 'pin-slash' : 'pin' })
+  }
   if (m.self && m.status === MESSAGE_STATUS.SENT && Date.now() - m.time <= config.recallTimeLimit) {
     candidates.push({ key: MESSAGE_MENU_KEY.RECALL, text: t('message.action.recall'), icon: 'arrow-lft-uturn' })
   }
@@ -1371,7 +1655,12 @@ const messageActions = computed<EmActionSheetAction[]>(() => {
 
 // 内置菜单 key 保留（业务追加项同名会被忽略，防宿主误覆盖复制/撤回等语义）
 function isBuiltinMenuKey(key: string): boolean {
-  return key === MESSAGE_MENU_KEY.COPY || key === MESSAGE_MENU_KEY.QUOTE || key === MESSAGE_MENU_KEY.RECALL || key === MESSAGE_MENU_KEY.DELETE
+  return key === MESSAGE_MENU_KEY.COPY
+    || key === MESSAGE_MENU_KEY.QUOTE
+    || key === MESSAGE_MENU_KEY.EDIT
+    || key === MESSAGE_MENU_KEY.PIN
+    || key === MESSAGE_MENU_KEY.RECALL
+    || key === MESSAGE_MENU_KEY.DELETE
 }
 
 function extraMessageActionsOf(m: EmMessageItem): EmActionSheetAction[] {
@@ -1399,7 +1688,7 @@ async function onResend(m: EmMessageItem): Promise<void> {
     scrollToBottom()
   } catch (e) {
     logger.error('resendMessage fail:', e)
-    uni.showToast({ title: t('message.send.failed'), icon: 'none' })
+    toastSendFailed(e)
   } finally {
     delete resendingByLocalId[m.localId]
   }
@@ -1466,6 +1755,10 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
     }
   } else if (action.key === MESSAGE_MENU_KEY.QUOTE) {
     quoteInfo.value = EmKit.makeQuote(m)
+  } else if (action.key === MESSAGE_MENU_KEY.EDIT) {
+    enterEditMode(m)
+  } else if (action.key === MESSAGE_MENU_KEY.PIN) {
+    await togglePinMessage(m)
   } else if (action.key === MESSAGE_MENU_KEY.RECALL) {
     await recallMessage(m)
   } else if (action.key === MESSAGE_MENU_KEY.DELETE) {

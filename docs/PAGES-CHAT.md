@@ -17,17 +17,20 @@
 
 - 进入即并行执行 `EmKit.enterConversation` 与首次 `EmKit.loadHistory`；已有缓存时先渲染缓存并直接贴底，不等历史回包。
 - 内置文本、图片、语音、视频、文件、自定义消息的发送与渲染；未识别的消息类型显示默认提示气泡，可交给 `#custom-message` 接管。
-- 首次历史未回包时展示骨架；首屏失败显示「点击重试」，已有缓存消息时改为顶部重试行，不遮挡消息。首屏与加载更多互斥，各自只拥有自己的错误态。
+- 首次历史未回包时展示气泡对话骨架（左右交替消息行 + 时间分隔占位）；首屏失败显示「点击重试」，已有缓存消息时改为顶部重试行，不遮挡消息。首屏与加载更多互斥，各自只拥有自己的错误态。
 - 点击消息区顶部的「加载更早消息」加载更早历史，加载前记录首条消息锚点，加载后回位，避免视口跳动；没有更多时显示「没有更多历史消息」。分页失败保留顶部重试行，重试仍走分页锚点路径。
 - 相邻消息间隔超过 `uiConfig.timeDividerInterval`（默认 5 分钟）插入时间分隔条，首条消息必显。
 - 消息发送成功后以 `send` 事件透出；文本与直发快捷回复共享提交锁，提交中输入栏 `submitting=true`、快捷回复条 `disabled=true`，但不影响草稿编辑。失败消息显示红色状态图标，点击即调用 `EmKit.resendMessage` 原地重发，同一 `localId` 重发完成前不可重复点击，失败后仍可重试。
 - 输入草稿按会话保存（`uiConfig.enableDraft` 默认开启）；离开页面时清空当前会话的服务端未读。
 
-### 引用、撤回与长按菜单
+### 引用、撤回、编辑、置顶与长按菜单
 
-- 长按消息打开菜单：复制（仅文本）、引用、撤回、删除。菜单项与顺序由 `uiConfig.messageMenuKeys` 决定。
+- 长按消息打开菜单：复制（仅文本）、引用、编辑（自己发送的文本消息）、置顶、撤回、删除。菜单项与顺序由 `uiConfig.messageMenuKeys` 决定，删除 key 即禁用对应能力。
 - 引用后输入栏上方出现引用条，发送的文本消息同时写入 `ext.msgQuote` 与兼容字段 `ext.emQuote`；气泡下方生成引用卡，点击定位原消息并闪烁高亮，原消息未加载或已删除时 toast 提示。
 - 撤回仅对「自己发送、状态为已发送、且在撤回窗口内」的消息出现；窗口由 `uiConfig.recallTimeLimit` 控制，默认 2 分钟。执行撤回时会再次检查时间窗，并拦截重复提交；成功后以 `recall` 事件透出，不额外弹确认框。
+- 撤回后的占位条显示原消息发送者的昵称（群聊取成员名片，单聊取好友备注 > 昵称）；自己撤回的文本消息在占位条上提供「重新编辑」，点击把原文回显到输入框，作为新消息发送。`uiConfig.enableReEdit` 可关闭该按钮。
+- 编辑仅支持自己发送的文本消息：点击「编辑」后输入栏上方出现编辑条（显示原文截断预览），修改后发送复用原消息 id，文本气泡尾部出现「已编辑」标记；单条消息最多编辑 10 次，达到上限后菜单项置灰，编辑失败保留编辑态供重试。
+- 置顶对未撤回的消息全类型可用：置顶后消息列表上方出现置顶条（最新置顶在前），多条置顶点击计数下拉展开完整列表（上限 20 条），点击任意置顶行定位并高亮原消息，行尾可取消置顶；`uiConfig.messageMenuKeys` 不含 `pin` 时置顶条不渲染。
 - 复制等待系统剪贴板返回结果，成功与失败分别提示；空文本按失败处理。
 - 删除先弹确认框，取消不发请求。有服务端 ID 的消息先删当前账号的漫游历史再删本地，本地消息仅本地删除；失败保留气泡并提示，成功后才以 `delete` 事件透出。删除后会话摘要与时间同步校正；该操作不删除接收方消息。
 - 业务动作可经 `extraMessageMenus` 追加在内置项之后（删除项保持末位），命中时以 `message-menu` 把 key 与消息项交给宿主。
@@ -131,7 +134,7 @@ function onOpenInfo(id: string) {
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条显隐 |
 | `quickReplies` | `EmQuickReply[]` | `[]` | 输入栏上方常用语，空数组不渲染；条目为 `{ label, text? }` |
 | `quickReplyMode` | `EmQuickReplyMode` | `'fill'` | `'fill'` 替换草稿（用户可编辑后再发）；`'send'` 直接发送 |
-| `extraMessageMenus` | `EmMessageMenuExtra[]` | `[]` | 长按菜单追加的业务动作，可带 `types` 限定消息类型；内置 key（copy/quote/recall/delete）不可覆盖 |
+| `extraMessageMenus` | `EmMessageMenuExtra[]` | `[]` | 长按菜单追加的业务动作，可带 `types` 限定消息类型；内置 key（copy/quote/edit/pin/recall/delete）不可覆盖 |
 
 ## Events
 
@@ -154,6 +157,7 @@ function onOpenInfo(id: string) {
 | `stream-message` | `message: EmMessageItem` | 富格式流式消息（`stream.customType` 非空且不是 `text`）。未提供时回落为纯文本气泡 |
 | `custom-message` | `message: EmMessageItem` | 自定义消息（`type='custom'`，按 `customEvent` 区分）与未识别消息类型。默认文案为「[自定义消息]」/「[暂不支持的消息]」 |
 | `input-toolbar` | 无 | 输入栏上方固定区，随键盘一起上移、不参与消息滚动。用于「发订单」「发病例」等业务快捷入口 |
+| `title` | `{ name: string, ext?: Record<string, unknown>, conversationId: string }` | 整标题自绘（导航栏标题位）。缺省回落内置标题（`title` prop > 会话/群/用户昵称回落链）；`ext` 为 `setConversationPresentation` / `setGroupPresentation` 注入的业务载荷 |
 | `input-bar` | `EmChatInputBarScope` | 整栏替换默认输入栏，结构/样式全自绘；键盘避让、面板互斥、录音、禁言、@、草稿等行为经作用域契约由库内保持，详见「整栏自绘输入栏」 |
 
 ### 插槽示例
@@ -293,6 +297,8 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 
 作用域完整字段与类型见 [EmChatInputBarScope](./API-TYPES.md)；行为核心也以 `useChatComposer` composable 导出，供完全自研聊天页的宿主复用同一套键盘/面板/录音逻辑。
 
+App 端自绘注意：`textarea` 是原生组件，`flex` 尺寸与背景样式渲染不可靠——高度/灰底/圆角由包裹层 `view` 承担，textarea 自身 `width/height: 100%`、不设背景（iOS 加 `disable-default-padding`），否则多行生长态下输入区会整体不可见。详见 [常见问题](./FAQ.md)。
+
 ## 消息能力与配置
 
 | 能力 | 默认行为 | 相关配置 |
@@ -300,7 +306,10 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 | 草稿 | 按会话保存，输入即存、清空/发送即清 | `uiConfig.enableDraft` |
 | 时间分隔条 | 相邻消息超过 5 分钟插入 | `uiConfig.timeDividerInterval` |
 | 撤回 | 自己发送且在 2 分钟内可撤回 | `uiConfig.recallTimeLimit` |
-| 长按菜单 | 复制（文本）/ 引用 / 撤回 / 删除 | `uiConfig.messageMenuKeys` |
+| 撤回重编辑 | 自己撤回的文本消息可在占位条回显输入框 | `uiConfig.enableReEdit` |
+| 消息编辑 | 自己发送的文本消息可编辑（单条上限 10 次） | `uiConfig.messageMenuKeys` 含 `edit` |
+| 置顶消息 | 未撤回消息可置顶，多条下拉展开（上限 20 条） | `uiConfig.messageMenuKeys` 含 `pin` |
+| 长按菜单 | 复制（文本）/ 引用 / 编辑 / 置顶 / 撤回 / 删除 | `uiConfig.messageMenuKeys` |
 | 已读回执 | 单聊最新一条自己消息显示已读/未读 | `EmKit.init({ enableReadReceipt })` |
 | 输入状态 | 单聊发送 typing，节流 5 秒、展示 5 秒 | `uiConfig.enableTyping`、`typingThrottle`、`typingTimeout` |
 | 输入栏工具 | 语音 / Emoji / 相册 / 拍照 / 视频 / 文件全开 | `uiConfig.inputFeatures` |

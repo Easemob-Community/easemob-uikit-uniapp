@@ -134,6 +134,7 @@ const { themeClass } = useTheme()
 | `--em-badge-text` | 未读数文字 | `#FFFFFF` | `#1E1E23` |
 | `--em-mask-color` | 弹层遮罩、视频时长胶囊底 | `rgba(0, 0, 0, 0.4)` | `rgba(0, 0, 0, 0.6)` |
 | `--em-skeleton-line-radius` | 骨架屏行圆角（明暗共用） | `4px` | `4px` |
+| `--em-skeleton-bubble-self` | 骨架屏己方气泡浅蓝底（聊天页首屏骨架，由品牌气泡蓝派生、不跟随主色） | `rgba(0, 158, 255, 0.16)` | `rgba(51, 177, 255, 0.2)` |
 
 ## 4. 尺寸与排版变量
 

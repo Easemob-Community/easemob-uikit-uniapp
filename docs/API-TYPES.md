@@ -42,6 +42,29 @@ import {
 | `customEvent` | `string` | 自定义消息事件名，`#custom-message` 按它分发 |
 | `customParams` | `Record<string, string>` | 自定义消息字符串参数 |
 | `stream` | `EmStreamInfo \| undefined` | 流式消息元信息，普通消息为 `undefined` |
+| `modifiedInfo` | `EmMessageModifiedInfo \| undefined` | 编辑元信息，被编辑过（含历史拉取）即存在，文本气泡据此显示「已编辑」 |
+| `pinned` | `boolean \| undefined` | 是否被置顶，由置顶列表同步打标 |
+| `recalledBy` | `string \| undefined` | 撤回操作者 userId；本地撤回有值，远程撤回事件服务端不下发操作者时为 `undefined` |
+
+### `EmMessageModifiedInfo`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `operatorId` | `string` | 编辑操作者 userId |
+| `operationCount` | `number` | 已编辑次数（单条上限 10 次） |
+| `operationTime` | `number` | 最近一次编辑时间戳（毫秒） |
+
+### `EmPinnedMessageItem` / `EmPinnedRow`
+
+置顶消息条目（`messageStore.pinnedByConversationId` 的元素类型）与置顶条展示行。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `message` | `EmMessageItem` | 被置顶消息（已过归一化） |
+| `pinnedAt` | `number` | 置顶时间戳（毫秒），列表按倒序排列 |
+| `operatorId` | `string` | 置顶操作者 userId |
+
+`EmPinnedRow` = `{ id: string; preview: string; item: EmPinnedMessageItem }`，预览文本由 `em-chat-page` 预计算（发送者展示名 + 摘要截断），`em-pinned-bar` 纯展示消费。
 
 ### `EmQuoteInfo`
 
@@ -136,7 +159,7 @@ import {
 
 ### `MESSAGE_MENU_KEY`
 
-`COPY='copy'`、`QUOTE='quote'`、`RECALL='recall'`、`DELETE='delete'`。
+`COPY='copy'`、`QUOTE='quote'`、`EDIT='edit'`、`PIN='pin'`、`RECALL='recall'`、`DELETE='delete'`；默认顺序即为此列表顺序，删除 key 即禁用对应能力。
 
 ## 3. 用户、联系人与群
 
@@ -147,6 +170,18 @@ import {
 | `userId` | `string` | 用户 ID |
 | `nickname` | `string` | 昵称 |
 | `avatarUrl` | `string` | 头像 URL |
+
+### `EmUserPresentation` / `EmConversationPresentation` / `EmGroupPresentation`
+
+宿主业务展示资料注入的 patch 类型（`EmKit.setUserPresentation` / `setConversationPresentation` / `setGroupPresentation` 的第二个参数），注入值优先于 SDK 资料参与回落链。
+
+| 类型 | 字段 | 说明 |
+|---|---|---|
+| `EmUserPresentation` | `nickname?: string`、`avatarUrl?: string` | 用户昵称/头像注入 |
+| `EmConversationPresentation` | `name?: string`、`avatar?: string`、`ext?: Record<string, unknown>` | 会话名/头像注入；`ext` 为业务载荷，随 `#title` / `#title-extra` / `#avatar` 插槽作用域透出 |
+| `EmGroupPresentation` | `name?: string`、`avatar?: string`、`ext?: Record<string, unknown>` | 群名/群头像注入；`ext` 随 `#name-extra` / `#title` 插槽作用域透出 |
+
+三个 API 的 `patch` 均支持传 `null` 表示清除该对象全部注入。
 
 ### `EmContactItem`
 
@@ -248,7 +283,7 @@ import {
 - `CONTACT_ENTRY_KEY`：`NOTICE='notice'`、`GROUP='group'`、`CONTACT='contact'`。
 - `CONTACT_INVITE_STATUS`：`PENDING` / `ACCEPTED` / `DECLINED`。
 - `CONTACT_INVITE_KIND`：`CONTACT='contact'`、`GROUP='group'`。
-- `CONTACT_MENU_KEY`：`DELETE='delete'`。
+- `CONTACT_MENU_KEY`：`REMARK='remark'`、`DELETE='delete'`；默认顺序即备注在前、删除在后。
 - `ALPHABET_KEYS`：`A`–`Z` + `#`。
 
 ### 列表加载常量
@@ -337,6 +372,13 @@ import {
 ### `CONNECTION_STATUS`
 
 `IDLE` / `CONNECTING` / `RECONNECTING` / `ONLINE` / `CLOSED`。
+
+### `ERROR_CODE`
+
+UIKit 业务错误码（挂在 `Error.code` 上，与 SDK `errorCode` 无关），供发送失败归因等场景识别：
+
+- `NETWORK_OFFLINE='EM_NETWORK_OFFLINE'`：发送前预检测命中系统网络离线（该次发送未触达 SDK，消息按失败落库、可重发）。
+- `NETWORK_TIMEOUT='EM_NETWORK_TIMEOUT'`：发送/拉取前的连接等待超时。
 
 ## 6. 平台与媒体类型
 

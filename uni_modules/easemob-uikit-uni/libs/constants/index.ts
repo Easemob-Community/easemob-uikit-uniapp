@@ -165,6 +165,8 @@ export const DEFAULT_CONVERSATION_TABS: ConversationTabKeyValue[] = [
 export const MESSAGE_MENU_KEY = {
   COPY: 'copy',
   QUOTE: 'quote',
+  EDIT: 'edit',
+  PIN: 'pin',
   RECALL: 'recall',
   DELETE: 'delete'
 } as const
@@ -176,6 +178,12 @@ export const TIME_DIVIDER_INTERVAL = 5 * 60 * 1000
 
 /** 消息撤回时间窗口（毫秒，2 分钟；超出后长按菜单不出现撤回项，对齐 vue 版 recallTimeLimit 默认 2min） */
 export const RECALL_TIME_LIMIT = 2 * 60 * 1000
+
+/** 单条消息可编辑次数上限（websdk 5.x modifyMessage 服务端约束；vue 版旧口径 5 次，以本地 SDK d.ts 为准） */
+export const MESSAGE_MODIFY_COUNT_LIMIT = 10
+
+/** 置顶条预览文本截断长度（对齐 vue 版 pinnedBar maxPreviewLength 默认 30） */
+export const PINNED_PREVIEW_MAX_LENGTH = 30
 
 /** typing 信号：发送节流间隔（同一会话内该间隔最多发一条 cmd），对齐 vue 版 5s */
 export const TYPING_THROTTLE = 5 * 1000
@@ -205,6 +213,7 @@ export type MediaPanelKeyValue = (typeof MEDIA_PANEL_KEY)[keyof typeof MEDIA_PAN
 
 /** 联系人页菜单 action key（条目长按） */
 export const CONTACT_MENU_KEY = {
+  REMARK: 'remark',
   DELETE: 'delete'
 } as const
 
@@ -302,6 +311,16 @@ export const LOAD_MORE_STATE = {
 } as const
 
 export type LoadMoreStateValue = (typeof LOAD_MORE_STATE)[keyof typeof LOAD_MORE_STATE]
+
+/** UIKit 业务错误码（挂在 Error.code 上，与 SDK errorCode 无关）：发送失败归因、网络预检测拦截等场景识别用 */
+export const ERROR_CODE = {
+  /** 发送前预检测命中：系统网络离线（该次发送未触达 SDK） */
+  NETWORK_OFFLINE: 'EM_NETWORK_OFFLINE',
+  /** 发送/拉取前的连接等待超时（waitOnline） */
+  NETWORK_TIMEOUT: 'EM_NETWORK_TIMEOUT'
+} as const
+
+export type ErrorCodeValue = (typeof ERROR_CODE)[keyof typeof ERROR_CODE]
 
 /** 联系人字母分组序列（A-Z + #，对齐 vue 版 DEFAULT_ALPHABET_KEYS） */
 export const ALPHABET_KEYS = [

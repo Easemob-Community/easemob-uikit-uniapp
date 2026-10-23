@@ -19,13 +19,19 @@
       <em-search-bar v-if="showSearch" v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
 
       <scroll-view :class="ns.e('scroll')" scroll-y>
-        <!-- 首次同步骨架（对齐 vue 版 conversation-list：替代转圈，6 条会话条目占位） -->
+        <!-- 首次同步骨架：条目形态对齐 em-conversation-item（圆头像 + 名字/时间行 + 摘要/未读行，逐行变宽） -->
         <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
-          <view v-for="index in SKELETON_COUNT" :key="index" :class="ns.e('skeleton-item')">
-            <em-skeleton variant="avatar" shape="rounded" width="48px" height="48px" />
-            <view :class="ns.e('skeleton-lines')">
-              <em-skeleton :width="SKELETON_LINE_WIDTHS[0]" />
-              <em-skeleton :width="SKELETON_LINE_WIDTHS[1]" :class="ns.e('skeleton-line-sub')" />
+          <view v-for="(nameWidth, index) in SKELETON_NAME_WIDTHS" :key="index" :class="ns.e('skeleton-item')">
+            <em-skeleton variant="avatar" shape="circle" width="48px" height="48px" />
+            <view :class="ns.e('skeleton-body')">
+              <view :class="ns.e('skeleton-top')">
+                <em-skeleton :width="nameWidth" height="16px" />
+                <em-skeleton width="32px" height="12px" :class="ns.e('skeleton-time')" />
+              </view>
+              <view :class="ns.e('skeleton-bottom')">
+                <em-skeleton :width="SKELETON_SUMMARY_WIDTHS[index]" height="14px" />
+                <em-skeleton v-if="SKELETON_UNREAD_ROWS[index]" variant="avatar" shape="circle" width="16px" height="16px" :class="ns.e('skeleton-badge')" />
+              </view>
             </view>
           </view>
         </view>
@@ -49,9 +55,15 @@
           :time-text="entry.timeText"
           :draft="entry.draft"
           :has-at-me="entry.hasAtMe"
+          :ext="entry.ext"
           @click="onSelect"
           @long-press="onLongPress"
-        />
+        >
+          <!-- 标题扩展位透传（标签/业务徽标）：scope 同 em-conversation-item 的 #title-extra -->
+          <template #title-extra="scope">
+            <slot name="title-extra" :item="scope.item" :name="scope.name" :ext="scope.ext" />
+          </template>
+        </em-conversation-item>
       </scroll-view>
 
       <em-action-sheet
@@ -98,7 +110,7 @@ import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { draftStore } from '../../../libs/store/draft'
 import { connectionStore } from '../../../libs/store/connection'
 import { contactDisplayNameOf, contactStore } from '../../../libs/store/contact'
-import { groupDisplayNameOf, groupStore } from '../../../libs/store/group'
+import { groupAvatarOf, groupDisplayNameOf } from '../../../libs/store/group'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { ConversationTypeValue, ConversationTabKeyValue } from '../../../libs/constants'
 import type { EmActionSheetAction, EmConversationItem as EmConversationData, EmSelectContactItem } from '../../../libs/types'
@@ -194,8 +206,10 @@ const tabEmptyText = computed<Record<ConversationTabKeyValue, string>>(() => ({
 }))
 
 // 首次同步骨架：条数与行宽对齐 vue 版 conversation-list（6 条、40%/70% 两行）
-const SKELETON_COUNT = 6
-const SKELETON_LINE_WIDTHS = ['40%', '70%']
+// 骨架行宽预设：名字/摘要宽度逐行变化，模拟真实会话长度分布；未读徽标只对部分行（真实列表仅部分会话未读）
+const SKELETON_NAME_WIDTHS = ['52%', '38%', '60%', '44%', '56%', '34%']
+const SKELETON_SUMMARY_WIDTHS = ['68%', '50%', '42%', '62%', '36%', '58%']
+const SKELETON_UNREAD_ROWS = [true, false, true, true, false, true]
 
 interface Entry {
   item: EmConversationData
@@ -204,6 +218,7 @@ interface Entry {
   draft: { text: string, time: number } | null
   timeText: string
   hasAtMe: boolean
+  ext: Record<string, unknown> | undefined
 }
 
 // 名称回落链（对齐 vue 版 conversation-item）：
@@ -232,12 +247,17 @@ const items = computed<Entry[]>(() => {
         ? groupName
         : displayNameOf(item.conversationId, item.name)
       const userAvatar = avatarOf(item.conversationId)
-      const groupAvatar = isGroup ? (groupStore.infoByGroupId[item.conversationId]?.avatar ?? '') : ''
+      const groupAvatar = isGroup ? groupAvatarOf(item.conversationId) : ''
       const avatar = userAvatar !== '' ? userAvatar : (groupAvatar !== '' ? groupAvatar : item.avatar)
       const draft = draftStore.draftByConversationId[item.conversationId] ?? null
       const time = draft != null && draft.time > item.lastMessageTime ? draft.time : item.lastMessageTime
       const hasAtMe = conversationStore.atMeByConversationId[item.conversationId] === true
-      return { item, name, avatar, draft, timeText: formatConversationTime(time), hasAtMe }
+      // 宿主业务注入（EmKit.setConversationPresentation）：name/avatar 最优先，ext 随条目插槽 scope 透出；
+      // 注入存于 store.overrideByConversationId，会话快照整量回写不影响（响应式，写入即更新）
+      const presentation = conversationStore.overrideByConversationId[item.conversationId]
+      const finalName = presentation?.name != null && presentation.name !== '' ? presentation.name : name
+      const finalAvatar = presentation?.avatar != null && presentation.avatar !== '' ? presentation.avatar : avatar
+      return { item, name: finalName, avatar: finalAvatar, draft, timeText: formatConversationTime(time), hasAtMe, ext: presentation?.ext }
     })
     .filter((entry) => {
       // 筛选 tab 维度（对齐 vue 版 conversation-list：unread=unreadCount>0、atMe=atMeMap 命中、single/group=chatType）
@@ -340,8 +360,10 @@ function onLongPress(conversationId: string): void {
   itemSheetVisible.value = true
 }
 
-// 长按菜单标题：群会话走群展示名回落链（与列表条目同名口径）
+// 长按菜单标题：宿主会话注入 > 群会话走群展示名回落链（与列表条目同名口径）
 function sheetTitleOf(item: EmConversationData): string {
+  const override = conversationStore.overrideByConversationId[item.conversationId]?.name
+  if (override != null && override !== '') return override
   if (item.chatType === CONVERSATION_TYPE.GROUP_CHAT) {
     const groupName = groupDisplayNameOf(item.conversationId)
     if (groupName !== item.conversationId) return groupName

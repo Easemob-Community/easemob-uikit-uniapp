@@ -1,6 +1,13 @@
 <template>
   <view class="page" :class="themeClass">
-    <em-conversation-page @select="onSelect" @menu="onMenu" />
+    <!-- #title-extra 演示：场景实验室注入 ext.demoTag 的会话，标题旁渲染宿主业务标签 -->
+    <em-conversation-page @select="onSelect" @menu="onMenu">
+      <template #title-extra="{ ext }">
+        <view v-if="tagOf(ext) !== ''" class="demo-tag">
+          <text class="demo-tag__text">{{ tagOf(ext) }}</text>
+        </view>
+      </template>
+    </em-conversation-page>
   </view>
 </template>
 
@@ -9,6 +16,7 @@ import { onLoad, onShow } from '@dcloudio/uni-app'
 import { EmKit, CONVERSATION_MENU_KEY, useTabBarBadge } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
+import { tagOf } from '@/common/presentation-demo'
 
 const { themeClass } = useDemoTheme()
 
@@ -69,5 +77,21 @@ function onMenu(key: string) {
   flex-direction: column;
   height: 100%;
   background-color: var(--em-conversation-list-bg);
+}
+
+/* #title-extra 演示标签：场景实验室「业务资料注入」开启后，注入 ext.demoTag 的会话标题旁展示 */
+.demo-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background-color: var(--em-bg-active);
+  flex-shrink: 0;
+}
+
+.demo-tag__text {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-10);
+  line-height: 14px;
+  color: var(--em-primary-color);
 }
 </style>

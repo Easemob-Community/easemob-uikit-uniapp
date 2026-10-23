@@ -13,6 +13,7 @@
   padding: var(--em-spacing-1);
 }
 
+/* 群同步骨架：条目形态对齐真实 __item（64px 卡片行 + 方形头像 + 群名 + 右侧人数），逐行变宽 */
 .em-group-page__skeleton {
   display: flex;
   flex-direction: column;
@@ -23,18 +24,21 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  margin-bottom: 12px;
+  height: var(--em-cell-height);
+  padding: 0 var(--em-spacing-3);
+  background-color: var(--em-bg-base);
+  border-radius: var(--em-radius);
+  margin-bottom: var(--em-spacing-1);
 }
 
 .em-group-page__skeleton-lines {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  margin-left: 12px;
+  margin-left: var(--em-spacing-3);
+  margin-right: var(--em-spacing-2);
 }
 
-.em-group-page__skeleton-line-sub {
-  margin-top: 8px;
+.em-group-page__skeleton-count {
+  flex-shrink: 0;
 }
 
 /* 群条目：64px 卡片行（对齐 vue 版 group-list cell 口径：白底圆角 8px、项间距 4px、内容左右 12px） */

@@ -5,7 +5,7 @@
 | 页面组件 | 源码 | 职责 | 典型路由 |
 |---|---|---|---|
 | `em-contact-page` | `components/pages/em-contact-page/em-contact-page.vue` | 通讯录入口：三入口、计数、红点、添加入口 | tabBar 页或通讯录首页 |
-| `em-contact-list-page` | `components/pages/em-contact-list-page/em-contact-list-page.vue` | 好友全量列表：字母分组、索引条、搜索、长按删除 | `contact-list` |
+| `em-contact-list-page` | `components/pages/em-contact-list-page/em-contact-list-page.vue` | 好友全量列表：字母分组、索引条、搜索、长按备注/删除 | `contact-list` |
 | `em-contact-requests-page` | `components/pages/em-contact-requests-page/em-contact-requests-page.vue` | 好友申请与群邀请：接受/拒绝、状态展示 | `contact-requests` |
 
 三个页面组件都在 `components/pages/` 下，需要 `pages.json` 的 custom easycom 规则（见 [快速开始](./QUICKSTART.md) 3.1 节）；都自带 `em-nav-bar`，路由设 `navigationStyle: "custom"`，App 端同时设 `app-plus.titleNView: false`。
@@ -109,8 +109,8 @@ function onAdd() {
 - 字母分组：A-Z 加 `#`，空组自动剔除，组内按展示名排序；没有拼音结果的中文名会进入 `#` 组。
 - 右侧字母索引条：点击或滑动跳转到对应分组并高亮；没有好友的字母置灰；首次加载完成后默认高亮第一组。
 - 搜索：匹配展示名、userId；注入拼音适配器后同时匹配全拼与首字母（见下节）。
-- `loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表。首次同步且无数据时展示 8 条骨架；后台或受控刷新失败且无缓存时显示错误与重试，有缓存或搜索无结果时保留原列表/空态，只有同步成功后的空列表才显示普通空态。重试调用 SDK `refreshContactSnapshot` 受控刷新。
-- 长按好友打开操作菜单：当前版本只提供「删除好友」，二次确认后调用 `EmKit.deleteContact`，按 userId 防重复提交；成功 toast 并刷新列表，失败保留当前状态。
+- `loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表。首次同步且无数据时展示 8 条条目骨架（含字母分组头）；后台或受控刷新失败且无缓存时显示错误与重试，有缓存或搜索无结果时保留原列表/空态，只有同步成功后的空列表才显示普通空态。重试调用 SDK `refreshContactSnapshot` 受控刷新。
+- 长按好友打开操作菜单：「备注」与「删除好友」。备注弹出居中编辑弹层，回填当前备注（无长度上限，清空输入即清除备注），保存调用 `EmKit.setContactRemark` 并按 userId 防重复提交；成功后备注立即在好友列表、会话列表、聊天页标题与引用卡上生效（备注 > 昵称 > userId），失败 toast 并保留弹层可重试。删除需二次确认后调用 `EmKit.deleteContact`，按 userId 防重复提交；成功 toast 并刷新列表，失败保留当前状态。菜单项与顺序由 `uiConfig.contactMenuKeys` 控制（默认备注在前、删除在后）。
 - 列表底部固定展示「没有更多了」：好友数据是 SDK 本地全量，没有分页。
 
 ### 最小用法
@@ -162,7 +162,7 @@ function onBack() {
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `menuKeys` | `ContactMenuKeyValue[]` | `['delete']` | 长按菜单项与顺序，取值来自 `CONTACT_MENU_KEY`；当前版本仅 `delete` 可用 |
+| `menuKeys` | `ContactMenuKeyValue[]` | 回落 `uiConfig.contactMenuKeys`（`['remark','delete']`） | 长按菜单项与顺序，取值来自 `CONTACT_MENU_KEY`；`remark` 修改备注、`delete` 删除好友 |
 | `autoSync` | `boolean` | `true` | 首次挂载自动读好友快照（要求已登录）；关闭后由宿主控制同步时机 |
 
 ### Events

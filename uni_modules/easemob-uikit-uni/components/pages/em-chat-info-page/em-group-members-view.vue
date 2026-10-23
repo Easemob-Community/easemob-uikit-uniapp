@@ -8,8 +8,18 @@
     <em-search-bar v-model="keyword" :placeholder="t('group.memberSearchPlaceholder')" />
 
     <scroll-view :class="ns.e('scroll')" scroll-y @scrolltolower="onScrollToLower">
+      <!-- 首屏成员加载骨架：条目形态对齐真实成员行（40 圆头像 + 名单行 + 角色角标偶现行），逐行变宽 -->
+      <view v-if="initialLoading && members.length === 0" :class="ns.e('skeleton')">
+        <view v-for="(width, index) in SKELETON_NAME_WIDTHS" :key="index" :class="ns.e('skeleton-item')">
+          <em-skeleton variant="avatar" shape="circle" width="40px" height="40px" />
+          <view :class="ns.e('skeleton-main')">
+            <em-skeleton :width="width" height="14px" />
+          </view>
+          <view v-if="SKELETON_ROLE_ROWS[index]" :class="ns.e('skeleton-role')" />
+        </view>
+      </view>
       <em-empty
-        v-if="initialLoadFailed && members.length === 0"
+        v-else-if="initialLoadFailed && members.length === 0"
         icon="circle-bang"
         :description="t('group.memberLoadFailed')"
       >
@@ -59,6 +69,7 @@ import EmIcon from '../../em-icon/em-icon.vue'
 import EmLoadMore from '../../em-load-more/em-load-more.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
+import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmText from '../../em-text/em-text.vue'
 import { EmKit } from '../../../libs'
 import { GROUP_MEMBER_ACTION, GROUP_MEMBER_ROLE, LOAD_MORE_STATE } from '../../../libs/constants'
@@ -103,6 +114,10 @@ const initialLoading = ref(false)
 const initialLoadFailed = ref(false)
 
 const members = computed(() => groupStore.memberMapByGroupId[props.groupId] ?? [])
+
+// 首屏骨架行宽预设：名单宽度逐行变化；角色角标只给前两行（对齐真实 owner/admin 偶现行）
+const SKELETON_NAME_WIDTHS = ['36%', '48%', '28%', '44%', '52%', '32%', '40%', '56%']
+const SKELETON_ROLE_ROWS = [true, true, false, false, false, false, false, false]
 
 const memberCount = computed(() => {
   const info = groupStore.infoByGroupId[props.groupId]

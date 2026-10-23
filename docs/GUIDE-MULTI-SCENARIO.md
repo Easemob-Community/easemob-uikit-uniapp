@@ -1,8 +1,9 @@
 # 多场景接入：客服、医疗、招聘、二手交易
 
-> 适用版本 **1.0.0-rc.1**。适合已经跑通登录、想把 IM 嵌进业务页面的宿主开发者（H5 移动端 / 微信小程序 / App 三端同一套代码）。
+> [!TIP]
+> **适用版本与目标读者**：适用版本 **1.0.0-rc.1**。适合已经跑通登录、想把 IM 嵌进业务页面的宿主开发者（H5 移动端 / 微信小程序 / App 三端同一套代码）。
 >
-> 这页解决什么问题：**不做会话列表**，从业务入口直接进入 1v1 会话（或多客服群聊），并把订单号、病例、职位、商品这类业务上下文带进聊天页；同时按业务需要改标题、加固定业务条、加卡片消息、加常用话术和长按动作。
+> **这页解决什么问题**：**不做会话列表**，从业务入口直接进入 1v1 会话（或多客服群聊），并把订单号、病例、职位、商品这类业务上下文带进聊天页；同时按业务需要改标题、加固定业务条、加卡片消息、加常用话术和长按动作。
 
 配套阅读：[聊天页](./PAGES-CHAT.md)（`em-chat-page` 全部契约）、[消息与扩展协议](./MESSAGING.md)（custom/ext/引用协议）、[EmKit API](./API-KIT.md)、[配置参考](./CONFIG.md)、[AI 流式消息](./AI-STREAM.md)、[示例工程](./DEMO.md)。
 
@@ -386,6 +387,49 @@ const peerUnread = useConversationUnreadCount(peerUserId)    // 单会话未读�
 
 - 非 tabBar 入口（业务页按钮）直接用 `conversationUnread.value` / `peerUnread.value` 渲染 `em-badge`。
 - `useConversationUnreadCount` 也接受 `ref`（动态会话 id）；非 setup 场景用 `EmKit.conversationUnreadCountOf(conversationId)` 取快照。
+
+### 5.7 业务资料注入（`set*Presentation`）
+
+宿主业务资料（CRM 昵称、员工头像、群名标签）经三个注入 API 写入，优先于 SDK 资料参与全库回落链；注入层与 SDK 数据分层存储，资料回推与会话快照刷新不会冲掉注入值。写入即响应式更新：
+
+```ts
+// 单聊：对端显示业务昵称；会话标题/列表旁挂业务标签（ext 随插槽 scope 透出）
+EmKit.setUserPresentation(peerId, { nickname: '张医生（皮肤科）' })
+EmKit.setConversationPresentation(peerId, { ext: { tag: '复诊' } })
+
+// 群聊：群名旁打标签（会话列表、聊天页标题、群详情页同步生效）
+EmKit.setGroupPresentation(groupId, { ext: { tag: '3 床家属群' } })
+```
+
+标签等扩展 UI 由宿主经插槽自绘——注入只负责数据与优先级：
+
+```vue
+<!-- 聊天页：整标题自绘（名称 + 业务标签） -->
+<em-chat-page :conversation-id="id" :chat-type="chatType">
+  <template #title="{ name, ext }">
+    <view class="title-row">
+      <text class="title-text">{{ name }}</text>
+      <view v-if="ext?.tag" class="title-tag"><text class="title-tag-text">{{ ext.tag }}</text></view>
+    </view>
+  </template>
+</em-chat-page>
+
+<!-- 会话列表：条目标题旁追加标签 -->
+<em-conversation-page @select="onSelect">
+  <template #title-extra="{ ext }">
+    <view v-if="ext?.tag" class="row-tag"><text class="row-tag-text">{{ ext.tag }}</text></view>
+  </template>
+</em-conversation-page>
+
+<!-- 群详情页：群名旁追加标签 -->
+<em-chat-info-page :conversation-id="groupId" :chat-type="CONVERSATION_TYPE.GROUP_CHAT">
+  <template #group-name-extra="{ ext }">
+    <view v-if="ext?.tag" class="name-tag"><text class="name-tag-text">{{ ext.tag }}</text></view>
+  </template>
+</em-chat-info-page>
+```
+
+清除注入传 `null`（如退出业务态时还原默认展示）：`EmKit.setConversationPresentation(peerId, null)`。登出/换账号后注入清空，在 `login` 成功后重新注入。API 细节见 [EmKit 门面](./API-KIT.md)。
 
 ## 6. AI 流式回复
 

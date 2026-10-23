@@ -1,9 +1,10 @@
 import type { ChatClient, LogEntry, PlatformAdapterOverrides } from 'easemob-websdk'
-import { CONNECTION_STATUS, LOG_LEVEL } from '../constants'
+import { CONNECTION_STATUS, ERROR_CODE, LOG_LEVEL } from '../constants'
 import { connectionStore } from '../store/connection'
+import { errorWithCode } from '../utils/error'
 import { applyKitConfig } from '../store/config'
 import { setLocale } from '../use/useLocale'
-import { subscribeNetworkStatus } from '../platform'
+import { subscribeNetworkStatus, checkNetworkOnce } from '../platform'
 import { createLogger, setLogLevel } from '../utils/logger'
 import type { EmKitConfig, EmLoginOptions, EmTokenRenewalResult } from '../types'
 import { ensureSdkModule, setSdkLoader, setSdkModule } from './sdk'
@@ -11,6 +12,24 @@ import { ensureSdkModule, setSdkLoader, setSdkModule } from './sdk'
 const logger = createLogger('client')
 // SDK onLog 转发出口（ns 独立，方便单独过滤 SDK 侧日志）
 const sdkLogger = createLogger('sdk')
+
+// ========== UI 侧系统网络感知（幂等单例） ==========
+// SDK runtime 有自己的一路网络监听（喂重连循环），这一路独立注册只回写 connectionStore，
+// 供 banner 先决显示与发送/登录预检测用；两路互不干扰，不合并。
+let systemNetworkUnsub: (() => void) | null = null
+
+function ensureSystemNetworkWatch(): void {
+  if (systemNetworkUnsub != null) return
+  systemNetworkUnsub = subscribeNetworkStatus((online) => {
+    connectionStore.networkOnline = online
+  })
+  // onNetworkStatusChange 只在变化时回调，开局先探测一次写初值（null = 未知，不预判）
+  void checkNetworkOnce().then((online) => {
+    if (online !== null) {
+      connectionStore.networkOnline = online
+    }
+  })
+}
 
 // 平台适配错误转一行日志：SDK 的 PlatformAdapterError 把真实原因放在 details/cause 里，
 // 只打 message 会丢掉「哪一步、哪条路径、什么 errCode」
@@ -93,6 +112,8 @@ export class EmClient {
     applyKitConfig(config)
     setLogLevel(config.logLevel ?? LOG_LEVEL.INFO)
     if (config.locale != null) setLocale(config.locale)
+    // 系统网络监听先挂上：登录前的离线也能被 banner/预检测感知（幂等，logout 不撤）
+    ensureSystemNetworkWatch()
     // SDK 模块就绪门：非小程序端为微任务级直通，小程序分包场景为真实异步
     this.initPromise = this.doInit(config)
   }
@@ -248,7 +269,8 @@ export class EmClient {
       logger.info('login success:', options.userId)
     } catch (e) {
       connectionStore.status = CONNECTION_STATUS.CLOSED
-      logger.error('login failed:', options.userId, e)
+      // 系统离线标记：登录失败的排查第一问通常是「是不是没网」，这里直接留痕，不改抛出值
+      logger.error('login failed:', options.userId, connectionStore.networkOnline === false ? '(system offline)' : '', e)
       throw e
     }
   }
@@ -279,7 +301,7 @@ export class EmClient {
           resolve()
         } else if (Date.now() - start > timeout) {
           clearInterval(timer)
-          reject(new Error('waitOnline timeout'))
+          reject(errorWithCode(ERROR_CODE.NETWORK_TIMEOUT, 'waitOnline timeout'))
         }
       }, 100)
     })

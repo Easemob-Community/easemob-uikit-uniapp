@@ -276,7 +276,7 @@ import EmGroupMembersView from '@/uni_modules/easemob-uikit-uni/components/pages
 | 组件 | 定位 | 指南 |
 |---|---|---|
 | `em-contact-page` | 通讯录入口页：搜索过滤入口项、好友列表 / 群组 / 新请求三个入口、右上角添加好友；事件 `entry-click`、`add` | [通讯录与好友](./PAGES-CONTACTS.md) |
-| `em-contact-list-page` | 好友列表页：字母分组、索引条、搜索、长按删除好友；事件 `select`、`back`；props `menuKeys`（默认 `['delete']`）、`autoSync`（默认 `true`） | [通讯录与好友](./PAGES-CONTACTS.md) |
+| `em-contact-list-page` | 好友列表页：字母分组、索引条、搜索、长按备注/删除好友；事件 `select`、`back`；props `menuKeys`（缺省回落 `uiConfig.contactMenuKeys`，默认 `['remark','delete']`）、`autoSync`（默认 `true`） | [通讯录与好友](./PAGES-CONTACTS.md) |
 | `em-contact-requests-page` | 好友申请页：待处理申请与历史申请、同意/拒绝；事件 `back` | [通讯录与好友](./PAGES-CONTACTS.md) |
 | `em-group-page` | 群组列表页：已加入群列表、建群面板、跳转群聊；事件 `click-group`、`created`、`back`；props `showNameInput`（默认 `false`）、`showSettings`（默认 `false`） | [群组列表与建群](./PAGES-GROUPS.md) |
 | `em-chat-info-page` | 聊天信息与群资料页：会话设置、群成员区、群名称与群公告、退群/解散；props `conversationId`、`chatType`、三个显隐开关；事件 `back`、`deleted`、`leaved`、`invite`、`remove-members`、`open-members`、`chat-member` | [聊天信息与群资料](./PAGES-CHAT-INFO.md) |

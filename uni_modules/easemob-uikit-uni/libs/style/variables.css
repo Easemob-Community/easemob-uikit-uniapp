@@ -143,8 +143,9 @@
   --em-empty-icon-color: #C9CDCF;
   --em-empty-text-color: #919BA1;
 
-  /* 骨架屏（底色复用 --em-bg-hover） */
+  /* 骨架屏（行底色复用 --em-bg-hover；己方气泡浅蓝由品牌气泡蓝派生、不跟随主色） */
   --em-skeleton-line-radius: 4px;
+  --em-skeleton-bubble-self: rgba(0, 158, 255, 0.16);
 
   /* 徽标（未读数/红点，独立于 danger 色） */
   --em-badge-bg: #FF7070;
@@ -204,6 +205,7 @@
   --em-empty-text-color: #737B82;
 
   --em-skeleton-line-radius: 4px;
+  --em-skeleton-bubble-self: rgba(51, 177, 255, 0.2);
 
   --em-badge-bg: #FF7070;
   --em-badge-text: #1E1E23;

@@ -84,6 +84,14 @@ export class EmChat {
       onMessageRecalled: (payload) => {
         this.messages.markRecalled(payload.conversationId, payload.messageId)
       },
+      // 远程消息编辑（本端编辑走 modifyTextMessage 成功回包本地 patch，SDK 事件不回推操作设备）
+      onMessageUpdated: (payload) => {
+        this.messages.applyMessageUpdated(payload)
+      },
+      // 远端/其他设备置顶变更：操作设备经 Promise 拿结果不走事件，统一重拉该会话置顶列表
+      onPinnedMessageChanged: (payload) => {
+        this.messages.onPinnedMessageChanged(payload.conversationId, payload.conversationType as string)
+      },
       onMessageReadReceipts: (receipts) => {
         receipts.forEach((r) => {
           this.messages.applyPeerReadTime(r.conversationType, r.conversationId, r.timestamp)
@@ -239,6 +247,24 @@ export class EmChat {
 
   async recallMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
     return this.messages.recallMessage(conversationId, chatType, messageId)
+  }
+
+  // 编辑已发送的文本消息（M2.20）：成功后同步会话摘要（编辑可能改变末条消息预览）
+  async modifyTextMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string, text: string): Promise<void> {
+    await this.messages.modifyTextMessage(conversationId, chatType, messageId, text)
+    this.conversations.syncMessageSummary(conversationId)
+  }
+
+  async pinMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
+    return this.messages.pinMessage(conversationId, chatType, messageId)
+  }
+
+  async unpinMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
+    return this.messages.unpinMessage(conversationId, chatType, messageId)
+  }
+
+  async refreshPinnedMessages(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
+    return this.messages.refreshPinnedMessages(conversationId, chatType)
   }
 
   async deleteMessage(message: EmMessageItem): Promise<void> {

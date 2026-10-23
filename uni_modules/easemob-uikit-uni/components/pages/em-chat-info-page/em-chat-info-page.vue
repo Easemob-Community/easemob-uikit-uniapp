@@ -29,7 +29,12 @@
           @open-members="onOpenMembers"
           @edit-name="nameEditShow = true"
           @show-announcement="announcementShow = true"
-        />
+        >
+          <!-- 群名扩展位透传（标签/业务徽标）：scope 同 em-group-info-blocks 的 #name-extra -->
+          <template #name-extra="scope">
+            <slot name="group-name-extra" :group-id="scope.groupId" :name="scope.name" :ext="scope.ext" />
+          </template>
+        </em-group-info-blocks>
 
         <!-- 设置 cell 组（52px 行高 + 发丝分隔线，对齐 vue 版 EmCell compact） -->
         <view :class="ns.e('group')">

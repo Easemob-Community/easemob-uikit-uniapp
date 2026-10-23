@@ -5,7 +5,7 @@
     <!-- 流式光标/异常提示必须是「常驻子 text + 内容切换」，不能 v-if 增删：
          鸿蒙蒸汽端在 text 内移除子 text 后，父 text 的字形不再绘制（气泡保留整块高度但全空白，
          M2.13 真机实测）。常驻节点只改文本内容，结构不变，避免触发该渲染缺陷。 -->
-    <text v-if="segments.length === 0" :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">{{ message.text }}<text :class="[ns.e('stream-cursor'), message.self && ns.m('stream-cursor-self')]">{{ streamCursorText }}</text><text :class="[ns.e('stream-error'), message.self && ns.m('stream-error-self')]">{{ streamErrorText }}</text></text>
+    <text v-if="segments.length === 0" :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">{{ message.text }}<text :class="[ns.e('stream-cursor'), message.self && ns.m('stream-cursor-self')]">{{ streamCursorText }}</text><text :class="[ns.e('stream-error'), message.self && ns.m('stream-error-self')]">{{ streamErrorText }}</text><text :class="ns.e('edited')">{{ showEdited ? t('message.edited') : '' }}</text></text>
     <text v-else :class="[ns.e('text'), message.self ? 'em-text-message__text--self' : '']">
       <template v-for="(seg, idx) in segments" :key="idx">
         <text
@@ -15,13 +15,15 @@
         >{{ seg.value }}</text>
         <text v-else>{{ seg.value }}</text>
       </template>
+      <!-- 「已编辑」标记必须常驻子 text + 内容切换（同流式光标纪律）：鸿蒙蒸汽端在 text 内增删子 text 会触发父 text 字形整块不绘制 -->
+      <text :class="ns.e('edited')">{{ showEdited ? t('message.edited') : '' }}</text>
     </text>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { MESSAGE_EXT_KEY, STREAM_CURSOR_CHAR, STREAM_MESSAGE_STATUS } from '../../libs/constants'
+import { MESSAGE_EXT_KEY, MESSAGE_STATUS, STREAM_CURSOR_CHAR, STREAM_MESSAGE_STATUS } from '../../libs/constants'
 import type { EmMessageItem, MentionContact } from '../../libs/types'
 import { parseMentions } from '../../libs/utils/mention'
 import { isPlainTextStream, isStreamActive } from '../../libs/utils/stream'
@@ -53,6 +55,10 @@ const emit = defineEmits<{
 
 const ns = useNamespace('text-message')
 const { t } = useLocale()
+
+// 「已编辑」标记（M2.20）：modifiedInfo 存在即已编辑（含历史拉取），气泡内文本尾部灰字（对齐 vue 版）；
+// 撤回墓碑不显示（vue 对齐 isModified 排除 recalled）
+const showEdited = computed(() => props.message.modifiedInfo != null && props.message.status !== MESSAGE_STATUS.RECALLED)
 
 /**
  * 流式消息展示态（M2.13）：分片合并由数据层完成，这里只负责展示。

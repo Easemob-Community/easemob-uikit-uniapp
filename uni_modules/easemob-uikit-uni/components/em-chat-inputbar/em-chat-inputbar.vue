@@ -8,6 +8,19 @@
       @select="onQuickReply"
     />
 
+    <!-- 编辑条（M2.20）：编辑态优先于引用条展示（对齐 vue 版 editing-bar）；
+         铅笔图标 + 「编辑消息」+ 原文单行截断 + 关闭（取消编辑退编辑态并清空输入，由父组件处理） -->
+    <view v-if="editing != null" :class="ns.e('editbar')">
+      <EmIcon name="rect-pencil" :size="14" :class="ns.e('editbar-icon')" />
+      <view :class="ns.e('editbar-main')">
+        <text :class="ns.e('editbar-title')">{{ t('message.editing') }}</text>
+        <text :class="ns.e('editbar-preview')">{{ editing.preview }}</text>
+      </view>
+      <view :class="ns.e('editbar-close')" @click="emit('edit-close')">
+        <EmIcon name="circle-xmark" :size="18" />
+      </view>
+    </view>
+
     <!-- 引用条（对齐 vue 版 quote-bar）：无边框无底色，2px 竖杠 + 摘要单行省略 + 18×18 纯图标关闭 -->
     <view v-if="quote != null" :class="ns.e('quotebar')">
       <view :class="ns.e('quotebar-line')"></view>
@@ -138,6 +151,8 @@ import { useLocale } from '../../libs/use/useLocale'
 interface Props {
   modelValue: string
   quote: EmQuoteInfo | null
+  /** 编辑态（M2.20）：非空时输入栏上方展示编辑条（优先于引用条），关闭经 edit-close 交回父组件 */
+  editing?: { preview: string } | null
   /** 输入栏功能集（chat-page 从 uiConfig 读出传入；原子组件不连 store），默认全开 */
   features?: EmInputFeatures
   /** emoji 面板字符集，默认内置 96（constants DEFAULT_EMOJI_LIST） */
@@ -159,6 +174,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   quote: null,
+  editing: null,
   features: () => ({ voice: true, emoji: true, image: true, camera: true, video: true, file: true, sendOnReturn: true }),
   emojis: () => DEFAULT_EMOJI_LIST,
   disabled: false,
@@ -176,6 +192,8 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'send'): void
   (e: 'quote-close'): void
+  // 编辑条关闭（M2.20）：父组件退编辑态并清空输入（vue 对齐 handleCancelEdit）
+  (e: 'edit-close'): void
   (e: 'media-select', key: string): void
   (e: 'voice-send', path: string, duration: number): void
   // 草稿尾部新增 @ 字符时触发（uni input 无光标 API，只支持尾部追加触发，与 emoji 同款限制）；

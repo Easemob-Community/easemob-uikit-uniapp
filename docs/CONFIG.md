@@ -46,6 +46,8 @@ EmKit.init({
 |---|---|---|---|
 | `enableDraft` | `boolean` | `true` | 输入栏草稿 |
 | `enableTyping` | `boolean` | `true` | “正在输入”信令（发送节流 + 接收展示） |
+| `enableReEdit` | `boolean` | `true` | 撤回消息的「重新编辑」按钮：自己撤回的文本消息可在撤回条上回显输入框重新发送 |
+| `enableGroupNameEdit` | `boolean` | `true` | 群信息页群名修改入口（仅群主可见笔图标） |
 | `recallTimeLimit` | `number` | `120000` | 撤回时间窗口（毫秒） |
 | `typingThrottle` | `number` | `5000` | typing 发送节流（毫秒） |
 | `typingTimeout` | `number` | `5000` | typing 展示超时（毫秒） |
@@ -58,8 +60,9 @@ EmKit.init({
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `inputFeatures` | `Partial<EmInputFeatures>` | 全部开启 | 输入栏功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` / `sendOnReturn`（回车发送，关闭则换行输入）；缺项保持默认开 |
-| `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `recall` / `delete` | 消息长按菜单项与顺序 |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `edit` / `pin` / `recall` / `delete` | 消息长按菜单项与顺序；`edit` 编辑消息、`pin` 置顶消息，删除 key 即禁用对应能力（置顶消息条随之不渲染） |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | `pin` / `mute` / `delete` | 会话长按菜单项与顺序 |
+| `contactMenuKeys` | `ContactMenuKeyValue[]` | `remark` / `delete` | 联系人条目长按菜单项与顺序；`remark` 修改好友备注 |
 | `emojiList` | `string[]` | 内置 96 个 | emoji 面板字符集 |
 
 ### 品牌与 SDK 加载
@@ -95,6 +98,8 @@ console.log(config.recallTimeLimit)
 |---|---|---|
 | `enableDraft` | `boolean` | `true` |
 | `enableTyping` | `boolean` | `true` |
+| `enableReEdit` | `boolean` | `true` |
+| `enableGroupNameEdit` | `boolean` | `true` |
 | `recallTimeLimit` | `number` | `120000` |
 | `typingThrottle` | `number` | `5000` |
 | `typingTimeout` | `number` | `5000` |
@@ -102,8 +107,9 @@ console.log(config.recallTimeLimit)
 | `enableStreamMessage` | `boolean` | `true` |
 | `streamThrottle` | `number` | `50` |
 | `inputFeatures` | `EmInputFeatures` | 全部 `true` |
-| `messageMenuKeys` | `MessageMenuKeyValue[]` | 四项 |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | 六项 |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | 三项 |
+| `contactMenuKeys` | `ContactMenuKeyValue[]` | 两项 |
 | `emojiList` | `string[]` | 96 个 |
 | `primaryColor` | `string` | `''` |
 | `logPayload` | `boolean` | `false` |

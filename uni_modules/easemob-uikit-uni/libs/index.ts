@@ -5,11 +5,11 @@ import { EmGroupDomain } from './chat/group'
 import { ensureUserInfos } from './chat/user-info'
 import { connectionStore } from './store/connection'
 import { contactRequestUnreadCount, contactStore } from './store/contact'
-import { clearConversations, conversationStore, conversationUnreadCountOf as unreadCountOfConversation, totalConversationUnread } from './store/conversation'
+import { clearConversations, conversationStore, conversationUnreadCountOf as unreadCountOfConversation, setConversationPresentation as setConversationPresentationImpl, totalConversationUnread } from './store/conversation'
 import { clearAllDrafts } from './store/draft'
-import { groupStore } from './store/group'
+import { groupStore, setGroupPresentation as setGroupPresentationImpl } from './store/group'
 import { clearMessages, messageStore } from './store/message'
-import { clearUsers, userStore } from './store/user'
+import { clearUsers, setUserPresentation as setUserPresentationImpl, userStore } from './store/user'
 import { copyText, exportTextFile } from './platform'
 import {
   attachmentCapability as getAttachmentCapability,
@@ -29,15 +29,18 @@ import type {
   EmAttachmentPickOptions,
   EmAttachmentProvider,
   EmContactInvite,
+  EmConversationPresentation,
   EmGroup,
   EmGroupMemberListResult,
+  EmGroupPresentation,
   EmKitConfig,
   EmLoginOptions,
   EmLocaleName,
   EmMessageHandler,
   EmMessageItem,
   EmQuoteInfo,
-  EmTokenRenewalResult
+  EmTokenRenewalResult,
+  EmUserPresentation
 } from './types'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from './platform'
 
@@ -277,6 +280,30 @@ class EmKitImpl {
     return this.chat.deleteMessage(message)
   }
 
+  // 编辑已发送的文本消息（M2.20，SDK modifyMessage）：单条次数上限见 constants MESSAGE_MODIFY_COUNT_LIMIT；
+  // 成功回包本地 patch 后立即生效（对方与其他设备经 onMessageUpdated 事件同步）
+  async modifyTextMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string, text: string): Promise<void> {
+    await this.client.whenReady()
+    return this.chat.modifyTextMessage(conversationId, chatType, messageId, text)
+  }
+
+  // 置顶/取消置顶消息（M2.20）：成功后本地立即打标并主动重拉置顶列表（SDK 不本端回推）
+  async pinMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.chat.pinMessage(conversationId, chatType, messageId)
+  }
+
+  async unpinMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.chat.unpinMessage(conversationId, chatType, messageId)
+  }
+
+  // 拉取会话置顶列表（进会话时调用；SDK 不分页、上限 20 条），结果写入 messageStore.pinnedByConversationId
+  async getPinnedMessageList(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
+    await this.client.whenReady()
+    return this.chat.refreshPinnedMessages(conversationId, chatType)
+  }
+
   deleteLocalMessage(conversationId: string, localId: string): void {
     this.chat.deleteLocalMessage(conversationId, localId)
   }
@@ -452,6 +479,24 @@ class EmKitImpl {
     return this.group.unmuteAllGroupMembers(groupId)
   }
 
+  // 注入宿主业务资料：优先于 SDK 昵称/头像参与全库回落链（会话列表/聊天页标题/通讯录/群成员名），
+  // SDK 资料回推不会冲掉；null 清除。登出时随账号清空，宿主在 login 后重新注入
+  setUserPresentation(userId: string, patch: EmUserPresentation | null): void {
+    setUserPresentationImpl(userId, patch)
+  }
+
+  // 注入宿主业务资料：name/avatar 优先于 SDK 会话名/头像（会话列表条目、长按菜单标题、聊天页标题回落链），
+  // ext 随 #title / #title-extra / #avatar 插槽 scope 透出供标签等自绘；null 清除
+  setConversationPresentation(conversationId: string, patch: EmConversationPresentation | null): void {
+    setConversationPresentationImpl(conversationId, patch)
+  }
+
+  // 注入宿主业务资料：name/avatar 优先于 SDK 群名/群头像（会话列表、聊天页标题、群列表、群详情），
+  // ext 随群详情 #name-extra 与聊天页 #title 插槽 scope 透出；null 清除
+  setGroupPresentation(groupId: string, patch: EmGroupPresentation | null): void {
+    setGroupPresentationImpl(groupId, patch)
+  }
+
   // 系统提示消息（本地灰条，不发服务端）：交易状态/医疗提示/客服转接等场景通用
   insertLocalNotice(conversationId: string, chatType: ConversationTypeValue, text: string): void {
     this.chat.insertLocalNotice(conversationId, chatType, text)
@@ -523,14 +568,14 @@ export type { UseChatComposerOptions, UseChatComposerResult } from './use/useCha
 export { nextZIndex } from './use/usePopup'
 export { useConfig, setConfig } from './store/config'
 export { themeStore } from './store/theme'
-export { userStore, displayNameOf, avatarOf, mergeUserInfo } from './store/user'
+export { userStore, displayNameOf, avatarOf, mergeUserInfo, setUserPresentation } from './store/user'
 export { contactStore, contactDisplayNameOf, pendingInviteCount, contactRequestUnreadCount } from './store/contact'
-export { conversationStore, totalConversationUnread, conversationUnreadCountOf } from './store/conversation'
+export { conversationStore, totalConversationUnread, conversationUnreadCountOf, setConversationPresentation } from './store/conversation'
 export { useUnreadCounts, getUnreadCounts, useConversationUnreadCount } from './use/useUnreadCounts'
 export type { EmUnreadCounts } from './use/useUnreadCounts'
 export { useTabBarBadge, syncTabBarBadges } from './use/useTabBarBadge'
 export type { EmTabBarBadgeOptions, EmTabBarBadgeController } from './use/useTabBarBadge'
-export { groupStore, groupDisplayNameOf, groupMemberDisplayNameOf, sortGroupMembers } from './store/group'
+export { groupStore, groupDisplayNameOf, groupAvatarOf, setGroupPresentation, groupMemberDisplayNameOf, sortGroupMembers } from './store/group'
 export { ensureUserInfos } from './chat/user-info'
 export { setPinyinAdapter, groupContacts, matchContact, resolveAlphabetKeyByOffsetY } from './utils/pinyin'
 export type { EmPinyinResult, EmContactGroup } from './utils/pinyin'

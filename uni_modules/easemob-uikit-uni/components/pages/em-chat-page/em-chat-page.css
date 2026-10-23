@@ -29,7 +29,9 @@
   color: var(--em-text-tertiary);
 }
 
-/* 首屏历史骨架：左侧头像 + 两行气泡占位；只在首次请求未回包且无缓存时出现 */
+/* 首屏历史骨架：气泡对话形态（左右交替 + 时间 chip + 图片块），对齐真实消息行布局；
+   只在首次请求未回包且无缓存时出现。气泡壳规格与真实气泡同源（radius/padding token），
+   内行用页面底色镂空出「文字」形态 */
 .em-chat-page__skeleton {
   display: flex;
   flex-direction: column;
@@ -43,21 +45,56 @@
   margin-bottom: var(--em-message-gap);
 }
 
+/* 己方行：头像与气泡整体靠右（与 __msg-self 同语义，row-reverse 后头像落在右侧） */
+.em-chat-page--skeleton-row-self {
+  flex-direction: row-reverse;
+}
+
+/* 时间 chip 行：居中，无头像无气泡 */
+.em-chat-page--skeleton-row-chip {
+  justify-content: center;
+}
+
 .em-chat-page__skeleton-avatar {
   flex-shrink: 0;
-  margin-right: 8px;
+  margin: 0 8px;
 }
 
-.em-chat-page__skeleton-body {
+.em-chat-page__skeleton-bubble {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  padding-top: 4px;
+  box-sizing: border-box;
+  background-color: var(--em-bubble-bg-other);
+  border-radius: var(--em-bubble-radius);
+  padding: var(--em-bubble-padding-y) var(--em-bubble-padding-x);
 }
 
-.em-chat-page__skeleton-line {
+/* 己方气泡：品牌蓝浅 tint（token 派生），与真实蓝色气泡建立方向感但不抢视觉 */
+.em-chat-page--skeleton-bubble-self {
+  background-color: var(--em-skeleton-bubble-self);
+}
+
+/* 图片消息块：近方形、无内行 */
+.em-chat-page--skeleton-bubble-image {
+  width: 200rpx;
+  height: 200rpx;
+  padding: 0;
+}
+
+.em-chat-page__skeleton-text {
+  width: 100%;
+}
+
+.em-chat-page__skeleton-text-gap {
   margin-bottom: 6px;
+}
+
+/* 时间分隔 chip：居中弱占位（对齐 __divider 形态） */
+.em-chat-page__skeleton-chip {
+  width: 72px;
+  height: 18px;
+  border-radius: 999px;
+  background-color: var(--em-message-chip-bg);
 }
 
 .em-chat-page__history-error {
@@ -441,3 +478,36 @@
   height: 0;
 }
 
+
+/* 撤回条「重新编辑」按钮（M2.20）：竖线分隔 + 主色文字（对齐 vue 版 reedit-btn 形态） */
+.em-chat-page__recalled-reedit {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--em-border-color);
+}
+
+.em-chat-page__recalled-reedit-text {
+  font-size: var(--em-font-size-12);
+  color: var(--em-primary-color);
+}
+
+/* 置顶角标（M2.20）：气泡上方小图钉（对齐 vue 版 message-bubble-wrapper 的 pin 角标）；
+   __content 需要定位上下文（独立规则补充，不影响既有盒模型） */
+.em-chat-page__content {
+  position: relative;
+}
+
+.em-chat-page__pin-badge {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  z-index: 1;
+  color: var(--em-text-tertiary);
+  transform: rotate(45deg);
+}
+
+/* 己方气泡右对齐：角标镜像到右上角 */
+.em-chat-page--pin-badge-self {
+  left: auto;
+  right: -6px;
+}
