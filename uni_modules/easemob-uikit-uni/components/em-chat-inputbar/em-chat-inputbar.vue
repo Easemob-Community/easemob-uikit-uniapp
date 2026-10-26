@@ -58,7 +58,9 @@
            ① 换行输入模式（sendOnReturn=false，全端）：生长 textarea，回车=换行，发送走栏上纸飞机；
            ② iOS 回车发送：生长 textarea + confirm-type=send——UITextView 粘贴保留换行（单行 input 会剥掉），键盘仍是发送键；
            ③ 单行 input（sendOnReturn=true 的其余端）：零回归，回车发送 -->
-      <view v-else-if="growingInput" :class="ns.e('multiline-wrap')" :style="growWrapStyle">
+      <!-- 包裹层点击转发焦点：灰底比原生 textarea 大一圈（上下 8px、左右 12px padding 不在原生命中区），
+           点灰底边缘默认落不到原生输入框上 → 不聚焦、也唤不起键盘（Android 真机实测） -->
+      <view v-else-if="growingInput" :class="ns.e('multiline-wrap')" :style="growWrapStyle" @click="requestInputFocus">
         <textarea
           :class="[ns.e('multiline-input'), disabled && ns.m('input-disabled')]"
           :style="growTextareaStyle"
@@ -66,15 +68,15 @@
           :focus="inputFocus"
           :placeholder="placeholder !== '' ? placeholder : t('chat.placeholder')"
           :disabled="disabled"
-          :auto-height="!growCapped"
+          :auto-height="growAutoHeight && !growCapped"
           :confirm-type="features.sendOnReturn ? 'send' : 'return'"
           :adjust-position="false"
           :show-confirm-bar="false"
           :disable-default-padding="true"
           @confirm="onComposerConfirm"
           @linechange="onGrowLineChange"
-          @focus="onInputFocus"
-          @blur="onInputBlur"
+          @focus="onTextareaFocus"
+          @blur="onTextareaBlur"
         />
       </view>
       <input
@@ -135,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue'
+import { computed, nextTick, ref, toRef, watch } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import EmQuickReplyBar from '../em-quick-reply-bar/em-quick-reply-bar.vue'
 import EmText from '../em-text/em-text.vue'
@@ -290,42 +292,147 @@ const GROWING_INPUT_ON_SEND_RETURN = false
 const growingInput = computed(() => !props.features.sendOnReturn || GROWING_INPUT_ON_SEND_RETURN)
 
 // 生长输入封装：蒸汽端原生 textarea 布局/事件值不可靠（文字绘制高度 ≠ 布局高度、v-model 可能不回传 \n），
-// 全部改 JS 驱动——包裹层高度跟 linechange 上报值走，行数用来封顶 5 行（不信草稿 \n）
+// 全部改 JS 驱动——行数/高度跟 linechange 上报值走，行数用来封顶 5 行（不信草稿 \n）。
+// 高度口径（坑集 §5r，改动前先读）：
+// - ≤5 行：不写任何高度，交给原生 auto-height + 包裹层自适应（单一口径最稳）；
+// - >5 行：关 auto-height、给 textarea 显式高度，包裹层高度 = 文本高度 + 竖直 padding（border-box 下必须自己加，
+//   否则 padding 被吃掉、文字顶到灰底边缘）；
+// - 封顶高度**恒 > 0**：恢复 >5 行草稿时首个 linechange 就已超行数上限，若只在「≤5 行」时冻结高度，
+//   封顶态会拿到高度 0 → 原生 textarea 塌成一条细线、文字溢出、点不聚焦（Android 真机实测，M2.22）。
 const GROW_MAX_LINES = 5
+// 包裹层竖直 padding 合计（css：上下各 --em-spacing-2 = 8px）
+const GROW_WRAP_PAD_Y = 16
+// 单行高度兜底：进页回填草稿的首帧还没有 linechange，用兜底行高先把封顶高度算出来，避免首帧塌陷/跳高
+const GROW_LINE_FALLBACK = 19
+
+// auto-height 开关：删除整行后原生 textarea 不回缩（Android 侧实测框高停在旧值），
+// 关一帧再打开可强制原生重新测量
+const growAutoHeight = ref(true)
 const growLineCount = ref(1)
-const growWrapHeight = ref(0) // 最近一次 ≤ 封顶行数的文本高度（px），包裹层高度 = 它 + 包裹层竖直 padding
-const growCappedHeight = ref(0) // 封顶后冻结的文本高度（超过 5 行时取最近 ≤5 行的值）
+const growLineHeight = ref(0) // 单行高度（px），由 height / lineCount 反推（同一事件内自洽，不受 padding 口径影响）
+const growTextHeight = ref(0) // 文本区高度（px，不含包裹层 padding）；0 = 还没有可信测量
+
+// 单行高度：优先实测值，没有测量时用兜底常量
+function effectiveLineHeight(): number {
+  return growLineHeight.value > 0 ? growLineHeight.value : GROW_LINE_FALLBACK
+}
+
+// 封顶后的文本区高度：恒 > 0（seed / linechange / 兜底三路都落在 growTextHeight）
+const growCappedTextHeight = computed(() => {
+  if (growTextHeight.value > 0) return growTextHeight.value
+  return Math.round(effectiveLineHeight() * GROW_MAX_LINES)
+})
+
+// 是否封顶（行数 > 上限）：所有高度/样式判断的唯一开关
+const growCapped = computed(() => growLineCount.value > GROW_MAX_LINES)
 
 function onGrowLineChange(e: EmTextareaLineChangeEvent): void {
   const lineCount = e.detail?.lineCount ?? 0
   const height = e.detail?.height ?? 0
   if (lineCount > 0) growLineCount.value = lineCount
-  if (height > 0 && lineCount <= GROW_MAX_LINES) {
-    growWrapHeight.value = height
-    growCappedHeight.value = height
+  if (height <= 0) return
+  if (lineCount > GROW_MAX_LINES) {
+    // 封顶：只有「已知高度还不到封顶高度」时才用本次上报反推（恢复 >5 行草稿、一次粘贴多行都属这类）。
+    // 已经到位的封顶高度不再学习——封顶态 textarea 有显式高度，上报值可能停在布局高度/残留值上，
+    // 用它反推会把封顶高度越学越大（Android 实测出现过 109 → 166px 的回路）
+    const target = Math.round(effectiveLineHeight() * GROW_MAX_LINES)
+    if (growTextHeight.value >= target) return
+    growLineHeight.value = clampLineHeight(height / lineCount)
+    growTextHeight.value = Math.round(effectiveLineHeight() * GROW_MAX_LINES)
+    return
   }
+  // 未封顶：原生 auto-height 生效，height 就是文本高度（可信），顺便学习单行高度
+  growLineHeight.value = clampLineHeight(height / Math.max(1, lineCount))
+  growTextHeight.value = height
 }
 
-// 草稿清空时复位生长态（linechange 在删空时可能不回调）
-watch(() => props.modelValue, (v) => {
-  if (v === '') {
-    growLineCount.value = 1
-    growWrapHeight.value = 0
-    growCappedHeight.value = 0
-  }
-})
+// 单行高度夹在合理区间：字体 14px 的蒸汽端实测约 18.6px，超出 [12, 40] 视为异常上报
+function clampLineHeight(value: number): number {
+  if (value < 12) return 12
+  if (value > 40) return 40
+  return value
+}
 
-const growCapped = computed(() => growLineCount.value > GROW_MAX_LINES)
-// 包裹层高度：未封顶跟内容；封顶冻结在 5 行高度（超出部分 textarea 内部滚动）
+// 生长态复位（草稿清空：linechange 在删空时可能不回调）
+function resetGrowState(): void {
+  growLineCount.value = 1
+  growLineHeight.value = 0
+  growTextHeight.value = 0
+}
+
+// 进页回填草稿时先估封顶高度：草稿由父组件 onMounted 后回填，linechange 要等原生布局才来，
+// 中间那一帧如果按「未知高度」渲染，Android 上会先撑成整段文本高度再塌回封顶高度（可见的高度跳变）。
+// 只数硬换行：折行数量必须等原生测量，这里只解决「已知 >5 行」的封顶态首帧。
+function seedGrowFromDraft(value: string): void {
+  const hardLines = value.split('\n').length
+  if (hardLines <= GROW_MAX_LINES) return
+  // 已经按同一（或更长）草稿封顶过：交给 linechange 精修，别在每次输入时重置
+  if (hardLines <= growLineCount.value) return
+  growLineCount.value = hardLines
+  growTextHeight.value = Math.round(effectiveLineHeight() * GROW_MAX_LINES)
+}
+
+// 删除整行后原生 textarea 的 auto-height 不会回缩（Android 侧行为，实测灰底停在旧高度）：
+// 关一帧 auto-height 再打开，逼原生按当前文本重新测量
+let growHardLines = 0
+
+function nudgeGrowAutoHeight(): void {
+  if (growCapped.value) return
+  growAutoHeight.value = false
+  nextTick(() => {
+    growAutoHeight.value = true
+  })
+}
+
+watch(() => props.modelValue, (v) => {
+  const hardLines = v.split('\n').length
+  const shrank = hardLines < growHardLines
+  growHardLines = hardLines
+  if (v === '') {
+    resetGrowState()
+    nudgeGrowAutoHeight()
+    return
+  }
+  seedGrowFromDraft(v)
+  if (shrank) nudgeGrowAutoHeight()
+}, { immediate: true })
+
+// 包裹层高度：未封顶不写（原生 auto-height 是唯一口径，包裹层跟着内容走，删除文字时不会出现
+// 「灰底比文字高/矮」的错位）；封顶时 = 文本高度 + 竖直 padding（border-box 下必须自己加）
 const growWrapStyle = computed(() => {
-  const h = growCapped.value ? growCappedHeight.value : growWrapHeight.value
-  return h > 0 ? `height: ${h}px;` : ''
+  if (!growCapped.value) return ''
+  return `height: ${growCappedTextHeight.value + GROW_WRAP_PAD_Y}px;`
 })
 // 封顶后关 auto-height（auto-height 下 style.height 不生效，反过来固定高度才生效）并写死文本高度
 const growTextareaStyle = computed(() => {
-  if (!growCapped.value || growCappedHeight.value <= 0) return ''
-  return `height: ${growCappedHeight.value}px;`
+  if (!growCapped.value) return ''
+  return `height: ${growCappedTextHeight.value}px;`
 })
+
+// 原生聚焦态（本地记一份）：包裹层点击转发焦点时用它避免打断已聚焦的输入
+const growFocused = ref(false)
+
+function onTextareaFocus(): void {
+  growFocused.value = true
+  onInputFocus()
+}
+
+function onTextareaBlur(): void {
+  growFocused.value = false
+  onInputBlur()
+}
+
+// 灰底 padding 区点击转发焦点（原生 textarea 只覆盖内容区）：
+// :focus 是布尔 prop，已是 true 时再赋 true 不会重新请求，故先落 false、nextTick 再置 true；
+// 已聚焦时直接跳过（原生自己处理光标/键盘，不打断打字）
+function requestInputFocus(): void {
+  if (props.disabled) return
+  if (growFocused.value) return
+  inputFocus.value = false
+  nextTick(() => {
+    inputFocus.value = true
+  })
+}
 
 // 生长输入的键盘右下角键：回车发送档（iOS）发送；换行输入档不处理（换行键只插换行，发送走栏上纸飞机）
 function onComposerConfirm(): void {

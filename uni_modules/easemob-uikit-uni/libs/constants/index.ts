@@ -43,6 +43,7 @@ export type StreamMessageStatusValue = (typeof STREAM_MESSAGE_STATUS)[keyof type
 
 /** 流式打字机光标字符（em-text-message 消费）：蒸汽端不支持 CSS 动画，静态常亮降级 */
 export const STREAM_CURSOR_CHAR = '▍'
+
 /** UIKit 版本号：与 uni_modules/easemob-uikit-uni/package.json 的 version 保持同步（发版时手动对齐）。
  *  当前消费方：自动派生 deviceId 的三段式中间段（Platform_uikitVersion_uuid）；
  *  升级后版本段变化，服务端会视为新设备。不运行时读 package.json（小程序端不可靠） */
@@ -172,6 +173,8 @@ export const MESSAGE_MENU_KEY = {
   EDIT: 'edit',
   PIN: 'pin',
   RECALL: 'recall',
+  /** 失败消息重发（仅 status=failed 出现，点击后走与红叹号一致的重发链路） */
+  RESEND: 'resend',
   DELETE: 'delete'
 } as const
 
@@ -321,10 +324,20 @@ export const ERROR_CODE = {
   /** 发送前预检测命中：系统网络离线（该次发送未触达 SDK） */
   NETWORK_OFFLINE: 'EM_NETWORK_OFFLINE',
   /** 发送/拉取前的连接等待超时（waitOnline） */
-  NETWORK_TIMEOUT: 'EM_NETWORK_TIMEOUT'
+  NETWORK_TIMEOUT: 'EM_NETWORK_TIMEOUT',
+  /** SDK onSendTimeout 信号：发送队列超时，等待中的消息统一落 FAILED 归因 */
+  SEND_TIMEOUT: 'EM_SEND_TIMEOUT',
+  /** 失败重发时本地媒体临时文件已被系统清理（无远端 URL 可复用） */
+  MEDIA_UNAVAILABLE: 'EM_MEDIA_UNAVAILABLE'
 } as const
 
 export type ErrorCodeValue = (typeof ERROR_CODE)[keyof typeof ERROR_CODE]
+
+/** 内置文件消息批量发送的并发上限（多选附件时按窗口并发，避免同时打满上传通道） */
+export const FILE_SEND_CONCURRENCY = 3
+
+/** 群消息已读人数批量查询的单次上限（服务端上限 20，超限直接 reject） */
+export const GROUP_READ_RECEIPT_BATCH = 20
 
 /** 联系人字母分组序列（A-Z + #，对齐 vue 版 DEFAULT_ALPHABET_KEYS） */
 export const ALPHABET_KEYS = [

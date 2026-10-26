@@ -323,6 +323,18 @@ class EmKitImpl {
     return this.chat.readReceiptEnabled
   }
 
+  /** 群已读回执是否开启（EmKitConfig.enableGroupReadReceipt，默认 false） */
+  isGroupReadReceiptEnabled(): boolean {
+    return this.chat.groupReadReceiptEnabled
+  }
+
+  /** 批量补齐群消息已读人数（SDK 单次上限 20，内部取最近 20 条己方已发送消息）；
+   *  群已读回执关闭时 no-op。进会话/加载历史后调用，失败静默（展示类补充信息） */
+  async refreshGroupReadCounts(conversationId: string): Promise<void> {
+    await this.client.whenReady()
+    return this.chat.refreshGroupReadCounts(conversationId)
+  }
+
   leaveConversation(): void {
     this.chat.leaveConversation()
   }

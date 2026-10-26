@@ -45,6 +45,23 @@ import {
 | `modifiedInfo` | `EmMessageModifiedInfo \| undefined` | 编辑元信息，被编辑过（含历史拉取）即存在，文本气泡据此显示「已编辑」 |
 | `pinned` | `boolean \| undefined` | 是否被置顶，由置顶列表同步打标 |
 | `recalledBy` | `string \| undefined` | 撤回操作者 userId；本地撤回有值，远程撤回事件服务端不下发操作者时为 `undefined` |
+| `failCode` | `number \| string \| undefined` | 最近一次发送失败的归因码：SDK 数字 code（如 `1200` 审核未通过、`501` 违规内容、`222` 被对方拒收）或 `ERROR_CODE` 业务码；发送成功后清空 |
+| `contentReplaced` | `boolean \| undefined` | 内容被审核替换（SDK `isContentReplaced`），气泡下方展示「内容已被审核修改」标识 |
+| `delivered` | `boolean \| undefined` | 单聊消息已送达对端（`onMessageDelivered` 命中）；已读展示仍以已读回执时间为准 |
+| `uploadProgress` | `number \| undefined` | 附件上传进度百分比（0-100），图片/语音/视频/文件发送中由 SDK `onFileUploadProgress` 回填；发送结束后清空 |
+| `groupReadCount` | `number \| undefined` | 群聊己方消息已读人数（`enableGroupReadReceipt` 开启时由群回执事件或批量查询回填） |
+
+### `EmMessageStatusPresentation`
+
+发送状态呈现配置（`EmKitConfig.messageStatus` / `EmUiConfig.messageStatus`），只改变呈现形式，不改变状态判定。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `position` | `'left' \| 'right'` | 状态列相对气泡的位置，默认 `left` |
+| `icons` | `Partial<Record<EmMessageStatusKind, string>>` | 按状态覆盖图标名（`EmIconName`），非法名回落内置图标 |
+| `texts` | `Partial<Record<EmMessageStatusKind, string>>` | 按状态追加短文案，空串/缺省不渲染 |
+
+`EmMessageStatusKind` = `'sending' | 'failed' | 'unread' | 'read'`。
 
 ### `EmMessageModifiedInfo`
 
@@ -159,7 +176,7 @@ import {
 
 ### `MESSAGE_MENU_KEY`
 
-`COPY='copy'`、`QUOTE='quote'`、`EDIT='edit'`、`PIN='pin'`、`RECALL='recall'`、`DELETE='delete'`；默认顺序即为此列表顺序，删除 key 即禁用对应能力。
+`COPY='copy'`、`QUOTE='quote'`、`EDIT='edit'`、`PIN='pin'`、`RECALL='recall'`、`RESEND='resend'`、`DELETE='delete'`；默认顺序即为此列表顺序，删除 key 即禁用对应能力。`RESEND` 仅在消息发送失败时出现。
 
 ## 3. 用户、联系人与群
 
@@ -379,6 +396,8 @@ UIKit 业务错误码（挂在 `Error.code` 上，与 SDK `errorCode` 无关）�
 
 - `NETWORK_OFFLINE='EM_NETWORK_OFFLINE'`：发送前预检测命中系统网络离线（该次发送未触达 SDK，消息按失败落库、可重发）。
 - `NETWORK_TIMEOUT='EM_NETWORK_TIMEOUT'`：发送/拉取前的连接等待超时。
+- `SEND_TIMEOUT='EM_SEND_TIMEOUT'`：SDK `onSendTimeout` 信号，仍在发送中的己方消息统一落失败并归因（失败气泡可重发）。
+- `MEDIA_UNAVAILABLE='EM_MEDIA_UNAVAILABLE'`：失败重发时本地媒体临时文件已被系统清理，且没有可复用的远端 URL。
 
 ## 6. 平台与媒体类型
 

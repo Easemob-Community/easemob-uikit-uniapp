@@ -148,16 +148,21 @@
               <!-- 群聊发送者昵称行（己方不显示；senderNameMode 控制显隐，伪装模式预留 'on-change' 档） -->
               <em-text v-if="showSenderName(m)" :text="senderNameOf(m)" :text-class="ns.e('sender-name')" :text-style="senderNameTextStyle" :class="ns.e('sender-name-host')" />
               <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
-              <view :class="ns.e('bubble-row')">
-                <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="ns.e('state')" @click="onResend(m)">
-                  <EmIcon name="circle-bang" :size="14" :class="ns.e('state-icon-failed')" />
+              <view :class="[ns.e('bubble-row'), statusAtEnd && ns.m('bubble-row-status-end')]">
+                <!-- 发送中/失败是独立关键状态，恒展示，不受 showReadStatus 展示开关控制；
+                     图标名与附加文案可经 config.messageStatus 覆盖（icons/texts），位置可镜像到气泡右侧 -->
+                <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="stateClass('failed')" @click="onFailedTap(m)">
+                  <EmIcon :name="statusIconOf('failed', 'circle-bang')" :size="14" :class="ns.e('state-icon-failed')" />
+                  <text v-if="statusTextOf('failed') !== ''" :class="ns.e('state-text')">{{ statusTextOf('failed') }}</text>
                 </view>
-                <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="ns.e('state')">
-                  <EmIcon name="loading-arc-normal" :size="14" :class="ns.e('state-icon-sending')" />
+                <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="stateClass('sending')">
+                  <EmIcon :name="statusIconOf('sending', 'loading-arc-normal')" :size="14" :class="ns.e('state-icon-sending')" />
+                  <text v-if="statusTextOf('sending') !== ''" :class="ns.e('state-text')">{{ statusTextOf('sending') }}</text>
                 </view>
                 <!-- 单聊已读回执：仅最新一条己方已发送消息展示（对齐 vue 版 readIconDisplay 'latest'），未读空心圆/已读对勾 -->
-                <view v-else-if="showReadState(m)" :class="ns.e('state')">
-                  <EmIcon :name="readIconName(m)" :size="14" :class="[ns.e('state-icon'), ns.m(isPeerRead(m) ? 'state-icon-read' : 'state-icon-unread')]" />
+                <view v-else-if="showReadState(m)" :class="stateClass(readKindOf(m))">
+                  <EmIcon :name="readIconOf(m)" :size="14" :class="[ns.e('state-icon'), ns.m(isPeerRead(m) ? 'state-icon-read' : 'state-icon-unread')]" />
+                  <text v-if="statusTextOf(readKindOf(m)) !== ''" :class="ns.e('state-text')">{{ statusTextOf(readKindOf(m)) }}</text>
                 </view>
                 <!-- 富格式流式气泡（customType='markdown' 等）由宿主经 #stream-message 插槽接管；
                      未提供插槽时回落内核纯文本气泡（内容仍随分片增长） -->
@@ -210,6 +215,16 @@
                   </slot>
                 </view>
               </view>
+              <!-- 群消息已读人数（enableGroupReadReceipt 开启时）：己方已发送消息下方展示累计已读人数，
+                   来源 = 群回执事件（服务端下发累计值）或进会话时批量查询补齐 -->
+              <view v-if="showGroupReadCount(m)" :class="[ns.e('group-read'), m.self && ns.m('group-read-self')]">
+                <text :class="ns.e('group-read-text')">{{ t('message.groupReadCount', { count: m.groupReadCount ?? 0 }) }}</text>
+              </view>
+              <!-- 审核替换标识：SDK isContentReplaced=true（历史/编辑事件/发送回包）时提示发送方内容被改动 -->
+              <view v-if="m.contentReplaced === true" :class="[ns.e('moderated'), m.self && ns.m('moderated-self')]">
+                <EmIcon name="shield" :size="12" :class="ns.e('moderated-icon')" />
+                <text :class="ns.e('moderated-text')">{{ t('message.moderated') }}</text>
+              </view>
               <!-- 置顶角标（M2.20）：气泡上方小图钉，覆盖全部消息类型（对齐 vue 版 message-bubble-wrapper） -->
               <view v-if="m.pinned === true" :class="[ns.e('pin-badge'), m.self && ns.m('pin-badge-self')]">
                 <EmIcon name="pin" :size="10" />
@@ -231,6 +246,12 @@
              内容未布局时钳到 0 且后续不重钳，大值技巧失效；锚点方案同机已被引用定位验证可用） -->
         <view :id="BOTTOM_ANCHOR_ID" :class="ns.e('bottom-anchor')"></view>
       </scroll-view>
+
+      <!-- 断连/重连提示：顶部 banner 之外的「消息待发」语义补充，贴输入栏上方（不遮消息区） -->
+      <view v-if="networkHint !== ''" :class="[ns.e('network-hint'), networkOffline && ns.m('network-hint-offline')]">
+        <EmIcon :name="networkOffline ? 'circle-bang' : 'loading-arc-normal'" :size="12" :class="ns.e('network-hint-icon')" />
+        <text :class="ns.e('network-hint-text')">{{ networkHint }}</text>
+      </view>
 
       <!-- 输入栏上方宿主工具条（#input-toolbar）：业务快捷入口固定位，宿主自绘胶囊/按钮
            （发订单、发病例、换手机号等），点击后自行 sendCustom/sendText；随键盘一起上移，不参与消息滚动 -->
@@ -314,6 +335,15 @@
         @update:visible="msgSheetVisible = $event"
       />
 
+      <!-- 失败气泡操作面板：标题带失败原因，提供「重新发送 / 删除」两个出口（替代点红叹号直接重发） -->
+      <em-action-sheet
+        :visible="failedSheetVisible"
+        :actions="failedActions"
+        :title="failedTitle"
+        @select="onFailedAction"
+        @update:visible="failedSheetVisible = $event"
+      />
+
       <!-- 群公告全文弹层（单行省略态超一行时的展开出口） -->
       <em-popup :visible="announcementVisible" position="center" @update:visible="announcementVisible = $event">
         <view :class="ns.e('announcement-dialog')">
@@ -361,13 +391,13 @@ import EmPopup from '../../em-popup/em-popup.vue'
 import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import EmPinnedBar from '../../em-pinned-bar/em-pinned-bar.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
-import { CONVERSATION_TYPE, ERROR_CODE, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
+import { CONNECTION_STATUS, CONVERSATION_TYPE, FILE_SEND_CONCURRENCY, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
 import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
 import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
-import { errorCodeOf } from '../../../libs/utils/error'
-import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
+import { sendFailureKeyOf, sendFailureKeyOfCode } from '../../../libs/utils/error'
+import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmMessageStatusKind, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
@@ -388,12 +418,15 @@ import { createLogger } from '../../../libs/utils/logger'
 
 const logger = createLogger('chat-page')
 
-// 发送失败 toast 归因：网络预检测拦截（EM_NETWORK_OFFLINE）/ 连接等待超时（EM_NETWORK_TIMEOUT）
-// 给「网络异常」文案，其余仍报通用「发送失败」——避免无网时用户误以为是 SDK 内部问题
+// 发送失败 toast 归因：业务网络码 / SDK 数字码（审核拒绝、被拉黑、禁言等）统一走 error.ts 映射，
+// 未命中回落通用「发送失败」；失败气泡的 action-sheet 复用同一映射展示原因
 function toastSendFailed(e: unknown): void {
-  const code = errorCodeOf(e)
-  const networkRelated = code === ERROR_CODE.NETWORK_OFFLINE || code === ERROR_CODE.NETWORK_TIMEOUT
-  uni.showToast({ title: networkRelated ? t('error.network') : t('message.send.failed'), icon: 'none' })
+  uni.showToast({ title: t(sendFailureKeyOf(e)), icon: 'none' })
+}
+
+// 失败气泡归因：优先读落库的 failCode（消息可能早已 sent 失败、错误对象已丢弃）
+function failureReasonOf(m: EmMessageItem): string {
+  return t(sendFailureKeyOfCode(m.failCode))
 }
 
 // scroll-top 初始预置大值：仅作首帧底部方向语义（滚底本体已改走 scroll-into-view 锚点，见 scrollToBottom）
@@ -653,6 +686,17 @@ function onMuteAllTap(): void {
   uni.showToast({ title: t('group.muteAllToast'), icon: 'none' })
 }
 
+// 断连/重连提示（输入栏上方）：顶部 banner 说明连接状态，这里补充「消息待发」语义；
+// 系统离线优先于 SDK 状态（与 em-connection-banner 同口径），关闭重连后自动消失
+const networkOffline = computed(() => connectionStore.networkOnline === false)
+const networkHint = computed(() => {
+  if (networkOffline.value) return t('chat.networkOfflineHint')
+  if (connectionStore.status === CONNECTION_STATUS.RECONNECTING || connectionStore.status === CONNECTION_STATUS.CONNECTING) {
+    return t('chat.reconnectingHint')
+  }
+  return ''
+})
+
 // ========== #input-bar 整栏自绘（M2.16）==========
 // 宿主提供 #input-bar 插槽时整栏替换默认 em-chat-inputbar：结构/样式任意自绘，但行为核心
 // （键盘避让/键盘↔面板互斥/录音手势状态机/禁用守卫）由页面侧 composer 承担，状态与动作经
@@ -811,9 +855,16 @@ const latestSelfLocalId = computed(() => {
   return ''
 })
 
+// 已读态图标：纯展示开关（config.showReadStatus 默认 false），与已读回执功能解耦。
+// 注意：发送中/失败状态在模板里是独立分支，恒展示，绝不与本函数耦合。
 function showReadState(m: EmMessageItem): boolean {
-  // 单聊已读回执专属：群聊不显示已读态图标（groupAck 不在一期）
-  return !isGroupChat.value && EmKit.isReadReceiptEnabled() && m.self && m.status === MESSAGE_STATUS.SENT && m.localId === latestSelfLocalId.value
+  // 单聊已读回执专属：群聊的回执信息走「已读人数」行（enableGroupReadReceipt），不复用单聊图标
+  return !isGroupChat.value
+    && config.showReadStatus
+    && EmKit.isReadReceiptEnabled()
+    && m.self
+    && m.status === MESSAGE_STATUS.SENT
+    && m.localId === latestSelfLocalId.value
 }
 
 function isPeerRead(m: EmMessageItem): boolean {
@@ -825,6 +876,44 @@ function isPeerRead(m: EmMessageItem): boolean {
 // 未读 = circle/empty-1，已读 = circle/checked（原 checkmarkempty / circle 代偿与 vue 字形不一致）
 function readIconName(m: EmMessageItem): EmIconName {
   return isPeerRead(m) ? 'circle-checked' : 'circle-empty-1'
+}
+
+// 发送状态呈现（P2 可配置）：config.messageStatus 覆盖图标名/附加文案/位置，
+// 缺省保持内置视觉（左侧 + circle-bang/loading-arc-normal/circle-empty-1/circle-checked、无文案）
+const statusAtEnd = computed(() => config.messageStatus.position === 'right')
+
+function statusIconOf(kind: EmMessageStatusKind, fallback: EmIconName): EmIconName {
+  const name = config.messageStatus.icons[kind]
+  return name != null && name !== '' ? name as EmIconName : fallback
+}
+
+function statusTextOf(kind: EmMessageStatusKind): string {
+  const text = config.messageStatus.texts[kind]
+  return text != null ? text : ''
+}
+
+// 有文案时状态列宽度自适应（图标 + 短文案横排）；无文案保持 20px 定宽，视觉与整改前一致
+function stateClass(kind: EmMessageStatusKind): string[] {
+  const list = [ns.e('state')]
+  if (statusTextOf(kind) !== '') list.push(ns.m('state-with-text'))
+  return list
+}
+
+function readKindOf(m: EmMessageItem): EmMessageStatusKind {
+  return isPeerRead(m) ? 'read' : 'unread'
+}
+
+function readIconOf(m: EmMessageItem): EmIconName {
+  return statusIconOf(readKindOf(m), readIconName(m))
+}
+
+// 群消息已读人数：仅群聊 + 开关开启 + 己方已发送 + 服务端已返回正数（0 不渲染，省一行空白）
+function showGroupReadCount(m: EmMessageItem): boolean {
+  return isGroupChat.value
+    && config.enableGroupReadReceipt
+    && m.self
+    && m.status === MESSAGE_STATUS.SENT
+    && (m.groupReadCount ?? 0) > 0
 }
 
 // ===== 流式消息跟随滚动（M2.13）=====
@@ -982,6 +1071,11 @@ async function loadInitialHistory(): Promise<void> {
     historySettled.value = true
     historyLoading.value = false
     scrollToBottom()
+    // 群已读人数补齐（开关关闭时 no-op）：批量查询最近己方消息的累计已读人数，
+    // 失败只告警（展示类补充信息，不阻断历史渲染）
+    if (isGroupChat.value && config.enableGroupReadReceipt) {
+      EmKit.refreshGroupReadCounts(props.conversationId).catch((e) => logger.warn('refreshGroupReadCounts fail:', e))
+    }
     // 请求结束后下一帧解除首帧隐藏
     nextTick(() => {
       ready.value = true
@@ -1384,21 +1478,34 @@ async function onPickFile(): Promise<void> {
     }
     let failed = false
     let lastSendError: unknown = null
-    // 多选按顺序逐条发送；切会话后未开始发送的临时文件立即释放。
-    for (let i = 0; i < files.length; i++) {
+    // 多选附件按 FILE_SEND_CONCURRENCY 窗口并发发送（默认 3），窗口之间保留顺序；
+    // 切会话后未开始发送的临时文件立即释放（窗口内已发出的请求由 domain 完成态兜底）
+    let offset = 0
+    while (offset < files.length) {
       if (!isPageRequestCurrent(request)) {
-        releaseUnsentFiles(files, i)
+        releaseUnsentFiles(files, offset)
         return
       }
-      try {
-        const item = await EmKit.sendFile(request.conversationId, request.chatType, files[i])
-        if (isPageRequestCurrent(request)) scrollToBottom()
-        emit('send', item)
-      } catch (e) {
+      const chunk = files.slice(offset, offset + FILE_SEND_CONCURRENCY)
+      const errors = await Promise.all(chunk.map(async (file) => {
+        try {
+          const item = await EmKit.sendFile(request.conversationId, request.chatType, file)
+          if (isPageRequestCurrent(request)) {
+            scrollToBottom()
+            emit('send', item)
+          }
+          return null
+        } catch (e) {
+          logger.error('sendFile fail:', e)
+          return e
+        }
+      }))
+      errors.forEach((e) => {
+        if (e == null) return
         failed = true
         lastSendError = e
-        logger.error('sendFile fail:', e)
-      }
+      })
+      offset += chunk.length
     }
     if (failed) toastSendFailed(lastSendError)
   } catch (e) {
@@ -1625,19 +1732,26 @@ const messageActions = computed<EmActionSheetAction[]>(() => {
   if (m.type === MESSAGE_TYPE.TEXT) {
     candidates.push({ key: MESSAGE_MENU_KEY.COPY, text: t('message.action.copy'), icon: 'rects' })
   }
-  candidates.push({ key: MESSAGE_MENU_KEY.QUOTE, text: t('message.action.quote'), icon: 'arrow-turn-left' })
-  // 编辑（M2.20）：仅自己发送的文本消息；达到编辑次数上限（SDK 约束）置灰
-  if (m.self && m.type === MESSAGE_TYPE.TEXT && m.status !== MESSAGE_STATUS.RECALLED) {
-    const count = m.modifiedInfo?.operationCount ?? 0
-    candidates.push({ key: MESSAGE_MENU_KEY.EDIT, text: t('message.action.edit'), icon: 'rect-pencil', disabled: count >= MESSAGE_MODIFY_COUNT_LIMIT })
-  }
-  // 置顶（M2.20）：未撤回消息全类型可置顶；已置顶切换为取消置顶文案/图标
-  if (m.status !== MESSAGE_STATUS.RECALLED) {
-    const pinned = m.pinned === true
-    candidates.push({ key: MESSAGE_MENU_KEY.PIN, text: pinned ? t('message.action.unpin') : t('message.action.pin'), icon: pinned ? 'pin-slash' : 'pin' })
-  }
-  if (m.self && m.status === MESSAGE_STATUS.SENT && Date.now() - m.time <= config.recallTimeLimit) {
-    candidates.push({ key: MESSAGE_MENU_KEY.RECALL, text: t('message.action.recall'), icon: 'arrow-lft-uturn' })
+  // 失败消息只有「重发/删除」有服务端语义：引用/编辑/置顶/撤回都依赖 serverId，统一不出现
+  if (m.status === MESSAGE_STATUS.FAILED) {
+    if (m.self) {
+      candidates.push({ key: MESSAGE_MENU_KEY.RESEND, text: t('message.action.resend'), icon: 'refresh' })
+    }
+  } else {
+    candidates.push({ key: MESSAGE_MENU_KEY.QUOTE, text: t('message.action.quote'), icon: 'arrow-turn-left' })
+    // 编辑（M2.20）：仅自己已发送的文本消息；达到编辑次数上限（SDK 约束）置灰
+    if (m.self && m.type === MESSAGE_TYPE.TEXT && m.status === MESSAGE_STATUS.SENT) {
+      const count = m.modifiedInfo?.operationCount ?? 0
+      candidates.push({ key: MESSAGE_MENU_KEY.EDIT, text: t('message.action.edit'), icon: 'rect-pencil', disabled: count >= MESSAGE_MODIFY_COUNT_LIMIT })
+    }
+    // 置顶（M2.20）：仅已发送/已撤回消息有 serverId；已置顶切换为取消置顶文案/图标
+    if (m.status === MESSAGE_STATUS.SENT || m.status === MESSAGE_STATUS.RECALLED) {
+      const pinned = m.pinned === true
+      candidates.push({ key: MESSAGE_MENU_KEY.PIN, text: pinned ? t('message.action.unpin') : t('message.action.pin'), icon: pinned ? 'pin-slash' : 'pin' })
+    }
+    if (m.self && m.status === MESSAGE_STATUS.SENT && Date.now() - m.time <= config.recallTimeLimit) {
+      candidates.push({ key: MESSAGE_MENU_KEY.RECALL, text: t('message.action.recall'), icon: 'arrow-lft-uturn' })
+    }
   }
   candidates.push({ key: MESSAGE_MENU_KEY.DELETE, text: t('message.action.delete'), icon: 'trash', danger: true })
   const builtin = config.messageMenuKeys
@@ -1660,6 +1774,7 @@ function isBuiltinMenuKey(key: string): boolean {
     || key === MESSAGE_MENU_KEY.EDIT
     || key === MESSAGE_MENU_KEY.PIN
     || key === MESSAGE_MENU_KEY.RECALL
+    || key === MESSAGE_MENU_KEY.RESEND
     || key === MESSAGE_MENU_KEY.DELETE
 }
 
@@ -1679,7 +1794,35 @@ const resendingByLocalId: Record<string, boolean> = {}
 const recallingByLocalId: Record<string, boolean> = {}
 const deletingByLocalId: Record<string, boolean> = {}
 
-// 失败重发：点状态列红叹号触发，等待 SDK 就绪前即按 localId 占锁，失败再落 failed 并允许重试
+// 失败气泡操作面板：点红叹号先展示失败原因，再选择重发/删除（失败原因已随消息落库，不依赖一次性 toast）
+const failedSheetVisible = ref(false)
+const failedMessage = ref<EmMessageItem | null>(null)
+const failedTitle = computed(() => {
+  const m = failedMessage.value
+  return m != null ? t('message.resend.title', { reason: failureReasonOf(m) }) : ''
+})
+const failedActions = computed<EmActionSheetAction[]>(() => [
+  { key: MESSAGE_MENU_KEY.RESEND, text: t('message.action.resend'), icon: 'refresh' },
+  { key: MESSAGE_MENU_KEY.DELETE, text: t('message.action.delete'), icon: 'trash', danger: true }
+])
+
+function onFailedTap(m: EmMessageItem): void {
+  if (m.status !== MESSAGE_STATUS.FAILED || resendingByLocalId[m.localId] === true) return
+  failedMessage.value = m
+  failedSheetVisible.value = true
+}
+
+async function onFailedAction(action: EmActionSheetAction): Promise<void> {
+  const m = failedMessage.value
+  if (m == null) return
+  if (action.key === MESSAGE_MENU_KEY.DELETE) {
+    confirmDeleteMessage(m)
+  } else if (action.key === MESSAGE_MENU_KEY.RESEND) {
+    await onResend(m)
+  }
+}
+
+// 失败重发：点状态列红叹号 → 失败面板选择「重新发送」，等待 SDK 就绪前即按 localId 占锁，失败再落 failed 并允许重试
 async function onResend(m: EmMessageItem): Promise<void> {
   if (m.status !== MESSAGE_STATUS.FAILED || resendingByLocalId[m.localId] === true) return
   resendingByLocalId[m.localId] = true
@@ -1761,6 +1904,8 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
     await togglePinMessage(m)
   } else if (action.key === MESSAGE_MENU_KEY.RECALL) {
     await recallMessage(m)
+  } else if (action.key === MESSAGE_MENU_KEY.RESEND) {
+    await onResend(m)
   } else if (action.key === MESSAGE_MENU_KEY.DELETE) {
     confirmDeleteMessage(m)
   }

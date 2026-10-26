@@ -12,6 +12,9 @@ UIKit 的配置分三层：
 EmKit.init({
   appkey: 'your-appkey',
   enableReadReceipt: true,
+  showReadStatus: false,
+  enableGroupReadReceipt: false,
+  messageStatus: { position: 'left', texts: { failed: '发送失败' } },
   logLevel: 'info',
   enableDraft: true,
   enableTyping: true,
@@ -26,7 +29,11 @@ EmKit.init({
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `appkey` | `string` | 必填 | 环信 AppKey |
-| `enableReadReceipt` | `boolean` | `true` | 单聊已读回执开关 |
+| `enableReadReceipt` | `boolean` | `true` | 单聊已读回执功能开关（是否发送/接收已读回执） |
+| `showReadStatus` | `boolean` | `false` |
+| `enableGroupReadReceipt` | `boolean` | `false` |
+| `messageStatus` | `Required<EmMessageStatusPresentation>` | `{ position: 'left', icons: {}, texts: {} }` | 单聊已读态图标（未读空心圆/已读对勾）显隐；纯展示开关，与 `enableReadReceipt` 解耦，不影响发送中/失败状态 |
+| `enableGroupReadReceipt` | `boolean` | `false` | 群聊已读回执：开启后群消息携带 `needReadReceipt`、自动回执群消息，并在己方群消息下方展示已读人数；关闭时群聊不产生任何回执请求 |
 | `locale` | `'zh-CN' \| 'en'` | 跟随系统/上次选择 | 初始化界面语言，写入本地偏好 |
 | `onTokenWillExpire` | `() => string \| Promise<string>` | 无 | Token 约 80% 生命周期时触发，返回新 token 后自动续期 |
 | `onTokenExpired` | `() => void` | 无 | Token 已过期、SDK 断开时触发；通常跳登录页 |
@@ -77,12 +84,31 @@ EmKit.init({
 | `enableStreamMessage` | `boolean` | `true` | 是否合并 AI 流式分片；`false` 时等完整消息一次上屏 |
 | `streamThrottle` | `number` | `50` | 流式分片合批间隔（毫秒）；`0` 表示逐片写入 |
 
+### 发送状态呈现
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `messageStatus` | `EmMessageStatusPresentation` | `{ position: 'left', icons: {}, texts: {} }` | 发送状态（发送中/失败/未读/已读）的图标、文案与位置；`position: 'right'` 把状态列镜像到气泡右侧，`icons` 按状态覆盖图标名，`texts` 追加短文案 |
+
+```ts
+EmKit.init({
+  appkey: 'your-appkey',
+  messageStatus: {
+    position: 'right',
+    icons: { failed: 'circle-bang' },
+    texts: { sending: '发送中', failed: '失败' }
+  }
+})
+```
+
+发送中与失败是独立关键状态，始终展示；`showReadStatus` 只控制单聊未读/已读图标，`messageStatus` 只改变呈现形式，不改变状态判定。
+
 ### 输入栏与菜单
 
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `inputFeatures` | `Partial<EmInputFeatures>` | 全部开启 | 输入栏功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` / `sendOnReturn`（回车发送，关闭则换行输入）；缺项保持默认开 |
-| `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `edit` / `pin` / `recall` / `delete` | 消息长按菜单项与顺序；`edit` 编辑消息、`pin` 置顶消息，删除 key 即禁用对应能力（置顶消息条随之不渲染） |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `edit` / `pin` / `recall` / `resend` / `delete` | 消息长按菜单项与顺序；`edit` 编辑消息、`pin` 置顶消息、`resend` 重发失败消息，删除 key 即禁用对应能力（置顶消息条随之不渲染） |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | `pin` / `mute` / `delete` | 会话长按菜单项与顺序 |
 | `contactMenuKeys` | `ContactMenuKeyValue[]` | `remark` / `delete` | 联系人条目长按菜单项与顺序；`remark` 修改好友备注 |
 | `emojiList` | `string[]` | 内置 96 个 | emoji 面板字符集 |
@@ -110,7 +136,7 @@ const { config } = useConfig()
 console.log(config.recallTimeLimit)
 ```
 
-`setConfig` 接受 `Partial<EmUiConfig>`，一层深合并：`inputFeatures` 按字段合并，其他顶层键整体替换。`uiConfig` 是响应式对象，改动会立即影响已挂载的页面组件。
+`setConfig` 接受 `Partial<EmUiConfig>`（`messageStatus` 允许只传部分字段），一层深合并：`inputFeatures` 按字段合并，`messageStatus` 的 `position` 整体替换、`icons`/`texts` 逐项覆盖，其他顶层键整体替换。`uiConfig` 是响应式对象，改动会立即影响已挂载的页面组件。
 
 ### `EmUiConfig` 字段
 
@@ -128,8 +154,11 @@ console.log(config.recallTimeLimit)
 | `timeDividerInterval` | `number` | `300000` |
 | `enableStreamMessage` | `boolean` | `true` |
 | `streamThrottle` | `number` | `50` |
+| `showReadStatus` | `boolean` | `false` |
+| `enableGroupReadReceipt` | `boolean` | `false` |
+| `messageStatus` | `Required<EmMessageStatusPresentation>` | `{ position: 'left', icons: {}, texts: {} }` |
 | `inputFeatures` | `EmInputFeatures` | 全部 `true` |
-| `messageMenuKeys` | `MessageMenuKeyValue[]` | 六项 |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | 七项 |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | 三项 |
 | `contactMenuKeys` | `ContactMenuKeyValue[]` | 两项 |
 | `emojiList` | `string[]` | 96 个 |

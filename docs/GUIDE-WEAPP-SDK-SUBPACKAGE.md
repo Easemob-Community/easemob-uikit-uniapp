@@ -1,5 +1,6 @@
 # 微信小程序 SDK 分包异步化实施指引
 
+> [!INFO]
 > 适用对象：接入 easemob-uikit-uni（或自行接入 easemob-websdk）的 uni-app x / uni-app / 原生 / Taro 微信小程序工程。
 > 本文基于示例工程的实测整理（2026-10-15），所有路径、脚本、体积数字均为实测值；微信基础库或开发者工具升级后请重新量一次。
 > 配套脚本：`scripts/prepare-sdk-subpackage.mjs`（构建后处理，可整段拷到宿主工程）、`scripts/check-mp-size.mjs`（体积与产物检查）。工程初始化与五端运行见 [快速开始](./QUICKSTART.md)。

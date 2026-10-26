@@ -3,6 +3,9 @@
 .em-chat-inputbar {
   display: flex;
   flex-direction: column;
+  /* 输入栏是页面 flex 列里的固定底部区：默认 flex-shrink:1 会被消息区挤扁，
+     生长输入撑高后整栏被压到比内容矮、内容溢出屏底（Android 真机实测） */
+  flex-shrink: 0;
   background-color: var(--em-input-bg);
   border-top-width: 1px;
   border-top-style: solid;

@@ -268,6 +268,9 @@
      480rpx ≈ 手机屏幕宽 70% 减头像与页边距，与旧 70% 语义基本一致（平板略窄，可接受） */
   max-width: 480rpx;
   min-width: 0;
+  /* 状态图标绝对定位在气泡左外侧（right:100%）：蒸汽端 view 默认 overflow:hidden，
+     不放行会把发送中/失败状态整块裁掉（表现为「气泡上屏但没有任何状态」） */
+  overflow: visible;
   margin-left: var(--em-spacing-2);
   margin-right: var(--em-spacing-2);
 }
@@ -294,6 +297,8 @@
   align-items: flex-end;
   max-width: 100%;
   position: relative;
+  /* 状态图标是气泡行的绝对定位子节点，必须在行容器同样放行溢出 */
+  overflow: visible;
 }
 
 /* 自定义消息出口壳：只承接 longpress（宿主卡片内容的事件冒泡）与宽度约束，不改变卡片自身布局 */
@@ -334,6 +339,46 @@
 
 .em-chat-page--state-icon-unread {
   color: var(--em-primary-color);
+}
+
+/* 状态列镜像到气泡右侧（config.messageStatus.position = 'right'）：不占布局宽度，贴气泡右外侧 */
+.em-chat-page--bubble-row-status-end .em-chat-page__state {
+  right: auto;
+  left: 100%;
+  margin-right: 0;
+  margin-left: var(--em-spacing-1);
+}
+
+/* 配置了状态文案（texts）时状态列宽度自适应：图标 + 短文案横排，不再受 20px 定宽挤压 */
+.em-chat-page--state-with-text {
+  width: auto;
+  min-width: 20px;
+  padding: 0 2px;
+}
+
+.em-chat-page__state-text {
+  margin-left: 2px;
+  font-size: var(--em-font-size-11);
+  line-height: 14px;
+  color: var(--em-text-tertiary);
+  white-space: nowrap;
+}
+
+/* 群已读人数（己方消息气泡下方）：弱化灰小字，右对齐与气泡同侧；无人数时不渲染 */
+.em-chat-page__group-read {
+  display: flex;
+  flex-direction: row;
+  margin-top: 4px;
+}
+
+.em-chat-page--group-read-self {
+  flex-direction: row-reverse;
+}
+
+.em-chat-page__group-read-text {
+  font-size: var(--em-font-size-11);
+  line-height: 14px;
+  color: var(--em-text-tertiary);
 }
 
 @keyframes em-chat-page-spin {
@@ -510,4 +555,54 @@
 .em-chat-page--pin-badge-self {
   left: auto;
   right: -6px;
+}
+
+/* 审核替换标识：气泡下方弱提示，与「已编辑」同属元信息层，不改变气泡内容 */
+.em-chat-page__moderated {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.em-chat-page--moderated-self {
+  flex-direction: row-reverse;
+}
+
+.em-chat-page__moderated-icon {
+  color: var(--em-warning-color);
+}
+
+.em-chat-page__moderated-text {
+  margin-left: 4px;
+  font-size: var(--em-font-size-11);
+  line-height: 14px;
+  color: var(--em-warning-color);
+}
+
+/* 断连/重连提示：贴输入栏上方的一条轻量状态，不抢消息区视觉 */
+.em-chat-page__network-hint {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  background-color: var(--em-bg-secondary);
+}
+
+.em-chat-page__network-hint-icon {
+  flex-shrink: 0;
+  margin-right: 4px;
+  color: var(--em-warning-color);
+}
+
+.em-chat-page__network-hint-text {
+  font-size: var(--em-font-size-11);
+  line-height: 14px;
+  color: var(--em-warning-color);
+}
+
+.em-chat-page--network-hint-offline .em-chat-page__network-hint-icon,
+.em-chat-page--network-hint-offline .em-chat-page__network-hint-text {
+  color: var(--em-danger-color);
 }

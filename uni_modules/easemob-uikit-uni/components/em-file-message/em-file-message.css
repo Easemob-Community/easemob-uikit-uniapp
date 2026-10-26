@@ -88,3 +88,15 @@
 .em-file-message__size--self {
   color: var(--em-bubble-text-self-secondary);
 }
+
+/* 上传进度（file 气泡内，文件名/大小下方）：主题色强调发送中，完成即随状态清空 */
+.em-file-message__progress {
+  font-size: var(--em-font-size-11);
+  line-height: 14px;
+  margin-top: 2px;
+  color: var(--em-primary-color);
+}
+
+.em-file-message__progress--self {
+  color: var(--em-bubble-text-self-secondary);
+}

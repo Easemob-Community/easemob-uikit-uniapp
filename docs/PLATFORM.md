@@ -4,6 +4,7 @@
 
 > 相关页面：[快速开始](./QUICKSTART.md) · [设计变量](./DESIGN-TOKENS.md) · [主题与国际化](./THEME-I18N.md) · [聊天与消息组件](./COMPONENTS-CHAT.md) · [示例工程](./DEMO.md) · [常见问题](./FAQ.md)
 
+> [!WARNING]
 > **仅支持 uni-app x 蒸汽模式（Vapor）**：DCloud 官方已于 2024 年停止 nvue 与 5+ 的维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台的维护（见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可方便升级。本插件不提供经典 uni-app（Vue2/Vue3、nvue）与 vdom 模式的兼容，下表环境要求以蒸汽编译目标为准。
 
 ## 环境要求

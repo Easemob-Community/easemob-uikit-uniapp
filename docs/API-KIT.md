@@ -262,7 +262,15 @@ onUnmounted(off)
 
 ### `EmKit.isReadReceiptEnabled()`
 
-返回当前是否启用单聊已读回执（由 `enableReadReceipt` 配置决定）。
+返回当前是否启用单聊已读回执功能（由 `enableReadReceipt` 配置决定）。已读态图标的显隐由独立的 `showReadStatus` 展示开关控制，默认关闭；发送中/失败状态不受这两个开关影响。
+
+### `EmKit.isGroupReadReceiptEnabled()`
+
+返回是否开启群聊已读回执（由 `enableGroupReadReceipt` 配置决定，默认 `false`）。
+
+### `EmKit.refreshGroupReadCounts(conversationId)`
+
+批量补齐群消息已读人数：内部取该群最近 20 条己方已发送消息，调用 SDK 群回执批量查询并回填 `EmMessageItem.groupReadCount`。群已读回执未开启时直接返回；失败不抛出（展示类补充信息）。返回 `Promise<void>`。进会话/加载历史后调用即可，聊天页已自动接入。
 
 ### `EmKit.clearConversationUnread(conversationId, chatType, force?)`
 

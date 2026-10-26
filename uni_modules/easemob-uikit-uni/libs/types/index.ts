@@ -76,6 +76,19 @@ export interface EmAttachmentCapability {
   providerName: string
 }
 
+/** 发送状态种类（气泡状态呈现配置的键）：发送中 / 失败 / 已发送未读 / 已读 */
+export type EmMessageStatusKind = 'sending' | 'failed' | 'unread' | 'read'
+
+/** 发送状态呈现配置（P2 可配置项）：位置 + 图标名 + 文案，缺省保持内置视觉。
+ *  position：状态列相对气泡的位置（left = 气泡左侧，默认；right = 气泡右侧）；
+ *  icons：按状态种类覆盖图标名（EmIconName，非法名回落内置图标）；
+ *  texts：按状态种类追加短文案（如 failed: '失败'），空串/缺省不渲染。 */
+export interface EmMessageStatusPresentation {
+  position?: 'left' | 'right'
+  icons?: Partial<Record<EmMessageStatusKind, string>>
+  texts?: Partial<Record<EmMessageStatusKind, string>>
+}
+
 /** uiConfig 运行时形态：EmKitConfig 的 UI 行为维度解析到全量默认值之后的 store 形态（libs/store/config.ts） */
 export interface EmUiConfig {
   /** 输入栏草稿，默认 true */
@@ -99,6 +112,14 @@ export interface EmUiConfig {
   enableStreamMessage: boolean
   /** 流式分片合批间隔（毫秒），默认 50；0 = 逐片立即写（高刷演示/调试用） */
   streamThrottle: number
+  /** 单聊已读态图标（未读空心圆/已读对勾）显隐，默认 false。
+   *  仅影响已读展示，不影响发送中/失败状态——后两者始终展示 */
+  showReadStatus: boolean
+  /** 群聊已读回执开关，默认 false：开启后群消息携带 needReadReceipt、自动回执群消息，
+   *  并展示己方群消息的已读人数（服务端需支持群已读回执） */
+  enableGroupReadReceipt: boolean
+  /** 发送状态呈现（位置/图标/文案），默认左侧 + 内置图标 + 无文案 */
+  messageStatus: Required<EmMessageStatusPresentation>
   /** 输入栏功能集，默认全开 */
   inputFeatures: EmInputFeatures
   /** 消息长按菜单项与顺序，默认 copy/quote/recall/delete 全量 */
@@ -131,8 +152,15 @@ export interface EmKitConfig {
   /** 显式指定自定义平台编号（透传 SDK customOSPlatform，需为 1–100 整数、向环信申请注册的编号）；
    *  不传则不注入，SDK 按默认平台类型上报。同 deviceId，同一会话内传入值必须保持稳定 */
   devicePlatform?: number
-  /** 单聊已读回执开关，默认 true */
+  /** 单聊已读回执开关，默认 true（功能开关：是否发送/接收已读回执） */
   enableReadReceipt?: boolean
+  /** 单聊已读态图标显隐，默认 false（纯展示开关，与 enableReadReceipt 解耦；
+   *  发送中/失败状态始终展示，不受本开关影响） */
+  showReadStatus?: boolean
+  /** 群聊已读回执开关，默认 false（needReadReceipt + 群回执上报 + 己方群消息已读人数展示） */
+  enableGroupReadReceipt?: boolean
+  /** 发送状态呈现（位置/图标/文案）：icons/texts 按 sending|failed|unread|read 覆盖，缺省保持内置 */
+  messageStatus?: EmMessageStatusPresentation
   /** uikit 内置 logger 级别，默认 'info'；'silent' 全关 */
   logLevel?: LogLevelValue
   /** 是否把 SDK 原始 payload 写入日志，默认 false；需同时 logLevel='debug' 才采集，生产环境慎开 */
@@ -262,6 +290,18 @@ export interface EmMessageItem {
   /** 撤回操作者 userId（M2.20）：本地撤回恒有值；远程撤回事件 SDK payload 无 operator 字段，保持 undefined。
    *  撤回条展示名取消息原发送者（vue 版同款语义），本字段供宿主扩展使用 */
   recalledBy?: string
+  /** 最近一次发送失败的归因码：SDK 数字 code（如 1200 审核未通过 / 501 违规内容 / 222 被拉黑）
+   *  或 UIKit 业务错误码（ERROR_CODE）；发送成功后清空。失败气泡与 toast 按它映射文案 */
+  failCode?: number | string
+  /** 消息内容被内容审核替换（SDK isContentReplaced）：气泡展示「内容已被审核修改」标识 */
+  contentReplaced?: boolean
+  /** 单聊消息已送达对端（SDK onMessageDelivered 命中）；宿主可据此做「已送达」展示 */
+  delivered?: boolean
+  /** 附件上传进度百分比（0-100）：SDK SendMessageOptions.onFileUploadProgress 回填，
+   *  仅图片/语音/视频/文件等带附件的发送中存在；发送结束（成功或失败）后清空 */
+  uploadProgress?: number
+  /** 群聊己方消息已读人数（enableGroupReadReceipt 开启时由服务端回执/批量查询回填） */
+  groupReadCount?: number
 }
 
 /** 置顶消息条目（M2.20；SDK PinnedMessageSummary 的中立子集，message 已过 toMessageItem 归一） */

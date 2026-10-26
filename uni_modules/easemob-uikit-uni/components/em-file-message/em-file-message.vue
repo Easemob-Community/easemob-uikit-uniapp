@@ -6,6 +6,8 @@
     <view :class="ns.e('info')">
       <em-text :text="fileName" :text-class="nameClass" :text-style="nameStyle" />
       <text v-if="sizeText !== ''" :class="[ns.e('size'), message.self ? 'em-file-message__size--self' : '']">{{ sizeText }}</text>
+      <!-- 附件上传进度（SDK onFileUploadProgress 回填）：发送中且有百分比时显示，完成后随状态清空 -->
+      <text v-if="uploadText !== ''" :class="[ns.e('progress'), message.self ? 'em-file-message__progress--self' : '']">{{ uploadText }}</text>
     </view>
   </view>
 </template>
@@ -16,6 +18,7 @@ import EmIcon from '../em-icon/em-icon.vue'
 import EmText from '../em-text/em-text.vue'
 import type { EmIconName } from '../em-icon/em-icons'
 import type { EmMessageItem } from '../../libs/types'
+import { MESSAGE_STATUS } from '../../libs/constants'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLongPressClickGuard } from '../../libs/use/useLongPressClickGuard'
 import { useLocale } from '../../libs/use/useLocale'
@@ -62,6 +65,13 @@ const sizeText = computed(() => {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+})
+
+// 附件上传进度（0-100，SDK SendMessageOptions.onFileUploadProgress 回填）：仅发送中且有百分比时显示
+const uploadText = computed(() => {
+  if (props.message.status !== MESSAGE_STATUS.SENDING) return ''
+  const value = props.message.uploadProgress
+  return value != null && value >= 0 && value <= 100 ? `${Math.round(value)}%` : ''
 })
 
 // 扩展名归类：与 --em-file-icon-{key} token 一一对应（对齐 vue 版 FILE_TYPE_RULES，一期裁剪类目）

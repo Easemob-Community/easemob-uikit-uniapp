@@ -6,10 +6,11 @@
 // 消息/会话方法全部显式携带 chatType（M2.9 群基础，breaking）；
 // 群数据域在 ./group（EmGroupDomain），由 libs/index.ts 的 EmKitImpl 直接组合。
 import type { ChatClient, Message, MultiDeviceEvent, StreamMessage } from 'easemob-websdk'
-import { CONVERSATION_TYPE, MESSAGE_EXT_KEY } from '../constants'
+import { CONVERSATION_TYPE, ERROR_CODE, MESSAGE_EXT_KEY } from '../constants'
 import type { ConversationTypeValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { conversationStore } from '../store/conversation'
+import { uiConfig } from '../store/config'
 import { createLogger } from '../utils/logger'
 import type { EmKitConfig, EmMessageHandler, EmMessageItem, EmQuoteInfo } from '../types'
 import { isPageVisible } from '../platform'
@@ -57,7 +58,7 @@ export class EmChat {
             conversationStore.atMeByConversationId[item.conversationId] = true
           }
         }
-        // 在当前会话收到对方消息：清服务端未读（按会话合批）+ 即时回已读回执（群聊在 sendReadReceipts 内部短路）。
+        // 在当前会话收到对方消息：清服务端未读（按会话合批）+ 即时回已读回执（群聊仅在开启群回执时上报）。
         // 不清未读的话，离开会话后 refreshSessionList/冷启动会把刚读过的会话又显示成未读（见 clearUnread 注释）
         // H5 标签页隐藏时用户并未看到，保持未读、不发回执（App/小程序 isPageVisible 恒 true，行为不变）
         if (!item.self && item.conversationId === this.conversations.currentConversationId && isPageVisible()) {
@@ -94,8 +95,18 @@ export class EmChat {
       },
       onMessageReadReceipts: (receipts) => {
         receipts.forEach((r) => {
+          if (r.conversationType === CONVERSATION_TYPE.GROUP_CHAT) {
+            // 群回执事件直接带每条消息的累计已读人数；未开启群回执时域内忽略
+            const groupReceipt = r as unknown as { receiptDetails?: ReadonlyArray<{ messageId: string, count: number }> }
+            this.messages.applyGroupReadReceipts(r.conversationId, groupReceipt.receiptDetails ?? [])
+            return
+          }
           this.messages.applyPeerReadTime(r.conversationType, r.conversationId, r.timestamp)
         })
+      },
+      // 单聊送达回执：只打标（EmMessageItem.delivered），已读展示仍以已读回执时间为准
+      onMessageDelivered: (payload) => {
+        this.messages.applyMessageDelivered(payload.conversationId, payload.messageId)
       }
     })
     client.addEventHandler('emkit-conversation-sync', {
@@ -118,6 +129,16 @@ export class EmChat {
         if (event.category !== 'conversation') return
         if (event.operation !== 'CONVERSATION_MUTE_INFO_CHANGED') return
         this.conversations.applyMuteInfoChanged(event.conversationId, event.remindType)
+      },
+      // 其他端删除漫游消息（含审核删除）：本地同步移除，避免列表残留；命中后校正会话摘要
+      onMultiDeviceMessageRemoved: (event) => {
+        if (this.messages.onMultiDeviceMessageRemoved(event)) {
+          this.conversations.syncMessageSummary(event.conversationId)
+        }
+      },
+      // 发送队列超时（payload 不带消息 id）：仍在 SENDING 的己方消息落 FAILED 并归因，供气泡重发/查看原因
+      onSendTimeout: () => {
+        this.messages.failPendingSends(ERROR_CODE.SEND_TIMEOUT)
       }
     })
   }
@@ -136,6 +157,10 @@ export class EmChat {
 
   get readReceiptEnabled(): boolean {
     return this.messages.readReceiptOn
+  }
+
+  get groupReadReceiptEnabled(): boolean {
+    return uiConfig.enableGroupReadReceipt
   }
 
   // 返回取消函数（unsubscriber）：宿主页面卸载时调用，防 handlers 泄漏叠加触发
@@ -179,6 +204,11 @@ export class EmChat {
 
   async loadHistory(conversationId: string, chatType: ConversationTypeValue, pageSize = 20): Promise<void> {
     return this.messages.loadHistory(conversationId, chatType, pageSize)
+  }
+
+  // 群消息已读人数批量补齐（uiConfig.enableGroupReadReceipt 关闭时 no-op）
+  async refreshGroupReadCounts(conversationId: string): Promise<void> {
+    return this.messages.refreshGroupReadCounts(conversationId)
   }
 
   async syncConversations(expectedEpoch?: number): Promise<void> {

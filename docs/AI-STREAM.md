@@ -277,11 +277,12 @@ const cursor = computed(() => (isStreamActive(props.message.stream?.status) ? ST
 
 ## 安全说明
 
-- **流式内容属于服务端生成内容，按不可信数据处理**。默认纯文本渲染只做文本节点输出，不存在 HTML 注入风险；一旦交给 markdown 渲染器，风险转移给宿主。
-- **markdown 渲染必须净化**：禁止渲染原始 HTML / `<script>` / 事件属性；链接只放行 `http` / `https`，并对 `javascript:`、`data:` 等协议做拦截；图片地址走可信域名白名单。
-- **不要把模型 API Key 放在客户端**：正确链路是客户端 → 宿主业务服务端 → 模型服务 → 环信 RESTful 下发流式消息 → 客户端 `onStreamMessage` 接收。AppKey 可以放前端，AppSecret 与模型密钥只能放服务端。
-- **token 由服务端签发**，客户端只持有当前会话所需 token，不写入代码与仓库。
-- **生产环境关闭 payload 日志**：`logPayload: true` 会把消息内容写入日志缓冲，流式全文同样在内；排查完立即关闭。
+> [!WARNING]
+> - **流式内容属于服务端生成内容，按不可信数据处理**。默认纯文本渲染只做文本节点输出，不存在 HTML 注入风险；一旦交给 markdown 渲染器，风险转移给宿主。
+> - **markdown 渲染必须净化**：禁止渲染原始 HTML / `<script>` / 事件属性；链接只放行 `http` / `https`，并对 `javascript:`、`data:` 等协议做拦截；图片地址走可信域名白名单。
+> - **不要把模型 API Key 放在客户端**：正确链路是客户端 → 宿主业务服务端 → 模型服务 → 环信 RESTful 下发流式消息 → 客户端 `onStreamMessage` 接收。AppKey 可以放前端，AppSecret 与模型密钥只能放服务端。
+> - **token 由服务端签发**，客户端只持有当前会话所需 token，不写入代码与仓库。
+> - **生产环境关闭 payload 日志**：`logPayload: true` 会把消息内容写入日志缓冲，流式全文同样在内；排查完立即关闭。
 
 ## 排错
 

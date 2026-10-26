@@ -50,7 +50,7 @@
 - 引用消息：气泡内引用条 + 点击定位
 - 撤回：2 分钟窗口、撤回提示条、（编辑入口**不做**）
 - 失败重发：气泡红色感叹号 + 点击重发
-- 单聊已读状态（`enableReadReceipt` 开关控制，群已读详情**不做**）
+- 单聊已读状态（`enableReadReceipt` 开关控制；群已读仅「已读人数」可经 `enableGroupReadReceipt` 打开，群已读成员明细**不做**）
 - 输入栏：文本/语音切换（按住说话）、表情入口（一期仅 emoji 字符面板，**不做表情包**）、相册/拍摄/文件 三个扩展动作；emoji/媒体面板与软键盘展开时，点击消息区收起（对齐 vue 版 `chat__content` 点击 blur）
 - typing 提示：默认开，不配开关
 - 草稿：默认开，不配开关
@@ -310,6 +310,13 @@ easemob-uikit-uniapp/
 - **范围**：websdk 5.1.3 API 齐备（`modifyMessage` 编辑上限 10 次、`pinMessage/unpinMessage/getPinnedMessageList` ≤20 条、事件 `onMessageUpdated/onPinnedMessageChanged`）。撤回条展示原发送者昵称（SDK `onMessageRecalled` payload 无操作者字段，vue 同款语义）+ 自己撤回的文本墓碑可「重新编辑」回显输入框（发新消息）；长按菜单新增 `edit`/`pin` 内置 key（走 `uiConfig.messageMenuKeys`，删 key 即禁用），输入栏新增编辑条（对齐 vue `editing-bar`），文本气泡加「已编辑」标记；新组件 `em-pinned-bar`（折叠态 + 多条下拉展开，点击定位复用引用定位机制）；新配置 `enableReEdit`/`enableGroupNameEdit`（默认开）；好友备注编辑（联系人列表长按菜单 `remark` 项 + 居中弹层，走既有 `EmKit.setContactRemark`，展示链备注 > 昵称 > userId 联动聊天页标题/撤回条/引用卡，`uiConfig.contactMenuKeys` 默认 remark/delete）。
 - **明确不做**：群主/管理员撤回他人消息（vue `enableRecallOther`，SDK 支持但不在本轮）；编辑时间窗口（vue 无此限制，仅次数上限）；会话列表撤回摘要改动（现有 `message.recalledPreview` 保持）。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；蒸汽端真机待验项记 STATUS.md。
+
+### M2.21：发送状态呈现与已读增强（2026-10-23 立项，承发送状态审查 P2 项）
+
+- **背景**：发送状态（发送中/失败/已读）此前只有内置一套图标与气泡左侧固定位置，宿主无法按品牌调整；附件上传无进度反馈；群聊完全无已读信息。三项均为 P2 体验增强。
+- **范围**：①`uiConfig.messageStatus`（`position: 'left' | 'right'`、`icons`、`texts`）按状态覆盖图标名与短文案、镜像状态列，发送中/失败判定不变；②`SendMessageOptions.onFileUploadProgress` 接入 `EmMessageItem.uploadProgress`，图片/视频蒙层与文件气泡显示百分比，发送结束清空；③`enableGroupReadReceipt`（默认关）开启群消息 `needReadReceipt`、群回执上报、群回执事件落库与 `EmKit.refreshGroupReadCounts` 批量补齐，聊天页己方群消息下方展示「N 人已读」。
+- **明确不做**：群已读成员明细查看器（PLAN 既定裁剪项）；进度条 UI 自绘动画；单条消息的已读成员列表接口。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；群回执与上传进度需真实账号/真机回归（记 STATUS.md）。
 
 ### M3：组件沉淀与发布
 

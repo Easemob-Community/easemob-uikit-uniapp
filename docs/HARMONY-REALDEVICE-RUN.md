@@ -33,6 +33,7 @@ HBuilderX 中设置 DevEco Studio 路径：工具 → 设置 → 运行配置 �
 
 改名后记得重新签名（Profile 与包名绑定）。
 
+> [!CAUTION]
 > **仓库安全**：`demo/manifest.json` 已移除 `app-harmony.distribute.signingConfigs`（证书绝对路径与密码不再入库）。
 > 本地首次运行时按本节在 HBuilderX 中重新配置即可；HBuilderX 可能把签名写回 manifest，**提交前务必还原/删除该段**。
 > 签名材料（`.p12` / `.cer` / `.p7b`）已在 `.gitignore` 中忽略。

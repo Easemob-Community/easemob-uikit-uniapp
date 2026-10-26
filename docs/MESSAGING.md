@@ -40,6 +40,7 @@ await EmKit.sendFile('user-b', CONVERSATION_TYPE.SINGLE_CHAT, file)
 - 媒体对象来自 `chooseImage` / `chooseVideo` / `chooseFile` 或输入栏事件。
 - App 端文件选择由宿主注册附件能力（`EmKit.setAttachmentProvider`）；`EmKit.sendFile` 接收 `{ path, name, size, mimeType?, temporary?, release? }`，`temporary` 附件在发送成功后由 UIKit 回调 `release` 清理，失败时保留供重发。详见 [EmKit API · 附件能力注入](./API-KIT.md)。
 - 发送成功后返回 `EmMessageItem`；失败会抛错，聊天页同时把消息置为 `failed` 并显示重发入口。
+- 附件消息发送中，SDK 回传 `onFileUploadProgress` 时会把百分比写入 `EmMessageItem.uploadProgress`（0-100），图片/视频气泡蒙层与文件气泡会显示进度；发送结束（成功或失败）后该字段清空。
 
 ### 业务上下文 `ext`
 
@@ -198,14 +199,18 @@ AI 流式输出通过 SDK 的 `onStreamMessage` 驱动：
 ### 失败重发
 
 - 失败消息保留原位，显示红色感叹号；domain 按 `conversationId + localId` 共享在途重发 Promise，页面实例或宿主重复调用都会得到同一实际成功/失败结果，失败后仍可重试。
-- 点击重发调用 `EmKit.resendMessage`；锁在等待 SDK 就绪前占有，页面防重仍保留。
-- 媒体消息按原类型重建；本地临时文件缺失时会明确报错，不会退化成空文本。
+- 点击红色感叹号先弹出失败面板：标题带失败原因，提供「重新发送 / 删除」；也可在长按菜单选「重发」，最终都调用 `EmKit.resendMessage`，锁在等待 SDK 就绪前占有，页面防重仍保留。
+- 失败原因按 SDK 错误码归因后写入 `EmMessageItem.failCode`（如 `1200` 审核未通过、`501` 违规内容、`508` 外部策略拦截、`222` 被对方拒收、`300` 未连接、`219` 管理员禁言、网络类业务码），toast 与失败面板共用同一套中英文案。
+- 媒体消息按原类型重建；本地临时文件缺失时会明确报错（`ERROR_CODE.MEDIA_UNAVAILABLE`），不会退化成空文本。
+- 其他设备删除漫游消息（含审核删除）时，本端经 `onMultiDeviceMessageRemoved` 同步移除；`onSendTimeout` 触发时，仍在发送中的己方消息统一落失败并归因。
 
 ### 已读回执
 
-- 单聊生效；群聊不发已读。
-- 仅最新一条己方已发送消息显示已读/未读图标。
-- 由 `enableReadReceipt` 控制，默认开启。
+- 功能开关 `enableReadReceipt` 默认开启（是否发送/接收已读回执），单聊生效。
+- 已读态图标另有纯展示开关 `showReadStatus`，默认关闭；开启后仅最新一条己方已发送消息显示已读/未读图标。
+- 群聊已读回执由独立开关 `enableGroupReadReceipt` 控制（默认关闭）：开启后群消息带 `needReadReceipt`、自动回执群内消息，并在己方群消息下方展示「N 人已读」。人数来自 `onMessageReadReceipts` 的群回执事件（服务端下发累计值）或 `EmKit.refreshGroupReadCounts` 批量查询，只增不减；关闭时群聊不产生回执请求。
+- 发送状态呈现可用 `messageStatus` 配置图标、文案与位置（气泡左侧/右侧）；它只改变呈现形式，不改变状态判定。
+- 发送中/失败状态不受以上两个开关影响：发送中恒显 loading，失败恒显红色感叹号。
 - 进入会话、当前会话收消息、离开聊天页都会清理服务端未读（按会话合批）。
 
 ### typing

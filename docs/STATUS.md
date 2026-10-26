@@ -103,6 +103,8 @@
 | 群系统通知上屏（建群/成员进出/改名/公告/转让）+ notice 长按菜单禁用 | H5/mp | |
 | 蒸汽真机群形态视觉：成员管理覆盖层 fixed 定位与弹层叠放、角色角标、宫格五列、multiple 已选条横滚 | App 三真机 | |
 | `EmContactNavEntry` 预留 `visible` 字段未加（PLAN 裁剪项「黑名单入口预留 visible 控制」），M4 黑名单落地时补 | 全端 | 非 breaking |
+| 群已读回执端到端（真实群 + 多名成员：消息带 needReadReceipt、群成员回执后己方看到「N 人已读」、进会话批量补齐、关闭开关后无请求/无人数） | H5/mp/App | 需真实群与至少两名成员；单账号单设备无法构造 |
+| 附件上传进度抓帧（大文件中/弱网下图片/视频蒙层与文件气泡的百分比、发送结束清空） | App/mp/H5 | 需可观测的慢上传；本轮真机上传过快未抓到 sending 帧 |
 
 ## 已验证基线（历史 SPIKE）
 
@@ -958,6 +960,35 @@
 - **门禁**：`check-docs` ✓（28 页 / 35 组件 / 79 方法 / 27 配置）；`build web` ✓（仅既有 demo-custom-inputbar 告警）；`build mp-weixin` ✓ 11 项防回归全绿（主包 980KB ≤ 1.5MB）；H5 产物静态伺服 / **HTTP 200**。
 - **待验（真机）**：App 旧自定义基座缺 `uni-getNetworkType` 模块时降级链路（warn 日志 + 不预判）；断网/恢复过程中 banner 的显示与消隐时序（H5 devtools Network offline 可手测）；离线时发送/重发的 FAILED 气泡与「网络异常」toast。
 
+## 2026-10-23 发送状态支持度审查修复（审核域 + 失败归因 + 体验增强）
+
+- **错误归因**：`libs/utils/error.ts` 的 `errorCodeOf` 兼容 SDK 5.x 数字 `code`（含 `'1200'` 字符串形态；保留 UIKit 字符串业务码）；新增 `SDK_ERROR_CODE_I18N_MAP`（连接/认证/禁言/文件/群组/审核等高频码，含 1200/1299 审核失败、501 违规内容、508 外部策略拦截、222 被拒收、221 不在好友列表、300 未连接、215/219 禁言）与 `sendFailureKeyOf` / `sendFailureKeyOfCode`；文案匹配仅作无 code 兜底。中英 locale 增补 30+ 个错误 key。
+- **失败归因落库**：`EmMessageItem` 增 `failCode?: number | string`；`deliver()` 与 `resendMessage` 的 catch 写入、成功后清空；`toastSendFailed` 改读统一映射；失败面板标题展示原因。新增 `ERROR_CODE.SEND_TIMEOUT` / `MEDIA_UNAVAILABLE`。
+- **审核域**：`EmMessageItem` 增 `contentReplaced?: boolean`；`toMessageItem`、`applyMessageUpdated`（普通编辑清标 / `isContentReplaced=true` 打标）与发送/重发回包 `applySentModeration`（同步服务端替换后的文本）共同维护；聊天页气泡下方展示「内容已被审核修改」标识（`shield` 图标 + warning 色，中英双文案）。
+- **事件补齐**：聊天页/消息域监听 `onMessageDelivered`（`delivered` 标记）、`onMultiDeviceMessageRemoved`（按 messageIds/beforeTimestamp 本地移除并校正会话摘要，顺带释放临时附件）、`onSendTimeout`（仍停在 SENDING 的己方消息统一落 FAILED + `EM_SEND_TIMEOUT`）。
+- **体验增强**：图片/视频发送中气泡内压暗蒙层 + 居中 loading（对齐 vue image/video message）；`MESSAGE_MENU_KEY.RESEND`（默认 `messageMenuKeys` 七项）与失败气泡 action-sheet（原因 + 重发/删除）；失败消息长按只保留复制/重发/删除，避免对无 serverId 的消息执行引用/编辑/置顶/撤回；断连/重连时输入栏上方「消息待发」提示；多选附件按 `FILE_SEND_CONCURRENCY=3` 分窗口并发。
+- **文档**：API-TYPES（EmMessageItem 三字段、MESSAGE_MENU_KEY、ERROR_CODE）、CONFIG（messageMenuKeys 默认七项）、PAGES-CHAT（失败面板/审核标识/断连提示/媒体蒙层）、MESSAGING（失败重发归因）、changelog 未发布段同步；`check-docs` ✓（28 页 / 35 组件 / 79 方法 / 27 配置）。
+- **门禁**：`build web` ✓（仅既有 demo-custom-inputbar 告警）；`build mp-weixin` ✓ 11 项防回归全绿（主包 993KB ≤ 1.5MB，分包合计 1425KB）；H5 产物静态伺服（5183）/ **HTTP 200**。
+- **待验（真实账号/真机）**：SDK 数字错误码实际回包文案（审核拒绝/拉黑/禁言）；审核替换事件在真实服务端的 `isContentReplaced` 字段形态；`onMultiDeviceMessageRemoved` 的 messageIds/beforeTimestamp 两种载荷；`onSendTimeout` 触发时多会话并发发送的失败归因是否只命中真正超时的消息；媒体蒙层与失败面板在 H5/微信开发者工具/蒸汽真机的观感。
+
+## 2026-10-23 真机复测：审核拒绝的失败态展示
+
+- **设备**：Redmi Note 7 Pro / Android 10（1080×2340），已连接 adb，运行当前 dev 包。
+- **复现**：在 demo 单聊会话发送 `fuck` → 服务端 ACK `MODERATION_001` / `error_type=moderation` → SDK `MessageSendError` code **1200**。
+- **表现**：toast「内容审核未通过，请修改后重试」；toast 消失后气泡左侧红色感叹号可见；点红叹号弹出「发送失败：内容审核未通过，请修改后重试」+「重新发送 / 删除」。日志：`[emkit:message] message send failed: <localId> 1200`。
+- **结论**：最新代码的失败态链路正常。用户此前看到「无状态」的两个可能：① toast 是居中宽条，显示期间会盖住气泡左下方约 2s，红叹号在 toast 消失后才清晰；② 跑的是未含 `overflow: visible` 修复的旧包，状态图标被蒸汽端默认 `overflow:hidden` 裁掉。
+- **已清理**：测试输入草稿已清空；失败消息仅本地内存态，未上报服务端。
+
+## 2026-10-23 已读态展示与发送状态解耦
+
+- **需求**：已读状态图标可独立开关（默认关闭）；发送中 loading 与发送失败红叹号是独立关键状态，不能随已读开关关闭。
+- **配置**：`EmKitConfig.showReadStatus` / `EmUiConfig.showReadStatus` 新增，默认 `false`；仅控制单聊最新己方已发送消息的未读/已读图标。`enableReadReceipt` 仍为功能开关（是否收发已读回执）。
+- **实现**：`em-chat-page` 的 `showReadState()` 改为读 `config.showReadStatus && EmKit.isReadReceiptEnabled()`；发送中/失败是模板中的独立 `v-if` 分支，未经过该函数，恒展示。模板补注释固定该契约。
+- **文档**：CONFIG（`EmKitConfig` / `EmUiConfig` 两处）、PAGES-CHAT（已读态图标/发送状态两段 + 能力表）、MESSAGING（已读回执段）、API-KIT（`isReadReceiptEnabled` 说明）、changelog 未发布段同步。
+- **门禁**：`build web` ✓ / `build mp-weixin` ✓ 11 项全绿 / `check-docs` ✓。
+
+- **真机验证（解耦后）**：`showReadStatus` 默认 false 时，单聊已发送成功的「米哈游/煞笔/干嘛」均无已读圆圈；随后发送 `fuck` 被审核拒绝，气泡左侧红叹号仍正常显示，toast「内容审核未通过，请修改后重试」。证明已读展示与发送中/失败状态已解耦。
+
 ## 2026-10-23 SDK init 注入固定 deviceId + 设备平台信息
 
 - **实现**：新增 `libs/client/device.ts` 导出 `resolveDeviceInfo(config)`（同步纯函数）；`EmClient.doInit` 的 `ChatClient.init` 入参展开其结果。`EmKitConfig` 增四字段：`enableDeviceInfo`（总开关，默认 true）、`deviceId` / `deviceName` / `devicePlatform`（显式覆盖）。
@@ -968,6 +999,16 @@
 - **门禁**：`build web` ✓；`build mp-weixin` ✓ 11 项防回归全绿（主包 1002KB ≤ 1.5MB，分包合计 1425KB）；H5 产物静态伺服 200 ✓（产物 JS 含 `emkit.device.id` / `customOSPlatform` 注入代码）。
 - **待验（真实账号/真机）**：H5 登录后抓 init 入参确认三字段注入与两次启动 deviceId 一致（localStorage 未清时）；`enableDeviceInfo: false` 时 init 入参不含任何设备字段；App（iOS/Android/鸿蒙 4.61+ 基线）与微信小程序真机的 deviceId 跨启动稳定性（鸿蒙需 4.61+ 才有 `uni.getDeviceInfo`，旧基座走 UUID 兜底分支）。
 
+## 2026-10-23 发送状态 P2 增强：上传进度 / 群已读回执 / 状态呈现可配置
+
+- **范围**：发送状态审查报告剩余 P2 三项（Reaction 事件按用户决定另行排期，未动）。
+- **上传进度**：`deliver()` 与 `performResendMessage` 给 `chatManager.sendMessage` 挂 `SendMessageOptions.onFileUploadProgress`，按整数百分比去重后写 `EmMessageItem.uploadProgress`（仅图片/语音/视频/文件，文本/自定义不挂回调）；发送成功/失败均清空。图片/视频蒙层改纵向布局，loading 下方显示百分比；文件气泡在大小行下方显示百分比。`toMessageItem` 不映射该字段（只属于发送中态）。
+- **群已读回执**：新配置 `enableGroupReadReceipt`（默认 `false`，`EmKitConfig` / `EmUiConfig` 双入口）。开启后：群消息发送前补 `needReadReceipt = true`（deliver 与重发两条路径）；`sendReadReceipts` 不再对群聊一刀切短路，改为 `groupReceiptWanted(chatType)` 判定；`onMessageReadReceipts` 的群回执分支把 `receiptDetails` 的累计已读人数写入 `EmMessageItem.groupReadCount`（只前进不回退）；新增 `EmKit.refreshGroupReadCounts(conversationId)`（SDK 单次上限 20，取最近 20 条己方已发送消息，`sessionEpoch` 防护，开关关闭时 no-op），聊天页 `loadInitialHistory` finally 里调用；己方群消息下方展示「N 人已读」（`message.groupReadCount` 中英）。新增常量 `GROUP_READ_RECEIPT_BATCH = 20`。
+- **状态呈现可配置**：新配置 `messageStatus`（`position: 'left' | 'right'`、`icons`、`texts`），`EmUiConfig` 存 resolved 形态（`Required<EmMessageStatusPresentation>`），`setConfig` 入参放宽为可只传部分字段（`position` 整体替换、`icons`/`texts` 逐项合并），`applyKitConfig` 归一后写入。聊天页状态列改由 `statusIconOf/statusTextOf/stateClass/statusAtEnd` 驱动：图标缺省回落内置；有文案时状态列宽度自适应并横排；`position: 'right'` 用 `--bubble-row-status-end` 镜像到气泡右侧。发送中/失败判定分支未改。
+- **文档**：PLAN（M2.21 里程碑 + §1.3 群已读口径）、CONFIG（EmKitConfig 两行 + 新增「发送状态呈现」节 + EmUiConfig 两行 + setConfig 合并语义）、API-TYPES（`uploadProgress`/`groupReadCount`/`EmMessageStatusPresentation`）、API-KIT（`isGroupReadReceiptEnabled`/`refreshGroupReadCounts`）、PAGES-CHAT（群已读人数/状态呈现/上传进度 + 能力表 + 边界）、MESSAGING、COMPONENTS-CHAT（图片/视频/文件发送中）、changelog 未发布段。
+- **门禁**：`build web` ✓（仅既有 demo 组件告警）；`build mp-weixin` ✓ 11 项防回归全绿（主包 1002KB ≤ 1.5MB，分包合计 1425KB）；H5 产物静态伺服 `/` **HTTP 200**；`check-docs` ✓（28 页 / 35 组件 / 81 方法 / 33 配置字段）；`check-skills` ✓（8 技能）；`git diff --check` ✓。
+- **真机回归（Redmi Note 7 Pro / Android 10，demo 账号）**：重新登录 → 会话列表 → 单聊 `hhhhh` → 相册选 7.6MB 图片发送成功、图片气泡正常渲染、无已读图标（`showReadStatus` 默认关）、发送中/失败状态未被新配置影响；连续抓帧未捕获到 sending 帧（本机上传过快，系统相册压缩阶段先出现「正在加载…」），上传百分比仍待弱网/大文件补验；测试期间向 demo 账号 `hhhhh` 会话发送了两张噪声图（仅测试数据）。
+- **待验**：群已读回执需真实群 + 多成员；上传进度弱网抓帧；`messageStatus.position='right'` 与文案的蒸汽端/小程序视觉；iOS/鸿蒙真机。
 
 ## 2026-10-23 SDK init 设备信息两处设计调整（同日修订）
 
@@ -995,3 +1036,23 @@
 - **取舍记录**：各段剔除全部空白字符（resource 里不允许空格）；机型/系统段不参与持久化读回校验（校验仍只看平台段+版本段）——同一台机器这两个值不变；用户系统升级后沿用旧系统段也可接受（代价仅是控制台展示旧版本串），不强求重派生。宿主显式 `config.deviceId` 仍原样、不加任何段。
 - **实现**：device.ts 内 `sanitizeSegment()` + `resolveModelSegments()`（仅 App 平台调用）；无新增条件编译，平台判断复用现有 `resolvePlatformName()` 归一结果。
 - **文档**：API-KIT deviceId 行、CONFIG「设备信息」表、changelog 未发布段同步。
+
+## 2026-10-23 生长输入（换行档）塌陷 / 点不聚焦修复（Android 真机）
+
+- **症状（用户真机反馈，均为换行输入档 `sendOnReturn=false` 的 textarea）**：
+  1. 从会话进聊天页时输入框高度会先变成最终高度（视觉残留过程）；
+  2. 多次换行且**不清空草稿**后，输入框「看着正常」但点击唤不起键盘，没有 placeholder，像被什么东西遮住。
+- **真机复现（Redmi Note 7 Pro / Android 10，dev 包 + adb，uiautomator 量原生 bounds + 截图像素量灰底）**：
+  - 草稿 7~8 个硬换行 → 退出再进会话（草稿持久化回填）。修复前实测：**灰底被压到 15~24 CSS px、原生 textarea 只剩 6.5 CSS px，草稿文字溢出到麦克风按钮上方**（点文字区落不到原生输入框 → 不聚焦；草稿非空所以没有 placeholder → 看起来像被遮挡）。修复后同流程灰底 109 CSS px（5 行 + 上下 8px padding）、原生 textarea 93 CSS px。
+  - 根因三处叠加：① 旧实现只在「lineCount ≤ 5」时冻结高度，恢复 >5 行草稿时首个 linechange 就超上限 → 封顶态高度恒为 0 → 原生 textarea 塌成一条细线（`auto-height=false` 又没 height）；② 包裹层是 border-box，封顶时只写文本高度，padding 被吃掉、文字顶到灰底边缘；③ 灰底比原生 textarea 大一圈（上下 8px、左右 12px padding 不在原生命中区），点灰底边缘本来就不聚焦。
+  - 实测 linechange 上报（logcat 插桩）：单行 18.55px，多行 height/lineCount 恒定 ≈18.6px；恢复 8 行草稿首个事件 `{lineCount:8,height:148.7}`；封顶后上报值会停在布局高度（不可再用来反推，否则封顶高度越学越大，实测出现 109→166px 回路）。
+  - 另实测：原生 textarea 的 auto-height **删除整行后不回缩**（灰底停在旧高度，点/失焦都不恢复）。
+- **修复（`em-chat-inputbar`）**：
+  - 高度口径重写：≤5 行不写高度（原生 auto-height + 包裹层自适应，唯一口径）；>5 行关 auto-height、textarea 显式高度 = `lineHeight × 5`、包裹层 = 该高度 + 16px 竖直 padding；单行高度由 `height / lineCount` 反推并夹在 [12,40]px，封顶后不再学习（避免越学越大）。
+  - 封顶高度**恒 > 0**：草稿回填时按硬换行数先 seed 一个封顶高度（兜底行高 19px），消灭首帧「先撑成整段再塌回」的高度跳变；首个超上限的 linechange 只在「已知高度不足封顶高度」时反推一次（恢复草稿、一次粘贴多行都覆盖）。
+  - 删行后 auto-height 不回缩：草稿换行数下降（或清空）时把 `auto-height` 关一帧再打开，逼原生重测（实测 166px → 53.5px 当场回缩）。
+  - 灰底 padding 区点击转发焦点：包裹层 `@click` → 先 `focus=false` 再 `nextTick` 置 true（`:focus` 是布尔 prop，同值不重发请求）；已聚焦时跳过不打断打字。
+  - 输入栏根加 `flex-shrink: 0`（页面 flex 列里不被消息区挤扁）。
+- **验证**：真机（同机 adb 实测）进页 8 行草稿 = 109 CSS 灰底 / 93 textarea，不再塌陷；点灰底上沿（padding）唤出键盘；8 行→点删到 2 行灰底回缩到 53.5；5 行内草稿进页高度正确（2/3/4 行分别 53/72/91 CSS）。门禁：`build web` ✓、`build mp-weixin` ✓（11 项防回归全绿，主包 1002KB）、H5 产物伺服 200 ✓。
+- **待验**：iOS / 鸿蒙换行档的封顶与回缩（iOS 走同一 textarea 分支，linechange 上报口径可能不同）；H5 与微信小程序的灰底 padding 点击转发；长文本「折行到 >5 行但无硬换行」的封顶（只依赖 linechange，未做 seed）。
+- **取舍记录（用户确认）**：不采用「离开页面/失焦时收成单行、聚焦再展开」的折叠形态。理由：① 组件随页面销毁，生长状态本就是每次进页面新建，「离开时重置」对下次进页无实际作用，能被带回的只有草稿内容，而框高必须跟着内容走，否则草稿会被裁掉；② 视觉/交互权威 vue 版 `h5-input` 与微信都是「rows=1 起步 + 随内容生长、失焦不回缩」；③ 进页高度残留/塌陷的根因已单独修掉，不需要靠折叠形态兜底。

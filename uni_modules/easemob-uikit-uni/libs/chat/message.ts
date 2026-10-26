@@ -9,20 +9,21 @@ import type {
   Message,
   FileMessageBody,
   ImageMessageBody,
+  SendMessageOptions,
   StreamMessage,
   TextMessageBody,
   VideoMessageBody,
   VoiceMessageBody
 } from 'easemob-websdk'
-import { CMD_ACTION, CONVERSATION_MESSAGE_RETAIN_LIMIT, CONVERSATION_TYPE, ERROR_CODE, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
-import type { ConversationTypeValue, MessageTypeValue, StreamMessageStatusValue } from '../constants'
+import { CMD_ACTION, CONVERSATION_MESSAGE_RETAIN_LIMIT, CONVERSATION_TYPE, ERROR_CODE, GROUP_READ_RECEIPT_BATCH, MESSAGE_EXT_KEY, MESSAGE_STATUS, MESSAGE_TYPE, STREAM_MESSAGE_STATUS } from '../constants'
+import type { ConversationTypeValue, ErrorCodeValue, MessageTypeValue, StreamMessageStatusValue } from '../constants'
 import { connectionStore } from '../store/connection'
 import { uiConfig } from '../store/config'
 import { getMessages, messageStore } from '../store/message'
 import type { EmPickedFile, EmPickedImage, EmPickedVideo } from '../platform'
 import type { EmMessageHandler, EmMessageItem, EmMessageModifiedInfo, EmPinnedMessageItem, EmQuoteInfo, EmStreamInfo } from '../types'
 import { isStreamTerminal } from '../utils/stream'
-import { errorWithCode } from '../utils/error'
+import { errorCodeOf, errorWithCode } from '../utils/error'
 import { createLogger } from '../utils/logger'
 import { useLocale } from '../use/useLocale'
 import { displayNameOf } from '../store/user'
@@ -685,19 +686,68 @@ export class EmMessageDomain {
       if (connectionStore.networkOnline === false) {
         throw errorWithCode(ERROR_CODE.NETWORK_OFFLINE, 'system offline')
       }
-      const sent = await chatManager.sendMessage(message)
+      // 群已读回执：消息带 needReadReceipt 后，群成员的回执才会累计到该消息的已读人数
+      if (this.groupReceiptWanted(item.chatType)) {
+        message.needReadReceipt = true
+      }
+      const sent = await chatManager.sendMessage(message, this.uploadOptionsOf(stored))
+      // 兜底：SDK 若以 resolve 返回 failed 态（而不是 reject），不能误标为已发送
+      if ((sent.sendStatus as string) === 'failed') {
+        throw new Error('send failed')
+      }
       stored.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
       stored.time = sent.timestamp
       stored.status = MESSAGE_STATUS.SENT
+      // 成功后清空失败归因：同一 localId 重发成功不能再显示上一次失败原因
+      delete stored.failCode
+      // 上传进度只属于发送中态：成功/失败后清空，避免残留百分比
+      delete stored.uploadProgress
+      logger.debug('message sent:', sent.msgLocalId, sent.sendStatus as string, sent.isContentReplaced === true ? '(content replaced)' : '')
       delete this.uploadFileByLocalId[item.localId]
       // 临时副本只在发送成功后清理；失败保留，用户点重发仍能读到同一路径
       this.releaseTemporary(stored.url)
       this.applyMediaBody(stored, sent)
+      this.applySentModeration(stored, sent)
     } catch (e) {
       stored.status = MESSAGE_STATUS.FAILED
+      delete stored.uploadProgress
+      // 失败归因落库：SDK 数字 code / UIKit 业务 code 都保留，气泡与 toast 共用同一映射
+      const code = errorCodeOf(e)
+      if (code !== '') stored.failCode = code
+      logger.warn('message send failed:', item.localId, code !== '' ? code : '(no code)', e)
       throw e
     }
     return stored
+  }
+
+  // 群已读回执是否生效：配置开关 + 群聊。needReadReceipt、群回执上报、已读人数展示三处共用口径
+  private groupReceiptWanted(chatType: string | undefined): boolean {
+    return uiConfig.enableGroupReadReceipt && chatType === CONVERSATION_TYPE.GROUP_CHAT
+  }
+
+  /** 附件上传进度回调（SDK SendMessageOptions.onFileUploadProgress）：仅带附件的消息有意义。
+   *  进度是弱一致的展示信息，按整数百分比去重后再写 store 代理（蒸汽端仅代理 mutation 触发更新）；
+   *  文本/自定义/本地通知没有上传阶段，不挂回调。 */
+  private uploadOptionsOf(stored: EmMessageItem): SendMessageOptions | undefined {
+    const type = stored.type
+    if (type === MESSAGE_TYPE.TEXT || type === MESSAGE_TYPE.CUSTOM || type === MESSAGE_TYPE.NOTICE) {
+      return undefined
+    }
+    return {
+      onFileUploadProgress: (progress) => {
+        let percent = -1
+        if (typeof progress.percent === 'number' && progress.percent >= 0) {
+          percent = Math.round(progress.percent)
+        } else if (typeof progress.total === 'number' && progress.total > 0) {
+          percent = Math.round((progress.loaded / progress.total) * 100)
+        }
+        if (percent < 0 || percent > 100) return
+        // 成功/失败后 SDK 仍可能补发尾帧：非发送中一律丢弃，避免百分比在完成态复活
+        if (stored.status !== MESSAGE_STATUS.SENDING) return
+        if (stored.uploadProgress === percent) return
+        stored.uploadProgress = percent
+      }
+    }
   }
 
   // 发送成功后把 SDK 回填的 body 元数据写回本地 item（item 是 toMessageItem 的副本）：
@@ -746,6 +796,17 @@ export class EmMessageDomain {
     if (stored.type === MESSAGE_TYPE.FILE) {
       const size = num('fileSize')
       if (size > 0) stored.fileSize = size
+    }
+  }
+
+  // 发送回包可能携带审核替换（isContentReplaced=true）：同步替换后的文本 + 打标，
+  // 否则发送方气泡会一直显示自己输入的原文，误以为服务端仍按原文投递。
+  private applySentModeration(stored: EmMessageItem, sent: Message): void {
+    if (sent.isContentReplaced !== true) return
+    stored.contentReplaced = true
+    if ((sent.type as string) === 'text') {
+      const content = (sent.body as TextMessageBody).content
+      if (typeof content === 'string' && content !== '') stored.text = content
     }
   }
 
@@ -801,11 +862,12 @@ export class EmMessageDomain {
     ensureUserInfos(older.map((m) => m.from))
   }
 
-  // 单聊已读回执：批量回执该会话内对端消息（serverId，最多 50 条），对方经 onMessageReadReceipts 收到；
-  // 群聊已读回执（groupAck）不在一期范围，群聊调用直接短路
+  // 已读回执：批量回执该会话内对端消息（serverId，最多 50 条），对方经 onMessageReadReceipts 收到。
+  // 单聊恒可用（enableReadReceipt 控制）；群聊回执需 uiConfig.enableGroupReadReceipt（服务端群回执能力），
+  // 关闭时群聊直接短路，不产生额外请求
   async sendReadReceipts(conversationId: string, chatType: ConversationTypeValue): Promise<void> {
     if (!this.readReceiptOn) return
-    if (chatType !== CONVERSATION_TYPE.SINGLE_CHAT) return
+    if (!this.groupReceiptWanted(chatType) && chatType !== CONVERSATION_TYPE.SINGLE_CHAT) return
     const chatManager = await this.readyChatManager()
     const list = messageStore.messagesByConversationId[conversationId] ?? []
     const ids: string[] = []
@@ -830,6 +892,41 @@ export class EmMessageDomain {
     if (timestamp > prev) {
       messageStore.peerReadTimeByConversationId[conversationId] = timestamp
     }
+  }
+
+  // 群已读回执事件落库：SDK 直接下发每条消息的累计已读人数，只前进不回退；
+  // 本地还没有该消息（历史/漫游未拉取）时忽略，进会话后 refreshGroupReadCounts 会补齐
+  applyGroupReadReceipts(conversationId: string, details: ReadonlyArray<{ messageId: string, count: number }>): void {
+    if (!uiConfig.enableGroupReadReceipt || details.length === 0) return
+    const list = messageStore.messagesByConversationId[conversationId] ?? []
+    details.forEach((detail) => {
+      const count = detail.count
+      if (typeof count !== 'number' || count <= 0) return
+      const target = list.find((m) => m.self && (m.id === detail.messageId || m.localId === detail.messageId))
+      if (target == null) return
+      if (count > (target.groupReadCount ?? 0)) target.groupReadCount = count
+    })
+  }
+
+  // 群消息已读人数批量补齐（进会话/加载历史后调用）：SDK 单次最多 20 条，取最近的己方已发送消息；
+  // 只是补充展示信息，失败静默（调用方已 catch）
+  async refreshGroupReadCounts(conversationId: string): Promise<void> {
+    if (!uiConfig.enableGroupReadReceipt) return
+    const epoch = this.sessionEpoch
+    const list = messageStore.messagesByConversationId[conversationId] ?? []
+    const ids: string[] = []
+    for (let i = list.length - 1; i >= 0 && ids.length < GROUP_READ_RECEIPT_BATCH; i--) {
+      const m = list[i]
+      if (m.self && m.status === MESSAGE_STATUS.SENT && m.id !== '') {
+        ids.push(m.id)
+      }
+    }
+    if (ids.length === 0) return
+    const chatManager = await this.readyChatManager()
+    if (epoch !== this.sessionEpoch) return
+    const details = await chatManager.getGroupMessageReadReceipts({ groupId: conversationId, messageIds: ids })
+    if (epoch !== this.sessionEpoch) return
+    this.applyGroupReadReceipts(conversationId, details)
   }
 
   // typing 信号：cmd 消息发送，本域节流（同一会话 uiConfig.typingThrottle 内最多一条）；失败静默
@@ -896,11 +993,12 @@ export class EmMessageDomain {
     return { operatorId: info.operatorId ?? '', operationCount: info.operationCount ?? 0, operationTime: info.operationTime ?? 0 }
   }
 
-  // 编辑结果本地 patch：成功回包与远程 onMessageUpdated 事件共用（SDK 均不替本端改内存态）
+  // 编辑结果本地 patch：成功回包与远程 onMessageUpdated 事件共用（SDK 均不替本端改内存态）。
+  // contentReplaced：审核替换与普通编辑共用该事件，true 时气泡展示「内容已被审核修改」标识
   private patchModifiedMessage(
     conversationId: string,
     messageId: string,
-    patch: { text?: string; ext?: Record<string, unknown>; modifiedInfo?: EmMessageModifiedInfo }
+    patch: { text?: string; ext?: Record<string, unknown>; modifiedInfo?: EmMessageModifiedInfo; contentReplaced?: boolean }
   ): void {
     const list = messageStore.messagesByConversationId[conversationId]
     if (list == null) return
@@ -912,6 +1010,7 @@ export class EmMessageDomain {
       target.quote = parseQuote(patch.ext)
     }
     if (patch.modifiedInfo != null) target.modifiedInfo = { ...patch.modifiedInfo }
+    if (typeof patch.contentReplaced === 'boolean') target.contentReplaced = patch.contentReplaced
   }
 
   async modifyTextMessage(conversationId: string, chatType: ConversationTypeValue, messageId: string, text: string): Promise<void> {
@@ -927,25 +1026,99 @@ export class EmMessageDomain {
     this.patchModifiedMessage(conversationId, messageId, {
       text: (updated.body as TextMessageBody).content,
       ext: (updated.ext ?? {}) as Record<string, unknown>,
-      modifiedInfo: this.toModifiedInfo(updated.modifiedInfo)
+      modifiedInfo: this.toModifiedInfo(updated.modifiedInfo),
+      // 用户主动编辑成功后清掉审核替换标识（内容已是用户当前输入）
+      contentReplaced: false
     })
   }
 
   // 远程编辑事件（SDK onMessageUpdated）：载荷为消息子集（该类型未在 SDK 根导出，按消费字段结构收口），
   // 按 id 命中本地消息 patch；消息未加载的会话忽略。SDK 支持文本与自定义消息编辑：
-  // 文本 patch 新内容，自定义消息只 patch ext/modifiedInfo（text 保持 undefined 不动现有值）
+  // 文本 patch 新内容，自定义消息只 patch ext/modifiedInfo（text 保持 undefined 不动现有值）。
+  // 内容审核替换也走本事件：isContentReplaced=true 时打标，发送方不再被静默覆盖。
   applyMessageUpdated(payload: {
     conversationId: string
     messageId: string
-    message: Pick<Message, 'type' | 'body' | 'ext' | 'modifiedInfo'>
+    message: Pick<Message, 'type' | 'body' | 'ext' | 'modifiedInfo'> & { isContentReplaced?: boolean }
   }): void {
     const isText = (payload.message.type as string) === 'text'
     const body = payload.message.body as TextMessageBody
     this.patchModifiedMessage(payload.conversationId, payload.messageId, {
       text: isText ? body.content : undefined,
       ext: (payload.message.ext ?? {}) as Record<string, unknown>,
-      modifiedInfo: this.toModifiedInfo(payload.message.modifiedInfo)
+      modifiedInfo: this.toModifiedInfo(payload.message.modifiedInfo),
+      // 普通编辑事件不带该字段 → 清掉旧标识；审核替换事件显式 true → 打标
+      contentReplaced: payload.message.isContentReplaced === true
     })
+  }
+
+  // 单聊送达回执（SDK onMessageDelivered）：只打标不新增状态，读取回执仍以已读时间为准
+  applyMessageDelivered(conversationId: string, messageId: string): void {
+    if (messageId === '') return
+    const list = messageStore.messagesByConversationId[conversationId]
+    if (list == null) return
+    const target = list.find((m) => m.id === messageId)
+    if (target != null) target.delivered = true
+  }
+
+  // 多端/审核删除消息（SDK onMultiDeviceMessageRemoved）：按 messageIds 或 beforeTimestamp 同步移除本地残留，
+  // 返回是否实际命中（门面据此校正会话摘要）；命中项顺带释放宿主附件临时副本。
+  onMultiDeviceMessageRemoved(event: {
+    conversationId: string
+    messageIds?: ReadonlyArray<string>
+    beforeTimestamp?: number
+  }): boolean {
+    const list = messageStore.messagesByConversationId[event.conversationId]
+    if (list == null) return false
+    const ids = event.messageIds ?? []
+    const before = event.beforeTimestamp ?? 0
+    if (ids.length === 0 && before <= 0) return false
+    const idSet: Record<string, boolean> = {}
+    ids.forEach((id) => {
+      if (id !== '') idSet[id] = true
+    })
+    const kept: EmMessageItem[] = []
+    let removed = 0
+    list.forEach((m) => {
+      const hitId = m.id !== '' && idSet[m.id] === true
+      const hitBefore = before > 0 && m.time > 0 && m.time < before
+      if (hitId || hitBefore) {
+        removed += 1
+        delete this.uploadFileByLocalId[m.localId]
+        this.releaseTemporary(m.url)
+        return
+      }
+      kept.push(m)
+    })
+    if (removed === 0) return false
+    messageStore.messagesByConversationId[event.conversationId] = kept
+    // 置顶条同样不能残留被删消息（审核删除/其他端删除后 pinned 列表同步过滤）
+    const pinned = messageStore.pinnedByConversationId[event.conversationId]
+    if (pinned != null) {
+      messageStore.pinnedByConversationId[event.conversationId] = pinned.filter((p) => {
+        const hitId = p.message.id !== '' && idSet[p.message.id] === true
+        const hitBefore = before > 0 && p.message.time > 0 && p.message.time < before
+        return !(hitId || hitBefore)
+      })
+    }
+    return true
+  }
+
+  // 发送超时信号（SDK onSendTimeout，payload 不带消息 id）：把仍停在 SENDING 的己方消息统一落 FAILED 并归因。
+  // 真正失败的 sendMessage Promise 随后会走 deliver/resend 的 catch（同一状态幂等覆盖）。
+  failPendingSends(code: ErrorCodeValue): number {
+    let count = 0
+    Object.keys(messageStore.messagesByConversationId).forEach((conversationId) => {
+      const list = messageStore.messagesByConversationId[conversationId]
+      list.forEach((m) => {
+        if (!m.self || m.status !== MESSAGE_STATUS.SENDING) return
+        m.status = MESSAGE_STATUS.FAILED
+        m.failCode = code
+        count += 1
+      })
+    })
+    if (count > 0) logger.warn('send timeout, pending messages marked failed:', count)
+    return count
   }
 
   // ========== 置顶消息（M2.20）：SDK pinMessage/unpinMessage/getPinnedMessageList（不分页，上限 20 条） ==========
@@ -1076,7 +1249,8 @@ export class EmMessageDomain {
     const isTextLike = item.type === MESSAGE_TYPE.TEXT || item.type === MESSAGE_TYPE.CUSTOM
     if (!isTextLike && !remote && item.url === '' && cachedFile == null) {
       // 媒体消息的本地临时文件已被系统清理（或 H5 刷新后丢失）：明确失败，别发一条空消息
-      throw new Error('local media file is unavailable')
+      item.failCode = ERROR_CODE.MEDIA_UNAVAILABLE
+      throw errorWithCode(ERROR_CODE.MEDIA_UNAVAILABLE, 'local media file is unavailable')
     }
     const name = item.fileName !== ''
       ? item.fileName
@@ -1165,17 +1339,34 @@ export class EmMessageDomain {
       if (connectionStore.networkOnline === false) {
         throw errorWithCode(ERROR_CODE.NETWORK_OFFLINE, 'system offline')
       }
-      const sent = await chatManager.sendMessage(message)
+      // 群已读回执：重发同样要带 needReadReceipt（否则该条消息没有已读人数）
+      if (this.groupReceiptWanted(chatType)) {
+        message.needReadReceipt = true
+      }
+      const sent = await chatManager.sendMessage(message, this.uploadOptionsOf(item))
       if (!isAccountEpochCurrent(expectedEpoch)) return
+      // 同 deliver：resolve 返回 failed 态时按失败处理，避免重发把失败消息误标为已发送
+      if ((sent.sendStatus as string) === 'failed') {
+        throw new Error('send failed')
+      }
       item.id = sent.msgServerId !== '' ? sent.msgServerId : sent.msgLocalId
       item.time = sent.timestamp
       item.status = MESSAGE_STATUS.SENT
+      delete item.failCode
+      delete item.uploadProgress
       delete this.uploadFileByLocalId[localId]
       // 重发成功同样释放宿主附件临时副本（失败则保留，允许再次重发）
       this.releaseTemporary(item.url)
       this.applyMediaBody(item, sent)
+      this.applySentModeration(item, sent)
     } catch (e) {
-      if (isAccountEpochCurrent(expectedEpoch)) item.status = MESSAGE_STATUS.FAILED
+      if (isAccountEpochCurrent(expectedEpoch)) {
+        item.status = MESSAGE_STATUS.FAILED
+        delete item.uploadProgress
+        const code = errorCodeOf(e)
+        if (code !== '') item.failCode = code
+        logger.warn('message resend failed:', localId, code !== '' ? code : '(no code)', e)
+      }
       throw e
     }
   }
@@ -1318,6 +1509,15 @@ export class EmMessageDomain {
     // 编辑标记（M2.20）：历史/接收/编辑回包均可能携带，透传为中立结构（存在即「已编辑」）
     if (message.modifiedInfo != null) {
       item.modifiedInfo = this.toModifiedInfo(message.modifiedInfo)
+    }
+    // 内容审核替换（SDK isContentReplaced）：历史/编辑事件/发送回包均可能携带，气泡据此展示标识
+    if (message.isContentReplaced === true) {
+      item.contentReplaced = true
+    }
+    // 群消息已读人数：wire 携带时直接落库（群回执事件/批量查询随后以更大值覆盖）
+    const wireReadCount = (message as unknown as Record<string, unknown>)['groupReadCount']
+    if (typeof wireReadCount === 'number' && wireReadCount > 0) {
+      item.groupReadCount = wireReadCount
     }
     return item
   }

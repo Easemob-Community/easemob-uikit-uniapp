@@ -190,7 +190,7 @@ function onQuickReply(item: EmQuickReply): void {
 <em-image-message :message="message" @preview="previewImage" @long-press="openMessageMenu" />
 ```
 
-**行为与平台**：有 `thumbUrl` 用缩略图，没有才用原图；尺寸按消息里的宽高比等比缩放到 200×200 的框内，缺宽高时按 120×160 显示。`aspectFill` 裁切保证不变形。H5 上长按后浏览器补发的 `click` 会被吞掉，长按弹菜单不会顺带触发预览。预览本身由宿主实现（默认聊天页用系统图片预览），组件只派发事件。
+**行为与平台**：发送中（`message.status === 'sending'`）在图片上盖压暗蒙层与居中 loading，`message.uploadProgress` 有值时同时显示上传百分比，发送结束自动消失。有 `thumbUrl` 用缩略图，没有才用原图；尺寸按消息里的宽高比等比缩放到 200×200 的框内，缺宽高时按 120×160 显示。`aspectFill` 裁切保证不变形。H5 上长按后浏览器补发的 `click` 会被吞掉，长按弹菜单不会顺带触发预览。预览本身由宿主实现（默认聊天页用系统图片预览），组件只派发事件。
 
 ## em-audio-message
 
@@ -231,7 +231,7 @@ function onQuickReply(item: EmQuickReply): void {
 <em-video-message :message="message" @preview="playVideo" @long-press="openMessageMenu" />
 ```
 
-**行为与平台**：播放入口在 App、H5、微信小程序一致显示；点击派发 `preview`，默认聊天页用内置的 `em-video-preview` 全屏播放，宿主也可以接自己的播放器或业务路由。尺寸按消息宽高比等比缩放到 240×240 内，没有宽高元数据时按 16:9 显示，避免加载后撑高列表。时长格式为 `分:秒`。H5 上长按补发的 `click` 会被吞掉，不会同时打开播放器与长按菜单。
+**行为与平台**：发送中封面压暗并显示居中 loading（有 `uploadProgress` 时叠加百分比），播放入口暂不显示。播放入口在 App、H5、微信小程序一致显示；点击派发 `preview`，默认聊天页用内置的 `em-video-preview` 全屏播放，宿主也可以接自己的播放器或业务路由。尺寸按消息宽高比等比缩放到 240×240 内，没有宽高元数据时按 16:9 显示，避免加载后撑高列表。时长格式为 `分:秒`。H5 上长按补发的 `click` 会被吞掉，不会同时打开播放器与长按菜单。
 
 ## em-video-preview
 
@@ -274,7 +274,7 @@ function onQuickReply(item: EmQuickReply): void {
 <em-file-message :message="message" @download="downloadFile" @long-press="openMessageMenu" />
 ```
 
-**行为与平台**：扩展名归类决定图标与图标底色，覆盖 PDF、Excel、Word、PPT、Markdown、图片、视频、音频，其余归为通用文件；文件名缺失时显示"文件"文案。大小按 B / KB / MB 三档格式化，`fileSize` 为 0 时不显示大小行。当前版本文件打开/下载尚未在任一端接入，点击不会派发 `download`，文件卡表现为纯展示；宿主如需接管，在自己的气泡实现里处理点击即可。H5 长按补发的 `click` 同样被吞掉。
+**行为与平台**：发送中且 `message.uploadProgress` 有值时，在大小行下方显示上传百分比（发送结束清空）。扩展名归类决定图标与图标底色，覆盖 PDF、Excel、Word、PPT、Markdown、图片、视频、音频，其余归为通用文件；文件名缺失时显示"文件"文案。大小按 B / KB / MB 三档格式化，`fileSize` 为 0 时不显示大小行。当前版本文件打开/下载尚未在任一端接入，点击不会派发 `download`，文件卡表现为纯展示；宿主如需接管，在自己的气泡实现里处理点击即可。H5 长按补发的 `click` 同样被吞掉。
 
 ## em-quick-reply-bar
 

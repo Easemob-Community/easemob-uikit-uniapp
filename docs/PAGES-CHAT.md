@@ -20,12 +20,15 @@
 - 首次历史未回包时展示气泡对话骨架（左右交替消息行 + 时间分隔占位）；首屏失败显示「点击重试」，已有缓存消息时改为顶部重试行，不遮挡消息。首屏与加载更多互斥，各自只拥有自己的错误态。
 - 点击消息区顶部的「加载更早消息」加载更早历史，加载前记录首条消息锚点，加载后回位，避免视口跳动；没有更多时显示「没有更多历史消息」。分页失败保留顶部重试行，重试仍走分页锚点路径。
 - 相邻消息间隔超过 `uiConfig.timeDividerInterval`（默认 5 分钟）插入时间分隔条，首条消息必显。
-- 消息发送成功后以 `send` 事件透出；文本与直发快捷回复共享提交锁，提交中输入栏 `submitting=true`、快捷回复条 `disabled=true`，但不影响草稿编辑。失败消息显示红色状态图标，点击即调用 `EmKit.resendMessage` 原地重发，同一 `localId` 重发完成前不可重复点击，失败后仍可重试。
+- 消息发送成功后以 `send` 事件透出；文本与直发快捷回复共享提交锁，提交中输入栏 `submitting=true`、快捷回复条 `disabled=true`，但不影响草稿编辑。失败消息显示红色状态图标，点击弹出失败面板（展示失败原因 + 「重新发送 / 删除」），选择重发后调用 `EmKit.resendMessage` 原地重发；同一 `localId` 重发完成前不可重复点击，失败后仍可重试。失败原因按 SDK 错误码归因（审核未通过 / 违规内容 / 被对方拒收 / 被禁言 / 网络异常等），并随消息保存在 `EmMessageItem.failCode` 中。
+- 断网或重连期间，输入栏上方显示「消息待发」提示（网络已断开 / 正在重连），连接恢复后自动消失；发送仍有离线预检测兜底。
+- 图片/视频消息发送中在气泡内显示压暗蒙层与居中 loading，发送完成或失败后自动消失；SDK 回传附件上传进度时，蒙层内同时显示百分比，文件气泡在大小下方显示上传百分比。进度只属于发送中状态，发送结束即清空。
 - 输入草稿按会话保存（`uiConfig.enableDraft` 默认开启）；离开页面时清空当前会话的服务端未读。
 
 ### 引用、撤回、编辑、置顶与长按菜单
 
-- 长按消息打开菜单：复制（仅文本）、引用、编辑（自己发送的文本消息）、置顶、撤回、删除。菜单项与顺序由 `uiConfig.messageMenuKeys` 决定，删除 key 即禁用对应能力。
+- 长按消息打开菜单：复制（仅文本）、引用、编辑（自己发送且已发送的文本消息）、置顶、撤回、重发（仅失败消息）、删除。菜单项与顺序由 `uiConfig.messageMenuKeys` 决定，删除 key 即禁用对应能力。失败消息的菜单只保留复制 / 重发 / 删除，避免对没有服务端 ID 的消息执行引用/编辑/置顶/撤回。
+- 内容被服务端审核替换时（`isContentReplaced`），气泡下方展示「内容已被审核修改」标识，发送方不再被静默覆盖；该标识与撤回/编辑事件同源更新。
 - 引用后输入栏上方出现引用条，发送的文本消息同时写入 `ext.msgQuote` 与兼容字段 `ext.emQuote`；气泡下方生成引用卡，点击定位原消息并闪烁高亮，原消息未加载或已删除时 toast 提示。
 - 撤回仅对「自己发送、状态为已发送、且在撤回窗口内」的消息出现；窗口由 `uiConfig.recallTimeLimit` 控制，默认 2 分钟。执行撤回时会再次检查时间窗，并拦截重复提交；成功后以 `recall` 事件透出，不额外弹确认框。
 - 撤回后的占位条显示原消息发送者的昵称（群聊取成员名片，单聊取好友备注 > 昵称）；自己撤回的文本消息在占位条上提供「重新编辑」，点击把原文回显到输入框，作为新消息发送。`uiConfig.enableReEdit` 可关闭该按钮。
@@ -37,9 +40,12 @@
 
 ### 已读回执与输入状态
 
-- 单聊已读回执：只对「最新一条自己发送的已发送消息」显示空心圆（未读）/对勾（已读），其余自己消息不显示已读态。已读回执默认开启，可经 `EmKit.init({ enableReadReceipt: false })` 关闭。
+- 单聊已读态图标：只对「最新一条自己发送的已发送消息」显示空心圆（未读）/对勾（已读），其余自己消息不显示。**默认关闭**，`EmKit.init({ showReadStatus: true })` 或 `setConfig({ showReadStatus: true })` 打开；该开关只控制已读展示，不影响发送中/失败状态。功能层面的已读回执由 `enableReadReceipt`（默认开启）单独控制。
+- 群聊已读人数：`enableGroupReadReceipt`（默认关闭）开启后，群聊发送的消息携带已读回执标记、进会话时自动回执群内消息，己方已发送消息下方显示「N 人已读」。人数来自群回执事件（服务端下发累计值）或进会话时的批量查询，只增不减；关闭该开关时群聊不产生任何回执请求，也不显示人数。
+- 发送状态呈现可配置：`messageStatus.position` 可把状态列（发送中 loading / 失败红叹号 / 未读已读图标）镜像到气泡右侧，`icons` 按状态替换图标名，`texts` 追加「发送中 / 失败」等短文案。配置只改变呈现形式，发送中与失败仍然恒显。
+- 发送中/发送失败是独立关键状态：发送中显示 loading，失败显示红色感叹号并可点开失败面板，始终展示，不随 `showReadStatus` 或 `enableReadReceipt` 关闭。
 - 单聊输入状态：草稿非空时按 `uiConfig.typingThrottle`（默认 5 秒）向对方发送 typing 信号；收到对方信号时导航栏副标题显示「对方正在输入…」，展示超时由 `uiConfig.typingTimeout` 控制（默认 5 秒）。
-- 群聊不显示已读回执，也不发送/接收 typing 信号；群聊导航栏副标题用于成员数。
+- 群聊不复用单聊的已读图标（已读信息以「N 人已读」人数行呈现，见上），也不发送/接收 typing 信号；群聊导航栏副标题用于成员数。
 
 ### @ 提及与群公告
 
@@ -264,7 +270,8 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 | 引用条 | 按 `scope.quote` 自绘，关闭调 `scope.closeQuote()` |
 | 快捷回复 | 按 `scope.quickReplies` 自绘，点击调 `scope.selectQuickReply(item)` |
 
-注意：插槽的有无在页面实例创建时确定（库据此实例化行为核心），不能用运行时开关在同一个页面实例里动态切换默认输入栏与自绘输入栏；需要切换时用不同页面实例（如查询参数 + 重新进入）。
+> [!WARNING]
+> 注意：插槽的有无在页面实例创建时确定（库据此实例化行为核心），不能用运行时开关在同一个页面实例里动态切换默认输入栏与自绘输入栏；需要切换时用不同页面实例（如查询参数 + 重新进入）。
 
 **最小示例**（完整可运行版见 demo 工程 `demo/components/demo-custom-inputbar`，场景开关面板里可一键体验）：
 
@@ -297,7 +304,8 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 
 作用域完整字段与类型见 [EmChatInputBarScope](./API-TYPES.md)；行为核心也以 `useChatComposer` composable 导出，供完全自研聊天页的宿主复用同一套键盘/面板/录音逻辑。
 
-App 端自绘注意：`textarea` 是原生组件，`flex` 尺寸与背景样式渲染不可靠——高度/灰底/圆角由包裹层 `view` 承担，textarea 自身 `width/height: 100%`、不设背景（iOS 加 `disable-default-padding`），否则多行生长态下输入区会整体不可见。详见 [常见问题](./FAQ.md)。
+> [!WARNING]
+> App 端自绘注意：`textarea` 是原生组件，`flex` 尺寸与背景样式渲染不可靠——高度/灰底/圆角由包裹层 `view` 承担，textarea 自身 `width/height: 100%`、不设背景（iOS 加 `disable-default-padding`），否则多行生长态下输入区会整体不可见。详见 [常见问题](./FAQ.md)。
 
 ## 消息能力与配置
 
@@ -308,9 +316,14 @@ App 端自绘注意：`textarea` 是原生组件，`flex` 尺寸与背景样式�
 | 撤回 | 自己发送且在 2 分钟内可撤回 | `uiConfig.recallTimeLimit` |
 | 撤回重编辑 | 自己撤回的文本消息可在占位条回显输入框 | `uiConfig.enableReEdit` |
 | 消息编辑 | 自己发送的文本消息可编辑（单条上限 10 次） | `uiConfig.messageMenuKeys` 含 `edit` |
+| 失败重发 | 点失败气泡的红叹号弹出原因面板，选择重发或删除 | `uiConfig.messageMenuKeys` 含 `resend` |
+| 审核替换 | 内容被审核修改时气泡下方展示标识 | — |
 | 置顶消息 | 未撤回消息可置顶，多条下拉展开（上限 20 条） | `uiConfig.messageMenuKeys` 含 `pin` |
-| 长按菜单 | 复制（文本）/ 引用 / 编辑 / 置顶 / 撤回 / 删除 | `uiConfig.messageMenuKeys` |
-| 已读回执 | 单聊最新一条自己消息显示已读/未读 | `EmKit.init({ enableReadReceipt })` |
+| 长按菜单 | 复制（文本）/ 引用 / 编辑 / 置顶 / 撤回 / 重发 / 删除 | `uiConfig.messageMenuKeys` |
+| 已读态图标 | 默认关闭；开启后单聊最新一条自己消息显示已读/未读 | `EmKit.init({ showReadStatus })`，功能开关 `enableReadReceipt` |
+| 群已读人数 | 默认关闭；开启后己方群消息下方显示「N 人已读」 | `EmKit.init({ enableGroupReadReceipt })` |
+| 发送状态呈现 | 默认气泡左侧、内置图标、无文案 | `EmKit.init({ messageStatus })` |
+| 附件上传进度 | 图片/视频/文件发送中显示百分比（SDK 回传时） | — |
 | 输入状态 | 单聊发送 typing，节流 5 秒、展示 5 秒 | `uiConfig.enableTyping`、`typingThrottle`、`typingTimeout` |
 | 输入栏工具 | 语音 / Emoji / 相册 / 拍照 / 视频 / 文件全开 | `uiConfig.inputFeatures` |
 | Emoji 面板 | 内置 96 个字符 | `uiConfig.emojiList` |
@@ -329,7 +342,7 @@ App 端自绘注意：`textarea` 是原生组件，`flex` 尺寸与背景样式�
 ## 行为与边界
 
 - 当前版本支持 Android、iOS、鸿蒙、H5 与微信小程序；消息列表、输入栏、弹层均为跨端同一套实现。
-- 已读回执与 typing 仅单聊；群聊不展示已读状态，也不发 typing 信号，导航栏副标题固定用于成员数。
+- typing 仅单聊；群聊不发 typing 信号，导航栏副标题固定用于成员数。单聊已读态图标由 `showReadStatus` 控制（默认关闭），群聊已读人数由 `enableGroupReadReceipt` 控制（默认关闭）。
 - 群详情尚未返回时导航栏不显示成员数副标题；成员数为 0 时同样不显示，不会出现「0 名成员」。
 - 撤回窗口默认 2 分钟，超时后长按菜单不再出现撤回项；撤回失败会 toast 提示。
 - 引用卡展示发送人与摘要，不展示被引用图片/视频的缩略图。
