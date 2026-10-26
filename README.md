@@ -4,7 +4,7 @@
 
 > **仅支持 uni-app x 蒸汽模式（Vapor）**：DCloud 官方已于 2024 年停止 nvue 与 5+ 维护，并将于 2027 年初停止 uni-app App 平台与 uni-app x vdom 平台维护（依据见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；uni-app x 蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可直接升级。本插件不提供经典 uni-app（Vue2/Vue3、nvue、vdom 模式）兼容，五端均基于 uni-app x 蒸汽编译目标。详见 [docs/PLATFORM.md](./docs/PLATFORM.md)。
 
-> 当前版本：**1.0.0-rc.1**（1.0 候选）。单聊、群聊、联系人、多场景扩展与 AI 流式消息已落地；能力边界与已知限制见下文。接入步骤见 [docs/QUICKSTART.md](./docs/QUICKSTART.md)，发布操作见 [docs/RELEASE-1.0.md](./docs/RELEASE-1.0.md)，逐日进度与各端实测状态见 [docs/STATUS.md](./docs/STATUS.md)。
+> 当前版本：**1.0.0-rc.2**（1.0 候选，未发布）。单聊、群聊、联系人、多场景扩展与 AI 流式消息已落地；能力边界与已知限制见下文。接入步骤见 [docs/QUICKSTART.md](./docs/QUICKSTART.md)，发布操作见 [docs/RELEASE-1.0.md](./docs/RELEASE-1.0.md)，逐日进度与各端实测状态见 [docs/STATUS.md](./docs/STATUS.md)。
 
 ## 兼容性
 
@@ -305,19 +305,3 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 - **日志隐私（1.0）**：原始 payload 默认不写日志；排查时开 `logLevel:'debug'` + `logPayload:true`，导出前自行脱敏。
 - **非当前会话消息上限（1.0）**：非当前会话只保留最近 100 条（`CONVERSATION_MESSAGE_RETAIN_LIMIT`），回会话时重新拉最新页；当前会话单次会话内不裁剪。若业务要求完整本地历史，请自行持久化。
 - 其余平台差异（蒸汽端 CSS 动画、H5 录音等）见 [docs/PLATFORM.md](./docs/PLATFORM.md)。
-
-### 迁移说明（chatType 必传）
-
-- `em-contact-page` 由「好友主页」重构为「入口页」（新请求/群组/好友列表三入口，emits `entry-click` + `add`）；原好友列表零回归平移至新页面级组件 `em-contact-list-page`（emits `select`/`back`），宿主按入口 key 接线路由。
-- `em-chat-page` / `em-chat-info-page` 新增**必传** `chatType` prop（`'singleChat' | 'groupChat'`）；消息/会话域 API 同步增必传 `chatType` 参数，`EmMessageItem`/`EmConversationItem` 增 `chatType` 字段。
-
-### 迁移说明（自定义消息字段）
-
-- `MESSAGE_TYPE` 新增 `CUSTOM`（`'custom'`），`EmMessageItem` 新增 `customEvent` / `customParams` 字段；仅当宿主**手工构造** `EmMessageItem`（如单测/假数据）时需要补 `customEvent: ''`、`customParams: {}`，正常收发链路不受影响。
-
-### 迁移说明（1.0.0-rc.1）
-
-- **引用协议**：发送改为 `ext.msgQuote`（与 vue 版同 key/同结构）为主、`ext.emQuote` 双写兼容 0.x；接收优先 `msgQuote`，旧消息回落 `emQuote`。业务 ext 不要占用这两个 key。
-- **返回事件**：`em-chat-page` 新增 `back` emit 与 `autoBack` prop。默认 `autoBack=true`，组件仍自行 `navigateBack`，旧用法零改动；需要拦截返回时传 `:auto-back="false"` 并监听 `@back`。
-- **平台能力**：新增 `PLATFORM_CAPABILITIES` / `videoPreview` / `filePick` / `fileOpen`；视频播放全端可用，文件打开全端暂缺（入口已隐藏）。
-- **版本号**：插件 `1.0.0-rc.1`；0.x 未正式发布，无历史用户迁移负担。

@@ -1,6 +1,6 @@
 # 1.0 发布清单（Release Checklist）
 
-> 目标版本：**1.0.0-rc.1**（候选版）。rc 通过真机矩阵后再发 `1.0.0` GA。
+> 目标版本：**1.0.0-rc.2**（候选版）。rc 通过真机矩阵后再发 `1.0.0` GA。
 > 本文是发布操作手册；能力/接口说明见 [README](../README.md)，接入步骤见 [QUICKSTART](./QUICKSTART.md)，评审结论见 [REVIEW-1.0-READINESS](./REVIEW-1.0-READINESS.md)。
 
 ## 1. 发布前必须通过（硬门禁）
@@ -26,7 +26,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5180/   # 200
 - [ ] 主包 ≤ 1.5MB，分包 `sub-sdk/im-sdk.js` 存在且无 `?.` 残留
 - [ ] H5 伺服 200
 - [ ] 图标 parity 通过（`scripts/verify-icons.py` / 构建脚本内断言）
-- [ ] `package.json`、`changelog.md`、README 版本号一致（`1.0.0-rc.1`）
+- [ ] `package.json`、`changelog.md`、README 版本号一致（`1.0.0-rc.2`）
 
 ## 2. 版本与物料
 
@@ -34,8 +34,8 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5180/   # 200
 
 | 文件 | 字段 | 当前值 |
 |---|---|---|
-| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.0-rc.1` |
-| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.0-rc.1` |
+| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.0-rc.2` |
+| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.0-rc.2` |
 | `demo/manifest.json` | `versionName` / `versionCode` | `1.0.0` / `100` |
 | `demo/package.json` | `version` | `1.0.0` |
 
@@ -113,7 +113,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5180/   # 200
 
 1. 合并发布分支，跑第 1 节硬门禁；
 2. 更新 `changelog.md` / `package.json`（rc → GA 时）；
-3. 打 tag：`git tag v1.0.0-rc.1 && git push origin v1.0.0-rc.1`；
+3. 打 tag：`git tag v1.0.0-rc.2 && git push origin v1.0.0-rc.2`；
 4. HBuilderX 打开 `uni_modules/easemob-uikit-uni/`，右键「发布到插件市场」；
 5. 上传仓库 Release（附 changelog、Quick Start 链接、已知限制）；
 6. 发布后 24h 内回归：插件市场安装 → 按 QUICKSTART 跑通 H5 + mp。

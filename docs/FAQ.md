@@ -118,7 +118,7 @@ EmKit.init({
 
 UIKit 默认在 `EmKit.init()` 时向 SDK 注入固定 deviceId（`enableDeviceInfo` 总开关，默认开启，关闭则完全不注入、SDK 用默认行为）。自动派生的格式与优先级：
 
-- **格式**：App 端（android / ios / harmonyos）且能取到设备品牌、型号、系统版本时，为六段式 `Platform_uikitVersion_brand_model_system_uuid`（例 `android_1.0.0-rc.1_Xiaomi_23127PN0CC_Android15_<uuid>`，机型/系统段不含空白字符）；机型信息任一缺失，以及 H5 / 微信小程序，退回三段式 `Platform_uikitVersion_uuid`（例 `web_1.0.0-rc.1_<uuid>`）。
+- **格式**：App 端（android / ios / harmonyos）且能取到设备品牌、型号、系统版本时，为六段式 `Platform_uikitVersion_brand_model_system_uuid`（例 `android_1.0.0-rc.2_Xiaomi_23127PN0CC_Android15_<uuid>`，机型/系统段不含空白字符）；机型信息任一缺失，以及 H5 / 微信小程序，退回三段式 `Platform_uikitVersion_uuid`（例 `web_1.0.0-rc.2_<uuid>`）。
 - **优先级**：已持久化值（本地存储 key `emkit.device.id`）→ `uni.getDeviceInfo()` 框架设备标识 → 自生成 UUID。一经得出即持久化，跨启动保持稳定。
 - **显式覆盖**：宿主传入 `config.deviceId` 时原样使用、不加任何段；`devicePlatform` 是向环信申请注册的 1–100 编号，传入后 SDK 会把 resource 改写为 `custom<N>_` 形态。
 

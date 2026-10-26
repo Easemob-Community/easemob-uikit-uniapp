@@ -62,4 +62,4 @@ features:
 | H5 | 现代浏览器（移动端布局） |
 | 小程序 | 微信小程序（SDK 需分包接入） |
 
-> 当前版本 `1.0.0-rc.1`。完整变更见 [更新日志](/uniapp/guide/changelog)。
+> 当前版本 `1.0.0-rc.2`（未发布）。完整变更见 [更新日志](/uniapp/guide/changelog)。

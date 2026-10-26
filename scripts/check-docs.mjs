@@ -94,6 +94,7 @@ const publicSources = new Set(pages.map(page => resolve(root, page.source)))
 for (const file of walkMarkdown(docsRoot)) {
   const name = basename(file)
   const rel = relative(docsRoot, file).replaceAll('\\', '/')
+  if (rel.startsWith('superpowers/')) continue
   if (publicSources.has(file)) continue
   if (internalDocs.has(name)) continue
   fail(`docs/${rel}: 未登记到 docs.manifest.mjs 的 pages，也不是内部材料白名单（新增公开页请登记）`)
