@@ -1,8 +1,46 @@
 # 更新日志
 
-## 未发布
+## 1.0.0-rc.2（未发布）
+
+### 修复
+
+- **App 端弹层偶发「底部 tabBar 收起但弹层不出现」**：蒸汽端（uni-app x App）新建 `v-if` 分支时，新分支的视觉节点会偶发整批不建（只建出命中区），表现为「底部 tabBar 已被收起、弹层却看不见，且整页点击被透明命中区吞掉」（Android 真机实测约 3/12，与点击位置、tabBar 隐藏、延迟补写无关）。`em-popup` 改为**常驻挂载**：去掉 `v-if`，页面挂载时就把 root/遮罩/面板建好；关闭态用根节点内联 `top: 200%` 移到视口下方（不绘制、不吃点击），打开/关闭只改这一个内联样式，不再创建/销毁节点。同时默认态即最终态（遮罩默认不透明、面板默认在最终位置，去掉 `--show` 类）。进场动画改为 **JS 逐帧内联位移**（约 200ms，面板从屏下 100% 滑回 0%，同 `useSpinRotation` 思路）：动画只做「附加位移」，尾段直接归零，因此任何一帧写入丢失都只会少一段动画或位置差一截，不会退回「看不见但吃点击」；收起不做退场动画（收尾那次写入若丢会留下幽灵弹层）。真机 20/20 次开合全部正常、每次 tabBar 如实归还（改前 3/12 失败）。同类弹层（长按会话菜单、选人、@提及、聊天页长按菜单）一并修复；原生 tabBar 持锁同时改为实例级「谁持有谁释放」，`releaseTabBar()` 在计数为 0 时不再调 `showTabBar`。
+
+- **iOS 拍摄黑屏**：iOS 相机授权被拒绝后，`uni.chooseImage` 仍会打开系统拍摄页并停在纯黑画面且不再弹窗。`em-chat-page` 在调起相机前用 `uni.getAppAuthorizeSetting` 预检 `cameraAuthorized`：`denied` 弹窗引导到系统设置（`uni.openAppAuthorizeSetting`），`config error` 提示安装包缺少权限描述；`not determined` 仍交给系统首次弹窗。新增 `getCameraAuthorizeState` / `openAppAuthorizeSetting` 从 `libs` 透出；H5/小程序/未知基座跳过预检，行为不变。示例工程在 `app-ios.distribute.privacyDescription` 补齐相机/相册/麦克风用途描述（改后需重新云打包或重打自定义基座生效）。
+
+- **`primaryColor` 在 App 端不生效**：页面级组件根节点同时绑定主题 class 与内联品牌色变量，而 App（uni-app x）端同一节点上 class 规则定义的 CSS 变量会顶掉内联同名变量，导致 `EmKit.init({ primaryColor })` / `setConfig({ primaryColor })` 在 App 端一直被主题值覆盖。七个页面级组件统一新增品牌作用域内层节点，内联品牌色变量下沉一层（与主题 class 分节点），App 端品牌色恢复正常。
+
+- **App 视频播放页黑屏（自定义基座缺 `uni-video` 模块）**：视频组件属于 uni-app x 内置模块 `uni-video`，会按代码用量摇树。基座如果是在接入视频组件之前打的，`<video>` 会被降级成 `<view>`，表现为点开播放器后全屏黑屏、无控制条。示例工程在 `manifest.json` 的 `app` / `app-android` / `app-ios` / `app-harmony` → `distribute.modules` 显式声明 `"uni-video": {}`；宿主接入视频后需重新打一次自定义基座，JS 热更不包含原生模块。
+
+- **iOS 视频一直转圈 `00:00`**：EaseMob chatfiles 直链无扩展名且不支持 HTTP Range（带 `Range` 仍返回 200 全量），iOS AVPlayer 远程渐进播放会卡死。App 端改为 `uni.downloadFile` 整包下载 → 复制为本地 `.mp4` → 播放；下载期显示进度，关闭时中止，同一 URL 会话内缓存。
+
+- **iOS 视频进度条在走但画面不动**：原生 `autoplay` 会在 `<video>` 事件绑定前起播，`play` 事件丢失后组件一直保留首帧/封面层。改为 `autoplay=false`、挂载后显式 `createVideoContext().play()`（未收到 `@play` 每 500ms 重试），且不再把 `poster` 传给 `<video>`（封面只用于下载 loading 背景）。iOS 真机已验证画面随进度更新。
+
+- **账号切换与异步时序一致性**：会话、联系人、群读取增加账号代次与请求顺序保护，登出后的旧响应不能恢复已清状态或复用旧 pending；同账号旧会话快照不覆盖新快照。会话刷新失败不再回退为内存空成功，联系人重试使用 SDK 受控刷新；后台同步失败直接进入列表重试态并保留缓存。SDK 没有群全量手动重启同步 API，群列表在失败后明确提示恢复连接或重新登录，不把内存重读当作同步成功。
+
+- **操作与编辑并发一致性**：删除会话、删除好友、退群/解散共享提交与完成锁，只产生一次成功事件。失败重发在 domain 按会话与消息共享实际结果；切换会话或编辑输入期间，旧发送/选择器完成回调不会误清新草稿、引用、@选择或解锁新请求，未发送的宿主临时附件会按 `release` 契约清理。好友快照会把历史 pending 申请收敛为已接受并同步未读角标；两人英文群通知修正为 `1 other`。
+
+- **换行输入框在恢复多行草稿后塌陷、点不聚焦**：换行输入档（`inputFeatures.sendOnReturn=false`）下，草稿有超过 5 个硬换行时退出再进会话，输入框会塌成一条细线、草稿文字溢出到工具栏上，点击唤不起键盘，看起来像被什么遮住。修复后：封顶高度恒按「单行高度 × 5 行 + 输入区上下内边距」计算，进页回填草稿时先按换行数预置封顶高度（不再有高度跳变）；删除整行后灰底会重新回缩到当前文本高度；点击灰底内边距区域也会聚焦输入框，不再只有文字区能点中。
 
 ### 新增
+
+- **聊天详情页删除好友**：`em-chat-info-page` 单聊分支新增「删除好友」按钮（红色字档），仅对方已是好友时显示；二次确认后删除，带提交锁，成功 toast 并新增 `contact-deleted` 事件通知宿主退场（不连带删除会话与本地消息），失败 toast 停留当前页。
+
+- **消息删除、复制与提交防重**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删当前账号的漫游历史再删本地，失败保留气泡，删除后校正会话摘要与时间；保留 `deleteLocalMessage` 作为显式本地删除入口。聊天页删除增加确认与失败提示，复制按系统结果提示成功或失败。`em-chat-inputbar` 新增 `submitting`，`em-quick-reply-bar` 新增 `disabled`，文本发送、直发快捷回复、失败重发与撤回均拦截重复提交，撤回执行时重新检查时间窗。
+
+- **通用提交态与加载失败重试**：`em-button` 新增 `loading`（默认 `false`），加载中显示 JS 驱动的旋转图标并拦截点击；`em-select-contact` 新增 `submitting`（默认 `false`），提交中禁止选择、重复确认与关闭；`LOAD_MORE_STATE` 新增 `ERROR`，加载失败可点击重试。
+
+- **会话与群管理操作闭环**：会话置顶/免打扰按会话与设置项独立串行并保护最新意图；删除会话、清空记录、删除好友、退群/解散增加确认与提交锁。群管理补设撤管理员/转让/移除确认、权限重验、保存中关闭保护；移除后强制刷新群详情与成员首屏，`getGroupMemberList` 以 `applied` 标识响应是否实际写入 store。
+
+- **选择异常与列表失败恢复**：图片、视频与内置文件选择区分用户取消和真实失败，取消静默、失败提示；会话、好友、群列表及聊天/群成员分页在无缓存失败时提供重试，有缓存时保留列表。
+
+- **输入栏多行输入**：新增 `inputFeatures.sendOnReturn`（默认 `true`，对齐微信「回车键发送消息」）：置 `false` 进入换行输入模式，输入框随打字生长（封顶 5 行，超出内部滚动），回车换行、发送走输入栏右侧的纸飞机发送键；`true` 时回车发送（iOS 上输入框仍可随粘贴内容生长，Android 保持单行输入）。
+
+- **视频消息全端播放**：新增 `em-video-preview` 全屏播放器（原生 `video` + 安全区关闭键 + 加载失败提示），聊天页点击视频消息即播放；`PLATFORM_CAPABILITIES.videoPreview` 全端 `true`，App/小程序不再隐藏播放入口，H5 由新窗口改为内置播放。App 端会先把视频下载到本地再播放（EaseMob chatfiles 直链不支持 Range，iOS 直接远程播放会卡 loading），下载期显示进度、关闭时中止；点击前会停掉正在播放的语音，关闭或离开页面时释放原生播放器。
+
+- **组件样式透出**：所有页面组件与原子组件新增 `custom-class` / `custom-style` 属性，用于在组件根节点追加宿主 class 与内联样式。`custom-style` 拼接到根节点内联样式末尾，五端生效且支持 `var()`；弹层类组件（`em-action-sheet`、`em-select-contact`、`em-mention-picker`）两属性落在最外层遮罩容器上。
+
+- **样式定制指南**：文档门户新增「样式定制」一页，汇总 `primaryColor` 配置、`--em-*` 变量、`custom-class` / `custom-style`、具名插槽四条定制通道的选型与平台边界；示例工程「样式实验室」页面新增 custom-style / custom-class / 变量覆盖三组对照演示，以及「拖动色相条实时换全页主题色」演示（根节点内联变量 + `setConfig` 双通道）。
 
 - **SDK 初始化注入固定设备标识**：`EmKit.init()` 默认向 SDK 注入稳定的 `deviceId`，服务端的多端登录查询与互踢可以按设备、平台、机型与 UIKit 版本维度区分。自动派生的 `deviceId`：App 端机型信息齐备时为六段式 `Platform_uikitVersion_brand_model_system_uuid`（机型/系统段剔除空白字符），其余端或机型信息缺失时为三段式 `Platform_uikitVersion_uuid`（Platform 取归一平台名 `android` / `ios` / `harmonyos` / `web` / `mp-weixin`，uikitVersion 为 UIKit 版本段）：优先复用此前持久化的设备标识，其次取 `uni.getDeviceInfo()` 框架设备标识，最后自生成 UUID；一经得出即写入本地存储，跨启动保持稳定。UIKit 升级后版本段变化，服务端会视为新设备。宿主显式传入的 `deviceId` 原样使用、不加段；注入时 UIKit 同步关闭 SDK 的 `useFixedDeviceId`（SDK 本地历史设备值优先，不关闭会导致老用户注入不生效）。新增 `EmKitConfig` 配置项：`enableDeviceInfo`（总开关，默认开启，关闭后完全不注入）、`deviceId`（显式覆盖自动派生值）、`devicePlatform`（自定义平台编号，透传 SDK `customOSPlatform`，需为向环信申请注册的 1–100 整数，不传则不注入）。显式传入的值在重复初始化时必须与首次一致（SDK 单例配置比对）。
 
@@ -17,52 +55,26 @@
 - **发送状态呈现可配置**：新增 `messageStatus`（`EmKitConfig` / `uiConfig`），可按状态（`sending` / `failed` / `unread` / `read`）覆盖图标名、追加短文案，并把状态列镜像到气泡右侧（`position: 'right'`）。仅改变呈现形式，发送中/失败仍然恒显。
 
 - **消息编辑**：长按自己发送的文本消息选「编辑」，输入栏上方出现编辑条（原文截断预览），修改后发送复用原消息 id（`EmKit.modifyTextMessage`），气泡尾部显示「已编辑」标记；单条消息最多编辑 10 次，达到上限后菜单项置灰，编辑失败保留编辑态供重试。通过 `uiConfig.messageMenuKeys` 移除 `edit` 可禁用。
+
 - **置顶消息**：长按未撤回的消息选「置顶」，聊天页顶部出现置顶条（最新置顶在前，服务端上限 20 条）；多条置顶点击计数下拉展开完整列表（最大高度 240px 内滚动），点击任意行定位并高亮原消息，行尾可取消置顶。远端成员的置顶变更实时同步；通过 `uiConfig.messageMenuKeys` 移除 `pin` 可禁用（置顶条同时不渲染）。宿主可经 `#pinned-bar` 插槽整栏接管。新增门面 `EmKit.pinMessage` / `unpinMessage` / `getPinnedMessageList` 与新组件 `em-pinned-bar`。
+
 - **撤回展示与重新编辑**：撤回占位条现在显示原消息发送者的昵称（群聊取成员名片，单聊取好友备注 > 昵称）；自己撤回的文本消息在占位条上提供「重新编辑」，点击把原文回显到输入框、作为新消息发送（`uiConfig.enableReEdit` 可关闭，默认开启）。
+
 - **好友备注**：联系人列表长按好友选「备注」，弹出居中编辑弹层（回填当前备注，无长度上限，清空即清除备注），保存走 `EmKit.setContactRemark`；成功后备注立即在好友列表、会话列表、聊天页标题与引用卡生效（展示链备注 > 昵称 > userId）。菜单项经 `uiConfig.contactMenuKeys` 配置（默认备注在前、删除在后）。
+
 - **群名修改开关**：群信息页的群名编辑入口（仅群主可见）新增 `uiConfig.enableGroupNameEdit` 总开关（默认开启）。
-
-### 变更
-
-- **消息长按菜单默认项**：`uiConfig.messageMenuKeys` 默认值由「复制/引用/撤回/删除」调整为「复制/引用/编辑/置顶/撤回/重发/删除」；失败消息只展示复制/重发/删除。
-- **已读态展示与发送状态解耦**：新增纯展示开关 `showReadStatus`（`EmKitConfig` / `uiConfig`），默认 **关闭**，只控制单聊未读空心圆/已读对勾的显隐；功能层的 `enableReadReceipt` 仍独立控制是否收发已读回执。发送中 loading 与发送失败红叹号是独立关键状态，恒展示，不随任一开关关闭。
-- **聊天页发送体验**：图片、视频发送中在气泡内显示压暗蒙层与居中 loading；断网/重连时输入栏上方显示「消息待发」提示；多选附件按并发上限 3 分窗口发送，避免同时占满上传通道。
-
-### 修复
-
-- **换行输入框在恢复多行草稿后塌陷、点不聚焦**：换行输入档（`inputFeatures.sendOnReturn=false`）下，草稿有超过 5 个硬换行时退出再进会话，输入框会塌成一条细线、草稿文字溢出到工具栏上，点击唤不起键盘，看起来像被什么遮住。修复后：封顶高度恒按「单行高度 × 5 行 + 输入区上下内边距」计算，进页回填草稿时先按换行数预置封顶高度（不再有高度跳变）；删除整行后灰底会重新回缩到当前文本高度；点击灰底内边距区域也会聚焦输入框，不再只有文字区能点中。
-
-## 1.0.0-rc.2（未发布）
-
-### 修复
-
-- **App 端弹层偶发「底部 tabBar 收起但弹层不出现」**：蒸汽端（uni-app x App）新建 `v-if` 分支时，新分支的视觉节点会偶发整批不建（只建出命中区），表现为「底部 tabBar 已被收起、弹层却看不见，且整页点击被透明命中区吞掉」（Android 真机实测约 3/12，与点击位置、tabBar 隐藏、延迟补写无关）。`em-popup` 改为**常驻挂载**：去掉 `v-if`，页面挂载时就把 root/遮罩/面板建好；关闭态用根节点内联 `top: 200%` 移到视口下方（不绘制、不吃点击），打开/关闭只改这一个内联样式，不再创建/销毁节点。同时默认态即最终态（遮罩默认不透明、面板默认在最终位置，去掉 `--show` 类）。进场动画改为 **JS 逐帧内联位移**（约 200ms，面板从屏下 100% 滑回 0%，同 `useSpinRotation` 思路）：动画只做「附加位移」，尾段直接归零，因此任何一帧写入丢失都只会少一段动画或位置差一截，不会退回「看不见但吃点击」；收起不做退场动画（收尾那次写入若丢会留下幽灵弹层）。真机 20/20 次开合全部正常、每次 tabBar 如实归还（改前 3/12 失败）。同类弹层（长按会话菜单、选人、@提及、聊天页长按菜单）一并修复；原生 tabBar 持锁同时改为实例级「谁持有谁释放」，`releaseTabBar()` 在计数为 0 时不再调 `showTabBar`。
-
-- **iOS 拍摄黑屏**：iOS 相机授权被拒绝后，`uni.chooseImage` 仍会打开系统拍摄页并停在纯黑画面且不再弹窗。`em-chat-page` 在调起相机前用 `uni.getAppAuthorizeSetting` 预检 `cameraAuthorized`：`denied` 弹窗引导到系统设置（`uni.openAppAuthorizeSetting`），`config error` 提示安装包缺少权限描述；`not determined` 仍交给系统首次弹窗。新增 `getCameraAuthorizeState` / `openAppAuthorizeSetting` 从 `libs` 透出；H5/小程序/未知基座跳过预检，行为不变。示例工程在 `app-ios.distribute.privacyDescription` 补齐相机/相册/麦克风用途描述（改后需重新云打包或重打自定义基座生效）。
-- **`primaryColor` 在 App 端不生效**：页面级组件根节点同时绑定主题 class 与内联品牌色变量，而 App（uni-app x）端同一节点上 class 规则定义的 CSS 变量会顶掉内联同名变量，导致 `EmKit.init({ primaryColor })` / `setConfig({ primaryColor })` 在 App 端一直被主题值覆盖。七个页面级组件统一新增品牌作用域内层节点，内联品牌色变量下沉一层（与主题 class 分节点），App 端品牌色恢复正常。
-- **App 视频播放页黑屏（自定义基座缺 `uni-video` 模块）**：视频组件属于 uni-app x 内置模块 `uni-video`，会按代码用量摇树。基座如果是在接入视频组件之前打的，`<video>` 会被降级成 `<view>`，表现为点开播放器后全屏黑屏、无控制条。示例工程在 `manifest.json` 的 `app` / `app-android` / `app-ios` / `app-harmony` → `distribute.modules` 显式声明 `"uni-video": {}`；宿主接入视频后需重新打一次自定义基座，JS 热更不包含原生模块。
-- **iOS 视频一直转圈 `00:00`**：EaseMob chatfiles 直链无扩展名且不支持 HTTP Range（带 `Range` 仍返回 200 全量），iOS AVPlayer 远程渐进播放会卡死。App 端改为 `uni.downloadFile` 整包下载 → 复制为本地 `.mp4` → 播放；下载期显示进度，关闭时中止，同一 URL 会话内缓存。
-- **iOS 视频进度条在走但画面不动**：原生 `autoplay` 会在 `<video>` 事件绑定前起播，`play` 事件丢失后组件一直保留首帧/封面层。改为 `autoplay=false`、挂载后显式 `createVideoContext().play()`（未收到 `@play` 每 500ms 重试），且不再把 `poster` 传给 `<video>`（封面只用于下载 loading 背景）。iOS 真机已验证画面随进度更新。
-- **账号切换与异步时序一致性**：会话、联系人、群读取增加账号代次与请求顺序保护，登出后的旧响应不能恢复已清状态或复用旧 pending；同账号旧会话快照不覆盖新快照。会话刷新失败不再回退为内存空成功，联系人重试使用 SDK 受控刷新；后台同步失败直接进入列表重试态并保留缓存。SDK 没有群全量手动重启同步 API，群列表在失败后明确提示恢复连接或重新登录，不把内存重读当作同步成功。
-- **操作与编辑并发一致性**：删除会话、删除好友、退群/解散共享提交与完成锁，只产生一次成功事件。失败重发在 domain 按会话与消息共享实际结果；切换会话或编辑输入期间，旧发送/选择器完成回调不会误清新草稿、引用、@选择或解锁新请求，未发送的宿主临时附件会按 `release` 契约清理。好友快照会把历史 pending 申请收敛为已接受并同步未读角标；两人英文群通知修正为 `1 other`。
-
-### 新增
-
-- **聊天详情页删除好友**：`em-chat-info-page` 单聊分支新增「删除好友」按钮（红色字档），仅对方已是好友时显示；二次确认后删除，带提交锁，成功 toast 并新增 `contact-deleted` 事件通知宿主退场（不连带删除会话与本地消息），失败 toast 停留当前页。
-- **消息删除、复制与提交防重**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删当前账号的漫游历史再删本地，失败保留气泡，删除后校正会话摘要与时间；保留 `deleteLocalMessage` 作为显式本地删除入口。聊天页删除增加确认与失败提示，复制按系统结果提示成功或失败。`em-chat-inputbar` 新增 `submitting`，`em-quick-reply-bar` 新增 `disabled`，文本发送、直发快捷回复、失败重发与撤回均拦截重复提交，撤回执行时重新检查时间窗。
-- **通用提交态与加载失败重试**：`em-button` 新增 `loading`（默认 `false`），加载中显示 JS 驱动的旋转图标并拦截点击；`em-select-contact` 新增 `submitting`（默认 `false`），提交中禁止选择、重复确认与关闭；`LOAD_MORE_STATE` 新增 `ERROR`，加载失败可点击重试。
-- **会话与群管理操作闭环**：会话置顶/免打扰按会话与设置项独立串行并保护最新意图；删除会话、清空记录、删除好友、退群/解散增加确认与提交锁。群管理补设撤管理员/转让/移除确认、权限重验、保存中关闭保护；移除后强制刷新群详情与成员首屏，`getGroupMemberList` 以 `applied` 标识响应是否实际写入 store。
-- **选择异常与列表失败恢复**：图片、视频与内置文件选择区分用户取消和真实失败，取消静默、失败提示；会话、好友、群列表及聊天/群成员分页在无缓存失败时提供重试，有缓存时保留列表。
-- **输入栏多行输入**：新增 `inputFeatures.sendOnReturn`（默认 `true`，对齐微信「回车键发送消息」）：置 `false` 进入换行输入模式，输入框随打字生长（封顶 5 行，超出内部滚动），回车换行、发送走输入栏右侧的纸飞机发送键；`true` 时回车发送（iOS 上输入框仍可随粘贴内容生长，Android 保持单行输入）。
-- **视频消息全端播放**：新增 `em-video-preview` 全屏播放器（原生 `video` + 安全区关闭键 + 加载失败提示），聊天页点击视频消息即播放；`PLATFORM_CAPABILITIES.videoPreview` 全端 `true`，App/小程序不再隐藏播放入口，H5 由新窗口改为内置播放。App 端会先把视频下载到本地再播放（EaseMob chatfiles 直链不支持 Range，iOS 直接远程播放会卡 loading），下载期显示进度、关闭时中止；点击前会停掉正在播放的语音，关闭或离开页面时释放原生播放器。
-- **组件样式透出**：所有页面组件与原子组件新增 `custom-class` / `custom-style` 属性，用于在组件根节点追加宿主 class 与内联样式。`custom-style` 拼接到根节点内联样式末尾，五端生效且支持 `var()`；弹层类组件（`em-action-sheet`、`em-select-contact`、`em-mention-picker`）两属性落在最外层遮罩容器上。
-- **样式定制指南**：文档门户新增「样式定制」一页，汇总 `primaryColor` 配置、`--em-*` 变量、`custom-class` / `custom-style`、具名插槽四条定制通道的选型与平台边界；示例工程「样式实验室」页面新增 custom-style / custom-class / 变量覆盖三组对照演示，以及「拖动色相条实时换全页主题色」演示（根节点内联变量 + `setConfig` 双通道）。
 
 ### 变更
 
 - **支持范围声明**：本插件仅支持 uni-app x 蒸汽模式（Vapor），不提供经典 uni-app（Vue2/Vue3、nvue）与 vdom 模式兼容。背景：DCloud 官方已于 2024 年停止 nvue 与 5+ 维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台维护，蒸汽模式已兼容 js/ts 写法、老工程可方便升级（见 [DCloud 官方文档](https://doc.dcloud.net.cn/uni-app-x/)）。
 
 - **输入栏发送键改为纸飞机**：不再常驻文字「发送」按钮，右侧发送位与「+」同槽互斥——草稿为空显示「+」媒体入口，草稿有内容时换成品牌色纸飞机发送键（`plane`）。输入框不再被发送按钮挤窄，空草稿也不会出现无反馈的发送键。
+
+- **消息长按菜单默认项**：`uiConfig.messageMenuKeys` 默认值由「复制/引用/撤回/删除」调整为「复制/引用/编辑/置顶/撤回/重发/删除」；失败消息只展示复制/重发/删除。
+
+- **已读态展示与发送状态解耦**：新增纯展示开关 `showReadStatus`（`EmKitConfig` / `uiConfig`），默认 **关闭**，只控制单聊未读空心圆/已读对勾的显隐；功能层的 `enableReadReceipt` 仍独立控制是否收发已读回执。发送中 loading 与发送失败红叹号是独立关键状态，恒展示，不随任一开关关闭。
+
+- **聊天页发送体验**：图片、视频发送中在气泡内显示压暗蒙层与居中 loading；断网/重连时输入栏上方显示「消息待发」提示；多选附件按并发上限 3 分窗口发送，避免同时占满上传通道。
 
 ## 1.0.0-rc.1（2026-10-21）
 
