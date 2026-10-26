@@ -36,8 +36,8 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5180/   # 200
 |---|---|---|
 | `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.0-rc.2` |
 | `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.0-rc.2` |
-| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.0` / `100` |
-| `demo/package.json` | `version` | `1.0.0` |
+| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.0-rc.2` / `102` |
+| `demo/package.json` | `version` | `1.0.0-rc.2` |
 
 > 发 GA 时把插件 version 改为 `1.0.0`，changelog 增 `1.0.0` 小节，demo 同步。
 
