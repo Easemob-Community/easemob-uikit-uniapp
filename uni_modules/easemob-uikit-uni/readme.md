@@ -2,7 +2,7 @@
 
 环信 IM 的 uni-app x 版 UIKit（蒸汽模式），一套代码覆盖 Android / iOS / 鸿蒙 / H5 / 微信小程序。
 
-> 当前版本：**1.0.0-rc.2**（未发布）。已包含登录接入、会话列表、聊天页（文本/图片/语音/视频/文件 + 引用/撤回/重发/已读回执 + AI 流式消息）、群聊、联系人/好友申请、聊天详情、连接状态条与日志导出；语言偏好持久化（中/英）。逻辑层在 `libs/`，组件层在 `components/`。
+> 当前版本：**1.0.0-rc.2**（未发布）。已包含登录接入、会话列表、聊天页（文本/图片/语音/视频/文件 + 引用/撤回/重发/已读回执 + AI 流式消息）、群聊、联系人/好友申请、聊天详情、连接状态条与日志导出；内置中英文并支持扩展语言，语言偏好可持久化。逻辑层在 `libs/`，组件层在 `components/`。
 >
 > 完整接入步骤、常见问题与平台边界见仓库 `docs/QUICKSTART.md`；本文给出最短可运行路径。
 > 用 AI 接入时，可直接加载仓库 `skills/` 下的宿主接入 Agent Skills（入口 `em-host-integration`）。
@@ -18,6 +18,14 @@
 | App | Android 6+ / iOS 15+ / 鸿蒙 API20+ |
 | 小程序 | 微信小程序（SDK 需按下方「分包」接入） |
 | H5 | 现代浏览器移动端；未做桌面宽屏布局 |
+
+![环信 uni-app x UIKit 场景示例](./assets/scene-lab-gallery.png)
+
+## 按接入形态选择
+
+- **只要单聊天页**：使用仓库 [`templates/chat-only`](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only)，包含登录恢复、聊天页、小程序分包与构建检查。
+- **完整 IM**：按下方步骤接入，页面组合参考仓库 `demo/`。
+- **业务页直进单聊**：使用 chat-only，或按仓库 `docs/GUIDE-MULTI-SCENARIO.md` 手动集成。
 
 ## 快速开始（宿主工程）
 

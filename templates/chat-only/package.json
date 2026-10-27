@@ -1,0 +1,9 @@
+{
+  "name": "easemob-uikit-chat-only",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "dependencies": {
+    "easemob-websdk": "5.1.3"
+  }
+}

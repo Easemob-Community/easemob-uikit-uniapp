@@ -4,7 +4,7 @@
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
       <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧「+」建群 -->
       <em-nav-bar
-        :title="t('group.title')"
+        :title="title !== '' ? title : t('group.title')"
         action-icon="circle-plus"
         @back="emit('back')"
         @action="onOpenCreate"
@@ -121,6 +121,8 @@ import { useLocale } from '../../../libs/use/useLocale'
 defineOptions({ styleIsolation: 'app-and-page' })
 
 interface Props {
+  /** 导航标题覆盖，空串回落 i18n */
+  title?: string
   /** 建群面板是否显示群名称输入框（对齐 vue config.showNameInput，默认 false：自动取前 3 名成员昵称当群名） */
   showNameInput?: boolean
   /** 建群面板是否显示群设置区（公开群/允许成员邀请开关，对齐 vue config.showSettings，默认 false） */
@@ -130,6 +132,7 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), {
+  title: '',
   showNameInput: false,
   showSettings: false,
   customClass: '',

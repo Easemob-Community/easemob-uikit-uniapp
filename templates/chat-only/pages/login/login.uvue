@@ -1,0 +1,130 @@
+<template>
+  <view class="login-page" :class="themeClass">
+    <view class="login-card">
+      <text class="login-title">单聊天登录</text>
+      <input v-model="userId" class="login-input" placeholder="当前用户 userId" />
+      <input v-model="peerId" class="login-input" placeholder="对方 userId" />
+      <text v-if="errorText !== ''" class="login-error">{{ errorText }}</text>
+      <button class="login-button" :disabled="submitting" @click="login">{{ submitting ? '登录中…' : '登录并进入聊天' }}</button>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { EmKit, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+import { IM_CONFIG } from '@/common/im-config'
+import { clearSession, loadSession, saveSession } from '@/common/session'
+
+const { themeClass } = useTheme()
+const userId = ref('')
+const peerId = ref(IM_CONFIG.peerId)
+const submitting = ref(false)
+const errorText = ref('')
+
+async function requestToken(id: string): Promise<string> {
+  const res = await uni.request({
+    url: IM_CONFIG.tokenEndpoint,
+    method: 'POST',
+    data: { userId: id }
+  })
+  if (res.statusCode < 200 || res.statusCode >= 300) throw new Error(`token 接口返回 ${res.statusCode}`)
+  const data = res.data as Record<string, string>
+  if (typeof data.token !== 'string' || data.token === '') throw new Error('token 接口未返回 token')
+  return data.token
+}
+
+function openChat(): void {
+  uni.reLaunch({
+    url: `/pages/chat/chat?conversationId=${encodeURIComponent(peerId.value)}&peerName=${encodeURIComponent(IM_CONFIG.peerName)}&peerAvatar=${encodeURIComponent(IM_CONFIG.peerAvatar)}`
+  })
+}
+
+async function login(): Promise<void> {
+  if (submitting.value) return
+  errorText.value = ''
+  if (IM_CONFIG.appkey === '' || IM_CONFIG.appkey === 'your-appkey' || IM_CONFIG.tokenEndpoint.indexOf('your-api.example.com') >= 0) {
+    errorText.value = '请先在 common/im-config.ts 配置 appkey 和 tokenEndpoint'
+    return
+  }
+  if (userId.value.trim() === '' || peerId.value.trim() === '') {
+    errorText.value = '请输入当前用户和对方 userId'
+    return
+  }
+  submitting.value = true
+  try {
+    const token = await requestToken(userId.value.trim())
+    await EmKit.login({ userId: userId.value.trim(), token })
+    saveSession({ userId: userId.value.trim(), token })
+    openChat()
+  } catch (e) {
+    clearSession()
+    errorText.value = e instanceof Error ? e.message : '登录失败，请检查配置和网络'
+  } finally {
+    submitting.value = false
+  }
+}
+
+onMounted(() => {
+  const session = loadSession()
+  if (session == null) return
+  userId.value = session.userId
+  submitting.value = true
+  requestToken(session.userId)
+    .then(async (token) => {
+      await EmKit.login({ userId: session.userId, token })
+      saveSession({ userId: session.userId, token })
+      openChat()
+    })
+    .catch(() => {
+      clearSession()
+    })
+    .finally(() => {
+      submitting.value = false
+    })
+})
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.login-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  background-color: var(--em-bg-base);
+}
+.login-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 420px;
+}
+.login-title {
+  margin-bottom: 24px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--em-text-primary);
+}
+.login-input {
+  height: 44px;
+  margin-bottom: 12px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background-color: var(--em-bg-secondary);
+  color: var(--em-text-primary);
+}
+.login-error {
+  margin-bottom: 12px;
+  color: var(--em-danger-color);
+}
+.login-button {
+  height: 44px;
+  padding: 0 16px;
+  background-color: var(--em-primary-color);
+  color: #ffffff;
+}
+</style>

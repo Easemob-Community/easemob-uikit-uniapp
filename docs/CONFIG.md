@@ -30,11 +30,9 @@ EmKit.init({
 |---|---|---|---|
 | `appkey` | `string` | 必填 | 环信 AppKey |
 | `enableReadReceipt` | `boolean` | `true` | 单聊已读回执功能开关（是否发送/接收已读回执） |
-| `showReadStatus` | `boolean` | `false` |
-| `enableGroupReadReceipt` | `boolean` | `false` |
-| `messageStatus` | `Required<EmMessageStatusPresentation>` | `{ position: 'left', icons: {}, texts: {} }` | 单聊已读态图标（未读空心圆/已读对勾）显隐；纯展示开关，与 `enableReadReceipt` 解耦，不影响发送中/失败状态 |
+| `showReadStatus` | `boolean` | `false` | 单聊已读态图标（未读空心圆/已读对勾）显隐；纯展示开关，与 `enableReadReceipt` 解耦，不影响发送中/失败状态 |
 | `enableGroupReadReceipt` | `boolean` | `false` | 群聊已读回执：开启后群消息携带 `needReadReceipt`、自动回执群消息，并在己方群消息下方展示已读人数；关闭时群聊不产生任何回执请求 |
-| `locale` | `'zh-CN' \| 'en'` | 跟随系统/上次选择 | 初始化界面语言，写入本地偏好 |
+| `locale` | `EmLocaleName` | 跟随系统/上次选择 | 初始化界面语言，写入本地偏好；扩展语言需先用 `mergeMessages` 注册文案表 |
 | `onTokenWillExpire` | `() => string \| Promise<string>` | 无 | Token 约 80% 生命周期时触发，返回新 token 后自动续期 |
 | `onTokenExpired` | `() => void` | 无 | Token 已过期、SDK 断开时触发；通常跳登录页 |
 
@@ -193,8 +191,12 @@ console.log(config.recallTimeLimit)
 | `senderNameMode` | `'always' \| 'hidden'` | `always` | 群聊气泡上方昵称行 |
 | `showAnnouncement` | `boolean` | `true` | 群公告条 |
 | `enableMention` | `boolean` | `true` | @ 提及链路 |
+| `peerName` / `peerAvatar` | `string` | `''` | 单聊对端业务昵称/头像，空串不注入 |
 | `title` | `string` | `''` | 导航标题覆盖；空串回落昵称链 |
+| `showNavBar` / `showBack` | `boolean` | `true` / `true` | 自绘导航栏与返回箭头显隐 |
 | `showAction` | `boolean` | `true` | 右上角详情入口 |
+| `inputFeatures` | `Partial<EmInputFeatures>` | 未设置 | 按字段覆盖当前页面的全局输入配置，不影响其他页面 |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | 未设置 | 当前页面菜单数组整体替换全局配置；置顶条也使用该结果 |
 | `autoBack` | `boolean` | `true` | 返回时是否由组件 `navigateBack` |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条 |
 | `quickReplies` | `EmQuickReply[]` | `[]` | 输入栏上方快捷回复 |
@@ -231,6 +233,23 @@ console.log(config.recallTimeLimit)
 2. 之后调用 `setConfig` 覆盖已解析值。
 3. 页面级 props 只影响该页面实例，不写回全局配置。
 4. `primaryColor` 同时写入页面根节点的 `--em-primary-color`；H5 还会写到 `document.documentElement`。
+
+`inputFeatures` 的页面 props 与全局配置按字段合并，未传字段继续响应 `setConfig`；`messageMenuKeys` 传入后则整体替换当前页面的全局菜单数组：
+
+```vue
+<!-- 社交聊天：使用全局全部工具 -->
+<em-chat-page conversation-id="user-a" chat-type="singleChat" />
+
+<!-- 客服聊天：只关闭语音、拍摄和视频，其他字段继续跟随全局配置 -->
+<em-chat-page
+  conversation-id="customer-service"
+  chat-type="singleChat"
+  :input-features="{ voice: false, camera: false, video: false }"
+  :message-menu-keys="['copy', 'quote', 'delete']"
+/>
+```
+
+两个页面实例互不回写配置。身份 props 写入的是账号级展示覆盖层；若两个页面同时为同一 userId 注入不同身份，最后写入者生效，业务上应避免这种冲突。
 
 ## 5. 与平台相关的能力
 

@@ -1,0 +1,3 @@
+<template>
+  <view><text>SDK Loader</text></view>
+</template>

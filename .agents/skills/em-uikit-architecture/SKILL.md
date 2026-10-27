@@ -28,7 +28,7 @@ uni_modules/easemob-uikit-uni/
 
 ## EmKit 门面（libs/index.ts → client + chat）
 
-- 所有 SDK 依赖的异步方法内部前置 `await whenReady()`（就绪门：MP 分包异步加载 SDK → ChatClient.init → login，各阶段 Promise 缓存、失败清缓存可重试）。宿主加载态用 `EmKit.whenReady()`。
+- 所有 SDK 依赖的异步方法内部前置 `await whenReady()`（就绪门：MP 分包异步加载 SDK → ChatClient.init → login，各阶段 Promise 缓存、失败清缓存可重试）。宿主加载态用 `EmKit.whenReady()`，原生 `ChatClient` 逃生舱用 `EmKit.getSDKClient()`；两者均返回 `Promise<ChatClient>`，初始化完成不代表登录或在线。
 - `EmKit.init(config)` 挂 bind 续体，时序先于业务调用。配置项见「配置体系」。
 - `onMessage` 返回取消函数（**页面 onUnmounted 必须反注册**，泄漏 P0 修复见坑集 #4）。
 
@@ -88,7 +88,8 @@ uni_modules/easemob-uikit-uni/
 - **软键盘**：`useKeyboardHeight` 统一高度源（App/小程序；H5 运行时无 `onKeyboardHeightChange`，条件编译跳过注册，否则聊天页 setup 白屏），消费点 = chat-page 弹起滚底 + `useChatComposer` 手动避让 + 面板高度对齐 `max(kb, PANEL_MIN_HEIGHT=280)`。
 - **输入栏行为核心**：`useChatComposer`（M2.16 自 em-chat-inputbar 抽取）——键盘避让 rootStyle/panelStyle、面板三态互斥、录音手势状态机、禁用守卫的单一实现；消费点 = em-chat-inputbar + chat-page 的 `#input-bar` 整栏自绘插槽（页面实例化后经 scope 透出，scope 类型 `EmChatInputBarScope` 在 libs/types；插槽有无静态确定，同实例不可切换）。
 - **日志**：`libs/utils/logger.ts` —— `createLogger(ns)` 统一 `[emkit:<ns>]` 前缀（debug 走 console.log 求全端稳定）；2000 行内存环形缓冲与 console 级别解耦；`EmKit.exportLogs()` 分端导出（H5 Blob 下载 / 小程序·App 写 USER_DATA_PATH 兜底剪贴板），配套 `getLogText/clearLogs`。
-- **i18n**：`useLocale` 的 messages 为 reactive store，`mergeMessages(locale, table)` 从门面透出（zh-CN/en 内置）。
+- **主题 chrome**：`useThemeChrome({ tabBarPages, colors? })` 封装 `initTheme`、页面 `onShow` 与 `themeStore.mode` watch；App/mp 走 `syncNativeThemeUI`，H5 同步 `.uni-page-head/.uni-tabbar`，demo 通过 `demo/common/theme.ts` 消费。
+- **i18n**：`useLocale` 的 messages 为 reactive store，`mergeMessages(locale, table)` 从门面透出（zh-CN/en 内置，支持扩展 locale）；持久化偏好只在对应文案表存在时恢复，缺失 key 回退 zh-CN。
 
 ## platform.ts 平台差异现状
 

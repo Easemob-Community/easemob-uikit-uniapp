@@ -81,10 +81,20 @@ function onMenu(key: string) {
 </style>
 ```
 
+## 宿主接线
+
+| 可见控件 | 事件或默认行为 | 宿主必须做什么 | 不接的后果 |
+|---|---|---|---|
+| 会话条目 | `select(conversationId, chatType)` | 跳聊天页并传两个参数 | 点击后停留在当前页 |
+| 右上「+」→ 发起单聊、选人完成 | `select(...)`；组件已创建本地会话 | 同上，跳聊天页 | 选人后不进入会话 |
+| 右上「+」→ 创建群组 | `menu('create-group')` | 跳群组页 | 菜单项没有页面动作 |
+| 长按会话的置顶/免打扰/删除 | 组件内部完成 | 无需接路由；按需做业务埋点 | 不适用 |
+
 ## Props
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
+| `title` | `string` | `''` | 导航标题覆盖；空串使用内置会话标题 |
 | `showSearch` | `boolean` | `true` | 顶部搜索条显隐 |
 | `tabs` | `ConversationTabKeyValue[]` | `['all','unread','atMe','single','group']` | 筛选 tab 及顺序，取值来自 `CONVERSATION_TAB_KEY`；传 `[]` 隐藏 tab 栏 |
 | `showTabs` | `boolean` | `true` | 筛选 tab 栏显隐；`false` 时无论 `tabs` 传什么都不渲染 |

@@ -4,7 +4,7 @@
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
       <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧 person/plus 添加好友（对齐 vue address-book header-extra） -->
       <em-nav-bar
-        :title="t('contact.title')"
+        :title="title !== '' ? title : t('contact.title')"
         :show-back="false"
         action-icon="person-plus"
         @action="emit('add')"
@@ -47,11 +47,14 @@ import { useLocale } from '../../../libs/use/useLocale'
 defineOptions({ styleIsolation: 'app-and-page' })
 
 interface Props {
+  /** 导航标题覆盖，空串回落 i18n */
+  title?: string
   customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
 withDefaults(defineProps<Props>(), {
+  title: '',
   customClass: '',
   customStyle: ''
 })

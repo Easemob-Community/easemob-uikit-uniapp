@@ -1,3 +1,4 @@
+import type { ChatClient } from 'easemob-websdk'
 import { EmClient } from './client'
 import { EmChat } from './chat'
 import { EmContact } from './chat/contact'
@@ -107,8 +108,13 @@ class EmKitImpl {
       .catch((e) => kitLogger.warn('kit bind skipped:', e))
   }
 
-  /** SDK 就绪门（宿主渲染「加载消息服务」占位态用）：resolve 于 SDK 模块加载 + ChatClient.init 完成；未 init 即 reject */
-  whenReady(): Promise<unknown> {
+  /** SDK 初始化就绪门：resolve 于 SDK 模块加载 + ChatClient.init 完成，不代表已登录或连接在线；未 init 即 reject */
+  whenReady(): Promise<ChatClient> {
+    return this.client.whenReady()
+  }
+
+  /** 获取 UIKit 内部复用的原生 ChatClient，供 SDK 未封装能力使用；普通收发与状态管理仍优先走 EmKit */
+  getSDKClient(): Promise<ChatClient> {
     return this.client.whenReady()
   }
 
@@ -582,6 +588,8 @@ export {
   THEME_STORAGE_KEY
 } from './use/useTheme'
 export type { EmThemeInitOptions, EmThemeSyncOptions } from './use/useTheme'
+export { useThemeChrome } from './use/useThemeChrome'
+export type { EmThemeChromeOptions, EmThemeChromeColors } from './use/useThemeChrome'
 export { useLocale, mergeMessages, initLocale, setLocale, getLocale, LOCALE_STORAGE_KEY } from './use/useLocale'
 export { useSafeArea, getSafeAreaBottom, getSafeAreaTop } from './use/useSafeArea'
 export { useChatComposer } from './use/useChatComposer'

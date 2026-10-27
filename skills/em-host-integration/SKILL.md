@@ -5,7 +5,7 @@ description: Use when 要把 easemob-uikit-uni 接入宿主 uni-app x 工程（�
 
 # 宿主接入总纲（easemob-uikit-uni）
 
-> 适用基线：UIKit `1.0.0-rc.1` · websdk `5.1.3` · HBuilderX `5.21+` · uni-app x（Vue3、蒸汽模式）。
+> 适用基线：UIKit `1.0.0-rc.2` · websdk `5.1.3` · HBuilderX `5.21+` · uni-app x（Vue3、蒸汽模式）。
 > 本技能只做**总纲与最短可用链路**；页面细节按任务加载文末「细分技能」。
 
 ## 1. 先判断边界

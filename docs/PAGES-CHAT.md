@@ -133,6 +133,16 @@ function onOpenInfo(id: string) {
 </style>
 ```
 
+## 宿主接线
+
+| 可见控件或状态 | 事件或默认行为 | 宿主必须做什么 | 不接的后果 |
+|---|---|---|---|
+| 右上「…」 | `open-info(conversationId)` | 跳聊天信息页；不做详情页时设 `showAction=false` | 点击后停留在聊天页 |
+| 返回箭头 | `autoBack=true` 自动 `navigateBack`，同时发 `back` | 根页设 `showBack=false`；自定义退场设 `autoBack=false` 并处理 `back` | 根页箭头无可用上一页 |
+| 未登录空态 | `unauthorized` | 跳登录页或提供登录入口；登录后当前页自动恢复 | 页面只显示「请先登录」 |
+| 业务长按动作 | `message-menu(key, message)` | 执行 `extraMessageMenus` 对应的业务动作 | 自定义菜单项只有选择事件 |
+| @ 片段 | `mention-click(userId)` | 按需跳成员资料 | 点击无页面动作 |
+
 ## Props
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -144,10 +154,16 @@ function onOpenInfo(id: string) {
 | `senderNameMode` | `EmSenderNameMode` | `'always'` | 群聊气泡上方是否显示发送者昵称；`'hidden'` 不显示 |
 | `showAnnouncement` | `boolean` | `true` | 群公告条显隐（仅群聊且群公告非空时生效） |
 | `enableMention` | `boolean` | `true` | 群聊 @ 提及链路开关；关闭后输入 `@` 不弹成员面板 |
+| `peerName` | `string` | `''` | 单聊对端业务昵称，写入展示覆盖层；空串不注入，页面卸载只清理自己写入且仍匹配的值 |
+| `peerAvatar` | `string` | `''` | 单聊对端业务头像，语义同 `peerName`；宿主后调用 `setUserPresentation` 的值不会被页面卸载误删 |
 | `title` | `string` | `''` | 导航栏标题覆盖，如「在线客服」；空串时单聊用昵称 > userId，群聊用群名 > groupId |
+| `showNavBar` | `boolean` | `true` | 顶部自绘导航栏显隐；关闭后连接条、消息区和输入栏占满原区域，适用于宿主自绘头部 |
+| `showBack` | `boolean` | `true` | 导航栏返回箭头显隐；聊天页作为根页时设为 `false`，避免不可用的返回入口 |
 | `showAction` | `boolean` | `true` | 右上角详情入口显隐；关闭后不再触发 `open-info`，详情页完全由宿主接管 |
 | `autoBack` | `boolean` | `true` | 点导航栏返回时是否由组件执行 `uni.navigateBack({ delta: 1 })`；`false` 时只发 `back` |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条显隐 |
+| `inputFeatures` | `Partial<EmInputFeatures>` | 未设置 | 按字段覆盖当前页面的全局输入配置，默认输入栏和 `#input-bar` scope 共用同一解析结果 |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | 未设置 | 当前页面菜单数组整体替换全局配置，不影响其他页面；置顶条显隐也使用该结果 |
 | `quickReplies` | `EmQuickReply[]` | `[]` | 输入栏上方常用语，空数组不渲染；条目为 `{ label, text? }` |
 | `quickReplyMode` | `EmQuickReplyMode` | `'fill'` | `'fill'` 替换草稿（用户可编辑后再发）；`'send'` 直接发送 |
 | `extraMessageMenus` | `EmMessageMenuExtra[]` | `[]` | 长按菜单追加的业务动作，可带 `types` 限定消息类型；内置 key（copy/quote/edit/pin/download/recall/delete）不可覆盖 |
@@ -158,6 +174,7 @@ function onOpenInfo(id: string) {
 |---|---|---|
 | `back` | 无 | 点击导航栏返回。`autoBack=true` 时组件随后自行 `navigateBack`；`false` 时由宿主决定退场或拦截 |
 | `open-info` | `conversationId: string` | 点击右上角详情入口，宿主跳聊天信息页 |
+| `unauthorized` | 无 | 当前未登录，页面已显示「请先登录」；宿主可跳登录页。登录后当前页自动重新加载历史 |
 | `send` | `message: EmMessageItem` | 文本、图片、语音、视频、文件、快捷回复发送成功后透出 |
 | `recall` | `message: EmMessageItem` | 撤回成功后透出 |
 | `delete` | `message: EmMessageItem` | 漫游删除（如有服务端 ID）与本地删除均完成后透出；仅本地消息在本地删除后透出 |

@@ -43,6 +43,16 @@ if (readme.includes('开发中')) fail('README.md: 仍含「开发中」')
 if (!readme.includes(pkg.version)) fail(`README.md: 未出现当前版本 ${pkg.version}`)
 if (!existsSync(resolve(root, 'docs/QUICKSTART.md'))) fail('缺少 docs/QUICKSTART.md')
 
+const versionReferences = [
+  'AGENTS.md',
+  'docs/QUICKSTART.md',
+  'skills/em-host-integration/SKILL.md',
+  'uni_modules/easemob-uikit-uni/libs/constants/index.ts'
+]
+for (const rel of versionReferences) {
+  if (!read(rel).includes(pkg.version)) fail(`${rel}: 未引用当前版本 ${pkg.version}`)
+}
+
 // 3) 平台矩阵（HBuilderX 4.71+ 新规范）
 const client = pkg.uni_modules?.platforms?.client
 if (client == null) {

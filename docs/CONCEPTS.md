@@ -68,7 +68,7 @@ await EmKit.whenReady()
 // 此时 SDK 模块已加载、ChatClient.init 完成，可以登录
 ```
 
-宿主需要在首屏显示“加载消息服务…”占位态时，`await EmKit.whenReady()` 后再渲染；未 `init()` 就调用会 reject。
+宿主需要在首屏显示“加载消息服务…”占位态时，`await EmKit.whenReady()` 后再渲染；未 `init()` 就调用会 reject。需要原生 `ChatClient` 注册 SDK 事件时，用语义更明确的 `await EmKit.getSDKClient()`；它只等待初始化完成，不代表登录或连接在线，普通收发仍优先走 EmKit。
 
 ### 3.3 登录 / 登出
 
@@ -186,7 +186,7 @@ uni.navigateTo({
 })
 ```
 
-聊天页自身完成进入会话、历史、未读、发送。业务上下文可通过 `sendText` 的 `ext`、`#banner`、`title` 等注入。详见 [多场景接入](./GUIDE-MULTI-SCENARIO.md)。
+聊天页自身完成进入会话、历史、未读、发送。业务上下文可通过 `sendText` 的 `ext`、`#banner`、`title` 等注入。详见 [多场景接入](./GUIDE-MULTI-SCENARIO.md)。如果需要包含登录恢复、聊天页和小程序分包的完整工程，可直接使用仓库 [`templates/chat-only`](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only)。
 
 ### 7.3 只用数据层
 

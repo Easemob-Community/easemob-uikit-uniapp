@@ -81,10 +81,19 @@ function onBack() {
 />
 ```
 
+## 宿主接线
+
+| 可见控件 | 事件或默认行为 | 宿主必须做什么 | 不接的后果 |
+|---|---|---|---|
+| 群条目 | `click-group(groupId)` | 以 `groupChat` 跳聊天页 | 点击后停留群列表 |
+| 建群成功 | `created(groupId)`；组件已建群并创建本地会话 | 以 `groupChat` 跳聊天页 | 建群成功但停留群列表 |
+| 返回箭头 | `back` | `navigateBack` 或自定义退场 | 点击后停留当前页 |
+
 ## Props
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
+| `title` | `string` | `''` | 导航标题覆盖；空串使用内置群组标题 |
 | `showNameInput` | `boolean` | `false` | 建群面板显示群名称输入框；关闭时始终使用自动群名。输入上限 255 字符 |
 | `showSettings` | `boolean` | `false` | 建群面板显示「公开群」「允许成员邀请」两个开关；关闭时不展示，按 `false` 创建 |
 

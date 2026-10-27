@@ -29,10 +29,21 @@
 ```
 uni_modules/easemob-uikit-uni/   # UIKit 插件本体（组件前缀 em-）
 demo/                            # 演示工程（uni-app x，manifest.json 开启 vapor）
+templates/chat-only/             # 可运行单聊天模板（web/mp 构建门禁）
 docs/                            # 文档（含 SDK 五端连通性 spike 记录）
 skills/                          # 宿主接入 Agent Skills（分发给接入方 AI）
 scripts/                         # 编译/发布脚本
 ```
+
+![环信 uni-app x UIKit 会话与业务场景](./docs/assets/scene-lab-gallery.png)
+
+## 接入路径
+
+| 目标 | 入口 |
+|---|---|
+| 只要一个单聊天页 | [可运行 `templates/chat-only`](./templates/chat-only/README.md)：含登录恢复、聊天页、小程序分包和构建检查 |
+| 完整 IM | 按下方快速开始，页面组合参考 `demo/` |
+| 业务页直进单聊 | 使用 chat-only，或阅读 [多场景接入](./docs/GUIDE-MULTI-SCENARIO.md) |
 
 ## 快速开始（宿主接入）
 

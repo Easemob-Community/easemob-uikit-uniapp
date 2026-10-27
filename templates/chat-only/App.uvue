@@ -1,0 +1,12 @@
+<script setup lang="ts">
+import { EmKit, initTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+import { IM_CONFIG } from '@/common/im-config'
+
+onLaunch(() => {
+  initTheme()
+  EmKit.init({ appkey: IM_CONFIG.appkey })
+})
+</script>
+
+<style>
+</style>

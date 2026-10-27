@@ -5,8 +5,10 @@
       <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar；
            #title 插槽：宿主整标题自绘（scope：name/ext/conversationId），缺省回落内置标题（会话注入名 > title prop > 昵称链） -->
       <em-nav-bar
+        v-if="showNavBar"
         :title="navTitle"
         :subtitle="headerSubtitle"
+        :show-back="showBack"
         :action-icon="showAction ? 'vertical' : ''"
         @back="onBack"
         @action="onOpenInfo"
@@ -96,6 +98,11 @@
               </view>
             </template>
           </view>
+        </view>
+
+        <!-- 未登录是独立状态：不进入历史请求、不展示网络错误，宿主可经 unauthorized 接管登录 -->
+        <view v-else-if="unauthorized" :class="ns.e('history-error')">
+          <em-empty icon="person" size="large" :description="t('chat.unauthorized')" />
         </view>
 
         <!-- 消息为空的宿主自定义出口（默认 em-empty 空态；必须等首次历史请求成功后才展示） -->
@@ -260,7 +267,7 @@
       <!-- 整栏自绘（#input-bar，M2.16）：宿主提供插槽时整栏替换默认输入栏，结构/样式任意自绘；
            行为核心（键盘避让/键盘↔面板互斥/录音手势/禁用守卫）由页面侧 composer 承担并经 scope
            （EmChatInputBarScope）透出，壳节点负责键盘顶起与安全区，自绘栏只需绑定 scope 契约 -->
-      <view v-if="hasCustomInputBar" :class="ns.e('inputbar-shell')" :style="composerShellStyle">
+      <view v-if="hasCustomInputBar && !unauthorized" :class="ns.e('inputbar-shell')" :style="composerShellStyle">
         <slot
           name="input-bar"
           :draft="draft"
@@ -270,7 +277,7 @@
           :disabled="isMutedAll"
           :notify-disabled-tap="onMuteAllTap"
           :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
-          :features="config.inputFeatures"
+          :features="resolvedInputFeatures"
           :emojis="config.emojiList"
           :quick-replies="quickReplies"
           :keyboard-lift="composerKeyboardLift"
@@ -298,11 +305,11 @@
         />
       </view>
       <em-chat-inputbar
-        v-else
+        v-else-if="!unauthorized"
         v-model="draft"
         :quote="quoteInfo"
         :editing="editingInfo"
-        :features="config.inputFeatures"
+        :features="resolvedInputFeatures"
         :emojis="config.emojiList"
         :quick-replies="quickReplies"
         :collapse-signal="inputbarCollapseSignal"
@@ -392,17 +399,17 @@ import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import EmPinnedBar from '../../em-pinned-bar/em-pinned-bar.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONNECTION_STATUS, CONVERSATION_TYPE, ERROR_CODE, FILE_SEND_CONCURRENCY, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
-import type { ConversationTypeValue } from '../../../libs/constants'
+import type { ConversationTypeValue, MessageMenuKeyValue } from '../../../libs/constants'
 import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, downloadAttachment, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
 import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
 import { errorCodeOf, sendFailureKeyOf, sendFailureKeyOfCode } from '../../../libs/utils/error'
-import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmMessageStatusKind, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
+import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmInputFeatures, EmMessageItem, EmMessageMenuExtra, EmMessageStatusKind, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, EmUserPresentation, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { clearDraft, getDraft, setDraft } from '../../../libs/store/draft'
-import { avatarOf } from '../../../libs/store/user'
+import { avatarOf, clearUserPresentationFields } from '../../../libs/store/user'
 import { contactDisplayNameOf } from '../../../libs/store/contact'
 import { connectionStore } from '../../../libs/store/connection'
 import { groupDisplayNameOf, groupMemberDisplayNameOf, groupStore } from '../../../libs/store/group'
@@ -456,8 +463,16 @@ interface Props {
   showAnnouncement?: boolean
   /** @提及链路开关（仅群聊生效；伪装模式预留位），默认 true */
   enableMention?: boolean
+  /** 单聊对端业务昵称；写入独立覆盖层，空串不注入 */
+  peerName?: string
+  /** 单聊对端业务头像；写入独立覆盖层，空串不注入 */
+  peerAvatar?: string
   /** 导航栏标题覆盖（空串回落默认昵称链：单聊昵称 > userId；群聊群名 > groupId），如「在线客服」 */
   title?: string
+  /** 顶部自绘导航栏显隐；false 时连接条和消息区上移占满原区域 */
+  showNavBar?: boolean
+  /** 导航栏返回箭头显隐；聊天页作为根页时可关闭 */
+  showBack?: boolean
   /** 右上角详情入口显隐（默认 true）；false 时宿主完全接管业务信息页（伪装模式/客服场景） */
   showAction?: boolean
   /** 点击返回时是否由组件执行 `uni.navigateBack`（默认 true）。
@@ -465,6 +480,10 @@ interface Props {
   autoBack?: boolean
   /** 顶部连接状态条显隐，默认 true */
   showConnectionBanner?: boolean
+  /** 当前页面输入栏配置，按字段覆盖全局 uiConfig.inputFeatures */
+  inputFeatures?: Partial<EmInputFeatures>
+  /** 当前页面消息菜单，传入时整体替换全局 uiConfig.messageMenuKeys */
+  messageMenuKeys?: MessageMenuKeyValue[]
   /** 快捷回复常用语（M2.12）：输入栏上方胶囊条，点击按 quickReplyMode 填草稿或直接发送 */
   quickReplies?: EmQuickReply[]
   /** 快捷回复点击行为，默认 'fill'（替换草稿，用户可编辑后再发）；'send' 直接发送 */
@@ -481,7 +500,11 @@ const props = withDefaults(defineProps<Props>(), {
   senderNameMode: 'always',
   showAnnouncement: true,
   enableMention: true,
+  peerName: '',
+  peerAvatar: '',
   title: '',
+  showNavBar: true,
+  showBack: true,
   showAction: true,
   autoBack: true,
   showConnectionBanner: true,
@@ -497,6 +520,8 @@ const emit = defineEmits<{
   (e: 'back'): void
   // 聊天详情入口（路由跳转由宿主页面接线）
   (e: 'open-info', conversationId: string): void
+  // 当前未登录：页面展示登录空态，宿主演示登录入口或跳登录页
+  (e: 'unauthorized'): void
   // 业务事件透出：行为仍内部调 EmKit 完成，事件仅通知宿主（payload 为发送/操作后的消息项）
   (e: 'send', message: EmMessageItem): void
   (e: 'recall', message: EmMessageItem): void
@@ -511,6 +536,36 @@ const ns = useNamespace('chat-page')
 const { themeClass } = useTheme()
 const { t } = useLocale()
 const { config } = useConfig()
+const resolvedInputFeatures = computed<EmInputFeatures>(() => ({ ...config.inputFeatures, ...props.inputFeatures }))
+const resolvedMessageMenuKeys = computed<MessageMenuKeyValue[]>(() => props.messageMenuKeys ?? config.messageMenuKeys)
+
+let peerPresentationUserId = ''
+let peerPresentation: EmUserPresentation = {}
+
+function clearPeerPresentation(): void {
+  if (peerPresentationUserId !== '') clearUserPresentationFields(peerPresentationUserId, peerPresentation)
+  peerPresentationUserId = ''
+  peerPresentation = {}
+}
+
+function syncPeerPresentation(): void {
+  clearPeerPresentation()
+  if (props.chatType !== CONVERSATION_TYPE.SINGLE_CHAT || props.conversationId === '') return
+  const patch: EmUserPresentation = {}
+  if (props.peerName !== '') patch.nickname = props.peerName
+  if (props.peerAvatar !== '') patch.avatarUrl = props.peerAvatar
+  if (patch.nickname === undefined && patch.avatarUrl === undefined) return
+  EmKit.setUserPresentation(props.conversationId, patch)
+  peerPresentationUserId = props.conversationId
+  peerPresentation = patch
+}
+
+watch(
+  () => [props.conversationId, props.chatType, props.peerName, props.peerAvatar],
+  () => syncPeerPresentation(),
+  { immediate: true }
+)
+onUnmounted(() => clearPeerPresentation())
 
 function onBack(): void {
   emit('back')
@@ -545,11 +600,12 @@ const historySettled = ref(false)
 const historyFailed = ref(false)
 const loadMoreFailed = ref(false)
 const historyLoading = ref(false)
+const unauthorized = ref(false)
 
 const list = computed<EmMessageItem[]>(() => messageStore.messagesByConversationId[props.conversationId] ?? [])
 const hasMore = computed(() => messageStore.hasMoreByConversationId[props.conversationId] === true)
-// 首次历史未回包且无缓存时用骨架，不用「暂无消息」占位（避免先闪空态再出消息）
-const showHistorySkeleton = computed(() => !historySettled.value && list.value.length === 0)
+// 首次历史未回包且无缓存时用骨架；未登录空态不再展示骨架或通用历史错误
+const showHistorySkeleton = computed(() => !unauthorized.value && !historySettled.value && list.value.length === 0)
 
 // 首屏气泡骨架行配置（静态预设）：形态/方向/宽度/文字行数，布局对齐真实消息行（头像在外侧、己方右对齐、
 // 时间 chip 居中）。宽度一律 rpx 定宽——百分比宽度链在蒸汽端有「行尾缺字」前科（见 __content 宽度注释），骨架同样禁用
@@ -1054,26 +1110,62 @@ function highlightMessage(target: EmMessageItem): void {
   }, 50)
 }
 
-// 首次历史加载 / 失败重试共用：historySettled 是空态的唯一开关；
-// 失败保留已缓存消息并给 toast + 顶部「点击重试」，不再静默只写 logger
+let historyGeneration = 0
+
+function presentUnauthorized(): void {
+  const shouldEmit = !unauthorized.value
+  historyGeneration += 1
+  unauthorized.value = true
+  historyFailed.value = false
+  loadMoreFailed.value = false
+  historyLoading.value = false
+  historySettled.value = true
+  ready.value = true
+  if (shouldEmit) emit('unauthorized')
+}
+
+watch(() => connectionStore.userId, (userId, previousUserId) => {
+  if (userId === '') {
+    if (previousUserId !== '') presentUnauthorized()
+    return
+  }
+  if (unauthorized.value) {
+    unauthorized.value = false
+    loadInitialHistory().catch(() => {})
+  }
+})
+
+// 首次历史加载 / 失败重试共用：未登录独立快速失败，其他失败保留缓存与通用重试。
 async function loadInitialHistory(): Promise<void> {
   if (historyLoading.value || loadingMore.value) return
+  if (connectionStore.userId === '') {
+    presentUnauthorized()
+    return
+  }
+  unauthorized.value = false
+  const generation = ++historyGeneration
   historyLoading.value = true
   historyFailed.value = false
   historySettled.value = false
   try {
     await EmKit.loadHistory(props.conversationId, props.chatType)
   } catch (e) {
+    if (generation !== historyGeneration) return
+    if (errorCodeOf(e) === ERROR_CODE.UNAUTHORIZED) {
+      presentUnauthorized()
+      return
+    }
     historyFailed.value = true
     logger.error('loadHistory fail:', e)
     uni.showToast({ title: t('chat.historyFailed'), icon: 'none' })
   } finally {
+    if (generation !== historyGeneration) return
     historySettled.value = true
     historyLoading.value = false
     scrollToBottom()
     // 群已读人数补齐（开关关闭时 no-op）：批量查询最近己方消息的累计已读人数，
     // 失败只告警（展示类补充信息，不阻断历史渲染）
-    if (isGroupChat.value && config.enableGroupReadReceipt) {
+    if (!unauthorized.value && isGroupChat.value && config.enableGroupReadReceipt) {
       EmKit.refreshGroupReadCounts(props.conversationId).catch((e) => logger.warn('refreshGroupReadCounts fail:', e))
     }
     // 请求结束后下一帧解除首帧隐藏
@@ -1231,6 +1323,7 @@ async function onLoadMore(): Promise<void> {
       })
     }
   } catch (e) {
+    if (unauthorized.value || errorCodeOf(e) === ERROR_CODE.UNAUTHORIZED) return
     loadMoreFailed.value = true
     logger.error('loadHistory fail:', e)
     uni.showToast({ title: t('chat.historyFailed'), icon: 'none' })
@@ -1627,7 +1720,7 @@ async function togglePinMessage(m: EmMessageItem): Promise<void> {
 
 // ========== 置顶消息条（M2.20）==========
 // 置顶能力开关 = 菜单 key 在 messageMenuKeys 中（删 key 即全禁用，置顶条不渲染）
-const pinEnabled = computed(() => config.messageMenuKeys.includes(MESSAGE_MENU_KEY.PIN))
+const pinEnabled = computed(() => resolvedMessageMenuKeys.value.includes(MESSAGE_MENU_KEY.PIN))
 const pinnedList = computed<EmPinnedMessageItem[]>(() => messageStore.pinnedByConversationId[props.conversationId] ?? [])
 const showPinnedBar = computed(() => pinEnabled.value && pinnedList.value.length > 0)
 const pinnedExpanded = ref(false)
@@ -1760,7 +1853,7 @@ const messageActions = computed<EmActionSheetAction[]>(() => {
     }
   }
   candidates.push({ key: MESSAGE_MENU_KEY.DELETE, text: t('message.action.delete'), icon: 'trash', danger: true })
-  const builtin = config.messageMenuKeys
+  const builtin = resolvedMessageMenuKeys.value
     .map((key) => candidates.find((a) => a.key === key))
     .filter((a): a is EmActionSheetAction => a != null)
   const extras = extraMessageActionsOf(m)

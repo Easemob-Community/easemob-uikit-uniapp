@@ -11,17 +11,18 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const demoDir = resolve(root, 'demo')
 const args = process.argv.slice(2)
 const watch = args.includes('--watch')
-const outDir = resolve(args.find(a => a !== '--watch') ?? resolve(demoDir, 'unpackage/dist/build/mp-weixin'))
+const positional = args.filter((arg) => arg !== '--watch')
+const hostDir = resolve(positional[1] ?? resolve(root, 'demo'))
+const outDir = resolve(positional[0] ?? resolve(hostDir, 'unpackage/dist/build/mp-weixin'))
 
 const WATCH_POLL_MS = 2000
 const WATCH_DEBOUNCE_MS = 1500
 
 // 1. 读取 IIFE 并锁定全局名（升级 SDK 后全局名若变化，在此失败而不是等到真机 ChatClient undefined）
-const sdkPkg = JSON.parse(readFileSync(resolve(demoDir, 'node_modules/easemob-websdk/package.json'), 'utf8'))
-const iifePath = resolve(demoDir, 'node_modules/easemob-websdk/bundle/im-sdk-web.iife.js')
+const sdkPkg = JSON.parse(readFileSync(resolve(hostDir, 'node_modules/easemob-websdk/package.json'), 'utf8'))
+const iifePath = resolve(hostDir, 'node_modules/easemob-websdk/bundle/im-sdk-web.iife.js')
 const iife = readFileSync(iifePath, 'utf8')
 const GLOBAL_NAME = 'IMSDK'
 if (!iife.startsWith(`var ${GLOBAL_NAME}=`)) {

@@ -5,7 +5,7 @@
 
 ## 1. 项目一句话
 
-环信 IM 的 **uni-app 版 UIKit**（**仅支持** uni-app x 蒸汽模式，不兼容经典 uni-app / vdom 模式；Android/iOS/鸿蒙 + H5 + 微信小程序共五端），MIT 开源，DCloud 插件市场分发。组件前缀 `em-`，CSS 变量前缀 `--em-*`，插件 id `easemob-uikit-uni`。当前版本 `1.0.0-rc.1`；进度与各端验证状态见 `docs/STATUS.md`，接入步骤见 `docs/QUICKSTART.md`。
+环信 IM 的 **uni-app 版 UIKit**（**仅支持** uni-app x 蒸汽模式，不兼容经典 uni-app / vdom 模式；Android/iOS/鸿蒙 + H5 + 微信小程序共五端），MIT 开源，DCloud 插件市场分发。组件前缀 `em-`，CSS 变量前缀 `--em-*`，插件 id `easemob-uikit-uni`。当前版本 `1.0.0-rc.2`；进度与各端验证状态见 `docs/STATUS.md`，接入步骤见 `docs/QUICKSTART.md`。
 
 ## 2. 硬约束（每次必守，违反即返工）
 
@@ -45,7 +45,7 @@
   - API/配置：`docs/API-KIT.md`、`API-TYPES.md`、`CONFIG.md`、`MESSAGING.md`
   - 设计与运行：`docs/THEME-I18N.md`、`DESIGN-TOKENS.md`、`GUIDE-STYLING.md`、`PLATFORM.md`、`FAQ.md`
   - 进阶：`docs/GUIDE-MULTI-SCENARIO.md`、`AI-STREAM.md`、`GUIDE-WEAPP-SDK-SUBPACKAGE.md`、`HARMONY-REALDEVICE-RUN.md`、`DEMO.md`
-- **内部材料（禁止进入公开 entries）**：`docs/RELEASE-1.0.md`、`docs/SPIKE-SDK-CONNECTIVITY.md`、`docs/SPIKE-SDK-SUBPACKAGE.md`、`docs/EVAL-MULTI-SCENARIO.md`、`docs/REVIEW-1.0-READINESS.md`
+- **内部材料（禁止进入公开 entries）**：`docs/RELEASE-1.0.md`、`docs/SPIKE-SDK-CONNECTIVITY.md`、`docs/SPIKE-SDK-SUBPACKAGE.md`、`docs/EVAL-MULTI-SCENARIO.md`、`docs/REVIEW-1.0-READINESS.md`、`docs/DX-REVIEW.md`、`docs/DX-REMEDIATION.md`
 
 ## 5. 安全
 

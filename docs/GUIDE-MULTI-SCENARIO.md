@@ -7,6 +7,8 @@
 
 配套阅读：[聊天页](./PAGES-CHAT.md)（`em-chat-page` 全部契约）、[消息与扩展协议](./MESSAGING.md)（custom/ext/引用协议）、[EmKit API](./API-KIT.md)、[配置参考](./CONFIG.md)、[AI 流式消息](./AI-STREAM.md)、[示例工程](./DEMO.md)。
 
+如果暂时只需跑通一个 1v1 聊天页，可以从仓库 [chat-only 模板](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only) 开始；需要在该最小链路上加入业务上下文、自定义卡片、快捷回复或业务菜单时，再按本页扩展。
+
 ## 1. 接入模型（三步）
 
 四个场景共享同一模型：宿主服务端为终端用户签发环信 token，客户端完成初始化与登录后，业务页直接 `navigateTo` 到含 `em-chat-page` 的自建页面。
@@ -79,7 +81,7 @@ uni.navigateTo({ url: '/sub-im/pages/chat/chat?conversationId=peer-user-id&chatT
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { EmKit, CONVERSATION_TYPE, mergeUserInfo, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, CONVERSATION_TYPE, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue, EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const { themeClass } = useTheme()
@@ -98,8 +100,8 @@ onLoad((query) => {
   chatType.value = query?.['chatType'] === CONVERSATION_TYPE.GROUP_CHAT
     ? CONVERSATION_TYPE.GROUP_CHAT
     : CONVERSATION_TYPE.SINGLE_CHAT
-  // 不等 SDK 同步，进会话前灌对端昵称头像
-  mergeUserInfo({ userId: conversationId.value, nickname: '在线客服', avatarUrl: '' })
+  // 业务覆盖层不会被后续 SDK 资料同步冲掉
+  EmKit.setUserPresentation(conversationId.value, { nickname: '在线客服', avatarUrl: '' })
 })
 
 function onSend(message: EmMessageItem): void {
@@ -146,7 +148,7 @@ function onSend(message: EmMessageItem): void {
 | 长按消息触发业务动作 | `extraMessageMenus` + `@message-menu` | §5.5 |
 | 交易状态 / 转接 / 排队提示 | `EmKit.insertLocalNotice` | §5.3 |
 | 业务入口未读角标 | `useConversationUnreadCount` / `EmKit.conversationUnreadCountOf` | §5.6 |
-| 进会话前注入对端昵称头像 | `mergeUserInfo` | §5.6 |
+| 进会话前注入对端昵称头像 | `EmKit.setUserPresentation` | §5.6 |
 | AI 客服流式回复 | `enableStreamMessage` + `#stream-message` | §6 |
 
 ## 4. 业务上下文与卡片消息
@@ -375,10 +377,10 @@ function onMessageMenu(key: string, message: EmMessageItem): void {
 ### 5.6 对端资料与入口未读角标
 
 ```ts
-import { mergeUserInfo, useUnreadCounts, useTabBarBadge, useConversationUnreadCount } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, useUnreadCounts, useTabBarBadge, useConversationUnreadCount } from '@/uni_modules/easemob-uikit-uni/libs'
 
-// 不等 SDK 同步，进会话前直接灌客服/医生/HR 的昵称头像
-mergeUserInfo({ userId: peerUserId, nickname: '在线客服', avatarUrl: 'https://example.com/avatar.png' })
+// 不等 SDK 同步，进会话前直接注入客服/医生/HR 的业务身份
+EmKit.setUserPresentation(peerUserId, { nickname: '在线客服', avatarUrl: 'https://example.com/avatar.png' })
 
 const { conversationUnread } = useUnreadCounts()            // 响应式总未读
 useTabBarBadge({ conversationIndex: 0 })                     // 原生 tabBar 角标
@@ -387,6 +389,15 @@ const peerUnread = useConversationUnreadCount(peerUserId)    // 单会话未读�
 
 - 非 tabBar 入口（业务页按钮）直接用 `conversationUnread.value` / `peerUnread.value` 渲染 `em-badge`。
 - `useConversationUnreadCount` 也接受 `ref`（动态会话 id）；非 setup 场景用 `EmKit.conversationUnreadCountOf(conversationId)` 取快照。
+
+`setUserPresentation` 与 `mergeUserInfo` 不是可互换的注入方式：
+
+| API | 写入位置 | 展示优先级 | 后续 SDK 同步 | 适用场景 |
+|---|---|---|---|---|
+| `EmKit.setUserPresentation` | 独立业务覆盖层 | 最高 | 不覆盖业务注入值 | 客服、医生、HR 等宿主业务身份 |
+| `mergeUserInfo` | SDK 资料缓存 | 低于业务覆盖层 | 新的 SDK 资料会覆盖同字段 | SDK 资料同步或缓存适配，不推荐业务身份使用 |
+
+两者都只影响本地展示，不修改服务端资料。业务覆盖层在登出/换账号时清空，重新登录后需再次注入。
 
 ### 5.7 业务资料注入（`set*Presentation`）
 

@@ -73,6 +73,7 @@ export default {
   'chat.reconnectingHint': '正在重连，消息将在连接恢复后发送',
   'chat.loadMoreHistory': '加载更早消息',
   'chat.historyFailed': '消息加载失败',
+  'chat.unauthorized': '请先登录',
   'chat.historyFailedRetry': '消息加载失败，点击重试',
   'chat.retry': '点击重试',
   'chat.voice.holdTalk': '按住说话',

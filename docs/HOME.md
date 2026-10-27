@@ -29,10 +29,13 @@ features:
 
 > **仅支持 uni-app x 蒸汽模式（Vapor）**。DCloud 官方已于 2024 年停止 nvue 与 5+ 的维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台的维护；uni-app x 蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可方便升级（见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）。因此本组件库不提供经典 uni-app（Vue2/Vue3、nvue）与 vdom 模式的兼容，Android、iOS、鸿蒙、H5 与微信小程序均基于 uni-app x 蒸汽编译目标。环境要求见 [平台能力与差异](/uniapp/guide/platform)。
 
+![会话与业务场景示例](/uniapp/guide/assets/scene-lab-gallery.png)
+
 ## 从这里开始
 
 | 目标 | 入口 |
 |---|---|
+| 只要单聊天页 | [可运行 chat-only 模板](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only) |
 | 从空工程跑到收发消息 | [快速开始](/uniapp/guide/quickstart) |
 | 理解分层、生命周期与数据流 | [核心概念与架构](/uniapp/guide/concepts) |
 | 接入会话、聊天、通讯录、群组页面 | [页面指南](/uniapp/guide/pages-conversation) |

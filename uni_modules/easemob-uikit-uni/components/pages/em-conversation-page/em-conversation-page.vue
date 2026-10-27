@@ -4,7 +4,7 @@
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
       <!-- 自绘导航栏（系统栏右上角被小程序胶囊独占，且与页内标题重复）：返回隐藏，右侧「+」发起单聊 -->
       <em-nav-bar
-        :title="t('conversation.title')"
+        :title="title !== '' ? title : t('conversation.title')"
         :show-back="false"
         action-icon="circle-plus"
         @action="onOpenCreate"
@@ -122,6 +122,8 @@ import { formatConversationTime } from '../../../libs/utils/time'
 defineOptions({ styleIsolation: 'app-and-page' })
 
 interface Props {
+  /** 导航标题覆盖，空串回落 i18n */
+  title?: string
   /** 顶部搜索条显隐，默认 true */
   showSearch?: boolean
   /** 筛选 tab 及顺序（对齐 vue conversation-tabs），默认全部五项；传空数组隐藏 tab 栏 */
@@ -139,6 +141,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  title: '',
   showSearch: true,
   tabs: () => DEFAULT_CONVERSATION_TABS,
   showTabs: true,

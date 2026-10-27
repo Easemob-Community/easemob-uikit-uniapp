@@ -8,6 +8,16 @@
 
 > 本文只覆盖「最小可用链路」。完整页面契约见 [页面指南](./PAGES-CONVERSATION.md)，组件与 API 见 [组件参考](./COMPONENTS.md)、[EmKit API](./API-KIT.md)，业务扩展见 [多场景接入](./GUIDE-MULTI-SCENARIO.md) 与 [AI 流式消息](./AI-STREAM.md)。
 
+下面的完整流程适合搭建完整 IM。若你只需要一个单聊页面，`chat-only` 模板已预置工程结构、登录恢复、聊天页和微信小程序 SDK 分包，省去从完整 Demo 删减页面与重新接线的步骤。它仍是需要修改的宿主工程：appkey、服务端 token 接口、对端资料和会话存储都要按你的业务配置，并非独立 SDK 或免配置服务。
+
+| 你的目标 | 推荐入口 |
+|---|---|
+| 只要一个可运行的单聊天页 | 使用仓库 `templates/chat-only`（[模板源码与说明](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only)），修改 appkey、token 接口和对端资料 |
+| 搭建完整 IM | 按本文接入，页面组合与事件处理参考仓库 `demo/` |
+| 已有业务页，直进单聊 | 使用单聊天模板，或阅读 [多场景接入](./GUIDE-MULTI-SCENARIO.md) 手动集成 |
+
+`em-chat-page` 面向整页使用；嵌入半屏、弹窗或侧栏请使用原子组件自行组合。
+
 ## 1. 前置条件
 
 | 项 | 要求 |

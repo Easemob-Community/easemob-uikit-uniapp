@@ -97,12 +97,24 @@ function onChatMember(userId: string) {
 </style>
 ```
 
+## 宿主接线
+
+| 可见控件 | 事件或默认行为 | 宿主必须做什么 | 不接的后果 |
+|---|---|---|---|
+| 返回箭头 | `back` | `navigateBack` 或自定义退场 | 点击后停留当前页 |
+| 群成员「发消息」 | `chat-member(userId)` | 创建/复用单聊会话并跳聊天页 | 点击后不进入私聊 |
+| 删除会话 | `deleted(conversationId)` | 操作成功后退场 | 已删除但仍停留当前页 |
+| 退群/解散 | `leaved(conversationId)` | 操作成功后退场 | 已退出但仍停留当前页 |
+| 删除好友 | `contact-deleted(userId)` | 操作成功后退场 | 已删除但仍停留当前页 |
+| 邀请/移除成员、打开成员视图 | `invite` / `remove-members` / `open-members` | 组件内部已完成，无需接路由 | 不适用，仅作通知 |
+
 ## Props
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `conversationId` | `string` | 必填 | 单聊为对方 userId，群聊为 groupId |
 | `chatType` | `ConversationTypeValue` | 必填 | `CONVERSATION_TYPE.SINGLE_CHAT` 或 `GROUP_CHAT`，决定单聊/群聊分支 |
+| `title` | `string` | `''` | 导航标题覆盖；空串使用内置聊天信息标题 |
 | `showMemberGrid` | `boolean` | `true` | 群聊成员宫格显隐（仅群聊生效） |
 | `showGroupName` | `boolean` | `true` | 群名称字段行显隐（仅群聊生效） |
 | `showAnnouncement` | `boolean` | `true` | 群公告字段行显隐（仅群聊生效） |

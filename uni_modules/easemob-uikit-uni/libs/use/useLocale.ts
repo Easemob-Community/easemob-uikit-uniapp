@@ -21,10 +21,6 @@ export function mergeMessages(locale: EmLocaleName, table: Record<string, string
   messages[locale] = { ...(messages[locale] ?? {}), ...table }
 }
 
-function isLocale(value: string): value is EmLocaleName {
-  return value === LOCALE.ZH_CN || value === LOCALE.EN
-}
-
 /** 系统语言 → 内置 locale：英文环境用 en，其余回落 zh-CN（与 vue 版默认一致） */
 function detectSystemLocale(): EmLocaleName {
   try {
@@ -37,11 +33,11 @@ function detectSystemLocale(): EmLocaleName {
 
 /**
  * 初始化语言偏好：优先本地持久化值，其次系统语言；幂等（宿主在 App onLaunch 调一次即可）。
- * 模块加载时自动调一次，保证未显式初始化的宿主也能跟随上次选择。
+ * 已注册的自定义 locale 也可恢复；只有本地值没有对应文案表时才回退系统语言。
  */
 export function initLocale(): EmLocaleName {
   const saved = getStorage(LOCALE_STORAGE_KEY)
-  const next = isLocale(saved) ? saved : detectSystemLocale()
+  const next = messages[saved] != null ? saved : detectSystemLocale()
   themeStore.locale = next
   return next
 }

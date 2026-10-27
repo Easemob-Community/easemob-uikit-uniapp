@@ -93,6 +93,10 @@ if (EmKit.state.userId === '') {
 }
 ```
 
+### 没登录就打开聊天页，为什么显示「请先登录」
+
+聊天页会检查 `EmKit.state.userId`。空账号时不等待连接超时，立即显示「请先登录」并发出 `unauthorized` 事件，宿主可在这里跳登录页或展示自己的登录入口。登录成功后当前聊天页会自动重新加载历史；已登录但断线重连不会误报未登录。
+
 ### Token 过期后无法自动恢复
 
 实现 `onTokenWillExpire`，由宿主服务端签发新 token 并返回；UIKit 会自动续期。Token 已经过期时，`onTokenExpired` 会被调用，通常在这里跳登录页。

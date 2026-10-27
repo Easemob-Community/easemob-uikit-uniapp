@@ -1095,3 +1095,19 @@
 - **文档**：PLAN（M2.24 + §1.2/§1.3）、PAGES-CHAT（附件下载节 + 长按菜单 + 行为边界）、PLATFORM（能力矩阵/权限/下载域名）、CONFIG（默认 `messageMenuKeys`）、API-KIT（`EmKit.downloadAttachment` + 工具表）、API-TYPES（三个类型 + `MESSAGE_MENU_KEY.DOWNLOAD` + 两个错误码）、README、changelog、RELEASE-1.0。
 - **门禁**：`build web` ✓；`build mp-weixin` ✓（11 项全绿，主包 1021KB）；H5 静态伺服 200 ✓；`check-docs` ✓（28 页 / 35 组件 / 82 方法 / 33 配置）；`check-skills` ✓（8 技能）；`check-release` ✓（仅历史签名 WARN）；`check-icon-parity` ✓（顺带修正 `statusIconOf` 状态键误报与 `refresh` 旧别名）；i18n 315/315；`git diff --check` ✓；文件名/类型判别纯函数手测通过。
 - **待验（真机/真实账号）**：Android/iOS/鸿蒙保存相册与打开文档、相册权限拒绝、微信小程序 `downloadFile` 合法域名与 `openDocument`、H5 浏览器下载/跨域新标签打开、大文件下载进度与页面切换。
+
+
+## 2026-10-27 接入体验反审整改（M2.25 / M2.26）
+
+- **单聊天起点**：新增 `templates/chat-only` 可运行 Vapor 工程，含登录、重新签发 token 恢复会话、单聊天页、小程序 SDK 分包与 `check-template.mjs`。模板 web/mp 构建通过；分包 11 项检查全绿，主包约 731KB。模板不再依赖不可编译的 minimal-host 夹具。
+- **聊天页公开契约**：新增 `showNavBar/showBack`、`peerName/peerAvatar`、页面级 `inputFeatures`（按字段覆盖全局）与 `messageMenuKeys`（数组整体覆盖当前页）。默认输入栏与 `#input-bar` 共用 features 解析结果，菜单与置顶条共用菜单解析结果。身份卸载只撤销本页最后写入且仍匹配的值，避免误删宿主后注入。
+- **未登录态**：`ERROR_CODE.UNAUTHORIZED`；`waitOnline` 空账号立即失败，登录后重连行为不变。聊天页显示独立「请先登录」空态并 emit `unauthorized`，隐藏骨架、通用历史错误和输入栏；登录后自动恢复历史，历史 generation 防止旧请求覆盖新状态。
+- **主题与品牌化**：新增 `useThemeChrome` 收口 App/mp 原生 chrome 和 H5 `.uni-page-head/.uni-tabbar`，demo 已消费；会话/通讯录/群/聊天信息页新增 `title`。`EmLocaleName` 支持扩展字符串，已注册自定义 locale 可恢复偏好，缺 key 仍回退 zh-CN。显式开启但不可用的 voice/file 在开发环境每类一次性 warning。
+- **文档与校验**：修正 CONFIG 配置表、版本口径和业务身份示例；公开业务身份统一 `setUserPresentation`。新增 `check-config-docs.mjs`、`check-dx-contract.mjs`、`check-theme-locale-contract.mjs`；扩展 release 与分包脚本宿主参数。五类页面补接线地图；README/插件 readme/文档首页加入口与现有场景图；changelog 同步。
+- **已执行验证**：多轮 `build web`、`build mp-weixin` 全绿；`check-template.mjs` 的模板 web/mp 构建与分包检查全绿；`check-docs`、`check-skills`、`check-release`（仅既有历史签名 WARN）、`check-config-docs`、`check-dx-contract`、`check-theme-locale-contract` 通过。
+- **未验证边界**：未使用真实账号执行模板登录/收发，未做微信开发者工具、H5 深色 chrome 运行时、双聊天实例、第三语言界面及 Android/iOS/鸿蒙真机专项；这些不得以编译结果替代。DX 处置记录见 `docs/DX-REMEDIATION.md`「实施结果」。
+
+- **最终复核**：自审补上「加载更早消息期间登出，旧失败回调不弹通用历史错误」的短路，契约检查 RED→GREEN。随后 demo 与模板 web/mp 全量复验、全部分包/文档/技能/发布/配置/用量/`git diff --check` 通过；demo 与模板 H5 最终产物静态伺服均 HTTP 200；生产 H5 产物未包含 voice 开发提示文本。未执行门户 sibling 仓同步构建与 App 新产物模块图检查。
+
+- **SDK 实例公开语义**：新增 `EmKit.getSDKClient(): Promise<ChatClient>`，复用同一初始化就绪门和 SDK 单例，供宿主注册原生事件或使用未封装能力；`whenReady()` 保留原行为并将返回类型由 `unknown` 修正为 `ChatClient`。API-KIT 补原生事件注册/卸载与普通业务优先走 EmKit 的边界说明。
+- **chat-only 文档补强**：模板 README 增加设立背景、适用边界与宿主必配项；QUICKSTART 解释模板与完整接入流程的分工；GUIDE-MULTI-SCENARIO 与 DEMO 增加最小单聊模板、完整 Demo 和业务扩展指南之间的选型分流。未新增公开页面或 manifest 条目。

@@ -105,7 +105,22 @@ onShow(() => {
 | `navigationBar` | `boolean` | `true` | 同步原生导航栏前景/背景色 |
 | `tabBar` | `boolean` | `false` | 强制同步 tabBar；默认只在当前页命中 `initTheme({ tabBarPages })` 时同步 |
 
-H5 没有原生导航栏 API，会自动跳过；H5 的页面 chrome 由宿主 CSS 处理。
+H5 没有原生导航栏 API。若页面使用 uni 内置导航栏或 tabBar，可在每个相关页面 setup 中使用 `useThemeChrome`，统一处理 App/小程序原生 chrome 和 H5 的 `.uni-page-head` / `.uni-tabbar`：
+
+```ts
+const { themeClass } = useThemeChrome({
+  tabBarPages: ['pages/conversation/conversation', 'pages/contact/contact', 'pages/mine/mine']
+})
+```
+
+它会在页面 `onShow` 和生效主题变化时同步，返回值与 `useTheme()` 相同。`colors` 可覆盖内置 chrome 颜色；没有内置导航栏/tabBar 的页面不需要额外 chrome 接线。
+
+| 主题接线 | 位置 | 作用 |
+|---|---|---|
+| `initTheme()` | `App.uvue` | 初始化偏好、系统主题与 tab 页清单 |
+| `themeClass` | 每个宿主页面根节点 | 让 `--em-*` 明暗变量进入页面子树 |
+| `theme.json` / manifest darkmode | 工程配置 | 对齐原生 chrome 首帧 |
+| `useThemeChrome()` 或 `syncNativeThemeUI()` | 页面 `onShow` 与主题变化 | 同步原生及 H5 chrome |
 
 ### 首帧原生 chrome
 
@@ -145,7 +160,7 @@ import { initLocale, setLocale, getLocale } from '@/uni_modules/easemob-uikit-un
 initLocale()          // 读取持久化偏好，否则跟随系统语言
 setLocale('en')       // 立即切换并持久化
 setLocale('zh-CN', false) // 临时切换，不写持久化
-getLocale()           // 'zh-CN' | 'en'
+getLocale()           // 当前 EmLocaleName，内置或已注册的扩展语言
 ```
 
 - 持久化 key：`emkit.locale`。
@@ -178,6 +193,18 @@ mergeMessages('zh-CN', {
 ```
 
 `mergeMessages(locale, table)` 是浅合并：同 key 覆盖，新 key 追加。适合品牌化文案，不建议修改结构性 key。
+
+也可以注册第三语言，再切换并持久化：
+
+```ts
+mergeMessages('ja', {
+  'chat.noMessages': 'メッセージはありません',
+  'chat.unauthorized': '先にログインしてください'
+})
+setLocale('ja')
+```
+
+扩展 locale 会保存在 `emkit.locale`，下次启动时若已注册对应文案表即可恢复；未注册的本地值回退系统语言。单个缺失 key 仍依次回退 `zh-CN` 和 key 本身。建议复制内置语言的全量 key 后翻译，当前不提供从右到左（RTL）布局。
 
 ### 组件内响应语言切换
 

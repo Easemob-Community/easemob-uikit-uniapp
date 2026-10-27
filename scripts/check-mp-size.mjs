@@ -12,8 +12,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const demoDir = resolve(root, 'demo')
-const outDir = process.argv[2] ?? resolve(demoDir, 'unpackage/dist/build/mp-weixin')
+const hostDir = resolve(process.argv[3] ?? resolve(root, 'demo'))
+const outDir = resolve(process.argv[2] ?? resolve(hostDir, 'unpackage/dist/build/mp-weixin'))
 
 const MAIN_PACKAGE_LIMIT = 1.5 * 1024 * 1024
 const SDK_FEATURE = 'msync' // websdk 协议层特征串，主包出现即说明 SDK 静态依赖残留
@@ -25,9 +25,9 @@ function check(name, ok, detail = '') {
 }
 
 // 1. SDK 精确锁版
-const demoPkg = JSON.parse(readFileSync(resolve(demoDir, 'package.json'), 'utf8'))
-const dep = demoPkg.dependencies?.['easemob-websdk'] ?? ''
-check('websdk 精确锁版', /^[0-9]+\.[0-9]+\.[0-9]+$/.test(dep), `demo/package.json = "${dep}"`)
+const hostPkg = JSON.parse(readFileSync(resolve(hostDir, 'package.json'), 'utf8'))
+const dep = hostPkg.dependencies?.['easemob-websdk'] ?? ''
+check('websdk 精确锁版', /^[0-9]+\.[0-9]+\.[0-9]+$/.test(dep), `${hostDir}/package.json = "${dep}"`)
 
 // 2. SDK 分包文件与主包残留
 const sdkFile = join(outDir, 'sub-sdk/im-sdk.js')

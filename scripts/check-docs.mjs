@@ -25,6 +25,8 @@ const internalDocs = new Set([
   'REVIEW-1.0-READINESS.md',
   'SPIKE-SDK-CONNECTIVITY.md',
   'SPIKE-SDK-SUBPACKAGE.md',
+  'DX-REVIEW.md',
+  'DX-REMEDIATION.md',
 ])
 
 const errors = []

@@ -9,10 +9,30 @@ import { createLogger, setLogLevel } from '../utils/logger'
 import type { EmKitConfig, EmLoginOptions, EmTokenRenewalResult } from '../types'
 import { ensureSdkModule, setSdkLoader, setSdkModule } from './sdk'
 import { resolveDeviceInfo } from './device'
+import { canPickAttachment } from '../attachment'
 
 const logger = createLogger('client')
 // SDK onLog 转发出口（ns 独立，方便单独过滤 SDK 侧日志）
 const sdkLogger = createLogger('sdk')
+let voiceCapabilityWarned = false
+let fileCapabilityWarned = false
+
+function warnUnavailableFeatures(config: EmKitConfig): void {
+  if (process.env.NODE_ENV !== 'production') {
+    // #ifdef WEB
+    if (config.inputFeatures?.voice === true && !voiceCapabilityWarned) {
+      voiceCapabilityWarned = true
+      logger.warn('inputFeatures.voice=true，但 H5 不提供语音入口')
+    }
+    // #endif
+    // #ifdef APP
+    if (config.inputFeatures?.file === true && !canPickAttachment() && !fileCapabilityWarned) {
+      fileCapabilityWarned = true
+      logger.warn('inputFeatures.file=true，但 App 尚无可用附件 provider，文件入口不会显示')
+    }
+    // #endif
+  }
+}
 
 // ========== UI 侧系统网络感知（幂等单例） ==========
 // SDK runtime 有自己的一路网络监听（喂重连循环），这一路独立注册只回写 connectionStore，
@@ -112,6 +132,7 @@ export class EmClient {
     // SDK 侧日志管理（setSdkLogLevel/setConsoleLogEnabled 为 SDK 模块级函数）在模块就绪后接线
     applyKitConfig(config)
     setLogLevel(config.logLevel ?? LOG_LEVEL.INFO)
+    warnUnavailableFeatures(config)
     if (config.locale != null) setLocale(config.locale)
     // 系统网络监听先挂上：登录前的离线也能被 banner/预检测感知（幂等，logout 不撤）
     ensureSystemNetworkWatch()
@@ -306,13 +327,19 @@ export class EmClient {
 
   // login resolve ≠ socket 就绪：发送/拉历史前统一等 onConnected
   waitOnline(timeout = 8000): Promise<void> {
+    if (connectionStore.userId === '') {
+      return Promise.reject(errorWithCode(ERROR_CODE.UNAUTHORIZED, 'login required'))
+    }
     if (connectionStore.status === CONNECTION_STATUS.ONLINE) {
       return Promise.resolve()
     }
     return new Promise<void>((resolve, reject) => {
       const start = Date.now()
       const timer = setInterval(() => {
-        if (connectionStore.status === CONNECTION_STATUS.ONLINE) {
+        if (connectionStore.userId === '') {
+          clearInterval(timer)
+          reject(errorWithCode(ERROR_CODE.UNAUTHORIZED, 'login required'))
+        } else if (connectionStore.status === CONNECTION_STATUS.ONLINE) {
           clearInterval(timer)
           resolve()
         } else if (Date.now() - start > timeout) {

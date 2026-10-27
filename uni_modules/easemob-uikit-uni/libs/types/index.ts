@@ -166,7 +166,7 @@ export interface EmKitConfig {
   logLevel?: LogLevelValue
   /** 是否把 SDK 原始 payload 写入日志，默认 false；需同时 logLevel='debug' 才采集，生产环境慎开 */
   logPayload?: boolean
-  /** 界面语言（zh-CN/en），默认跟随系统/上次持久化偏好；设置后写入本地并立即生效 */
+  /** 界面语言（内置 zh-CN/en，可先 mergeMessages 注册扩展语言），默认跟随系统/上次持久化偏好；设置后写入本地并立即生效 */
   locale?: EmLocaleName
   /** SDK 自身 console 输出开关，默认 true（关闭后 SDK 日志仍经 onLog 转发进 uikit logger） */
   sdkConsoleLog?: boolean
@@ -511,7 +511,7 @@ export interface EmSelectContactItem {
   avatar: string
 }
 
-export type EmLocaleName = LocaleValue
+export type EmLocaleName = LocaleValue | (string & {})
 
 export type EmAvatarShape = 'circle' | 'square'
 

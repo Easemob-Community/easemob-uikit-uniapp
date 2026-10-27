@@ -3,7 +3,7 @@
     <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
       <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar -->
-      <em-nav-bar :title="t('chat.info.title')" @back="emit('back')" />
+      <em-nav-bar :title="title !== '' ? title : t('chat.info.title')" @back="emit('back')" />
 
       <scroll-view :class="ns.e('scroll')" scroll-y>
         <!-- 单聊分支：对方信息条（对齐 vue 版成员 strip 的单聊形态：48px 头像 + 昵称 + userId） -->
@@ -155,6 +155,8 @@ interface Props {
   conversationId: string
   /** 会话类型（M2.9 Phase 2 起必传，breaking）：单聊/群聊分支分流 */
   chatType: ConversationTypeValue
+  /** 导航标题覆盖，空串回落 i18n */
+  title?: string
   /** 群分支成员宫格显隐（仅群聊生效，伪装预留），默认 true */
   showMemberGrid?: boolean
   /** 群分支群名称字段行显隐（仅群聊生效，伪装预留），默认 true */
@@ -166,6 +168,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  title: '',
   showMemberGrid: true,
   showGroupName: true,
   showAnnouncement: true,

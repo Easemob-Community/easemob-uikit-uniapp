@@ -37,7 +37,7 @@ uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${peerUserId}&chat
 | 快捷回复 | `quickReplies` + `quickReplyMode` | `fill` 填草稿 / `send` 直发 |
 | 业务长按 | `extraMessageMenus` + `@message-menu` | 追加在内置项后、删除项前 |
 | 本地系统提示 | `EmKit.insertLocalNotice(...)` | 只本地、不发服务端、进程重启不保留 |
-| 对端资料注入 | `mergeUserInfo({ userId, nickname, avatarUrl })` | 不等 SDK 同步，先显示客服/医生资料 |
+| 对端资料注入 | `EmKit.setUserPresentation(userId, { nickname, avatarUrl })` | 业务覆盖层优先于 SDK 资料，后续同步不会冲掉 |
 | 单会话未读 | `useConversationUnreadCount(conversationId)` | 业务入口角标 |
 
 ## 3. 发送业务上下文（ext）
@@ -290,13 +290,14 @@ EmKit.insertGroupNotice(groupId, '客服小环已接入')
 ## 10. 对端资料注入（服务账号场景）
 
 ```ts
-import { mergeUserInfo } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 
-mergeUserInfo({ userId: peerUserId, nickname: '在线客服', avatarUrl: 'https://cdn.example.com/kf.png' })
+EmKit.setUserPresentation(peerUserId, { nickname: '在线客服', avatarUrl: 'https://cdn.example.com/kf.png' })
 ```
 
 - 进会话前调用，避免先显示 userId 再跳昵称。
-- 只影响本地展示缓存，不修改服务端资料。
+- 写入独立的业务覆盖层，优先于 SDK 资料且不会被后续资料同步冲掉；不修改服务端资料。
+- 登出/换账号会清空覆盖层，重新登录后需再次注入；退出业务态可传 `null` 清除。
 
 ## 11. 入口未读角标
 

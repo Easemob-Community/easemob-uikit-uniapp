@@ -77,7 +77,34 @@ import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 await EmKit.whenReady()
 ```
 
-返回 `Promise<unknown>`。未 `init()` 时 reject；小程序分包场景下可用于渲染“加载消息服务…”占位态。
+返回 `Promise<ChatClient>`。未 `init()` 时 reject；小程序分包场景下可用于渲染“加载消息服务…”占位态。它只表示 SDK 初始化完成，不代表已登录或连接在线。
+
+### `EmKit.getSDKClient()`
+
+获取 UIKit 内部复用的原生 `ChatClient`，用于 UIKit 尚未封装的 SDK 能力。返回 `Promise<ChatClient>`，与 `whenReady()` 使用同一就绪门；未 `init()` 时 reject。不要再次调用 `ChatClient.init()` 创建第二个实例。
+
+```ts
+import { onUnmounted } from 'vue'
+
+const client = await EmKit.getSDKClient()
+client.chatManager.addEventHandler('host-message', {
+  onMessage(message) {
+    console.log('收到消息', message)
+  }
+})
+client.addEventHandler('host-connection', {
+  onConnected() {
+    console.log('SDK 已连接')
+  }
+})
+
+onUnmounted(() => {
+  client.chatManager.removeEventHandler('host-message')
+  client.removeEventHandler('host-connection')
+})
+```
+
+原生事件监听 ID 应保持宿主内唯一，并在页面卸载时移除。普通消息发送、接收与状态管理优先使用 `EmKit.sendText()` / `EmKit.onMessage()`；直接调用 `client.chatManager.sendMessage()` 会绕过 UIKit 的本地消息列表、发送状态和失败重试等链路。
 
 ### `EmKit.renewToken(token)`
 
@@ -108,7 +135,7 @@ await EmKit.whenReady()
 
 ### `EmKit.setLocale(locale)` / `EmKit.getLocale()`
 
-切换/读取界面语言，`locale` 为 `'zh-CN' | 'en'`。`setLocale` 会持久化并立即生效，详见 [主题与国际化](./THEME-I18N.md)。
+切换/读取界面语言。内置 `zh-CN` / `en`，也可先通过 `mergeMessages` 注册其他 `EmLocaleName`。`setLocale` 会持久化并立即生效，详见 [主题与国际化](./THEME-I18N.md)。
 
 ## 3. 发送消息
 
@@ -487,6 +514,7 @@ await EmKit.updateGroupInfo(groupId, { name: '新群名' })
 |---|---|
 | `useTheme()` | 返回 `{ themeClass, isDark, themeStore, setTheme, getTheme }` |
 | `initTheme({ mode?, tabBarPages? })` / `setTheme(mode)` / `getTheme()` / `syncNativeThemeUI(options?)` | 主题初始化、切换与原生 chrome 同步 |
+| `useThemeChrome({ tabBarPages, colors? })` | 页面 setup 中初始化主题，并在 `onShow` 和主题变化时同步 App/小程序原生 chrome 与 H5 内置导航栏/tabBar；返回 `useTheme()` 结果 |
 | `useLocale()` / `initLocale()` / `setLocale(locale, persist?)` / `getLocale()` / `mergeMessages(locale, table)` | 文案读取、语言切换与文案注入 |
 | `useConfig()` / `setConfig(partial)` | 读取/运行时修改 `uiConfig` |
 | `themeStore` / `useNamespace()` | 主题响应式状态与 BEM 命名工具 |
@@ -503,7 +531,7 @@ await EmKit.updateGroupInfo(groupId, { name: '新群名' })
 
 | 导出 | 说明 |
 |---|---|
-| `userStore` / `displayNameOf()` / `avatarOf()` / `mergeUserInfo()` | 用户资料缓存与展示回落链 |
+| `userStore` / `displayNameOf()` / `avatarOf()` / `mergeUserInfo()` | SDK 用户资料缓存与展示回落链；`mergeUserInfo()` 写入的资料可能被后续 SDK 同步覆盖，业务身份注入请使用 `EmKit.setUserPresentation()` |
 | `contactStore` / `contactDisplayNameOf()` / `pendingInviteCount()` / `contactRequestUnreadCount` | 好友与申请数据 |
 | `conversationStore` / `totalConversationUnread` / `conversationUnreadCountOf()` | 会话数据 |
 | `groupStore` / `groupDisplayNameOf()` / `groupMemberDisplayNameOf()` / `sortGroupMembers()` | 群与成员数据 |

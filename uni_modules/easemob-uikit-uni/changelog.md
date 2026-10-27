@@ -26,6 +26,10 @@
 
 ### 新增
 
+- **单聊天接入与页面实例配置**：新增可运行的 `templates/chat-only`（登录恢复、单聊天页、微信小程序 SDK 分包和 web/mp 构建检查）。`em-chat-page` 新增 `showNavBar` / `showBack`、`peerName` / `peerAvatar`、页面级 `inputFeatures`（按字段覆盖全局）与 `messageMenuKeys`（数组整体覆盖当前页面）；未登录立即显示「请先登录」并发出 `unauthorized`，不再等待连接超时，登录后自动恢复历史加载。
+- **原生 SDK 实例入口**：新增 `EmKit.getSDKClient(): Promise<ChatClient>`，明确获取 UIKit 内部复用的原生客户端，便于宿主注册 SDK 事件或使用尚未封装的能力；`whenReady()` 保留且返回类型由 `unknown` 修正为 `ChatClient`。
+- **主题、标题与扩展语言**：新增 `useThemeChrome` 统一同步 App/小程序原生 chrome 与 H5 内置导航栏/tabBar；会话、通讯录、群组、聊天信息页新增 `title`；`EmLocaleName` 支持通过 `mergeMessages` 注册扩展语言并恢复其持久化偏好。显式开启但当前端不可用的语音/文件入口会在开发环境给出一次性提示。
+
 - **聊天详情页删除好友**：`em-chat-info-page` 单聊分支新增「删除好友」按钮（红色字档），仅对方已是好友时显示；二次确认后删除，带提交锁，成功 toast 并新增 `contact-deleted` 事件通知宿主退场（不连带删除会话与本地消息），失败 toast 停留当前页。
 
 - **消息删除、复制与提交防重**：新增 `EmKit.deleteMessage(message)`，有服务端 ID 时先删当前账号的漫游历史再删本地，失败保留气泡，删除后校正会话摘要与时间；保留 `deleteLocalMessage` 作为显式本地删除入口。聊天页删除增加确认与失败提示，复制按系统结果提示成功或失败。`em-chat-inputbar` 新增 `submitting`，`em-quick-reply-bar` 新增 `disabled`，文本发送、直发快捷回复、失败重发与撤回均拦截重复提交，撤回执行时重新检查时间窗。

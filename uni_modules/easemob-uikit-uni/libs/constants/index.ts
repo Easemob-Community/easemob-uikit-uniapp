@@ -332,6 +332,8 @@ export type LoadMoreStateValue = (typeof LOAD_MORE_STATE)[keyof typeof LOAD_MORE
 export const ERROR_CODE = {
   /** 发送前预检测命中：系统网络离线（该次发送未触达 SDK） */
   NETWORK_OFFLINE: 'EM_NETWORK_OFFLINE',
+  /** 当前没有登录账号：依赖连接的操作立即失败，不进入 waitOnline 等待 */
+  UNAUTHORIZED: 'EM_UNAUTHORIZED',
   /** 发送/拉取前的连接等待超时（waitOnline） */
   NETWORK_TIMEOUT: 'EM_NETWORK_TIMEOUT',
   /** SDK onSendTimeout 信号：发送队列超时，等待中的消息统一落 FAILED 归因 */

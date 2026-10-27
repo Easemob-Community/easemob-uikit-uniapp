@@ -113,6 +113,7 @@ easemob-uikit-uniapp/
 ├── demo/                          # uni-app x 演示工程（蒸汽模式，HBuilder V 可开）
 │   ├── manifest.json              # vapor: true
 │   └── pages/                     # 登录页 + 组件示例页
+├── templates/chat-only/         # 单聊天可运行模板（M2.25，含登录恢复与 SDK 分包）
 ├── tests/                         # uni-automator 全端测试
 ├── scripts/                       # 发布/校验脚本
 └── docs/                          # 文档内容源（公开页面经 docs.manifest.mjs 聚合到独立门户）
@@ -332,6 +333,18 @@ easemob-uikit-uniapp/
 - **范围**：`em-chat-page` 长按图片/视频/文件消息的菜单新增「下载」项（`MESSAGE_MENU_KEY.DOWNLOAD`，默认 `messageMenuKeys` 包含）。图片/视频：App/小程序 `uni.downloadFile` + `uni.saveImageToPhotosAlbum` / `uni.saveVideoToPhotosAlbum`，H5 浏览器下载；文件：App/小程序下载后尝试 `uni.openDocument`（doc/docx/xls/xlsx/ppt/pptx/pdf），H5 浏览器下载。下载流程收口 `libs/utils/download.ts`，平台原语与条件编译留在 `libs/platform.ts`；公开导出 `downloadAttachment(message, options?)`。
 - **明确不做**：语音消息下载；下载管理页/队列/取消；断点续传；相册外的系统文件目录写入；H5 强制保存到相册（浏览器无此能力）。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs` + `check-skills.mjs`；真机（Android/iOS/鸿蒙/微信小程序）下载与打开成功路径、相册权限拒绝、小程序 downloadFile 合法域名待验。
+
+### M2.25：接入体验整改 I——单聊天模板、导航与登录态（2026-10-27 立项，承 docs/DX-REVIEW.md）
+
+- **范围**：修正业务身份注入、配置表与版本口径并加自动校验；新增 `templates/chat-only/` 可编译工程及 web/mp 构建门禁；`em-chat-page` 新增 `showNavBar`/`showBack`；未登录经 `ERROR_CODE.UNAUTHORIZED` 快速失败，聊天页展示登录空态并透出 `unauthorized`；补齐页面事件接线地图与入口文档。
+- **明确不做**：自动路由、Provider/DI、嵌入式聊天、消息类型注册表、PC；U-15 的未读分隔、聊天搜索、无障碍与字号缩放不在本次范围。
+- **门禁**：demo 与模板 web/mp 构建、分包检查、H5 静态伺服 200、`check-docs`/`check-skills`/`check-release`/`check-config-docs`；真实账号与真机未验证项只记 STATUS，不宣称已解决。
+
+### M2.26：接入体验整改 II——实例配置与品牌化（2026-10-27 立项，承 docs/DX-REVIEW.md）
+
+- **范围**：`em-chat-page` 新增 `peerName`/`peerAvatar`、页面级 `inputFeatures`（按字段覆盖全局）与 `messageMenuKeys`（数组整体覆盖）；新增 `useThemeChrome` 收口 H5/App/mp chrome；会话/通讯录/群/聊天信息页新增 `title`；`EmLocaleName` 支持扩展字符串及偏好恢复；已配置但平台不可用的 voice/file 给开发期一次性提示；复用现有素材补首屏展示；新增 `EmKit.getSDKClient(): Promise<ChatClient>` 作为原生 SDK 实例逃生舱，`whenReady()` 保留并明确相同返回类型。
+- **明确不做**：会话级 `setConfigScope`、Provider、新增 `#nav-action`、RTL、内置气泡结构接管；全局 `uiConfig` 语义不变，页面覆盖不写回全局。
+- **门禁**：沿用 M2.25；重点验证双实例配置隔离、宿主后注入资料不被卸载误删、第三语言持久化、H5 深色 chrome。未实测端不记为已解决。
 
 ### M3：组件沉淀与发布
 

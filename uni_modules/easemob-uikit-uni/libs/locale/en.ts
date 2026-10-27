@@ -73,6 +73,7 @@ export default {
   'chat.reconnectingHint': 'Reconnecting. Messages will be sent once the connection recovers',
   'chat.loadMoreHistory': 'Load earlier messages',
   'chat.historyFailed': 'Failed to load messages',
+  'chat.unauthorized': 'Please log in first',
   'chat.historyFailedRetry': 'Failed to load messages. Tap to retry',
   'chat.retry': 'Tap to retry',
   'chat.voice.holdTalk': 'Hold to talk',
