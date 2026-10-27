@@ -11,6 +11,7 @@ import { groupStore, setGroupPresentation as setGroupPresentationImpl } from './
 import { clearMessages, messageStore } from './store/message'
 import { clearUsers, setUserPresentation as setUserPresentationImpl, userStore } from './store/user'
 import { copyText, exportTextFile } from './platform'
+import { downloadAttachment as downloadAttachmentImpl } from './utils/download'
 import {
   attachmentCapability as getAttachmentCapability,
   canPickAttachment as canPickAttachmentImpl,
@@ -38,6 +39,8 @@ import type {
   EmLocaleName,
   EmMessageHandler,
   EmMessageItem,
+  EmMessageDownloadOptions,
+  EmMessageDownloadResult,
   EmQuoteInfo,
   EmTokenRenewalResult,
   EmUserPresentation
@@ -306,6 +309,12 @@ class EmKitImpl {
 
   deleteLocalMessage(conversationId: string, localId: string): void {
     this.chat.deleteLocalMessage(conversationId, localId)
+  }
+
+  // 下载消息附件（图片/视频保存到相册、文件下载并尝试打开；H5 浏览器下载）。
+  // 长按菜单「下载」走同一实现；宿主自绘消息卡片时可复用。
+  async downloadAttachment(message: EmMessageItem, options?: EmMessageDownloadOptions): Promise<EmMessageDownloadResult> {
+    return downloadAttachmentImpl(message, options)
   }
 
   async resendMessage(conversationId: string, chatType: ConversationTypeValue, localId: string): Promise<void> {
@@ -590,6 +599,7 @@ export type { EmTabBarBadgeOptions, EmTabBarBadgeController } from './use/useTab
 export { groupStore, groupDisplayNameOf, groupAvatarOf, setGroupPresentation, groupMemberDisplayNameOf, sortGroupMembers } from './store/group'
 export { ensureUserInfos } from './chat/user-info'
 export { setPinyinAdapter, groupContacts, matchContact, resolveAlphabetKeyByOffsetY } from './utils/pinyin'
+export { downloadAttachment, attachmentFileNameOf, downloadKindOf, downloadUrlOf } from './utils/download'
 export type { EmPinyinResult, EmContactGroup } from './utils/pinyin'
 export { filterActiveMentions, parseMentions } from './utils/mention'
 export type { EmMentionSegment } from './utils/mention'

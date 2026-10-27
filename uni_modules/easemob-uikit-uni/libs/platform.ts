@@ -2,6 +2,8 @@
 // localStorage 在 App 端 js 引擎不可用，一律走 uni.setStorage。
 
 import { createLogger } from './utils/logger'
+import { errorWithCode } from './utils/error'
+import { ERROR_CODE, OPEN_DOCUMENT_FILE_TYPES } from './constants'
 import type { EmAttachment } from './types'
 
 const logger = createLogger('platform')
@@ -661,4 +663,227 @@ export function copyText(text: string): Promise<void> {
       reject(e)
     }
   })
+}
+
+// ========== 附件下载 / 保存 ==========
+
+/** 图片/视频保存到相册的结果 */
+export interface EmMediaSaveResult {
+  /** App/小程序下载到本地的临时路径；H5 浏览器下载为空串 */
+  filePath: string
+  /** 是否真正写入系统相册（H5 浏览器下载为 false） */
+  savedToAlbum: boolean
+}
+
+/** 文件下载结果 */
+export interface EmFileDownloadResult {
+  /** App 为 USER_DATA_PATH 下补过扩展名的文件；小程序为临时文件；H5 浏览器下载为空串 */
+  filePath: string
+  fileName: string
+}
+
+let attachmentFileSeq = 0
+
+/** 取文件扩展名（不含点，小写；无扩展名或异常字符返回空串） */
+function extensionOfFileName(fileName: string): string {
+  const dot = fileName.lastIndexOf('.')
+  if (dot < 0 || dot === fileName.length - 1) return ''
+  const ext = fileName.slice(dot + 1).toLowerCase()
+  return /^[a-z0-9]{1,8}$/.test(ext) ? ext : ''
+}
+
+function errMsgOf(e: unknown): string {
+  const msg = (e as { errMsg?: unknown } | null)?.errMsg
+  return typeof msg === 'string' && msg !== '' ? msg : 'unknown error'
+}
+
+/** 相册权限拒绝的跨端兜底识别：App/小程序失败 errMsg 含 auth/deny/permission/authorize，或 errCode=1101005（未获取权限） */
+function isAlbumAuthDenied(e: unknown): boolean {
+  const code = (e as { errCode?: unknown } | null)?.errCode
+  if (code === 1101005 || code === '1101005') return true
+  return /auth|denied|deny|permission|authorize/i.test(errMsgOf(e))
+}
+
+/**
+ * H5 浏览器下载：同步创建 a[download] 并点击，不依赖 fetch（chatfiles 跨域时 fetch 会被 CORS 拦截）。
+ * 跨域直链的 download 属性可能被浏览器忽略，此时由 target=_blank 交给浏览器预览/下载；
+ * 文件名以响应头 Content-Disposition 为准，前端只能尽力指定。
+ */
+function downloadInBrowser(url: string, fileName: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    // #ifdef WEB
+    try {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.target = '_blank'
+      a.rel = 'noopener'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      resolve()
+    } catch (e) {
+      reject(e)
+    }
+    // #endif
+    // #ifndef WEB
+    reject(new Error('browser download is only available on web'))
+    // #endif
+  })
+}
+
+/** App/小程序：uni.downloadFile 下载到临时文件，带进度回调 */
+function downloadToTemp(url: string, onProgress?: (percent: number) => void): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    let task: ReturnType<typeof uni.downloadFile> | null = null
+    try {
+      task = uni.downloadFile({
+        url,
+        success: (res) => {
+          const status = res.statusCode ?? 0
+          const path = res.tempFilePath ?? ''
+          if (status >= 200 && status < 300 && path !== '') {
+            resolve(path)
+            return
+          }
+          reject(new Error(`downloadFile fail: status ${status}`))
+        },
+        fail: (e) => {
+          reject(new Error(errMsgOf(e)))
+        }
+      })
+    } catch (e) {
+      reject(e)
+      return
+    }
+    if (task != null && onProgress != null) {
+      task.onProgressUpdate((res) => {
+        const percent = res.progress
+        if (typeof percent === 'number' && percent >= 0 && percent <= 100) onProgress(percent)
+      })
+    }
+  })
+}
+
+/**
+ * App：把下载临时文件复制到 USER_DATA_PATH 并补扩展名。
+ * uni.downloadFile 的临时路径可能没有扩展名，系统文档预览依赖扩展名；FSM 属可选 UTS 模块，
+ * 缺失或复制失败时退回临时路径（openDocument 仍可能成功）。
+ */
+function copyToSandbox(tempPath: string, fileName: string): Promise<string> {
+  // #ifdef APP
+  return new Promise<string>((resolve) => {
+    try {
+      const base = (uni.env.USER_DATA_PATH ?? '').replace(/\/+$/, '')
+      if (base === '') {
+        resolve(tempPath)
+        return
+      }
+      attachmentFileSeq += 1
+      const ext = extensionOfFileName(fileName)
+      const target = `${base}/em-attachment-${Date.now()}-${attachmentFileSeq}.${ext === '' ? 'bin' : ext}`
+      uni.getFileSystemManager().copyFile({
+        srcPath: tempPath,
+        destPath: target,
+        success: () => resolve(target),
+        fail: (e) => {
+          logger.warn('copy attachment to sandbox fail:', errMsgOf(e))
+          resolve(tempPath)
+        }
+      })
+    } catch (e) {
+      logger.warn('copy attachment to sandbox unavailable:', e)
+      resolve(tempPath)
+    }
+  })
+  // #endif
+  // #ifndef APP
+  return Promise.resolve(tempPath)
+  // #endif
+}
+
+/**
+ * 图片/视频保存到相册：App/小程序 downloadFile + saveImageToPhotosAlbum / saveVideoToPhotosAlbum；
+ * H5 浏览器下载（浏览器没有相册写入能力）。
+ */
+export function saveMediaToAlbum(
+  url: string,
+  fileName: string,
+  kind: 'image' | 'video',
+  onProgress?: (percent: number) => void
+): Promise<EmMediaSaveResult> {
+  // #ifdef WEB
+  return downloadInBrowser(url, fileName).then(() => ({ filePath: '', savedToAlbum: false }))
+  // #endif
+  // #ifndef WEB
+  return downloadToTemp(url, onProgress).then((tempPath) => new Promise<EmMediaSaveResult>((resolve, reject) => {
+    const onSuccess = (): void => resolve({ filePath: tempPath, savedToAlbum: true })
+    const onFail = (e: unknown): void => {
+      const message = errMsgOf(e)
+      logger.warn('save media to album fail:', message)
+      reject(isAlbumAuthDenied(e) ? errorWithCode(ERROR_CODE.DOWNLOAD_AUTH_DENIED, message) : new Error(message))
+    }
+    try {
+      if (kind === 'image') {
+        uni.saveImageToPhotosAlbum({ filePath: tempPath, success: onSuccess, fail: onFail })
+      } else {
+        uni.saveVideoToPhotosAlbum({ filePath: tempPath, success: onSuccess, fail: onFail })
+      }
+    } catch (e) {
+      onFail(e)
+    }
+  }))
+  // #endif
+}
+
+/**
+ * 文件下载：App/小程序下载到本地（App 复制到 USER_DATA_PATH 补扩展名）；H5 浏览器下载。
+ * 调用方拿到 filePath 后按需 openDownloadedFile。
+ */
+export function downloadFileToLocal(
+  url: string,
+  fileName: string,
+  onProgress?: (percent: number) => void
+): Promise<EmFileDownloadResult> {
+  // #ifdef WEB
+  return downloadInBrowser(url, fileName).then(() => ({ filePath: '', fileName }))
+  // #endif
+  // #ifndef WEB
+  return downloadToTemp(url, onProgress).then((tempPath) => {
+    return copyToSandbox(tempPath, fileName).then((filePath) => ({ filePath, fileName }))
+  })
+  // #endif
+}
+
+/**
+ * 尝试用系统文档预览打开本地文件（App/小程序）。
+ * 只对 doc/docx/xls/xlsx/ppt/pptx/pdf 传 fileType；其余类型交给系统按扩展名尝试。
+ * 打开失败 resolve false（下载本身已成功），由 UI 决定提示「已下载但无法打开」。
+ */
+export function openDownloadedFile(filePath: string, fileName: string): Promise<boolean> {
+  // #ifdef WEB
+  return Promise.resolve(false)
+  // #endif
+  // #ifndef WEB
+  return new Promise<boolean>((resolve) => {
+    const ext = extensionOfFileName(fileName)
+    const fileType = OPEN_DOCUMENT_FILE_TYPES.indexOf(ext) >= 0 ? ext : ''
+    try {
+      uni.openDocument({
+        filePath,
+        fileType: fileType === '' ? undefined : fileType,
+        showMenu: true,
+        success: () => resolve(true),
+        fail: (e) => {
+          logger.warn('openDocument fail:', errMsgOf(e))
+          resolve(false)
+        }
+      })
+    } catch (e) {
+      logger.warn('openDocument unavailable:', e)
+      resolve(false)
+    }
+  })
+  // #endif
 }

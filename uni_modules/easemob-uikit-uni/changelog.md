@@ -38,6 +38,8 @@
 
 - **输入栏单行/多行模式**：新增 `inputFeatures.inputMode` 与 `CHAT_INPUT_MODE`。`'single'` 为全端单行 input、回车发送；`'multiline'` 为全端生长 textarea、回车换行、纸飞机发送，1 行起步、最多 5 行，超出内部滚动。未设置时保留旧 `sendOnReturn` 行为：`false` 走多行；`true`（默认）时 iOS 走多行回车发送，其余端走单行。
 
+- **消息附件下载**：长按图片/视频/文件消息的菜单新增「下载」（`MESSAGE_MENU_KEY.DOWNLOAD`，默认 `messageMenuKeys` 包含）。App/小程序把图片/视频保存到系统相册，文件下载后尝试系统文档预览打开（doc/docx/xls/xlsx/ppt/pptx/pdf）；H5 走浏览器下载。下载流程收口 `downloadAttachment(message, options?)`（同时以 `EmKit.downloadAttachment` 透出），支持进度回调、相册权限拒绝（`DOWNLOAD_AUTH_DENIED`）与下载失败提示；文件打开失败以 `opened=false` 返回并提示「已下载但当前类型无法打开」。
+
 - **视频消息全端播放**：新增 `em-video-preview` 全屏播放器（原生 `video` + 安全区关闭键 + 加载失败提示），聊天页点击视频消息即播放；`PLATFORM_CAPABILITIES.videoPreview` 全端 `true`，App/小程序不再隐藏播放入口，H5 由新窗口改为内置播放。App 端会先把视频下载到本地再播放（EaseMob chatfiles 直链不支持 Range，iOS 直接远程播放会卡 loading），下载期显示进度、关闭时中止；点击前会停掉正在播放的语音，关闭或离开页面时释放原生播放器。
 
 - **组件样式透出**：所有页面组件与原子组件新增 `custom-class` / `custom-style` 属性，用于在组件根节点追加宿主 class 与内联样式。`custom-style` 拼接到根节点内联样式末尾，五端生效且支持 `var()`；弹层类组件（`em-action-sheet`、`em-select-contact`、`em-mention-picker`）两属性落在最外层遮罩容器上。

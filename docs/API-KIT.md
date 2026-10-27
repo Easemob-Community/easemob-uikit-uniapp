@@ -258,6 +258,12 @@ onUnmounted(off)
 
 仅删除本地消息，不影响服务端，也不等待 SDK 就绪；只有实际命中并删除时才校正会话摘要与时间，未加载列表或陈旧 `localId` 的空调用不改数据。返回 `void`。
 
+### `EmKit.downloadAttachment(message, options?)`
+
+下载一条图片/视频/文件消息的附件。App 与微信小程序：图片/视频写入系统相册，文件下载到本地后尝试调用系统文档预览打开；H5 交给浏览器下载。`options.onProgress` 仅在 App/小程序由 `uni.downloadFile` 提供（0–100），H5 不会回调。
+
+返回 `Promise<EmMessageDownloadResult>`：`kind`（`'image' | 'video' | 'file'`）、`fileName`、`filePath`（App/小程序本地路径，H5 为空串）、`savedToAlbum`（图片/视频是否写入相册）、`opened`（文件是否成功打开）。相册权限被拒绝时抛 `DOWNLOAD_AUTH_DENIED`，消息没有可下载附件时抛 `DOWNLOAD_UNSUPPORTED`；文件打开失败不抛错，以 `opened=false` 返回。
+
 ### `EmKit.sendTyping(conversationId, chatType)`
 
 发送“正在输入”信令（单聊）。UIKit 内部按 `typingThrottle` 节流；聊天页已自动接入。返回 `Promise<void>`。
@@ -517,6 +523,7 @@ await EmKit.updateGroupInfo(groupId, { name: '新群名' })
 | `startRecord()` / `stopRecord()` / `isRecording()` / `playAudio()` / `stopAudio()` | 录音与音频播放 |
 | `setStorage()` / `getStorage()` | 本地存储封装（App 端不走 localStorage） |
 | `copyText(text)` | 写入系统剪贴板，返回 `Promise<void>`；空文本与原生失败会 reject，原生提示已关闭，由调用方统一反馈 |
+| `downloadAttachment(message, options?)` | 下载附件（与 `EmKit.downloadAttachment` 同一实现）：图片/视频保存到相册、文件下载并尝试打开，H5 浏览器下载；返回 `Promise<EmMessageDownloadResult>` |
 
 ### 日志与 SDK 加载
 

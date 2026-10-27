@@ -179,6 +179,8 @@ export const MESSAGE_MENU_KEY = {
   QUOTE: 'quote',
   EDIT: 'edit',
   PIN: 'pin',
+  /** 下载附件（仅已发送的图片/视频/文件消息出现；App/小程序保存到相册或打开文档，H5 浏览器下载） */
+  DOWNLOAD: 'download',
   RECALL: 'recall',
   /** 失败消息重发（仅 status=failed 出现，点击后走与红叹号一致的重发链路） */
   RESEND: 'resend',
@@ -335,10 +337,17 @@ export const ERROR_CODE = {
   /** SDK onSendTimeout 信号：发送队列超时，等待中的消息统一落 FAILED 归因 */
   SEND_TIMEOUT: 'EM_SEND_TIMEOUT',
   /** 失败重发时本地媒体临时文件已被系统清理（无远端 URL 可复用） */
-  MEDIA_UNAVAILABLE: 'EM_MEDIA_UNAVAILABLE'
+  MEDIA_UNAVAILABLE: 'EM_MEDIA_UNAVAILABLE',
+  /** 下载附件时宿主/系统未授予相册权限（App/小程序保存图片/视频） */
+  DOWNLOAD_AUTH_DENIED: 'EM_DOWNLOAD_AUTH_DENIED',
+  /** 当前消息类型没有可下载的附件（非图片/视频/文件，或 URL 为空） */
+  DOWNLOAD_UNSUPPORTED: 'EM_DOWNLOAD_UNSUPPORTED'
 } as const
 
 export type ErrorCodeValue = (typeof ERROR_CODE)[keyof typeof ERROR_CODE]
+
+/** 文档预览显式指定的文件扩展名（uni.openDocument 文档口径；App 对未知类型仍交给系统尝试，小程序仅这七类） */
+export const OPEN_DOCUMENT_FILE_TYPES = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf']
 
 /** 内置文件消息批量发送的并发上限（多选附件时按窗口并发，避免同时打满上传通道） */
 export const FILE_SEND_CONCURRENCY = 3

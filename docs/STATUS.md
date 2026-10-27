@@ -105,6 +105,7 @@
 | `EmContactNavEntry` 预留 `visible` 字段未加（PLAN 裁剪项「黑名单入口预留 visible 控制」），M4 黑名单落地时补 | 全端 | 非 breaking |
 | 群已读回执端到端（真实群 + 多名成员：消息带 needReadReceipt、群成员回执后己方看到「N 人已读」、进会话批量补齐、关闭开关后无请求/无人数） | H5/mp/App | 需真实群与至少两名成员；单账号单设备无法构造 |
 | 附件上传进度抓帧（大文件中/弱网下图片/视频蒙层与文件气泡的百分比、发送结束清空） | App/mp/H5 | 需可观测的慢上传；本轮真机上传过快未抓到 sending 帧 |
+| 附件下载（M2.24：图片/视频存相册、文件下载打开、H5 浏览器下载、相册权限拒绝、小程序 downloadFile 域名） | App/mp/H5 | 需真实账号与真机；H5 需可下载的 chatfiles 直链 |
 
 ## 已验证基线（历史 SPIKE）
 
@@ -1072,6 +1073,7 @@
 - **文档**：API-KIT store 表、`COMPONENTS-CONVERSATION` banner 段、changelog 1.0.0-rc.2 修复段同步。
 - **待验**：H5 双标签同账号互踢（206）与改密（216）真机回归；断网兜底、token 过期、limit 行为不回退。
 
+
 ## 2026-10-26 输入栏单/多行模式拆分 + App 高度单源化（M2.23）
 
 - **根因**：旧多行实现混用原生 `auto-height`、JS 封顶和 `nextTick` 重测；`nextTick` 不保证原生文本控件完成布局，清空/删行后 Android、iOS、鸿蒙都会出现先高后低或旧高度残留。
@@ -1083,3 +1085,13 @@
 - **鸿蒙真机（nova 12）**：6 行稳定封顶 5 行；删到 2 行再清空均按当前内容回缩，placeholder 与单行灰底恢复，未再出现先高后低。
 - **iOS 真机（用户复测）**：多行输入高度表现正常，确认修复观感良好；至此 Android、iOS、鸿蒙三端高度问题均已通过真机验证，本问题暂时收口。
 - **常规回归待验**：H5 与微信小程序的真实账号交互未执行（H5 仅产物 200，缺测试账号）；旧 `sendOnReturn` 三态的运行时回归未逐项执行。
+
+## 2026-10-26 消息附件下载（M2.24）
+
+- **范围**：长按图片/视频/文件消息的菜单新增「下载」（`MESSAGE_MENU_KEY.DOWNLOAD`，默认 `messageMenuKeys` 八项：copy/quote/edit/pin/download/recall/resend/delete）。发送中、失败、已撤回的消息不出现；文本/语音/自定义/通知不出现。
+- **实现**：`libs/utils/download.ts` 编排消息类型判别、文件名生成、结果归一；平台原语与条件编译收口 `libs/platform.ts`：App/小程序 `uni.downloadFile` + `uni.saveImageToPhotosAlbum` / `uni.saveVideoToPhotosAlbum` / `uni.openDocument`（App 对 doc/docx/xls/xlsx/ppt/pptx/pdf 指定类型、其他类型交给系统尝试；小程序仅支持这七类）；App 下载文件复制到 `USER_DATA_PATH` 并补扩展名（FSM 缺失/复制失败退回临时路径）；H5 同步 `a[download]` 浏览器下载，不写相册。
+- **公开面**：`downloadAttachment(message, options?)` 从 `libs` 导出，同时以 `EmKit.downloadAttachment` 透出；新增类型 `EmMessageDownloadKind/Options/Result`；新增业务码 `ERROR_CODE.DOWNLOAD_AUTH_DENIED` / `DOWNLOAD_UNSUPPORTED`；新增 i18n 键 `message.action.download` 与 `message.download.*`（中英）。
+- **交互**：App/小程序下载中 loading + 百分比；成功按结果提示「已保存到相册 / 文件已下载并打开 / 文件已下载但当前类型无法打开」；H5 提示「下载已开始」。相册权限拒绝提示「请允许访问相册后重试」，其余失败提示「下载失败，请稍后重试」；单条消息按 localId 加锁防重复点击。
+- **文档**：PLAN（M2.24 + §1.2/§1.3）、PAGES-CHAT（附件下载节 + 长按菜单 + 行为边界）、PLATFORM（能力矩阵/权限/下载域名）、CONFIG（默认 `messageMenuKeys`）、API-KIT（`EmKit.downloadAttachment` + 工具表）、API-TYPES（三个类型 + `MESSAGE_MENU_KEY.DOWNLOAD` + 两个错误码）、README、changelog、RELEASE-1.0。
+- **门禁**：`build web` ✓；`build mp-weixin` ✓（11 项全绿，主包 1021KB）；H5 静态伺服 200 ✓；`check-docs` ✓（28 页 / 35 组件 / 82 方法 / 33 配置）；`check-skills` ✓（8 技能）；`check-release` ✓（仅历史签名 WARN）；`check-icon-parity` ✓（顺带修正 `statusIconOf` 状态键误报与 `refresh` 旧别名）；i18n 315/315；`git diff --check` ✓；文件名/类型判别纯函数手测通过。
+- **待验（真机/真实账号）**：Android/iOS/鸿蒙保存相册与打开文档、相册权限拒绝、微信小程序 `downloadFile` 合法域名与 `openDocument`、H5 浏览器下载/跨域新标签打开、大文件下载进度与页面切换。

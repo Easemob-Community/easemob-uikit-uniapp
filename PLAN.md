@@ -36,17 +36,17 @@
 ### 1.2 消息气泡（5 种 + 出口）
 
 - 文本（`em-text-message`）：链接识别、`@` 高亮；流式文本（AI 流式输出：打字机光标 / 终态收敛 / 异常提示，M2.13）
-- 图片（`em-image-message`）：缩略气泡 + `uni.previewImage` 原生预览（**不做自研预览手势层**）
+- 图片（`em-image-message`）：缩略气泡 + `uni.previewImage` 原生预览（**不做自研预览手势层**）；长按菜单可保存到相册（App/小程序）或浏览器下载（H5）
 - 语音（`em-voice-message`）：时长刻度、播放态动画、未读红点
-- 视频（`em-video-message`）：封面 + 原生 `video` 组件播放
-- 文件（`em-file-message`）：图标 + 文件名 + 大小 + 下载进度
+- 视频（`em-video-message`）：封面 + 原生 `video` 组件播放；长按菜单可保存到相册（App/小程序）或浏览器下载（H5）
+- 文件（`em-file-message`）：图标 + 文件名 + 大小；长按菜单下载，App/小程序下载后尝试调用系统文档预览打开，H5 走浏览器下载
 - 自定义消息出口：`#custom-message` 插槽整卡自绘（UIKit 不内置卡片组件，M2.14）
 - 发送侧业务入口：`#input-toolbar` 插槽（输入栏上方固定位，宿主自绘「发订单/发病例/换手机号」等胶囊并自行 `sendCustom`，M2.15）
 - 不支持类型（位置/名片等）统一渲染「暂不支持的消息」占位
 
 ### 1.3 聊天页交互
 
-- 长按菜单：**复制 / 引用 / 撤回 / 删除** 四项（action-sheet 形态，不做 Web 版定位浮层）
+- 长按菜单：**复制 / 引用 / 撤回 / 删除** 为基础项，另有置顶/编辑/重发/下载等按消息状态与类型出现的附加项（action-sheet 形态，不做 Web 版定位浮层）
 - 引用消息：气泡内引用条 + 点击定位
 - 撤回：2 分钟窗口、撤回提示条、（编辑入口**不做**）
 - 失败重发：气泡红色感叹号 + 点击重发
@@ -325,6 +325,13 @@ easemob-uikit-uniapp/
 - **高度定案**：textarea 固定 19px 行高并始终 `auto-height=false`，文本区高度 = `19 × min(可视行数, 5)`，包裹层另加 16px 竖直 padding；`linechange` 只取行数、不取高度。草稿清空立即回单行，硬换行减少同步收缩，>5 行硬换行草稿首帧直接封顶。禁止恢复 auto-height/固定高度混用或二次原生重测。
 - **明确不做**：富文本、PC 拖拽、1/3 屏展开输入、新的运行时依赖、按平台区分的延时/重试。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs` + `check-skills.mjs`；Android/iOS/鸿蒙按同一真机矩阵验证，未实测端不得记为已解决。
+
+### M2.24：消息附件下载（2026-10-26 立项）
+
+- **背景**：此前文件气泡为纯展示，图片/视频只有预览/播放没有保存入口；宿主拿到 `message.url` 也只能自行实现，且聊天页没有可供宿主接管的下载事件。补齐「收到附件后能落到本地」的基础能力。
+- **范围**：`em-chat-page` 长按图片/视频/文件消息的菜单新增「下载」项（`MESSAGE_MENU_KEY.DOWNLOAD`，默认 `messageMenuKeys` 包含）。图片/视频：App/小程序 `uni.downloadFile` + `uni.saveImageToPhotosAlbum` / `uni.saveVideoToPhotosAlbum`，H5 浏览器下载；文件：App/小程序下载后尝试 `uni.openDocument`（doc/docx/xls/xlsx/ppt/pptx/pdf），H5 浏览器下载。下载流程收口 `libs/utils/download.ts`，平台原语与条件编译留在 `libs/platform.ts`；公开导出 `downloadAttachment(message, options?)`。
+- **明确不做**：语音消息下载；下载管理页/队列/取消；断点续传；相册外的系统文件目录写入；H5 强制保存到相册（浏览器无此能力）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs` + `check-skills.mjs`；真机（Android/iOS/鸿蒙/微信小程序）下载与打开成功路径、相册权限拒绝、小程序 downloadFile 合法域名待验。
 
 ### M3：组件沉淀与发布
 

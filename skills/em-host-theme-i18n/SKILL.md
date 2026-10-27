@@ -174,7 +174,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 | `enableStreamMessage` | `true` | AI 流式分片合并 |
 | `streamThrottle` | `50` | 流式合批 ms |
 | `inputFeatures` | 工具全开、`inputMode` 未设置、`sendOnReturn=true` | `voice/emoji/image/camera/video/file` 工具子集；`inputMode('single'|'multiline')` 显式单/多行，优先于旧 `sendOnReturn` |
-| `messageMenuKeys` | 四项全量 | `copy/quote/recall/delete` 及顺序 |
+| `messageMenuKeys` | 八项全量 | `copy/quote/edit/pin/download/recall/resend/delete` 及顺序；`download` 仅对已发送的图片/视频/文件出现 |
 | `conversationMenuKeys` | 三项全量 | `pin/mute/delete` 及顺序 |
 | `emojiList` | 内置 96 | emoji 面板字符集 |
 | `primaryColor` | `''` | 品牌色 |

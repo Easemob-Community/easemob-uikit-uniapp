@@ -391,12 +391,12 @@ import EmPopup from '../../em-popup/em-popup.vue'
 import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import EmPinnedBar from '../../em-pinned-bar/em-pinned-bar.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
-import { CONNECTION_STATUS, CONVERSATION_TYPE, FILE_SEND_CONCURRENCY, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
+import { CONNECTION_STATUS, CONVERSATION_TYPE, ERROR_CODE, FILE_SEND_CONCURRENCY, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
 import type { ConversationTypeValue } from '../../../libs/constants'
-import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
+import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, downloadAttachment, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
 import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
-import { sendFailureKeyOf, sendFailureKeyOfCode } from '../../../libs/utils/error'
+import { errorCodeOf, sendFailureKeyOf, sendFailureKeyOfCode } from '../../../libs/utils/error'
 import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmMessageItem, EmMessageMenuExtra, EmMessageStatusKind, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
 import { conversationStore } from '../../../libs/store/conversation'
@@ -1735,7 +1735,7 @@ const messageActions = computed<EmActionSheetAction[]>(() => {
   // 失败消息只有「重发/删除」有服务端语义：引用/编辑/置顶/撤回都依赖 serverId，统一不出现
   if (m.status === MESSAGE_STATUS.FAILED) {
     if (m.self) {
-      candidates.push({ key: MESSAGE_MENU_KEY.RESEND, text: t('message.action.resend'), icon: 'refresh' })
+      candidates.push({ key: MESSAGE_MENU_KEY.RESEND, text: t('message.action.resend'), icon: 'ringarrow-ccw' })
     }
   } else {
     candidates.push({ key: MESSAGE_MENU_KEY.QUOTE, text: t('message.action.quote'), icon: 'arrow-turn-left' })
@@ -1748,6 +1748,12 @@ const messageActions = computed<EmActionSheetAction[]>(() => {
     if (m.status === MESSAGE_STATUS.SENT || m.status === MESSAGE_STATUS.RECALLED) {
       const pinned = m.pinned === true
       candidates.push({ key: MESSAGE_MENU_KEY.PIN, text: pinned ? t('message.action.unpin') : t('message.action.pin'), icon: pinned ? 'pin-slash' : 'pin' })
+    }
+    // 下载（M2.24）：仅已发送的图片/视频/文件；发送中/失败/已撤回没有可用的远端附件
+    const downloadable = m.type === MESSAGE_TYPE.IMAGE || m.type === MESSAGE_TYPE.VIDEO || m.type === MESSAGE_TYPE.FILE
+    const hasSource = m.url !== '' || (m.type === MESSAGE_TYPE.IMAGE && m.thumbUrl !== '')
+    if (downloadable && hasSource && m.status === MESSAGE_STATUS.SENT) {
+      candidates.push({ key: MESSAGE_MENU_KEY.DOWNLOAD, text: t('message.action.download'), icon: 'arrow-down-tray' })
     }
     if (m.self && m.status === MESSAGE_STATUS.SENT && Date.now() - m.time <= config.recallTimeLimit) {
       candidates.push({ key: MESSAGE_MENU_KEY.RECALL, text: t('message.action.recall'), icon: 'arrow-lft-uturn' })
@@ -1773,6 +1779,7 @@ function isBuiltinMenuKey(key: string): boolean {
     || key === MESSAGE_MENU_KEY.QUOTE
     || key === MESSAGE_MENU_KEY.EDIT
     || key === MESSAGE_MENU_KEY.PIN
+    || key === MESSAGE_MENU_KEY.DOWNLOAD
     || key === MESSAGE_MENU_KEY.RECALL
     || key === MESSAGE_MENU_KEY.RESEND
     || key === MESSAGE_MENU_KEY.DELETE
@@ -1793,6 +1800,7 @@ function onLongPressMessage(m: EmMessageItem): void {
 const resendingByLocalId: Record<string, boolean> = {}
 const recallingByLocalId: Record<string, boolean> = {}
 const deletingByLocalId: Record<string, boolean> = {}
+const downloadingByLocalId: Record<string, boolean> = {}
 
 // 失败气泡操作面板：点红叹号先展示失败原因，再选择重发/删除（失败原因已随消息落库，不依赖一次性 toast）
 const failedSheetVisible = ref(false)
@@ -1802,7 +1810,7 @@ const failedTitle = computed(() => {
   return m != null ? t('message.resend.title', { reason: failureReasonOf(m) }) : ''
 })
 const failedActions = computed<EmActionSheetAction[]>(() => [
-  { key: MESSAGE_MENU_KEY.RESEND, text: t('message.action.resend'), icon: 'refresh' },
+  { key: MESSAGE_MENU_KEY.RESEND, text: t('message.action.resend'), icon: 'ringarrow-ccw' },
   { key: MESSAGE_MENU_KEY.DELETE, text: t('message.action.delete'), icon: 'trash', danger: true }
 ])
 
@@ -1881,6 +1889,59 @@ async function deleteMessage(m: EmMessageItem): Promise<void> {
   }
 }
 
+// 附件下载（M2.24）：长按图片/视频/文件消息菜单触发。App/小程序展示下载进度并保存到相册/打开文档；
+// H5 交给浏览器下载，不出现进度。单条消息加锁防重复点击；失败只 toast，不影响其它消息操作。
+async function downloadMessage(m: EmMessageItem): Promise<void> {
+  if (downloadingByLocalId[m.localId] === true) return
+  downloadingByLocalId[m.localId] = true
+  let loadingShown = false
+  let lastPercent = -1
+  try {
+    uni.showLoading({ title: t('message.download.downloading'), mask: false })
+    loadingShown = true
+    const result = await downloadAttachment(m, {
+      onProgress: (percent: number) => {
+        if (!loadingShown || percent === lastPercent) return
+        lastPercent = percent
+        uni.showLoading({ title: t('message.download.progress', { percent }), mask: false })
+      }
+    })
+    if (loadingShown) {
+      uni.hideLoading()
+      loadingShown = false
+    }
+    if (result.kind === 'file') {
+      if (result.filePath === '') {
+        uni.showToast({ title: t('message.download.started'), icon: 'none' })
+      } else if (result.opened) {
+        uni.showToast({ title: t('message.download.opened'), icon: 'none' })
+      } else {
+        uni.showToast({ title: t('message.download.savedNotOpened'), icon: 'none' })
+      }
+    } else if (result.savedToAlbum) {
+      uni.showToast({ title: t('message.download.savedToAlbum'), icon: 'none' })
+    } else {
+      uni.showToast({ title: t('message.download.started'), icon: 'none' })
+    }
+  } catch (e) {
+    if (loadingShown) {
+      uni.hideLoading()
+      loadingShown = false
+    }
+    logger.warn('download attachment fail:', e)
+    const code = errorCodeOf(e)
+    if (code === ERROR_CODE.DOWNLOAD_AUTH_DENIED) {
+      uni.showToast({ title: t('message.download.authDenied'), icon: 'none' })
+    } else if (code === ERROR_CODE.DOWNLOAD_UNSUPPORTED) {
+      uni.showToast({ title: t('message.download.unsupported'), icon: 'none' })
+    } else {
+      uni.showToast({ title: t('message.download.failed'), icon: 'none' })
+    }
+  } finally {
+    delete downloadingByLocalId[m.localId]
+  }
+}
+
 async function onMessageAction(action: EmActionSheetAction): Promise<void> {
   const m = activeMessage.value
   if (m == null) return
@@ -1902,6 +1963,8 @@ async function onMessageAction(action: EmActionSheetAction): Promise<void> {
     enterEditMode(m)
   } else if (action.key === MESSAGE_MENU_KEY.PIN) {
     await togglePinMessage(m)
+  } else if (action.key === MESSAGE_MENU_KEY.DOWNLOAD) {
+    await downloadMessage(m)
   } else if (action.key === MESSAGE_MENU_KEY.RECALL) {
     await recallMessage(m)
   } else if (action.key === MESSAGE_MENU_KEY.RESEND) {

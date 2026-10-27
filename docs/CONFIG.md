@@ -108,7 +108,7 @@ EmKit.init({
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `inputFeatures` | `Partial<EmInputFeatures>` | 工具全开、`inputMode` 未设置、`sendOnReturn=true` | 输入栏工具、单/多行模式与旧回车配置；缺项保持默认值 |
-| `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `edit` / `pin` / `recall` / `resend` / `delete` | 消息长按菜单项与顺序；`edit` 编辑消息、`pin` 置顶消息、`resend` 重发失败消息，删除 key 即禁用对应能力（置顶消息条随之不渲染） |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `edit` / `pin` / `download` / `recall` / `resend` / `delete` | 消息长按菜单项与顺序；`edit` 编辑消息、`pin` 置顶消息、`download` 下载附件（仅图片/视频/文件出现）、`resend` 重发失败消息，删除 key 即禁用对应能力（置顶消息条随之不渲染） |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | `pin` / `mute` / `delete` | 会话长按菜单项与顺序 |
 | `contactMenuKeys` | `ContactMenuKeyValue[]` | `remark` / `delete` | 联系人条目长按菜单项与顺序；`remark` 修改好友备注 |
 | `emojiList` | `string[]` | 内置 96 个 | emoji 面板字符集 |
@@ -160,7 +160,7 @@ console.log(config.recallTimeLimit)
 | `enableGroupReadReceipt` | `boolean` | `false` |
 | `messageStatus` | `Required<EmMessageStatusPresentation>` | `{ position: 'left', icons: {}, texts: {} }` |
 | `inputFeatures` | `EmInputFeatures` | 工具全开、`inputMode` 未设置、`sendOnReturn=true` |
-| `messageMenuKeys` | `MessageMenuKeyValue[]` | 七项 |
+| `messageMenuKeys` | `MessageMenuKeyValue[]` | 八项 |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | 三项 |
 | `contactMenuKeys` | `ContactMenuKeyValue[]` | 两项 |
 | `emojiList` | `string[]` | 96 个 |

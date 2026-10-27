@@ -51,6 +51,22 @@ import {
 | `uploadProgress` | `number \| undefined` | 附件上传进度百分比（0-100），图片/语音/视频/文件发送中由 SDK `onFileUploadProgress` 回填；发送结束后清空 |
 | `groupReadCount` | `number \| undefined` | 群聊己方消息已读人数（`enableGroupReadReceipt` 开启时由群回执事件或批量查询回填） |
 
+### `EmMessageDownloadKind` / `EmMessageDownloadOptions` / `EmMessageDownloadResult`
+
+`downloadAttachment` / `EmKit.downloadAttachment` 的类型：
+
+- `EmMessageDownloadKind = 'image' | 'video' | 'file'`：可下载的附件类型（语音不参与）。
+- `EmMessageDownloadOptions = { onProgress?: (percent: number) => void }`：进度回调，仅 App/小程序 `uni.downloadFile` 提供；H5 不回调。
+- `EmMessageDownloadResult`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `kind` | `EmMessageDownloadKind` | 下载类型 |
+| `fileName` | `string` | 生成的安全文件名（文件消息优先原文件名） |
+| `filePath` | `string` | App/小程序本地路径；H5 浏览器下载时为空串 |
+| `savedToAlbum` | `boolean` | 图片/视频是否已写入系统相册；H5 为 `false` |
+| `opened` | `boolean` | 文件是否已成功调用系统文档预览；H5 或打开失败为 `false` |
+
 ### `EmMessageStatusPresentation`
 
 发送状态呈现配置（`EmKitConfig.messageStatus` / `EmUiConfig.messageStatus`），只改变呈现形式，不改变状态判定。
@@ -180,7 +196,7 @@ import {
 
 ### `MESSAGE_MENU_KEY`
 
-`COPY='copy'`、`QUOTE='quote'`、`EDIT='edit'`、`PIN='pin'`、`RECALL='recall'`、`RESEND='resend'`、`DELETE='delete'`；默认顺序即为此列表顺序，删除 key 即禁用对应能力。`RESEND` 仅在消息发送失败时出现。
+`COPY='copy'`、`QUOTE='quote'`、`EDIT='edit'`、`PIN='pin'`、`DOWNLOAD='download'`、`RECALL='recall'`、`RESEND='resend'`、`DELETE='delete'`；默认顺序即为此列表顺序（`download` 仅对已发送的图片/视频/文件出现），删除 key 即禁用对应能力。`RESEND` 仅在消息发送失败时出现。
 
 ## 3. 用户、联系人与群
 
@@ -402,6 +418,8 @@ UIKit 业务错误码（挂在 `Error.code` 上，与 SDK `errorCode` 无关）�
 - `NETWORK_TIMEOUT='EM_NETWORK_TIMEOUT'`：发送/拉取前的连接等待超时。
 - `SEND_TIMEOUT='EM_SEND_TIMEOUT'`：SDK `onSendTimeout` 信号，仍在发送中的己方消息统一落失败并归因（失败气泡可重发）。
 - `MEDIA_UNAVAILABLE='EM_MEDIA_UNAVAILABLE'`：失败重发时本地媒体临时文件已被系统清理，且没有可复用的远端 URL。
+- `DOWNLOAD_AUTH_DENIED='EM_DOWNLOAD_AUTH_DENIED'`：下载图片/视频时系统未授予相册权限（App/小程序）。
+- `DOWNLOAD_UNSUPPORTED='EM_DOWNLOAD_UNSUPPORTED'`：消息没有可下载的附件（非图片/视频/文件，或 URL 为空）。
 
 ## 6. 平台与媒体类型
 

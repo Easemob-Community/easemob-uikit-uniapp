@@ -35,6 +35,8 @@ SCAN_DIRS = [
 ]
 # uni.showToast / showLoading 的 icon 取值，不是 em-icon 名
 NON_EM_ICON_VALUES = {'none', 'success', 'error', 'loading', 'info', 'warn', 'fail', 'exception'}
+# statusIconOf(kind, fallback) 的首参是消息状态键，不是图标名（:name 表达式里会被引号正则一并抓到）
+NON_ICON_ARG_VALUES = {'sending', 'failed', 'unread', 'read'}
 
 STATIC_NAME_RE = re.compile(r'<EmIcon\b[^>]*?(?<!:)name="([^"]+)"', re.S)
 BOUND_NAME_RE = re.compile(r':name="([^"]+)"')
@@ -70,7 +72,7 @@ def referenced_names(path: Path) -> set[str]:
         names.add(m.group(1))
     for m in ICON_PROP_RE.finditer(text):
         names.add(m.group(1))
-    return {n for n in names if ' ' not in n and n not in NON_EM_ICON_VALUES}
+    return {n for n in names if ' ' not in n and n not in NON_EM_ICON_VALUES and n not in NON_ICON_ARG_VALUES}
 
 
 def main() -> int:

@@ -198,6 +198,17 @@ EmKit.clearConversationUnread(conversationId, chatType)
 
 App 未内置通用文件选择器。宿主注册附件 provider 且当前可用时，输入栏显示「文件」入口；未注册或 provider 不可用时入口隐藏。可用 `EmKit.canPickAttachment`（或响应式 `canPickAttachment()`）检查当前状态。小程序与 H5 使用内置文件选择。
 
+### 图片/视频/文件怎么保存或下载
+
+长按图片/视频/文件气泡，在菜单里选「下载」：
+
+- App 与微信小程序：图片/视频保存到系统相册；文件下载到本地后尝试调用系统文档预览打开（App 对 doc/docx/xls/xlsx/ppt/pptx/pdf 指定类型、其他类型交给系统尝试；微信小程序仅支持这七类，其他类型提示无法打开）。
+- H5：走浏览器下载，不写相册；跨域直链可能在新标签页打开，文件名以响应头为准。
+- 微信小程序需要在微信公众平台配置 `downloadFile` 合法域名，否则下载会被平台拦截。
+- 相册权限被拒绝时提示「请允许访问相册后重试」；文件单击不触发下载，下载入口只在长按菜单。
+- App 端保存相册依赖内置模块 `uni-media`、打开文档依赖 `uni-openDocument`；旧自定义基座没有这些模块时调用会失败，需要重新打自定义基座（与 `uni-video` 同理）。
+- 宿主自绘消息卡片时可以调用 `EmKit.downloadAttachment(message)`（或门面导出的 `downloadAttachment`）复用同一套下载逻辑。
+
 ### 视频点击没有播放 / App 播放器黑屏
 
 视频气泡在 App、H5、微信小程序都内置全屏播放器。若点击后停在黑屏或提示「视频加载失败」，按顺序排查：

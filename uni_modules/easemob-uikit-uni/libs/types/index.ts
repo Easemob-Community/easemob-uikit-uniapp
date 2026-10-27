@@ -305,6 +305,26 @@ export interface EmMessageItem {
   groupReadCount?: number
 }
 
+/** 可下载的消息附件类型（语音消息不参与下载） */
+export type EmMessageDownloadKind = 'image' | 'video' | 'file'
+
+/** downloadAttachment 选项：进度回调仅 App/小程序由 uni.downloadFile 提供，H5 无进度 */
+export interface EmMessageDownloadOptions {
+  onProgress?: (percent: number) => void
+}
+
+/** downloadAttachment 结果：图片/视频看 savedToAlbum，文件看 opened 与 filePath */
+export interface EmMessageDownloadResult {
+  kind: EmMessageDownloadKind
+  fileName: string
+  /** App/小程序本地文件路径；H5 走浏览器下载，恒为空串 */
+  filePath: string
+  /** 图片/视频已写入系统相册（App/小程序）；H5 为 false */
+  savedToAlbum: boolean
+  /** 文件已交给系统文档预览打开（App/小程序）；H5 或打开失败为 false */
+  opened: boolean
+}
+
 /** 置顶消息条目（M2.20；SDK PinnedMessageSummary 的中立子集，message 已过 toMessageItem 归一） */
 export interface EmPinnedMessageItem {
   message: EmMessageItem
