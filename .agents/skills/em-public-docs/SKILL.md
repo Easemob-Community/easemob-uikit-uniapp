@@ -76,6 +76,7 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 | `AI-STREAM.md` | `/guide/ai-stream` | AI 流式消息 |
 | `GUIDE-MULTI-SCENARIO.md` | `/guide/multi-scenario` | 多场景（客服/医疗/招聘/交易）接入 |
 | `GUIDE-WEAPP-SDK-SUBPACKAGE.md` | `/guide/weapp-sdk-subpackage` | 微信小程序 SDK 分包 |
+| `GUIDE-ON-DEMAND.md` | `/guide/on-demand` | 按需接入与包体积：什么自动裁剪、什么始终全量、怎么自查 |
 | `HARMONY-REALDEVICE-RUN.md` | `/guide/harmony-realdevice-run` | 鸿蒙真机与签名 |
 | `DEMO.md` | `/guide/demo` | Demo 工程与场景实验室 |
 | `../uni_modules/easemob-uikit-uni/changelog.md` | `/guide/changelog` | 对外更新日志 |

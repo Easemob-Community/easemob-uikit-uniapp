@@ -40,6 +40,7 @@ export const pages = [
   { source: 'docs/GUIDE-MULTI-SCENARIO.md', to: 'uniapp/guide/multi-scenario.md', group: '进阶接入', text: '多场景接入' },
   { source: 'docs/AI-STREAM.md', to: 'uniapp/guide/ai-stream.md', group: '进阶接入', text: 'AI 流式消息' },
   { source: 'docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md', to: 'uniapp/guide/weapp-sdk-subpackage.md', group: '进阶接入', text: '微信小程序 SDK 分包' },
+  { source: 'docs/GUIDE-ON-DEMAND.md', to: 'uniapp/guide/on-demand.md', group: '进阶接入', text: '按需接入与包体积' },
   { source: 'docs/HARMONY-REALDEVICE-RUN.md', to: 'uniapp/guide/harmony-realdevice-run.md', group: '进阶接入', text: '鸿蒙真机运行与签名' },
 
   // 示例与版本
@@ -126,6 +127,7 @@ export default {
             'uniapp/guide/multi-scenario.md': 'docs/GUIDE-MULTI-SCENARIO.md',
             'uniapp/guide/ai-stream.md': 'docs/AI-STREAM.md',
             'uniapp/guide/weapp-sdk-subpackage.md': 'docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md',
+            'uniapp/guide/on-demand.md': 'docs/GUIDE-ON-DEMAND.md',
             'uniapp/guide/harmony-realdevice-run.md': 'docs/HARMONY-REALDEVICE-RUN.md',
             'uniapp/guide/demo.md': 'docs/DEMO.md',
             'uniapp/guide/changelog.md': 'uni_modules/easemob-uikit-uni/changelog.md',

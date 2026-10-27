@@ -1,0 +1,7 @@
+{
+  "pages": [{ "path": "pages/conversation/conversation", "style": { "navigationStyle": "custom" } }],
+  "subPackages": [
+    { "root": "sub-im", "pages": [{ "path": "pages/chat/chat", "style": { "navigationStyle": "custom" } }] }
+  ],
+  "easycom": { "autoscan": true, "custom": { "^em-([a-z-]+)-page$": "@/uni_modules/easemob-uikit-uni/components/pages/em-$1-page/em-$1-page.vue" } }
+}

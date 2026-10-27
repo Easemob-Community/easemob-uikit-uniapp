@@ -350,6 +350,7 @@ easemob-uikit-uniapp/
 2. `uni-automator` 核心用例全绿
 3. 新增组件自查清单：纯 ts？ucss 子集？无 scoped？文字在 text 上？easycom 路径规范？条件编译显式？
 4. 包体积基线：微信小程序主包（demo）≤ 1.5MB（UIKit+SDK 进分包），每次发版记录数字
+5. 能力清单无漂移：`node scripts/audit-usage.mjs demo --check`（新增组件必须归类到 `scripts/capability-manifest.mjs`）
 
 ## 7. 社区运营清单（随 M3 执行）
 
@@ -424,3 +425,37 @@ easemob-uikit-uniapp/
 | Web 版组件 API 契约 | `easemob-uikit-vue/packages/uikit-im/src` | props/emits 命名、i18n key、Avatar 徽标规范的参照（实现不可复用，全部重写） |
 | 环信 websdk | npm `easemob-websdk` | M0 spike 对象；作为 peer 依赖 |
 
+
+## 附录 C：按需接入与体积审计（2026-10-26 探索结论）
+
+### C.1 摇树现状分层
+
+| 层 | 机制 | 自动摇树 | 说明 |
+|---|---|---|---|
+| 组件 | easycom 按模板标签编译 | 是 | 产物 `pages/**.json` 的 `usingComponents` 只登记本页用到的组件，未引用的组件不产出 |
+| 页面 | 宿主 `pages.json` 声明 | 由宿主决定 | 插件不带 `pages.json`；声明了才编译，未声明即不进包 |
+| libs 模块 | `libs/index.ts` 桶 + `EmKit` 单例 | 否 | `EmKitImpl` 的 7 个 `readonly` store 字段在实例化时求值，桶内整图可达 |
+| 静态资源 | 图标字体 / i18n | 否 | `em-icon.css` 约 118KB，内嵌全量 420 字形；zh/en 各 315 键 |
+| SDK | websdk（peer） | 否 | 已用小程序分包绕开，见 `GUIDE-WEAPP-SDK-SUBPACKAGE.md` |
+
+关键推论：**运行时门控（`inputFeatures` / `messageMenuKeys`）不改变产物体积**——`em-chat-page` 顶部静态 import 了 19 个组件，关开关只是不渲染。要减体积只能动「页面清单 / 组件引用 / 资源」，不能动配置。
+
+### C.2 已落地工具
+
+- `scripts/capability-manifest.mjs` — 能力清单单一事实源（能力 → 独有组件 + EmKit API）。新增组件必须归类，共享原子组件放 `ATOMIC_COMPONENTS`（`features[].components` 只写该能力独有组件，否则一项能力使用会连带把别的标成在用）。
+- `scripts/audit-usage.mjs` — 宿主接入用量审计，零依赖。判定模型：以 `pages.json` 声明页为**编译根**，沿宿主 import 链取闭包；组件分 `direct` / `indirect` / `out` 三态；页面给「入站引用 + 独占体积」作为裁剪收益。
+  - `indirect`（宿主没直接用但被页面静态 import）**不是**可裁收益，是「已进包、配置裁不掉」；
+  - `out`（从编译根不可达）本来就没编译，省 0；
+  - 唯一安全可靠的移除手段是**页面级**：删 `pages.json` 声明 + 页面文件。
+- 回归夹具 `scripts/fixtures/minimal-host/`（只声明会话 + 聊天两页，不参与编译，不可运行）：用于断言三态可区分。报告用 `--out=reports/xxx.md` 本地生成（`reports/` 已 gitignore，不入库）；夹具实测：间接带入 162.5KB、包外 254.5KB。
+
+### C.3 后续（未排期，按收益排序）
+
+| 项 | 收益 | 风险 | 依赖 |
+|---|---|---|---|
+| 图标字体子集化（按用量裁码点后重新内联） | 118KB → 20~30KB，所有宿主受益 | 低（动态 `:name` 用 `--keep` 白名单兜底） | `scripts/build-icons.py` 已有管线 |
+| 页面清单生成器（`--features=` → `pages.json` 片段） | 结构性，按页级联删组件 | 中（路由是字符串，误删即 404） | 需先接入审计输出 |
+| i18n 单语裁剪 | 每语言约 14KB | 低 | 审计输出 |
+| `libs` 按域拆桶（chat/contact/group 子入口） | 仅对自绘 UI 宿主有效 | 中（改动对外导入契约） | 先改 `docs/API-KIT.md` |
+
+明确不做：物理删除 `uni_modules` 内文件（插件市场升级覆盖、云端打包冲突）；`--fix` 自动删（路由 / 动态组件 / 动态图标三类字符串无法静态判定，误删代价远高于收益）。

@@ -1,0 +1,17 @@
+<template>
+  <view class="page">
+    <em-chat-page :conversation-id="cid" :chat-type="ctype" />
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+
+const cid = ref('')
+const ctype = ref(0)
+
+onLoad((q) => {
+  cid.value = (q?.conversationId as string) ?? ''
+})
+</script>
