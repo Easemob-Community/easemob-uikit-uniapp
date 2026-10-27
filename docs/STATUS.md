@@ -1063,3 +1063,11 @@
 - **提交**：`bbb6f5b chore(release): 统一 1.0.0-rc.2 版本物料`、`9b849d6 docs(release): 同步 1.0.0-rc.2 公开版本口径`。
 - **安全事项**：当前树已无 demo 签名配置/绝对路径，但 `check-release.mjs` 仍会 WARN：Git 历史中的旧 `demo/manifest.json` 提交包含 `keyPassword`。本轮未重写历史；公开发布前需轮换证书密码，并决定重写历史或重建公开仓。
 - **门禁**：`check-release` ✓（`OK 发布自检通过（1.0.0-rc.2）；WARN 1 项`，WARN 仅为历史签名密码）；`git diff --check` ✓；`check-docs` ✓（28 页 / 35 组件 / 81 方法 / 33 配置字段）；`check-skills` ✓（8 技能）；`build web` ✓（仅既有 demo warning）；`build mp-weixin` ✓ 11 项防回归全绿（主包 1003KB ≤ 1.5MB，分包合计 1425KB）；H5 产物静态伺服 HTTP 200 ✓。
+
+## 2026-10-26 被踢下线误报「网络异常」修复
+
+- **症状**：多端登录互踢（及改密被踢/设备超限）时连接状态条显示「网络异常，请检查网络情况」。
+- **根因**：websdk 5.1.3 被踢以 `reason: "error"` + errorCode 206/216/217（另 207 账号被删 / 214 设备超限）派发 `onDisconnected`（bundle 实测 `handleTerminalConnectionError` → `updateStatus("disconnected","error")`）；banner CLOSED 分支只特判 `token-expired`/`limit`，被踢落入网络异常兜底。
+- **修复（对齐 vue 版 connection-events）**：`utils/error.ts` 增 `KICK_ERROR_CODE` + `isKickErrorCode()`；`connectionStore` 增 `kicked`/`kickCode`；`client/index.ts` `onDisconnected` 命中打标，`onConnected`/登录成功/登出清除；`em-connection-banner` 按 kickCode 分流既有四条被踢 i18n 文案（kickedAnotherDevice/kickedPasswordChanged/kickedDeviceLimit/kickedOffline）。
+- **文档**：API-KIT store 表、`COMPONENTS-CONVERSATION` banner 段、changelog 1.0.0-rc.2 修复段同步。
+- **待验**：H5 双标签同账号互踢（206）与改密（216）真机回归；断网兜底、token 过期、limit 行为不回退。

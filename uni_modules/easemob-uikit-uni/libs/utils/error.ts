@@ -12,6 +12,27 @@ export interface EmCodedError extends Error {
   code?: EmErrorCode
 }
 
+// SDK 被踢/账号失效类断开错误码（对齐 vue 版 KICK_ERROR_CODE）。
+// onDisconnected 携带这些码时是账号态终态（SDK 不再自动重连），UI 应展示被踢文案而非网络异常
+export const KICK_ERROR_CODE = {
+  /** 当前账号在其他设备登录（互踢） */
+  USER_LOGIN_ANOTHER_DEVICE: 206,
+  /** 账号被服务端删除 */
+  USER_REMOVED: 207,
+  /** 登录设备数超过限制 */
+  USER_LOGIN_TOO_MANY_DEVICES: 214,
+  /** 修改密码导致被踢下线 */
+  USER_KICKED_BY_CHANGE_PASSWORD: 216,
+  /** 被其他设备主动踢下线 */
+  USER_KICKED_BY_OTHER_DEVICE: 217
+} as const
+
+/** 断开/失败错误码是否属于被踢/账号失效终态 */
+export function isKickErrorCode(code: unknown): code is number {
+  return typeof code === 'number' && Number.isFinite(code)
+    && (Object.values(KICK_ERROR_CODE) as number[]).includes(code)
+}
+
 /** 构造带业务错误码的 Error（走 Error 形态，不改变现有 catch/throw 结构） */
 export function errorWithCode(code: ErrorCodeValue, message: string): EmCodedError {
   const err = new Error(message) as EmCodedError

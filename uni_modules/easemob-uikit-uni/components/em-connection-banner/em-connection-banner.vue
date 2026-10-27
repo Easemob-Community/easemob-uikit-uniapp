@@ -50,8 +50,21 @@ const state = computed<BannerState | null>(() => {
     }
     return null
   }
-  // CLOSED：按 SDK 断开原因区分被踢/Token 过期/普通网络异常
+  // CLOSED：被踢/账号失效终态优先按 kickCode 分流，其余按 SDK 断开原因区分 Token 过期/设备超限/普通网络异常
   if (status === CONNECTION_STATUS.CLOSED) {
+    // 被踢类断开 SDK 以 reason="error" + 被踢错误码透出，靠 kicked 标记识别，不能落「网络异常」兜底
+    if (connectionStore.kicked) {
+      switch (connectionStore.kickCode) {
+        case 206:
+          return { tone: 'error', icon: 'circle-bang', text: t('status.kickedAnotherDevice') }
+        case 216:
+          return { tone: 'error', icon: 'circle-bang', text: t('status.kickedPasswordChanged') }
+        case 214:
+          return { tone: 'error', icon: 'circle-bang', text: t('status.kickedDeviceLimit') }
+        default:
+          return { tone: 'error', icon: 'circle-bang', text: t('status.kickedOffline') }
+      }
+    }
     const reason = connectionStore.reason
     if (reason === 'token-expired') {
       return { tone: 'error', icon: 'circle-bang', text: t('status.tokenExpired') }

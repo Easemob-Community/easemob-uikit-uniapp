@@ -135,7 +135,7 @@ function onTabChange(tab: ConversationTabKeyValue): void {
 <em-connection-banner :show="showConnectionBanner" />
 ```
 
-**行为与平台**：组件只读连接状态（`connectionStore`），不参与业务。`online` 与 `idle` 状态下不渲染任何内容；`connecting` 与 `reconnecting` 用警示色 + 环形箭头图标 + 对应文案；`closed` 时按断开原因分流——`token-expired` 显示 Token 过期、`limit` 显示设备数超限被踢、其余显示网络异常，三者都用错误色 + 感叹号图标。状态条是浅色底的轻量条，不遮挡内容，暗色模式随 token 切换。整页场景下由 `em-conversation-page` / `em-chat-page` 的 `showConnectionBanner` 控制显隐，单独使用时自行传 `show`。
+**行为与平台**：组件只读连接状态（`connectionStore`），不参与业务。`online` 与 `idle` 状态下不渲染任何内容；`connecting` 与 `reconnecting` 用警示色 + 环形箭头图标 + 对应文案；`closed` 时被踢/账号失效终态（`kicked=true`，错误码 206/207/214/216/217）按 `kickCode` 分流——206 显示"当前账号已在其他设备登录"、216 显示"账号密码已修改，请重新登录"、214 显示"登录设备数超过限制，当前设备已下线"、其余显示"当前账号已被迫下线，请重新登录"；其余断开再按原因分流——`token-expired` 显示 Token 过期、`limit` 显示设备数超限被踢、其余显示网络异常，全部用错误色 + 感叹号图标。状态条是浅色底的轻量条，不遮挡内容，暗色模式随 token 切换。整页场景下由 `em-conversation-page` / `em-chat-page` 的 `showConnectionBanner` 控制显隐，单独使用时自行传 `show`。
 
 ## 页面组件：em-conversation-page
 

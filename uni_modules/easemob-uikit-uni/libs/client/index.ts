@@ -1,7 +1,7 @@
 import type { ChatClient, LogEntry, PlatformAdapterOverrides } from 'easemob-websdk'
 import { CONNECTION_STATUS, ERROR_CODE, LOG_LEVEL } from '../constants'
 import { connectionStore } from '../store/connection'
-import { errorWithCode } from '../utils/error'
+import { errorWithCode, isKickErrorCode } from '../utils/error'
 import { applyKitConfig } from '../store/config'
 import { setLocale } from '../use/useLocale'
 import { subscribeNetworkStatus, checkNetworkOnce } from '../platform'
@@ -183,6 +183,8 @@ export class EmClient {
           connectionStore.errorCode = 0
           connectionStore.reconnecting = false
           connectionStore.reconnectAttempt = 0
+          connectionStore.kicked = false
+          connectionStore.kickCode = 0
           logger.info('connected')
         },
         onDisconnected: (payload) => {
@@ -190,6 +192,12 @@ export class EmClient {
           connectionStore.reason = payload.reason
           connectionStore.errorCode = payload.errorCode ?? 0
           connectionStore.reconnecting = false
+          // 被踢/账号失效（206/207/214/216/217）是账号态终态，SDK 不再自动重连：
+          // 打 kicked 标记，banner 据此展示被踢文案而非兜底「网络异常」（对齐 vue 版）
+          if (isKickErrorCode(payload.errorCode)) {
+            connectionStore.kicked = true
+            connectionStore.kickCode = payload.errorCode
+          }
           logger.warn('disconnected:', payload.reason, payload.errorCode ?? 0)
         },
         // 自动重连达到上限：状态落 CLOSED，原因/错误码透出给宿主做「重新登录/检查网络」引导
@@ -270,6 +278,8 @@ export class EmClient {
       await client.login({ userId: options.userId, token: options.token })
       connectionStore.userId = options.userId
       connectionStore.status = CONNECTION_STATUS.ONLINE
+      connectionStore.kicked = false
+      connectionStore.kickCode = 0
       logger.info('login success:', options.userId)
     } catch (e) {
       connectionStore.status = CONNECTION_STATUS.CLOSED
@@ -290,6 +300,8 @@ export class EmClient {
     connectionStore.errorCode = 0
     connectionStore.reconnecting = false
     connectionStore.reconnectAttempt = 0
+    connectionStore.kicked = false
+    connectionStore.kickCode = 0
   }
 
   // login resolve ≠ socket 就绪：发送/拉历史前统一等 onConnected

@@ -21,6 +21,8 @@ import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 | `userId` | `string` | 当前登录用户；空串表示未登录 |
 | `reason` | `string` | 最近一次连接事件原因（SDK 原值，如 `login` / `reconnect` / `offline` / `token-expired` / `limit`） |
 | `errorCode` | `number` | 最近一次断开/重连失败错误码，0 表示无 |
+| `kicked` | `boolean` | 是否处于被踢/账号失效终态（`onDisconnected` 命中被踢错误码 206/207/214/216/217 时为 `true`，SDK 不再自动重连）；重新登录成功、恢复在线或登出时清除 |
+| `kickCode` | `number` | 被踢错误码（`kicked=true` 时的 `errorCode`，UI 按码分流文案：206 他处登录 / 216 改密被踢 / 214 设备超限 / 其余被迫下线），0 表示无 |
 | `reconnecting` | `boolean` | 是否处于自动重连 |
 | `reconnectAttempt` | `number` | 当前重连尝试次数 |
 | `networkOnline` | `boolean \| null` | 系统网络是否可用（先于 SDK 连接事件感知）：`true` 在线 / `false` 离线 / `null` 未知（基座未提供网络探测能力） |

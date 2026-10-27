@@ -4,6 +4,8 @@
 
 ### 修复
 
+- **多端登录被踢误报「网络异常」**：被踢/账号失效类断开（SDK 错误码 206 他处登录 / 207 账号被删 / 214 设备超限 / 216 改密被踢 / 217 被其他设备踢）到达时 SDK 以 `reason: "error"` 派发 `onDisconnected`，原连接状态条只认 `token-expired` 与 `limit`，被踢落入「网络异常，请检查网络情况」兜底。现 `onDisconnected` 命中被踢错误码时写入 `connectionStore.kicked` / `kickCode`（重新登录、恢复在线或登出时清除），连接状态条按 `kickCode` 显示被踢专属文案（当前账号已在其他设备登录 / 账号密码已修改 / 登录设备数超过限制 / 当前账号已被迫下线），普通断网仍显示网络异常。
+
 - **App 端弹层偶发「底部 tabBar 收起但弹层不出现」**：蒸汽端（uni-app x App）新建 `v-if` 分支时，新分支的视觉节点会偶发整批不建（只建出命中区），表现为「底部 tabBar 已被收起、弹层却看不见，且整页点击被透明命中区吞掉」（Android 真机实测约 3/12，与点击位置、tabBar 隐藏、延迟补写无关）。`em-popup` 改为**常驻挂载**：去掉 `v-if`，页面挂载时就把 root/遮罩/面板建好；关闭态用根节点内联 `top: 200%` 移到视口下方（不绘制、不吃点击），打开/关闭只改这一个内联样式，不再创建/销毁节点。同时默认态即最终态（遮罩默认不透明、面板默认在最终位置，去掉 `--show` 类）。进场动画改为 **JS 逐帧内联位移**（约 200ms，面板从屏下 100% 滑回 0%，同 `useSpinRotation` 思路）：动画只做「附加位移」，尾段直接归零，因此任何一帧写入丢失都只会少一段动画或位置差一截，不会退回「看不见但吃点击」；收起不做退场动画（收尾那次写入若丢会留下幽灵弹层）。真机 20/20 次开合全部正常、每次 tabBar 如实归还（改前 3/12 失败）。同类弹层（长按会话菜单、选人、@提及、聊天页长按菜单）一并修复；原生 tabBar 持锁同时改为实例级「谁持有谁释放」，`releaseTabBar()` 在计数为 0 时不再调 `showTabBar`。
 
 - **iOS 拍摄黑屏**：iOS 相机授权被拒绝后，`uni.chooseImage` 仍会打开系统拍摄页并停在纯黑画面且不再弹窗。`em-chat-page` 在调起相机前用 `uni.getAppAuthorizeSetting` 预检 `cameraAuthorized`：`denied` 弹窗引导到系统设置（`uni.openAppAuthorizeSetting`），`config error` 提示安装包缺少权限描述；`not determined` 仍交给系统首次弹窗。新增 `getCameraAuthorizeState` / `openAppAuthorizeSetting` 从 `libs` 透出；H5/小程序/未知基座跳过预检，行为不变。示例工程在 `app-ios.distribute.privacyDescription` 补齐相机/相册/麦克风用途描述（改后需重新云打包或重打自定义基座生效）。
