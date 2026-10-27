@@ -173,7 +173,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 | `timeDividerInterval` | `300000` | 聊天页时间分隔条间隔 ms |
 | `enableStreamMessage` | `true` | AI 流式分片合并 |
 | `streamThrottle` | `50` | 流式合批 ms |
-| `inputFeatures` | 全开 | `voice/emoji/image/camera/video/file` 子集 |
+| `inputFeatures` | 工具全开、`inputMode` 未设置、`sendOnReturn=true` | `voice/emoji/image/camera/video/file` 工具子集；`inputMode('single'|'multiline')` 显式单/多行，优先于旧 `sendOnReturn` |
 | `messageMenuKeys` | 四项全量 | `copy/quote/recall/delete` 及顺序 |
 | `conversationMenuKeys` | 三项全量 | `pin/mute/delete` 及顺序 |
 | `emojiList` | 内置 96 | emoji 面板字符集 |

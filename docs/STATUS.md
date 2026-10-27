@@ -1071,3 +1071,15 @@
 - **修复（对齐 vue 版 connection-events）**：`utils/error.ts` 增 `KICK_ERROR_CODE` + `isKickErrorCode()`；`connectionStore` 增 `kicked`/`kickCode`；`client/index.ts` `onDisconnected` 命中打标，`onConnected`/登录成功/登出清除；`em-connection-banner` 按 kickCode 分流既有四条被踢 i18n 文案（kickedAnotherDevice/kickedPasswordChanged/kickedDeviceLimit/kickedOffline）。
 - **文档**：API-KIT store 表、`COMPONENTS-CONVERSATION` banner 段、changelog 1.0.0-rc.2 修复段同步。
 - **待验**：H5 双标签同账号互踢（206）与改密（216）真机回归；断网兜底、token 过期、limit 行为不回退。
+
+## 2026-10-26 输入栏单/多行模式拆分 + App 高度单源化（M2.23）
+
+- **根因**：旧多行实现混用原生 `auto-height`、JS 封顶和 `nextTick` 重测；`nextTick` 不保证原生文本控件完成布局，清空/删行后 Android、iOS、鸿蒙都会出现先高后低或旧高度残留。
+- **公开契约**：`inputFeatures` 新增可选 `inputMode('single'|'multiline')` 与 `CHAT_INPUT_MODE`。显式 single = 全端单行 input 回车发送；multiline = 全端 textarea 回车换行、纸飞机发送、5 行封顶内滚。未传时保留旧 `sendOnReturn` 三态，旧 iOS 回车发送行为不变。
+- **组件**：`em-chat-inputbar` 输入区拆为同目录内部 `em-chat-single-input` / `em-chat-multiline-input`；父组件保留发送、引用/编辑条、工具、面板和 composer 行为。
+- **高度定案**：textarea 固定 19px 行高并始终 `auto-height=false`，文本区高度 = `19 × min(可视行数,5)`，包裹层另加 16px；`linechange` 只取行数不取高度。空草稿直接回 1 行，硬换行减少同步收缩，>5 行硬换行草稿首帧直接封顶，不再做平台延时或 auto-height 二次重测。
+- **门禁**：`build web` ✓；`build mp-weixin` ✓（11 项全绿，主包 1014KB）；H5 最终产物独立静态伺服 `/` HTTP 200 ✓；`check-docs` ✓；`check-skills` ✓；App 模块图 152 模块、libs 反向依赖与循环均 0 ✓；`git diff --check` ✓。
+- **Android 真机（vivo NEX A，1080×2316）**：空态单行正常；6 行稳定封顶且原生命中区高 285px=95 CSS px（19×5）；删到 2 行为 38 CSS px，清空为 19 CSS px；>5 行草稿退出重进直接保持 5 行，无先高后低、塌陷或无法聚焦。
+- **鸿蒙真机（nova 12）**：6 行稳定封顶 5 行；删到 2 行再清空均按当前内容回缩，placeholder 与单行灰底恢复，未再出现先高后低。
+- **iOS 真机（用户复测）**：多行输入高度表现正常，确认修复观感良好；至此 Android、iOS、鸿蒙三端高度问题均已通过真机验证，本问题暂时收口。
+- **常规回归待验**：H5 与微信小程序的真实账号交互未执行（H5 仅产物 200，缺测试账号）；旧 `sendOnReturn` 三态的运行时回归未逐项执行。

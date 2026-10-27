@@ -66,15 +66,16 @@ UIKit 的输入栏使用手动避让：输入框 `adjust-position=false`，按�
 
 **全屏弹层的顶部安全区**：由内容节点自己注入 `padding-top: getSafeAreaTop()`（`getSafeAreaTop` 见 [EmKit API](./API-KIT.md)），内容高度同步扣除同一值；iOS 蒸汽端全屏弹层容器的 padding 不参与布局，不能靠弹层容器承载顶部安全区，否则底部确认键会被顶出屏。
 
-### App 端多行输入框（textarea）不生长 / 无底色无占位符
+### App 端多行输入框高度异常 / 无底色无占位符
 
-App 端 `textarea` 是原生组件（iOS 为 UITextView）：`flex:1` 不生效，背景、圆角等装饰样式渲染不可靠，表现为多行输入区整体不可见。自绘输入栏（`#input-bar` 插槽）或业务页面里用到 textarea 时：
+App 端 `textarea` 是原生组件（iOS 为 UITextView）：`flex:1` 不生效，背景、圆角等装饰样式渲染不可靠；`auto-height` 与 JS 固定高度混用还可能出现先高后低、清空后仍残留多行高度。自绘输入栏（`#input-bar` 插槽）或业务页面里用到 textarea 时：
 
-- 尺寸与装饰（高度、灰底、圆角、裁切）由外层包裹 `view` 承担，高度跟随业务上报的行高变化；
-- textarea 自身只设 `width/height: 100%`，不设背景；
+- 尺寸与装饰（高度、灰底、圆角、裁切）由外层包裹 `view` 承担；
+- 使用固定 px 行高并始终显式设置 textarea 高度，不要依赖 `auto-height` 的二次重测；`linechange` 只取行数，不拿事件高度反推行高；
+- 空草稿由草稿状态直接恢复单行高度，长草稿在首个原生事件前就先按最大行数封顶；
 - iOS 另设 `disable-default-padding` 去掉默认内边距。
 
-UIKit 内置输入栏的生长输入区已按此实现，可直接参考其结构（自绘输入栏契约见 [聊天页](./PAGES-CHAT.md)）。
+UIKit 内置多行输入区使用固定 19px 行高，按 `19 × min(行数, 5)` 计算文本区高度，包裹层额外承担上下内边距。自绘输入栏契约见 [聊天页](./PAGES-CHAT.md)。
 
 ### H5 刷新 404
 

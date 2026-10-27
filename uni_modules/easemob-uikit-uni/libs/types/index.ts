@@ -1,4 +1,5 @@
 import type {
+  ChatInputModeValue,
   ConnectionStatusValue,
   ContactInviteKindValue,
   ContactInviteStatusValue,
@@ -21,7 +22,9 @@ export type EmConnectionStatus = ConnectionStatusValue
 /** 会话类型（单聊/群聊），联合类型自 CONVERSATION_TYPE 常量派生 */
 export type EmChatType = ConversationTypeValue
 
-/** 输入栏功能集（resolved 形态，全量布尔；EmKitConfig.inputFeatures 为其可选子集） */
+export type EmChatInputMode = ChatInputModeValue
+
+/** 输入栏功能集（resolved 形态；EmKitConfig.inputFeatures 为其可选子集） */
 export interface EmInputFeatures {
   voice: boolean
   emoji: boolean
@@ -29,11 +32,9 @@ export interface EmInputFeatures {
   camera: boolean
   video: boolean
   file: boolean
-  /**
-   * 回车键发送（对齐微信「回车键发送消息」）：
-   * true（默认）= 键盘回车发送，多行内容靠粘贴；false = 换行输入模式，
-   * 输入框生长为多行（封顶 5 行），回车=换行，发送走输入栏纸飞机
-   */
+  /** 输入形态；缺省按 sendOnReturn 兼容旧三态，显式设置后优先于 sendOnReturn */
+  inputMode?: EmChatInputMode
+  /** 旧回车键配置：仅在未显式设置 inputMode 时决定输入形态与回车行为 */
   sendOnReturn: boolean
 }
 

@@ -122,7 +122,7 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
-import { EmKit, getStorage, setStorage, getSafeAreaBottom, getSafeAreaTop, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+import { CHAT_INPUT_MODE, EmKit, getStorage, setStorage, getSafeAreaBottom, getSafeAreaTop, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
 
 // 登录页是固定深色品牌页（渐变底 + 光晕，两种主题下都不变），不消费明暗 token；
 // 仅接 themeClass 保持主题引擎初始化一致（自定义导航栏页不做原生 chrome 同步，避免状态栏前景色被覆盖）。
@@ -183,9 +183,7 @@ async function onLogin() {
   }
   logging.value = true
   try {
-    // inputFeatures.sendOnReturn=false：demo 演示「换行输入」档（回车=换行、输入框生长、发送走按钮）；
-    // 库默认 true（回车发送，零回归）
-    EmKit.init({ appkey: appkey.value, enableReadReceipt: true, logLevel: 'debug', sdkLogLevel: 'DEBUG', inputFeatures: { sendOnReturn: false } })
+    EmKit.init({ appkey: appkey.value, enableReadReceipt: true, logLevel: 'debug', sdkLogLevel: 'DEBUG', inputFeatures: { inputMode: CHAT_INPUT_MODE.MULTILINE } })
     await EmKit.login({ userId: userId.value, token: token.value })
     setStorage(KEY_APPKEY, appkey.value)
     setStorage(KEY_USERID, userId.value)

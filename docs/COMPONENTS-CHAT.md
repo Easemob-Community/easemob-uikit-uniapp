@@ -13,7 +13,7 @@
 | `modelValue` | `string` | 必填 | 草稿内容，配合 `v-model` 使用 |
 | `quote` | `EmQuoteInfo \| null` | 必填 | 当前引用消息；`null` 时引用条不渲染 |
 | `editing` | `{ preview: string } \| null` | `null` | 编辑态（消息编辑）：非空时输入栏上方展示编辑条（铅笔图标 + "编辑消息" + 原文单行截断），优先于引用条 |
-| `features` | `EmInputFeatures` | 工具项全开、`sendOnReturn=true` | 功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` / `sendOnReturn` |
+| `features` | `EmInputFeatures` | 工具项全开、`sendOnReturn=true`、`inputMode` 未设置 | 功能集：工具开关、单行/多行模式与旧回车配置 |
 | `emojis` | `string[]` | 内置 96 个 | emoji 面板字符集 |
 | `disabled` | `boolean` | `false` | 禁用态（如全员禁言）：输入、发送、语音、面板全部拦截 |
 | `submitting` | `boolean` | `false` | 文本或直发快捷回复提交中：拦截重复 `send` 与快捷回复点选，不影响草稿编辑 |
@@ -45,7 +45,8 @@
 | `camera` | `boolean` | 媒体面板的"拍摄"项 |
 | `video` | `boolean` | 媒体面板的"视频"项 |
 | `file` | `boolean` | 媒体面板的"文件"项 |
-| `sendOnReturn` | `boolean` | 默认 `true`：回车发送；`false`：生长 textarea、回车换行，封顶 5 行 |
+| `inputMode` | `EmChatInputMode` | 可选。`'single'`：全端单行 input、回车发送；`'multiline'`：全端生长 textarea、回车换行、纸飞机发送，1 行起步、封顶 5 行内滚。显式设置时优先于 `sendOnReturn` |
+| `sendOnReturn` | `boolean` | 旧回车配置，仅在未设置 `inputMode` 时生效：`false` 走多行；`true` 时 iOS 走多行回车发送，其余端走单行 |
 
 `EmQuoteInfo` 的字段：
 
@@ -84,7 +85,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
+import { CHAT_INPUT_MODE, EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue, EmInputFeatures, EmQuoteInfo, EmQuickReply } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const draft = ref('')
@@ -100,6 +101,7 @@ const inputFeatures = ref<EmInputFeatures>({
   camera: true,
   video: true,
   file: true,
+  inputMode: CHAT_INPUT_MODE.MULTILINE,
   sendOnReturn: true
 })
 

@@ -318,6 +318,14 @@ easemob-uikit-uniapp/
 - **明确不做**：群已读成员明细查看器（PLAN 既定裁剪项）；进度条 UI 自绘动画；单条消息的已读成员列表接口。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs`；群回执与上传进度需真实账号/真机回归（记 STATUS.md）。
 
+### M2.23：输入栏单行/多行模式拆分与跨端高度单源化（2026-10-26 立项）
+
+- **背景**：M2.18 以 `sendOnReturn` 同时决定输入形态与回车行为，且多行高度混用原生 `auto-height`、JS 封顶和 `nextTick` 重测。Android、iOS、鸿蒙均已复现先高后低或清空后残留超高，属于通用实现问题，不再按平台追加延时补丁。
+- **范围**：`inputFeatures` 新增可选 `inputMode('single'|'multiline')`。显式 single = 全端单行 input、回车发送；显式 multiline = 全端生长 textarea、回车换行、纸飞机发送、封顶 5 行内滚。未传时保留 M2.18 的 `sendOnReturn` 三态兼容。`em-chat-inputbar` 输入区拆为同目录内部 single/multiline 组件，外层工具、面板、引用/编辑条、发送和 `useChatComposer` 行为不变。
+- **高度定案**：textarea 固定 19px 行高并始终 `auto-height=false`，文本区高度 = `19 × min(可视行数, 5)`，包裹层另加 16px 竖直 padding；`linechange` 只取行数、不取高度。草稿清空立即回单行，硬换行减少同步收缩，>5 行硬换行草稿首帧直接封顶。禁止恢复 auto-height/固定高度混用或二次原生重测。
+- **明确不做**：富文本、PC 拖拽、1/3 屏展开输入、新的运行时依赖、按平台区分的延时/重试。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs.mjs` + `check-skills.mjs`；Android/iOS/鸿蒙按同一真机矩阵验证，未实测端不得记为已解决。
+
 ### M3：组件沉淀与发布
 
 - 原子组件沉淀（em-*-message 气泡族、输入栏等从页面级组件解耦）；pages_init.json 页面模板注册

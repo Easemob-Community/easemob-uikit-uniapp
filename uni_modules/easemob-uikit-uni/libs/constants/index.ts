@@ -65,6 +65,13 @@ export const CONVERSATION_TYPE = {
 
 export type ConversationTypeValue = (typeof CONVERSATION_TYPE)[keyof typeof CONVERSATION_TYPE]
 
+export const CHAT_INPUT_MODE = {
+  SINGLE: 'single',
+  MULTILINE: 'multiline'
+} as const
+
+export type ChatInputModeValue = (typeof CHAT_INPUT_MODE)[keyof typeof CHAT_INPUT_MODE]
+
 /** 消息 ext 自定义 key */
 export const MESSAGE_EXT_KEY = {
   /** 引用（1.0 起主协议）：与 vue 版 `ext.msgQuote` 同 key、同结构，跨 UIKit 互认 */

@@ -166,6 +166,10 @@ import {
 
 `SINGLE_CHAT='singleChat'`、`GROUP_CHAT='groupChat'`。类型别名 `ConversationTypeValue` / `EmChatType`。
 
+### `CHAT_INPUT_MODE`
+
+`SINGLE='single'`、`MULTILINE='multiline'`；类型别名 `ChatInputModeValue` / `EmChatInputMode`。通过 `inputFeatures.inputMode` 使用，显式设置时优先于旧 `sendOnReturn` 配置。
+
 ### `CONVERSATION_TAB_KEY`
 
 `ALL='all'`、`UNREAD='unread'`、`AT_ME='atMe'`、`SINGLE='single'`、`GROUP='group'`；默认顺序见 `DEFAULT_CONVERSATION_TABS`。

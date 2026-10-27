@@ -157,7 +157,7 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 ### 5l. 蒸汽端原生 `textarea` 不吃 flex 尺寸/背景样式 → 多行输入区「消失」（iOS 真机实测 2026-10-22，M2.18）
 - **症状**：输入栏换行档（`sendOnReturn=false`）多行生长态，textarea 区域整体不可见（无灰底、无占位符、不随行数长高）；H5/mp 正常。
 - **根因**：textarea 是原生组件（iOS 为 `UITextView`），蒸汽端 `flex:1` 不生效（文档明示 App 默认宽 300px）、`background-color`/`border-radius` 等装饰样式渲染不可靠；内联 `height` 也可能被组件自身布局覆盖。参照 §5b（原生 button 文字基线）——**原生组件只保证内容区，装饰与尺寸必须由外层包裹承担**。
-- **解法**：包裹层 view 承担高度（跟 `linechange` 上报值走）+ 灰底 + 圆角 + 裁切，textarea 自身 `width/height: 100%` 填充、`background` 不设（iOS 另加 `disable-default-padding` 去默认内边距）。`em-chat-inputbar` 的生长输入已按此落地（`__multiline-wrap`）。
+- **解法**：包裹层 view 承担高度（固定行高 × `linechange.lineCount`，封顶 5 行）+ 灰底 + 圆角 + 裁切，textarea 自身 `width:100%` + 显式高度、`background` 不设（iOS 另加 `disable-default-padding` 去默认内边距）。已收口到 `em-chat-inputbar/em-chat-multiline-input`；高度细节见 §5r。
 - **纪律**：蒸汽端给原生输入类组件（textarea/button）做定制样式时，尺寸、背景、圆角一律落包裹层；组件自身只留文字相关样式。
 
 ### 5n. App 播放器全屏黑屏：自定义基座缺 `uni-video` 模块，`<video>` 被降级为 `<view>`（iOS 真机实测 2026-10-22，M2.19）
@@ -190,13 +190,13 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **代价**：弹层内容（如选人列表）会在页面挂载时就建好（不再等首次打开）；收起为瞬隐（无退场动画）。
 - **纪律**：蒸汽端凡「打开时才建起来」的 UI（弹层/浮层/面板）都不要依赖新分支的首次渲染；要么常驻挂载 + 只改样式，要么接受它偶发不出现。要动画用 JS 逐帧写内联样式（同 `useSpinRotation`），并保证任意一帧丢写时终态仍可见。
 
-### 5r. 生长 textarea 封顶态「灰底塌成一条线 / 点不聚焦 / 没有 placeholder」（Android 真机实测 2026-10-23，M2.22）
-- **症状**：换行输入档（`inputFeatures.sendOnReturn=false`）多次换行、**不清空草稿**就退出再进会话：输入框看着像被什么遮住——灰底只剩一条细线/高度明显不对，草稿文字溢出到麦克风按钮上方，点它唤不起键盘；草稿非空所以也没有 placeholder，更像「被遮挡」。
-- **根因（adbd + uiautomator 量原生 bounds + 截图像素量灰底）**：旧实现只在 `lineCount ≤ 5` 时冻结高度，**恢复 >5 行草稿时首个 linechange 就超上限**，封顶分支永远拿不到高度 → `auto-height=false` 又无 `height` → 原生 textarea 塌成 6.5 CSS px、灰底被压到 15 CSS px；再叠加两点：包裹层是 border-box 但封顶只写文本高度（padding 被吃掉、文字顶到边缘）、灰底比原生 textarea 大一圈（上下 8px / 左右 12px padding 不在原生命中区）。
-- **实测口径（同机 logcat 插桩，可直接复用）**：linechange 上报 `{lineCount, height}` 单行 18.55px、多行 `height/lineCount ≈ 18.6px`（封顶高度一律 `lineHeight × 上限 + 包裹层竖直 padding`）；封顶后上报值会停在布局高度，**不能再用它反推单行高度**（踩过 109 → 166px 越学越大的回路）；原生 textarea 的 auto-height **删除整行后不回缩**（灰底停在旧高度，点/失焦都不恢复）。
-- **解法**：① 高度口径单源——≤5 行不写高度（原生 auto-height 唯一口径），>5 行关 auto-height、textarea 写 `lineHeight×5`、包裹层写 `该高度 + 16px`；② 封顶高度恒 > 0——草稿回填时按**硬换行数**先 seed 一个封顶高度（兜底行高 19px），首个超上限的 linechange 只在「已知高度不足封顶高度」时反推一次；③ 换行数下降/清空时把 `auto-height` 关一帧再打开，逼原生重测；④ 灰底包裹层 `@click` 转发焦点（先 `:focus=false` 再 `nextTick` 置 true，同值不重发请求），并给输入栏根加 `flex-shrink: 0`。
-- **纪律**：蒸汽端「原生组件 + JS 算高度」这类组合，**同一份上报值只能有一种解释口径**；封顶/冻结类的高度必须保证「任何分支都 > 0」，且切换状态时用**值变化**而不是「有时写有时不写」（置空后原生布局可能不回收旧高度，实测残留 166px）。给原生输入组件包灰底时，padding 区不会命中原生输入框，必须自己做点击转发。
-- **验证口径**：进页带 >5 行草稿应得到 5 行灰底（Android 1080×2340 上 ≈109 CSS px / 300 device px）；点灰底上沿应唤出键盘；逐行删到窗口内行数，灰底应逐级回缩。
+### 5r. 生长 textarea 高度塌陷、先高后低、清空后残留超高（App 三端，M2.22/M2.23）
+- **症状**：多行草稿恢复时灰底可能塌成细线、文字溢出且点不聚焦；输入/删行时视觉先高后低；清空后 placeholder 已恢复但灰底仍停在约 5 行高。Android、iOS、鸿蒙均有用户真机复现，属于通用实现问题，不是单平台兼容性分支。
+- **根因**：旧实现混用三套时序——≤5 行交给原生 `auto-height`，>5 行切 JS 固定高度，删行/清空再用 `nextTick` 开关 `auto-height` 逼原生重测。官方明确 `auto-height=true` 时 `style.height` 不生效；`nextTick` 只保证 Vue 更新，不保证原生文本控件完成布局。封顶后 `linechange.height` 还可能停在布局残留值，反推行高会形成越学越大的回路。
+- **定案解法**：固定 textarea `line-height:19px` 并始终 `auto-height=false`；文本区高度恒为 `19 × min(visualLineCount,5)`，包裹层恒为该值 +16px。`linechange` 只取 `lineCount`，不读 height/heightRpx；空草稿由 modelValue watcher 同步回 1 行，硬换行减少同步收缩，>5 个硬换行的草稿首帧直接按 5 行封顶。禁止再靠开关 auto-height、延时或平台补丁做二次矫正。
+- **交互保留**：灰底包裹层 `@click` 转发焦点（先 `:focus=false` 再 `nextTick` 置 true，同值不重发请求），输入栏根保持 `flex-shrink:0`；这里的 nextTick 只用于焦点请求，不参与高度测量。
+- **纪律**：原生 textarea 的装饰和尺寸由包裹层承担，文本行高用 px；任何分支高度都必须 >0，且高度只能有「固定行高 × 行数」一种算法。软折行依赖 linechange 校正，清空/硬换行减少不等待原生事件。
+- **验证口径**：三端同测空态、1→6 行、6→2 行、发送清空、>5 行草稿重进、软折行和灰底点击；不得出现先高后低、空草稿高框、文字裁切或无法聚焦。
 
 ## 小程序（mp-weixin）
 
@@ -256,7 +256,7 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 | `uni.env.USER_DATA_PATH` | ⚠️ App 是应用沙盒，文件管理器不可见；写成功也取不出，日志导出以剪贴板/分享为准 |
 | `uni.getFileSystemManager().readFile`（App） | ⚠️ 只认 uni 沙盒目录（`uni.env.*`）；系统缓存里的宿主文件读不到（1300013/1300002），SDK 的附件 md5 即踩中，见 §5h |
 | `uni.uploadFile` 读宿主缓存路径（App） | ✅ 原生读文件，不受 FSM 沙盒限制；附件上传以它为准 |
-| textarea 生长输入（App，`sendOnReturn=false`） | ⚠️ linechange 上报值只有「≤5 行」时可信；封顶后上报停在布局高度，`auto-height` 删行不回缩（关一帧再开强制重测），封顶高度必须恒 > 0 且自己加包裹层 padding（§5r） |
+| textarea 生长输入（App） | ⚠️ 禁止混用 auto-height 与 JS 固定高度；固定 19px 行高并始终显式高度，linechange 只取 lineCount，清空由草稿状态直接复位（§5r） |
 | `<video>` 组件（App） | ⚠️ 属内置模块 `uni-video`，参与摇树；自定义基座未包含时组件降级为 `<view>`（播放页黑屏），接入视频后需重打基座或 manifest 显式声明（§5n） |
 | iOS 远程视频直链 | ⚠️ chatfiles 无后缀且不支持 Range，AVPlayer 会停在 `00:00`；先下载到本地 `.mp4` 再播（§5o） |
 | iOS `autoplay` + `poster` | ⚠️ autoplay 可能抢在事件绑定前起播导致 `play` 丢失、画面停在首帧；改 `autoplay=false` + 挂载后显式 `play()`，`poster` 不进 `<video>`（§5p） |

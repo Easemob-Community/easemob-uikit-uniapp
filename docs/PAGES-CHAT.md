@@ -65,7 +65,8 @@
 
 - 输入栏支持语音、Emoji、相册、拍照、视频、文件；单项可经 `uiConfig.inputFeatures` 关闭，Emoji 字符集可经 `uiConfig.emojiList` 替换。
 - 右侧是「+」与发送键的同槽互斥：草稿为空显示「+」媒体入口，草稿有内容时换成品牌色纸飞机发送键，不再常驻文字发送按钮，输入框因此更宽。
-- `inputFeatures.sendOnReturn`（默认 `true`）对齐微信「回车键发送消息」：`true` = 回车发送（iOS 上输入框可随粘贴内容生长）；`false` = 换行输入模式，输入框随打字生长（封顶 5 行，超出内部滚动），回车换行、发送走输入栏右侧的纸飞机发送键。Android 系统限制其 textarea 键盘右下角恒为换行，故回车发送档在 Android 保持单行输入。
+- `inputFeatures.inputMode` 显式选择输入形态：`'single'` 为全端单行 input、回车发送；`'multiline'` 为全端生长 textarea、回车换行、纸飞机发送，1 行起步、最多 5 行，超出内部滚动。多行文本使用固定 19px 行高，输入区按行数显式计算高度，清空立即回到单行。
+- 未设置 `inputMode` 时保留旧 `sendOnReturn` 行为：`false` 走多行；`true`（默认）时 iOS 走多行回车发送，其余端走单行。显式 `inputMode` 优先，不与 `sendOnReturn` 组合。Android 系统限制 textarea 键盘右下角恒为换行。
 - `quickReplies` 在输入栏上方渲染常用语胶囊：`quickReplyMode='fill'`（默认）整句替换草稿，`'send'` 直接发送（不带引用与 @）。
 - 全员禁言且当前用户不是群主/管理员时，输入栏进入禁用态，输入框提示为「全员禁言中」；尝试发送/工具/语音时 toast「全员禁言中，仅群主和管理员可发言」。
 - 引用条、@ 选择面板、媒体面板与键盘之间的切换由组件自身处理；切换 `conversationId` 时清空引用与 @ 状态。

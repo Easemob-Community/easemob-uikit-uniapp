@@ -19,7 +19,7 @@ EmKit.init({
   enableDraft: true,
   enableTyping: true,
   recallTimeLimit: 120000,
-  inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true, sendOnReturn: true },
+  inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true, inputMode: 'single', sendOnReturn: true },
   primaryColor: '#009EFF'
 })
 ```
@@ -107,11 +107,13 @@ EmKit.init({
 
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `inputFeatures` | `Partial<EmInputFeatures>` | 全部开启 | 输入栏功能集：`voice` / `emoji` / `image` / `camera` / `video` / `file` / `sendOnReturn`（回车发送，关闭则换行输入）；缺项保持默认开 |
+| `inputFeatures` | `Partial<EmInputFeatures>` | 工具全开、`inputMode` 未设置、`sendOnReturn=true` | 输入栏工具、单/多行模式与旧回车配置；缺项保持默认值 |
 | `messageMenuKeys` | `MessageMenuKeyValue[]` | `copy` / `quote` / `edit` / `pin` / `recall` / `resend` / `delete` | 消息长按菜单项与顺序；`edit` 编辑消息、`pin` 置顶消息、`resend` 重发失败消息，删除 key 即禁用对应能力（置顶消息条随之不渲染） |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | `pin` / `mute` / `delete` | 会话长按菜单项与顺序 |
 | `contactMenuKeys` | `ContactMenuKeyValue[]` | `remark` / `delete` | 联系人条目长按菜单项与顺序；`remark` 修改好友备注 |
 | `emojiList` | `string[]` | 内置 96 个 | emoji 面板字符集 |
+
+`inputFeatures.inputMode='single'` 为全端单行 input、回车发送；`'multiline'` 为全端生长 textarea、回车换行、纸飞机发送，1 行起步、最多 5 行，超出内部滚动。未设置 `inputMode` 时保留旧 `sendOnReturn` 行为：`false` 走多行；`true` 时 iOS 走多行回车发送，其余端走单行。显式 `inputMode` 优先，不与 `sendOnReturn` 组合。
 
 ### 品牌与 SDK 加载
 
@@ -157,7 +159,7 @@ console.log(config.recallTimeLimit)
 | `showReadStatus` | `boolean` | `false` |
 | `enableGroupReadReceipt` | `boolean` | `false` |
 | `messageStatus` | `Required<EmMessageStatusPresentation>` | `{ position: 'left', icons: {}, texts: {} }` |
-| `inputFeatures` | `EmInputFeatures` | 全部 `true` |
+| `inputFeatures` | `EmInputFeatures` | 工具全开、`inputMode` 未设置、`sendOnReturn=true` |
 | `messageMenuKeys` | `MessageMenuKeyValue[]` | 七项 |
 | `conversationMenuKeys` | `ConversationMenuKeyValue[]` | 三项 |
 | `contactMenuKeys` | `ContactMenuKeyValue[]` | 两项 |
@@ -165,7 +167,7 @@ console.log(config.recallTimeLimit)
 | `primaryColor` | `string` | `''` |
 | `logPayload` | `boolean` | `false` |
 
-`EmInputFeatures` 为 `{ voice, emoji, image, camera, video, file }`，每项 `boolean`。
+`EmInputFeatures` 包含布尔工具字段 `voice` / `emoji` / `image` / `camera` / `video` / `file`，以及可选 `inputMode` 与旧 `sendOnReturn` 配置。
 
 ## 3. 页面级配置
 
