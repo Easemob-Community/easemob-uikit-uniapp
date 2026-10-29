@@ -362,7 +362,7 @@ function onSelect(action: EmActionSheetAction): void {
 </view>
 ```
 
-**行为与平台**：平铺层固定为容器的 `200% × 140%` 并整体旋转，因此覆盖范围只由 CSS 决定，不依赖窗口尺寸或 `createSelectorQuery` 测量（蒸汽端该查询拿不到 rect）；行列数只用窗口宽高与文案估算宽做"密度"近似，算错也只影响疏密，不影响铺满。整层只用一个 `transform: rotate()`，不把变换落在 `<text>` 上；文案为空时不渲染瓦片节点，五端表现一致；组件是静态装饰层，不播放动画。需要图片、业务 logo 或更复杂的排版时，直接用页面的 `#watermark` 插槽自绘，不必经过本组件。
+**行为与平台**：平铺层按容器比例放大并整体旋转，旋转后始终盖住容器四角，因此不依赖窗口尺寸或 `createSelectorQuery` 测量；行数与列数按屏幕尺寸与文案长度自动估算，只影响疏密，不影响铺满。文案为空时不渲染瓦片节点，可直接作为开关；组件是静态装饰层，不播放动画，也不依赖平台专有 API。需要图片、业务 logo 或更复杂的排版时，直接用页面的 `#watermark` 插槽自绘，不必经过本组件。
 
 ## 平台范围速查
 
@@ -371,7 +371,6 @@ function onSelect(action: EmActionSheetAction): void {
 | `em-nav-bar` 胶囊避让 | 按安全区处理 | 按安全区处理 | 按胶囊矩形计算右内边距 |
 | `em-popup` 收起原生 tabBar | 是 | 否（tabBar 是页面内元素） | 是 |
 | `em-skeleton` 动画 | 静态块 | 静态块 | 静态块 |
-| `em-watermark` 事件穿透 | 依赖 `pointer-events`，用 `watermark-probe` 验证 | 支持 | 支持 |
 | `em-icon` 字体图标 | 支持 | 支持 | 支持 |
 
 更多平台差异见 [平台能力与差异](./PLATFORM.md)，样式变量见 [设计变量](./DESIGN-TOKENS.md)。
