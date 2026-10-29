@@ -1,6 +1,6 @@
 <template>
   <view class="page" :class="themeClass">
-    <em-contact-page @entry-click="onEntryClick" @add="onAdd" />
+    <em-contact-page :watermark="watermarkText" @entry-click="onEntryClick" @add="onAdd" />
     <view v-if="showAddContact" class="addcontact">
       <view class="addcontact__panel">
         <text class="addcontact__title">添加好友</text>
@@ -20,8 +20,11 @@ import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { EmKit, CONTACT_ENTRY_KEY, useTabBarBadge } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
+import { useDemoWatermark } from '@/common/watermark-demo'
 
 const { themeClass } = useDemoTheme()
+// 组件级水印（M2.27）：开关在「我的」页；关闭时为空串
+const { text: watermarkText } = useDemoWatermark()
 
 // 与会话页共用同一响应式来源；tab 页常驻，任一页挂载后角标都会持续跟随 store 更新
 const tabBarBadge = useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })

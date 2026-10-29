@@ -7,6 +7,7 @@
       v-if="conversationId !== '' && useCustomInputBar"
       :conversation-id="conversationId"
       :chat-type="chatType"
+      :watermark="watermarkText"
       :title="sceneTitle"
       :show-action="!sceneHideAction"
       :quick-replies="sceneQuickReplies"
@@ -26,6 +27,7 @@
       v-else-if="conversationId !== ''"
       :conversation-id="conversationId"
       :chat-type="chatType"
+      :watermark="watermarkText"
       :title="sceneTitle"
       :show-action="!sceneHideAction"
       :quick-replies="sceneQuickReplies"
@@ -165,10 +167,13 @@ import DemoComposerBar from '@/components/demo-composer-bar/demo-composer-bar.vu
 import DemoCustomInputbar from '@/components/demo-custom-inputbar/demo-custom-inputbar.vue'
 import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
 import { useDemoTheme } from '@/common/theme'
+import { useDemoWatermark } from '@/common/watermark-demo'
 import { applyScenePresentation, clearScenePresentation, tagOf } from '@/common/presentation-demo'
 import { AI_STREAM_DEMO_CONTENT, AI_STREAM_ERROR_CONTENT, AI_STREAM_FAB_VISIBLE, runMockAiStream } from '@/common/ai-stream-demo'
 
 const { themeClass } = useDemoTheme()
+// 组件级水印（M2.27）：开关在「我的」页；关闭时为空串
+const { text: watermarkText } = useDemoWatermark()
 
 const conversationId = ref('')
 const chatType = ref<ConversationTypeValue>(CONVERSATION_TYPE.SINGLE_CHAT)

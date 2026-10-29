@@ -1,7 +1,7 @@
 <template>
   <view class="page" :class="themeClass">
     <!-- #title-extra 演示：场景实验室注入 ext.demoTag 的会话，标题旁渲染宿主业务标签 -->
-    <em-conversation-page @select="onSelect" @menu="onMenu">
+    <em-conversation-page :watermark="watermarkText" @select="onSelect" @menu="onMenu">
       <template #title-extra="{ ext }">
         <view v-if="tagOf(ext) !== ''" class="demo-tag">
           <text class="demo-tag__text">{{ tagOf(ext) }}</text>
@@ -17,8 +17,11 @@ import { EmKit, CONVERSATION_MENU_KEY, useTabBarBadge } from '@/uni_modules/ease
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
 import { tagOf } from '@/common/presentation-demo'
+import { useDemoWatermark } from '@/common/watermark-demo'
 
 const { themeClass } = useDemoTheme()
+// 组件级水印（M2.27）：开关在「我的」页，文案 = 昵称 + userId；关闭时为空串
+const { text: watermarkText } = useDemoWatermark()
 
 // 底部 tabBar 角标：会话总未读 → index 0，联系人请求未读 → index 1（响应式，SDK 事件驱动）
 const tabBarBadge = useTabBarBadge({ conversationIndex: 0, contactIndex: 1 })

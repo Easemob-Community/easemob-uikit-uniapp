@@ -298,6 +298,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 - **自定义卡片**：内核只保留 `sendCustom` + `#custom-message` 插槽，不内置卡片组件/schema；Demo 提供宿主侧 `demo-card` 参考实现（14 种卡片、字段/角标/主次按钮、手机号脱敏、未知回落）与免登录预览页
 - **输入栏业务入口**：`em-chat-page` 新增 `#input-toolbar` 插槽；Demo 用 `demo-composer-bar` 注入场景化「发订单/发工单/发病例/发简历/换手机号」等入口，点击即发对应自定义卡片，入口开关可实时切换
 - **连接与体验**：连接状态条（重连/断开/被踢）、聊天首屏骨架与历史失败重试、非当前会话消息内存上限、录音 60s 自动发送与权限失败提示、日志 payload 默认关闭、语言偏好持久化、会话/好友列表 `autoSync`
+- **组件级水印**：会话列表 / 聊天 / 好友列表 / 群组列表 / 通讯录首页统一支持 `watermark` prop（字符串或 `EmWatermarkOptions`）与 `#watermark` 插槽；默认由 `em-watermark` 平铺（纯 view/text，无 canvas/图片），覆盖层不响应交互，聊天页不含输入栏与弹层
 
 当前版本不包含：单条转发、联系人详情页/黑名单、群共享文件、公开群入群申请审批、群名片、群已读回执详情、群聊消息搜索、群公告富文本、presence 在线状态。这些能力需要在宿主侧扩展。
 

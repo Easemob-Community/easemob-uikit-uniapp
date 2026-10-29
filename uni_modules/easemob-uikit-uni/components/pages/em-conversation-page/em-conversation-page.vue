@@ -2,69 +2,85 @@
   <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
     <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
-      <!-- 自绘导航栏（系统栏右上角被小程序胶囊独占，且与页内标题重复）：返回隐藏，右侧「+」发起单聊 -->
-      <em-nav-bar
-        :title="title !== '' ? title : t('conversation.title')"
-        :show-back="false"
-        action-icon="circle-plus"
-        @action="onOpenCreate"
-      />
+      <!-- 水印 stage：内容区定位上下文（底边即水印下边界，不含输入栏/弹层）；不加 overflow 以免裁掉组件探出元素 -->
+      <view :class="ns.e('stage')">
+        <!-- 自绘导航栏（系统栏右上角被小程序胶囊独占，且与页内标题重复）：返回隐藏，右侧「+」发起单聊 -->
+        <em-nav-bar
+          :title="title !== '' ? title : t('conversation.title')"
+          :show-back="false"
+          action-icon="circle-plus"
+          @action="onOpenCreate"
+        />
 
-      <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
-      <em-connection-banner :show="showConnectionBanner" />
+        <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
+        <em-connection-banner :show="showConnectionBanner" />
 
-      <!-- 筛选 tab（对齐 vue 版 conversation-tabs：全部/未读/@我/单聊/群组；showTabs=false 或 tabs 传空数组可隐藏） -->
-      <em-conversation-tabs v-if="showTabs && tabs.length > 0" :tabs="tabs" :active="activeTab" @change="onTabChange" />
+        <!-- 筛选 tab（对齐 vue 版 conversation-tabs：全部/未读/@我/单聊/群组；showTabs=false 或 tabs 传空数组可隐藏） -->
+        <em-conversation-tabs v-if="showTabs && tabs.length > 0" :tabs="tabs" :active="activeTab" @change="onTabChange" />
 
-      <em-search-bar v-if="showSearch" v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
+        <em-search-bar v-if="showSearch" v-model="keyword" :placeholder="t('conversation.searchPlaceholder')" />
 
-      <scroll-view :class="ns.e('scroll')" scroll-y>
-        <!-- 首次同步骨架：条目形态对齐 em-conversation-item（圆头像 + 名字/时间行 + 摘要/未读行，逐行变宽） -->
-        <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
-          <view v-for="(nameWidth, index) in SKELETON_NAME_WIDTHS" :key="index" :class="ns.e('skeleton-item')">
-            <em-skeleton variant="avatar" shape="circle" width="48px" height="48px" />
-            <view :class="ns.e('skeleton-body')">
-              <view :class="ns.e('skeleton-top')">
-                <em-skeleton :width="nameWidth" height="16px" />
-                <em-skeleton width="32px" height="12px" :class="ns.e('skeleton-time')" />
-              </view>
-              <view :class="ns.e('skeleton-bottom')">
-                <em-skeleton :width="SKELETON_SUMMARY_WIDTHS[index]" height="14px" />
-                <em-skeleton v-if="SKELETON_UNREAD_ROWS[index]" variant="avatar" shape="circle" width="16px" height="16px" :class="ns.e('skeleton-badge')" />
+        <scroll-view :class="ns.e('scroll')" scroll-y>
+          <!-- 首次同步骨架：条目形态对齐 em-conversation-item（圆头像 + 名字/时间行 + 摘要/未读行，逐行变宽） -->
+          <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
+            <view v-for="(nameWidth, index) in SKELETON_NAME_WIDTHS" :key="index" :class="ns.e('skeleton-item')">
+              <em-skeleton variant="avatar" shape="circle" width="48px" height="48px" />
+              <view :class="ns.e('skeleton-body')">
+                <view :class="ns.e('skeleton-top')">
+                  <em-skeleton :width="nameWidth" height="16px" />
+                  <em-skeleton width="32px" height="12px" :class="ns.e('skeleton-time')" />
+                </view>
+                <view :class="ns.e('skeleton-bottom')">
+                  <em-skeleton :width="SKELETON_SUMMARY_WIDTHS[index]" height="14px" />
+                  <em-skeleton v-if="SKELETON_UNREAD_ROWS[index]" variant="avatar" shape="circle" width="16px" height="16px" :class="ns.e('skeleton-badge')" />
+                </view>
               </view>
             </view>
           </view>
-        </view>
-        <view v-else-if="syncFailed && conversationStore.items.length === 0">
-          <em-empty icon="circle-bang" :description="t('common.syncFailed')">
-            <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
-          </em-empty>
-        </view>
-        <view v-else-if="conversationStore.loaded && items.length === 0">
-          <slot name="empty">
-            <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText" />
+          <view v-else-if="syncFailed && conversationStore.items.length === 0">
+            <em-empty icon="circle-bang" :description="t('common.syncFailed')">
+              <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
+            </em-empty>
+          </view>
+          <view v-else-if="conversationStore.loaded && items.length === 0">
+            <slot name="empty">
+              <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText" />
+            </slot>
+          </view>
+
+          <em-conversation-item
+            v-for="entry in items"
+            :key="entry.item.conversationId"
+            :item="entry.item"
+            :name="entry.name"
+            :avatar="entry.avatar"
+            :time-text="entry.timeText"
+            :draft="entry.draft"
+            :has-at-me="entry.hasAtMe"
+            :ext="entry.ext"
+            @click="onSelect"
+            @long-press="onLongPress"
+          >
+            <!-- 标题扩展位透传（标签/业务徽标）：scope 同 em-conversation-item 的 #title-extra -->
+            <template #title-extra="scope">
+              <slot name="title-extra" :item="scope.item" :name="scope.name" :ext="scope.ext" />
+            </template>
+          </em-conversation-item>
+        </scroll-view>
+
+        <!-- 水印覆盖层（#watermark）：铺满 stage、pointer-events:none 穿透、裁切旋转溢出；层级低于库内弹层基准 2000 -->
+        <view v-if="hasWatermark" :class="ns.e('watermark')">
+          <slot name="watermark" :keyword="keyword">
+            <em-watermark
+              :text="wmText"
+              :font-size="wmFontSize"
+              :opacity="wmOpacity"
+              :rotate="wmRotate"
+              :color="wmColor"
+            />
           </slot>
         </view>
-
-        <em-conversation-item
-          v-for="entry in items"
-          :key="entry.item.conversationId"
-          :item="entry.item"
-          :name="entry.name"
-          :avatar="entry.avatar"
-          :time-text="entry.timeText"
-          :draft="entry.draft"
-          :has-at-me="entry.hasAtMe"
-          :ext="entry.ext"
-          @click="onSelect"
-          @long-press="onLongPress"
-        >
-          <!-- 标题扩展位透传（标签/业务徽标）：scope 同 em-conversation-item 的 #title-extra -->
-          <template #title-extra="scope">
-            <slot name="title-extra" :item="scope.item" :name="scope.name" :ext="scope.ext" />
-          </template>
-        </em-conversation-item>
-      </scroll-view>
+      </view>
 
       <em-action-sheet
         :visible="createSheetVisible"
@@ -92,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, useSlots } from 'vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmConnectionBanner from '../../em-connection-banner/em-connection-banner.vue'
 import EmActionSheet from '../../em-action-sheet/em-action-sheet.vue'
@@ -103,6 +119,7 @@ import EmEmpty from '../../em-empty/em-empty.vue'
 import EmButton from '../../em-button/em-button.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmSelectContact from '../../em-select-contact/em-select-contact.vue'
+import EmWatermark from '../../em-watermark/em-watermark.vue'
 import { EmKit } from '../../../libs'
 import { CONVERSATION_MENU_KEY, CONVERSATION_TAB_KEY, CONVERSATION_TYPE, DEFAULT_CONVERSATION_TABS } from '../../../libs/constants'
 import { conversationStore } from '../../../libs/store/conversation'
@@ -113,11 +130,12 @@ import { contactDisplayNameOf, contactStore } from '../../../libs/store/contact'
 import { groupAvatarOf, groupDisplayNameOf } from '../../../libs/store/group'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
 import type { ConversationTypeValue, ConversationTabKeyValue } from '../../../libs/constants'
-import type { EmActionSheetAction, EmConversationItem as EmConversationData, EmSelectContactItem } from '../../../libs/types'
+import type { EmActionSheetAction, EmConversationItem as EmConversationData, EmSelectContactItem, EmWatermarkOptions } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
 import { formatConversationTime } from '../../../libs/utils/time'
+import { useWatermark } from '../../../libs/use/useWatermark'
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
@@ -136,6 +154,8 @@ interface Props {
   autoSync?: boolean
   /** 顶部连接状态条显隐，默认 true */
   showConnectionBanner?: boolean
+  /** 组件级水印：字符串=文案；对象=可调样式；不传不渲染；空串=不显示（运行期开关） */
+  watermark?: string | EmWatermarkOptions
   customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
@@ -166,6 +186,17 @@ const syncFailed = computed(() => conversationStore.syncFailed)
 const syncPending = ref(false)
 const syncing = computed(() => conversationStore.syncing || syncPending.value)
 const keyword = ref('')
+
+// 水印（M2.27）：slot 存在性为实例级常量；文案为空串时 em-watermark 自行隐藏，壳节点不增删
+const slots = useSlots()
+const {
+  hasWatermark,
+  text: wmText,
+  fontSize: wmFontSize,
+  opacity: wmOpacity,
+  rotate: wmRotate,
+  color: wmColor
+} = useWatermark({ watermark: () => props.watermark, hasSlot: slots.watermark != null })
 
 // 首次挂载与失败重试共用锁；后台同步结果也由 domain 写入同一 store。
 async function syncList(): Promise<void> {

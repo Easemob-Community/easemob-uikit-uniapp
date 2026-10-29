@@ -1,6 +1,6 @@
 <template>
   <view class="page" :class="themeClass">
-    <em-group-page @click-group="onClickGroup" @created="onClickGroup" @back="onBack" />
+    <em-group-page :watermark="watermarkText" @click-group="onClickGroup" @created="onClickGroup" @back="onBack" />
   </view>
 </template>
 
@@ -8,8 +8,11 @@
 import { onLoad } from '@dcloudio/uni-app'
 import { EmKit, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
+import { useDemoWatermark } from '@/common/watermark-demo'
 
 const { themeClass } = useDemoTheme()
+// 组件级水印（M2.27）：开关在「我的」页；关闭时为空串
+const { text: watermarkText } = useDemoWatermark()
 
 onLoad(() => {
   // 只看是否已登录：断网/自动重连不踢回登录页

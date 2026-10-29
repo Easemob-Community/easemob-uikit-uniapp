@@ -523,6 +523,28 @@
   height: 0;
 }
 
+/* 水印 stage（M2.27）：nav → 消息列表的定位上下文；底边即输入栏上沿，
+   水印因此天然不含输入栏/面板/弹层（对齐 vue 版 chat__content 口径）；不加 overflow 以免裁掉气泡角标 */
+.em-chat-page__stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 0;
+  position: relative;
+}
+
+/* 水印覆盖层：铺满 stage、穿透事件、裁切旋转溢出；z-index 低于库内弹层基准 2000 */
+.em-chat-page__watermark {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden;
+}
+
 
 /* 撤回条「重新编辑」按钮（M2.20）：竖线分隔 + 主色文字（对齐 vue 版 reedit-btn 形态） */
 .em-chat-page__recalled-reedit {

@@ -1111,3 +1111,17 @@
 
 - **SDK 实例公开语义**：新增 `EmKit.getSDKClient(): Promise<ChatClient>`，复用同一初始化就绪门和 SDK 单例，供宿主注册原生事件或使用未封装能力；`whenReady()` 保留原行为并将返回类型由 `unknown` 修正为 `ChatClient`。API-KIT 补原生事件注册/卸载与普通业务优先走 EmKit 的边界说明。
 - **chat-only 文档补强**：模板 README 增加设立背景、适用边界与宿主必配项；QUICKSTART 解释模板与完整接入流程的分工；GUIDE-MULTI-SCENARIO 与 DEMO 增加最小单聊模板、完整 Demo 和业务扩展指南之间的选型分流。未新增公开页面或 manifest 条目。
+
+## 2026-10-28 组件级水印（M2.27）
+
+- **范围**：新增原子组件 `em-watermark`；`em-conversation-page` / `em-chat-page` / `em-contact-page` / `em-contact-list-page` / `em-group-page` 新增 `watermark?: string | EmWatermarkOptions` prop 与 `#watermark` 作用域插槽；新增公开类型 `EmWatermarkOptions`；demo「我的」页加水印开关（偏好持久化），会话/聊天/好友/群组/通讯录 demo 页接上；新增开发验证页 `sub-im/pages/watermark-probe`。
+- **壳口径**（对齐 vue 版 `#watermark`）：每页在 `brand-scope` 内新增 `__stage`（`flex:1;height:0;position:relative`，不加 `overflow` 以免裁掉组件探出元素），覆盖层 `__watermark` 为 `absolute + 四边 0 + z-index:10 + pointer-events:none + overflow:hidden`。聊天页 stage 只包 nav → 消息列表，底边即输入栏上沿，**天然不含输入栏/表情面板/弹层**；会话/好友/群组/通讯录覆盖 nav + 搜索 + 列表。
+- **平铺定案**：初稿「按窗口几何算旋转包围盒 + 固定 px 瓦片」在 H5 首帧暴露 `getWindowInfo()` 早于视口稳定（拿到启动默认尺寸）→ 层尺寸偏小留白；改为**覆盖只由 CSS 决定**（平铺层 `200% × 140%` + 负偏移 + 整层旋转），窗口宽高/宽高比只用于行列密度近似，算错只影响疏密。瓦片数典型 40–70（4 列 × 10 行），旋转只落整层 view，`<text>` 内不增删子节点（§5d/§5j/§5q 规避）。
+- **运行期开关**：`hasWatermark` 是实例级常量（`slots.watermark != null || watermark prop !== undefined`），不随开关增删壳节点；关闭用空文案（根节点内联 `display:none`），不要切 `v-if`、也不要用 `undefined` 关闭。
+- **H5 实测（Chrome headless + CDP，watermark-probe）**：覆盖层铺满整页（含输入框）；`elementFromPoint` 命中底层 `probe__item`；CDP 真实鼠标点击 `tap 0→1`；触摸长按 `longpress 0→1`；滚轮滚动 `scrollTop 0→400`；点击输入框 `document.activeElement=INPUT`。即 H5 端 `pointer-events:none` 穿透成立。
+- **门禁**：`build web` ✓；`build mp-weixin` ✓（11 项防回归全绿，主包 1038KB）；H5 最终产物静态伺服 200 ✓；`check-docs` ✓（29 页 / 36 组件 / 83 方法 / 33 配置）；`check-dx-contract` / `check-config-docs` / `check-theme-locale-contract` / `check-skills` / `check-release`（仅既有 keyPassword WARN）✓；`build app-harmony`（prod）✓ 重编后 `check-app-module-graph` ✓（158 模块，0 反向依赖、0 循环）。App 编译产物已确认 `em-chat-page__watermark` 落成 `pointerEvents:"none"`、`em-watermark__layer/__row/__text` 样式齐全，即 ucss 声明被编译器接受、未被丢弃。
+- **待验（真机，不得以编译/ H5 结果替代）**：
+  1. **App 三端 `pointer-events:none` 穿透**：用 `sub-im/pages/watermark-probe` 逐端验证「点行计 tap / 长按计 longpress / 列表可滚 / 输入框可聚焦」。这是唯一阻塞项——官方 CSS 文档的「App 平台拍平兼容性」对 `pointer-events` 标 `x`，但蒸汽 runtime 的样式映射表含 `pointer-events`，Android 基座有 `pointerEventsIsNone`/`dispatchPointerEvent`、iOS 基座有 `pointerEvents`/`hitTest`，需真机定案。
+  2. 若某端穿透失效：该端不能上覆盖层，需另立「垫底水印」方案（内容容器加 `position:relative;z-index:1`，水印层 `z-index:0`），视觉会被不透明卡片/气泡遮挡，属降级而非等价实现。
+  3. 五端视觉验收：暗色模式可读、四角无空洞、瓦片不压住输入框/弹层；聊天页 stage 包裹后键盘避让、滚底锚点、引用定位、多选栏、`#input-bar` 自绘栏逐项回归。
+  4. H5 桌面端窗口缩放不重排行列（移动优先，明确不支持）；如宿主需要，二期加 `uni.onWindowResize`（需先确认各端实现）。

@@ -1,6 +1,6 @@
 # 基础组件
 
-这页是 12 个通用原子组件的契约参考：`em-action-sheet`、`em-avatar`、`em-badge`、`em-button`、`em-empty`、`em-icon`、`em-load-more`、`em-nav-bar`、`em-popup`、`em-search-bar`、`em-skeleton`、`em-text`。它们不连 store、不碰路由，props 进、events 出，可以直接嵌进宿主自己的界面。
+这页是 13 个通用原子组件的契约参考：`em-action-sheet`、`em-avatar`、`em-badge`、`em-button`、`em-empty`、`em-icon`、`em-load-more`、`em-nav-bar`、`em-popup`、`em-search-bar`、`em-skeleton`、`em-text`、`em-watermark`。它们不连 store、不碰路由，props 进、events 出，可以直接嵌进宿主自己的界面。
 
 本页所有组件都符合 easycom 目录约定，`pages.json` 打开 `autoscan` 后可直接写标签；也可以显式 `import` 后局部注册。引入方式与选型见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。
 
@@ -341,6 +341,29 @@ function onSelect(action: EmActionSheetAction): void {
 
 **为什么需要双通道**：组件的样式隔离级别是 `app-and-page`（编译为 `apply-shared`），父组件的 wxss 只能影响页面级节点，碰不到本组件内部那个 `text` 节点。因此在微信小程序上，只写 `textClass` 会出现"字体、颜色全部失效"的现象；`textStyle` 走内联样式，不受样式隔离限制，是跨端必须补齐的那一半。约定是**两边同时给**：`textClass` 供 H5 / App 的样式表命中，`textStyle` 供小程序命中，值保持一致。组件是 `virtualHost`，宿主写在标签上的 class（常用于 flex、`min-width`、`margin`）会合并到根 `view` 上，宽度与溢出约束在根节点这一层生效。
 
+## em-watermark
+
+组件级水印的默认平铺内容：按当前窗口几何铺满父容器，瓦片整体旋转、低透明度，纯 `view` + `text` 渲染，不依赖 canvas、图片或测量 API。它只负责"画内容"——定位与事件穿透由页面级组件（会话列表页、聊天页、好友列表页、群组列表页、通讯录入口页）的 `#watermark` 覆盖层壳负责；直接嵌进宿主自己的容器时，父容器需要 `position: relative` 且有确定尺寸。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `text` | `string` | 必填 | 水印文案，通常为"昵称 + userId"；空串不渲染，可直接作为运行期开关 |
+| `fontSize` | `number` | `12` | 字号（px） |
+| `opacity` | `number` | `0.08` | 整层不透明度 |
+| `rotate` | `number` | `-20` | 整层旋转角度（度） |
+| `color` | `string` | `var(--em-text-primary)` | 文字颜色；暗色主题跟随 token 自动反转 |
+| `customClass` / `customStyle` | `string` | `''` | 根节点样式透出，见 [样式定制](./GUIDE-STYLING.md) |
+
+无事件、无插槽。
+
+```vue
+<view class="watermark-host">
+  <em-watermark text="张三 13800138000" />
+</view>
+```
+
+**行为与平台**：平铺层固定为容器的 `200% × 140%` 并整体旋转，因此覆盖范围只由 CSS 决定，不依赖窗口尺寸或 `createSelectorQuery` 测量（蒸汽端该查询拿不到 rect）；行列数只用窗口宽高与文案估算宽做"密度"近似，算错也只影响疏密，不影响铺满。整层只用一个 `transform: rotate()`，不把变换落在 `<text>` 上；文案为空时不渲染瓦片节点，五端表现一致；组件是静态装饰层，不播放动画。需要图片、业务 logo 或更复杂的排版时，直接用页面的 `#watermark` 插槽自绘，不必经过本组件。
+
 ## 平台范围速查
 
 | 能力 | App（Android / iOS / 鸿蒙） | H5 | 微信小程序 |
@@ -348,6 +371,7 @@ function onSelect(action: EmActionSheetAction): void {
 | `em-nav-bar` 胶囊避让 | 按安全区处理 | 按安全区处理 | 按胶囊矩形计算右内边距 |
 | `em-popup` 收起原生 tabBar | 是 | 否（tabBar 是页面内元素） | 是 |
 | `em-skeleton` 动画 | 静态块 | 静态块 | 静态块 |
+| `em-watermark` 事件穿透 | 依赖 `pointer-events`，用 `watermark-probe` 验证 | 支持 | 支持 |
 | `em-icon` 字体图标 | 支持 | 支持 | 支持 |
 
 更多平台差异见 [平台能力与差异](./PLATFORM.md)，样式变量见 [设计变量](./DESIGN-TOKENS.md)。

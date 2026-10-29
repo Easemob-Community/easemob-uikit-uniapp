@@ -1,0 +1,229 @@
+<template>
+  <!-- 水印穿透探针（M2.27，开发验证页）：覆盖层铺满整页（含输入框），验证 pointer-events:none 在五端
+       是否真的把点击/长按/滚动/聚焦都放给底层。App 三端必测：点行计 tap、长按计 longpress、列表可滚、
+       底部输入框可聚焦输入；任一失效即该端不支持穿透，需要走「垫底」兜底方案。 -->
+  <view class="probe" :class="themeClass">
+    <view class="probe__stage">
+      <view class="probe__bar" :style="'padding-top:' + safeTop + 'px'">
+        <text class="probe__title">水印穿透探针</text>
+        <text class="probe__stat">tap {{ tapCount }} · longpress {{ longPressCount }} · input「{{ inputText }}」</text>
+        <text class="probe__stat">window {{ winW }}×{{ winH }} · stage {{ stageW }}×{{ stageH }}</text>
+        <view class="probe__actions">
+          <view class="probe__btn" @click="reset">
+            <text class="probe__btn-text">清零</text>
+          </view>
+          <view class="probe__btn" @click="showing = !showing">
+            <text class="probe__btn-text">{{ showing ? '隐藏水印' : '显示水印' }}</text>
+          </view>
+        </view>
+      </view>
+
+      <scroll-view class="probe__scroll" scroll-y>
+        <view
+          v-for="i in ROWS"
+          :key="i"
+          class="probe__item"
+          @click="onTap(i)"
+          @longpress="onLongPress(i)"
+        >
+          <text class="probe__item-text">第 {{ i }} 行：点一下计 tap，长按计 longpress</text>
+        </view>
+        <view class="probe__tail">
+          <text class="probe__tail-text">到底了：能滚到这里说明覆盖层没有吃掉滚动</text>
+        </view>
+      </scroll-view>
+
+      <view class="probe__inputbar">
+        <input class="probe__input" v-model="inputText" placeholder="覆层之下仍应能聚焦并输入" />
+      </view>
+
+      <!-- 覆盖层：与页面级组件同款壳（absolute + 四边 0 + z-index 10 + pointer-events:none + overflow:hidden） -->
+      <view v-if="showing" class="probe__watermark">
+        <em-watermark :text="WATERMARK_TEXT" />
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { onReady } from '@dcloudio/uni-app'
+import EmWatermark from '@/uni_modules/easemob-uikit-uni/components/em-watermark/em-watermark.vue'
+import { getSafeAreaTop } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+
+const { themeClass } = useDemoTheme()
+
+const ROWS = 40
+const WATERMARK_TEXT = '水印探针 13800138000'
+
+const safeTop = getSafeAreaTop()
+const winW = ref(0)
+const winH = ref(0)
+const stageW = ref(0)
+const stageH = ref(0)
+const tapCount = ref(0)
+const longPressCount = ref(0)
+const inputText = ref('')
+const showing = ref(true)
+
+onReady(() => {
+  const info = uni.getWindowInfo()
+  winW.value = Number(info.windowWidth)
+  winH.value = Number(info.windowHeight)
+
+  // 探针只报一次实测尺寸：和 window 对齐说明页面尺寸 API 可信；不一致时以实测为准排查
+  uni.createSelectorQuery()
+    .select('.probe__watermark')
+    .boundingClientRect()
+    .exec((res) => {
+      const rect = res != null && res.length > 0 ? res[0] as { width: number, height: number } | null : null
+      if (rect == null) return
+      stageW.value = Number(rect.width)
+      stageH.value = Number(rect.height)
+    })
+})
+
+function onTap(index: number): void {
+  tapCount.value = tapCount.value + 1
+  console.log('[watermark-probe] tap row', index)
+}
+
+function onLongPress(index: number): void {
+  longPressCount.value = longPressCount.value + 1
+  console.log('[watermark-probe] longpress row', index)
+}
+
+function reset(): void {
+  tapCount.value = 0
+  longPressCount.value = 0
+  inputText.value = ''
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.probe {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  background-color: var(--em-bg-base);
+}
+
+.probe__stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 0;
+  position: relative;
+}
+
+.probe__bar {
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-bottom: 8px;
+  background-color: var(--em-bg-elevated);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.probe__title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--em-text-primary);
+}
+
+.probe__stat {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--em-text-secondary);
+}
+
+.probe__actions {
+  display: flex;
+  flex-direction: row;
+  margin-top: 8px;
+}
+
+.probe__btn {
+  height: 28px;
+  padding-left: 12px;
+  padding-right: 12px;
+  margin-right: 8px;
+  border-radius: 14px;
+  background-color: var(--em-control-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.probe__btn-text {
+  font-size: 12px;
+  color: var(--em-text-primary);
+}
+
+.probe__scroll {
+  flex: 1;
+  height: 0;
+}
+
+.probe__item {
+  padding: 14px 16px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--em-divider-color);
+}
+
+.probe__item-text {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--em-text-primary);
+}
+
+.probe__tail {
+  padding: 24px 16px;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+}
+
+.probe__tail-text {
+  font-size: 12px;
+  color: var(--em-text-tertiary);
+}
+
+.probe__inputbar {
+  padding: 8px 16px;
+  background-color: var(--em-bg-elevated);
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: var(--em-divider-color);
+}
+
+.probe__input {
+  height: 36px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-radius: 8px;
+  background-color: var(--em-control-bg);
+  font-size: 14px;
+  color: var(--em-text-primary);
+}
+
+/* 覆盖层壳：与页面级组件 __watermark 完全同款 */
+.probe__watermark {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden;
+}
+</style>

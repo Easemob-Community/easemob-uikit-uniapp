@@ -90,7 +90,10 @@ function onAdd() {
 
 ### Props
 
-本页不接收 props。
+| 属性 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `title` | `string` | `''` | 导航标题覆盖；空串使用内置通讯录标题 |
+| `watermark` | `string \| EmWatermarkOptions` | 未设置 | 组件级水印：字符串=文案、对象=可调样式，空串不显示；覆盖导航栏/搜索/入口列表。不传则不渲染 |
 
 ### Events
 
@@ -101,7 +104,9 @@ function onAdd() {
 
 ### Slots
 
-本页不对外提供插槽。
+| 插槽 | 作用域 | 说明 |
+|---|---|---|
+| `watermark` | `{ keyword: string }` | 水印覆盖层，铺满导航栏/搜索/入口列表，`pointer-events: none` 不响应交互；缺省渲染 `em-watermark` |
 
 ### 宿主接线
 
@@ -176,6 +181,7 @@ function onBack() {
 |---|---|---|---|
 | `menuKeys` | `ContactMenuKeyValue[]` | 回落 `uiConfig.contactMenuKeys`（`['remark','delete']`） | 长按菜单项与顺序，取值来自 `CONTACT_MENU_KEY`；`remark` 修改备注、`delete` 删除好友 |
 | `autoSync` | `boolean` | `true` | 首次挂载自动读好友快照（要求已登录）；关闭后由宿主控制同步时机 |
+| `watermark` | `string \| EmWatermarkOptions` | 未设置 | 组件级水印：字符串=文案、对象=可调样式，空串不显示；覆盖导航栏/连接条/横幅/公告/置顶/消息列表，**不含输入栏、面板与弹层**。不传则不渲染（零开销） |
 
 ### Events
 
@@ -186,7 +192,9 @@ function onBack() {
 
 ### Slots
 
-本页不对外提供插槽。
+| 插槽 | 作用域 | 说明 |
+|---|---|---|
+| `watermark` | `{ keyword: string }` | 水印覆盖层，铺满导航栏/搜索/字母分组列表，`pointer-events: none` 不响应交互；缺省渲染 `em-watermark` |
 
 ### 拼音与字母索引
 

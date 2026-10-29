@@ -38,6 +38,23 @@ export interface EmInputFeatures {
   sendOnReturn: boolean
 }
 
+/**
+ * 组件级水印配置：页面 `watermark` prop 的对象形态（字符串等价于 `{ text }`）。
+ * 只描述默认平铺内容（em-watermark）；需要整层自绘时用页面 `#watermark` 插槽。
+ */
+export interface EmWatermarkOptions {
+  /** 水印文案（通常为当前用户昵称 + userId）；空串 = 不显示，可作运行期开关 */
+  text: string
+  /** 字号（px），默认 12 */
+  fontSize?: number
+  /** 整层不透明度，默认 0.08 */
+  opacity?: number
+  /** 旋转角度（度），默认 -20 */
+  rotate?: number
+  /** 文字颜色，默认 var(--em-text-primary)，暗色主题自动反转 */
+  color?: string
+}
+
 /** 附件选择上下文：聊天页调起宿主附件能力时透传；resolve 外部 URI 时可只带 mimeTypes */
 export interface EmAttachmentPickOptions {
   conversationId?: string

@@ -33,6 +33,8 @@
 | 聊天页 | `em-chat-page` | 消息列表（list-view 复用）、5 种气泡、输入栏、长按菜单（支持业务动作追加）、群公告条位、业务横幅位（`#banner`）、输入栏业务入口位（`#input-toolbar`）、下拉加载历史、自定义消息收发（`#custom-message` 插槽 + `EmKit.sendCustom`）、快捷回复条 |
 | 登录接入 | demo 内置 `pages/login` | appkey + userId + token 登录；demo 提供「测试 token 获取」入口（仅开发用） |
 
+**组件级水印（M2.27）**：会话列表 / 聊天 / 好友列表 / 群组列表 / 通讯录首页统一支持 `watermark` prop 与 `#watermark` 插槽。UIKit 只提供铺满、`pointer-events: none` 穿透、裁切的覆盖层壳（对齐 vue 版 `#watermark` 契约），默认内容由原子组件 `em-watermark` 平铺；聊天页只覆盖内容区（header / 通知条 / 消息列表），不含输入栏、面板与弹层。
+
 ### 1.2 消息气泡（5 种 + 出口）
 
 - 文本（`em-text-message`）：链接识别、`@` 高亮；流式文本（AI 流式输出：打字机光标 / 终态收敛 / 异常提示，M2.13）
@@ -345,6 +347,13 @@ easemob-uikit-uniapp/
 - **范围**：`em-chat-page` 新增 `peerName`/`peerAvatar`、页面级 `inputFeatures`（按字段覆盖全局）与 `messageMenuKeys`（数组整体覆盖）；新增 `useThemeChrome` 收口 H5/App/mp chrome；会话/通讯录/群/聊天信息页新增 `title`；`EmLocaleName` 支持扩展字符串及偏好恢复；已配置但平台不可用的 voice/file 给开发期一次性提示；复用现有素材补首屏展示；新增 `EmKit.getSDKClient(): Promise<ChatClient>` 作为原生 SDK 实例逃生舱，`whenReady()` 保留并明确相同返回类型。
 - **明确不做**：会话级 `setConfigScope`、Provider、新增 `#nav-action`、RTL、内置气泡结构接管；全局 `uiConfig` 语义不变，页面覆盖不写回全局。
 - **门禁**：沿用 M2.25；重点验证双实例配置隔离、宿主后注入资料不被卸载误删、第三语言持久化、H5 深色 chrome。未实测端不记为已解决。
+
+### M2.27：组件级水印（2026-10-28 立项，评估见 `reports/uikit-watermark-evaluation.md`）
+
+- **背景**：vue 版以 `#watermark` 插槽在聊天/好友/群组/黑名单/通讯录首页提供铺满、穿透的覆盖层壳，uni 版此前无水印能力；企业合规场景需要按页面展示当前用户身份水印，且不得影响列表点击、长按、滚动与键盘避让。
+- **范围**：新增原子组件 `em-watermark`（纯 view + text 平铺；`uni.getWindowInfo()` 同步几何 + 旋转包围盒，不做 `createSelectorQuery` 测量；无 canvas / 无图片 / 无新依赖）；`em-conversation-page` / `em-chat-page` / `em-contact-list-page` / `em-group-page` / `em-contact-page` 新增 `watermark?: string | EmWatermarkOptions` prop 与 `#watermark` 插槽（插槽优先，可整层自绘）；覆盖层 `position:absolute + 四边 0 + z-index:10 + pointer-events:none + overflow:hidden`，聊天页只包内容区（header → 消息列表），不含输入栏/面板/弹层；公开类型 `EmWatermarkOptions`；demo「我的」页加水印开关。
+- **明确不做**：全局 `EmKit.init` 级水印开关、垫底（behind）模式、canvas / dataURI 背景 / UTS 原生插件、漂移动画、聊天信息页与新的朋友页接入（二期按需）。
+- **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs` + `check-app-module-graph`；App 三端 `pointer-events` 穿透、布局与键盘回归真机待验（记 STATUS，未实测端不得记为已解决）。
 
 ### M3：组件沉淀与发布
 

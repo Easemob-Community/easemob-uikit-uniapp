@@ -101,6 +101,7 @@ function onMenu(key: string) {
 | `emptyText` | `string` | `''` | 空列表文案；空串使用分 tab 的 i18n 默认文案。搜索无结果时不使用该值 |
 | `autoSync` | `boolean` | `true` | 首次挂载自动拉取会话快照（要求 `EmKit.state.userId` 非空）；关闭后由宿主自行控制同步时机 |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条显隐 |
+| `watermark` | `string \| EmWatermarkOptions` | 未设置 | 组件级水印：字符串=文案、对象=可调样式，空串不显示；覆盖导航栏/连接条/横幅/公告/置顶/消息列表，**不含输入栏、面板与弹层**。不传则不渲染（零开销） |
 
 ## Events
 
@@ -115,6 +116,7 @@ function onMenu(key: string) {
 |---|---|---|
 | `empty` | 无 | 列表为空（含搜索无结果）时整体替换默认空态 |
 | `title-extra` | `{ item: EmConversationItem, name: string, ext?: Record<string, unknown> }` | 条目标题旁的扩展位（标签/业务徽标）。`ext` 为 `EmKit.setConversationPresentation` 注入的业务载荷；缺省不渲染不占位 |
+| `watermark` | `{ keyword: string }` | 水印覆盖层，铺满导航栏/连接条/筛选 tab/搜索/列表，`pointer-events: none` 不响应交互；缺省渲染 `em-watermark` |
 
 ## 宿主接线
 

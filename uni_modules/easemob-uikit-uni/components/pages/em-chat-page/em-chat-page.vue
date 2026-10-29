@@ -2,257 +2,274 @@
   <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
     <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
-      <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar；
-           #title 插槽：宿主整标题自绘（scope：name/ext/conversationId），缺省回落内置标题（会话注入名 > title prop > 昵称链） -->
-      <em-nav-bar
-        v-if="showNavBar"
-        :title="navTitle"
-        :subtitle="headerSubtitle"
-        :show-back="showBack"
-        :action-icon="showAction ? 'vertical' : ''"
-        @back="onBack"
-        @action="onOpenInfo"
-      >
-        <template #title>
-          <!-- fallback 内联样式双通道：app-and-page 隔离下 nav-bar 组件样式不外泄，缺省标题需自带字重与主题色 -->
-          <slot name="title" :name="peerDisplayName" :ext="titleExt" :conversation-id="conversationId">
-            <text :style="fallbackTitleTextStyle">{{ navTitle }}</text>
+      <!-- 水印 stage：nav → 消息列表的定位上下文；底边即输入栏上沿，水印天然不含输入栏/面板/弹层；
+           只补 position，不加 overflow（会裁掉气泡角标等组件探出元素） -->
+      <view :class="ns.e('stage')">
+        <!-- 自绘导航栏（pages.json 配 navigationStyle:custom / App titleNView:false），胶囊避让内置于 em-nav-bar；
+             #title 插槽：宿主整标题自绘（scope：name/ext/conversationId），缺省回落内置标题（会话注入名 > title prop > 昵称链） -->
+        <em-nav-bar
+          v-if="showNavBar"
+          :title="navTitle"
+          :subtitle="headerSubtitle"
+          :show-back="showBack"
+          :action-icon="showAction ? 'vertical' : ''"
+          @back="onBack"
+          @action="onOpenInfo"
+        >
+          <template #title>
+            <!-- fallback 内联样式双通道：app-and-page 隔离下 nav-bar 组件样式不外泄，缺省标题需自带字重与主题色 -->
+            <slot name="title" :name="peerDisplayName" :ext="titleExt" :conversation-id="conversationId">
+              <text :style="fallbackTitleTextStyle">{{ navTitle }}</text>
+            </slot>
+          </template>
+        </em-nav-bar>
+
+        <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
+        <em-connection-banner :show="showConnectionBanner" />
+
+        <!-- 业务横幅（#banner）：nav-bar 与群公告条之间的固定区，不随消息滚动；
+             医疗病情摘要条/招聘职位条/交易商品条等由宿主渲染（样式与间距宿主自管） -->
+        <slot name="banner" />
+
+        <!-- 群公告条（仅群聊 + showAnnouncement）：标题 + 单行省略正文，超一行给出展开按钮（全量走 em-popup 弹层） -->
+        <view v-if="showAnnouncementBanner" :class="ns.e('announcement')">
+          <EmIcon name="board" :size="14" :class="ns.e('announcement-icon')" />
+          <view :class="ns.e('announcement-main')">
+            <text :class="ns.e('announcement-title')">{{ t('chat.announcementBanner.title') }}</text>
+            <em-text :text="announcement" :text-class="ns.e('announcement-text')" :text-style="announcementTextStyle" :class="ns.e('announcement-host')" />
+          </view>
+          <view v-if="announcementCanExpand" :class="ns.e('announcement-toggle')" @click="announcementVisible = true">
+            <EmIcon name="chevron-down" :size="14" :class="ns.e('announcement-toggle-icon')" />
+          </view>
+        </view>
+
+        <!-- 置顶消息条（M2.20）：折叠态最新一条预览、多条下拉展开；置顶能力开关=messageMenuKeys 含 pin；
+             宿主可经 #pinned-bar 插槽整体接管（scope 同默认数据） -->
+        <slot v-if="showPinnedBar" name="pinned-bar" :rows="pinnedRows" :expanded="pinnedExpanded" :toggle-expand="togglePinnedExpand" :locate="locatePinnedMessage" :unpin="unpinPinnedMessage">
+          <em-pinned-bar
+            :rows="pinnedRows"
+            :expanded="pinnedExpanded"
+            @toggle-expand="togglePinnedExpand"
+            @locate="locatePinnedMessage"
+            @unpin="unpinPinnedMessage"
+          />
+        </slot>
+        <scroll-view
+          :class="ns.e('scroll')"
+          scroll-y
+          :scroll-top="scrollTopVal"
+          :scroll-into-view="anchorId"
+          :scroll-with-animation="scrollWithAnimation"
+          :show-scrollbar="false"
+          :enhanced="true"
+          :style="ready ? '' : 'opacity: 0;'"
+          @scroll="onChatScroll"
+          @scrolltolower="onChatScrollToLower"
+          @click="onChatAreaClick"
+        >
+          <view v-if="(historyFailed || loadMoreFailed) && list.length > 0" :class="ns.e('history')" @click="retryHistory">
+            <text :class="ns.e('history-text')">{{ t('chat.historyFailedRetry') }}</text>
+          </view>
+          <view v-else-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
+            <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
+          </view>
+          <view v-else-if="list.length > 0" :class="ns.e('history')">
+            <text :class="ns.e('history-text')">{{ t('conversation.noMoreHistory') }}</text>
+          </view>
+
+          <!-- 首屏历史未回包：气泡骨架占位（左右交替对话形态，对齐真实消息行布局）；不显示空态，避免「先闪暂无消息再出消息」 -->
+          <view v-if="showHistorySkeleton" :class="ns.e('skeleton')">
+            <view
+              v-for="(row, index) in skeletonRows"
+              :key="index"
+              :class="[ns.e('skeleton-row'), row.self && ns.m('skeleton-row-self'), row.kind === 'chip' && ns.m('skeleton-row-chip')]"
+            >
+              <view v-if="row.kind === 'chip'" :class="ns.e('skeleton-chip')" />
+              <template v-else>
+                <em-skeleton variant="avatar" shape="circle" width="36px" height="36px" :class="ns.e('skeleton-avatar')" />
+                <view
+                  :class="[ns.e('skeleton-bubble'), row.self && ns.m('skeleton-bubble-self'), row.kind === 'image' && ns.m('skeleton-bubble-image')]"
+                  :style="row.kind === 'image' ? '' : 'width: ' + row.widthRpx + 'rpx'"
+                >
+                  <em-skeleton
+                    v-for="n in row.lines"
+                    :key="n"
+                    height="16px"
+                    :class="[ns.e('skeleton-text'), n < row.lines ? ns.e('skeleton-text-gap') : '']"
+                    custom-style="background-color: var(--em-bg-base)"
+                  />
+                </view>
+              </template>
+            </view>
+          </view>
+
+          <!-- 未登录是独立状态：不进入历史请求、不展示网络错误，宿主可经 unauthorized 接管登录 -->
+          <view v-else-if="unauthorized" :class="ns.e('history-error')">
+            <em-empty icon="person" size="large" :description="t('chat.unauthorized')" />
+          </view>
+
+          <!-- 消息为空的宿主自定义出口（默认 em-empty 空态；必须等首次历史请求成功后才展示） -->
+          <slot v-else-if="list.length === 0 && historySettled && !historyFailed && !loadMoreFailed" name="empty">
+            <em-empty icon="bubble-rect-2" size="large" :description="t('chat.noMessages')" />
           </slot>
-        </template>
-      </em-nav-bar>
 
-      <!-- 连接状态条：重连中/断开/被踢（宿主可 showConnectionBanner=false 关闭） -->
-      <em-connection-banner :show="showConnectionBanner" />
-
-      <!-- 业务横幅（#banner）：nav-bar 与群公告条之间的固定区，不随消息滚动；
-           医疗病情摘要条/招聘职位条/交易商品条等由宿主渲染（样式与间距宿主自管） -->
-      <slot name="banner" />
-
-      <!-- 群公告条（仅群聊 + showAnnouncement）：标题 + 单行省略正文，超一行给出展开按钮（全量走 em-popup 弹层） -->
-      <view v-if="showAnnouncementBanner" :class="ns.e('announcement')">
-        <EmIcon name="board" :size="14" :class="ns.e('announcement-icon')" />
-        <view :class="ns.e('announcement-main')">
-          <text :class="ns.e('announcement-title')">{{ t('chat.announcementBanner.title') }}</text>
-          <em-text :text="announcement" :text-class="ns.e('announcement-text')" :text-style="announcementTextStyle" :class="ns.e('announcement-host')" />
-        </view>
-        <view v-if="announcementCanExpand" :class="ns.e('announcement-toggle')" @click="announcementVisible = true">
-          <EmIcon name="chevron-down" :size="14" :class="ns.e('announcement-toggle-icon')" />
-        </view>
-      </view>
-
-      <!-- 置顶消息条（M2.20）：折叠态最新一条预览、多条下拉展开；置顶能力开关=messageMenuKeys 含 pin；
-           宿主可经 #pinned-bar 插槽整体接管（scope 同默认数据） -->
-      <slot v-if="showPinnedBar" name="pinned-bar" :rows="pinnedRows" :expanded="pinnedExpanded" :toggle-expand="togglePinnedExpand" :locate="locatePinnedMessage" :unpin="unpinPinnedMessage">
-        <em-pinned-bar
-          :rows="pinnedRows"
-          :expanded="pinnedExpanded"
-          @toggle-expand="togglePinnedExpand"
-          @locate="locatePinnedMessage"
-          @unpin="unpinPinnedMessage"
-        />
-      </slot>
-      <scroll-view
-        :class="ns.e('scroll')"
-        scroll-y
-        :scroll-top="scrollTopVal"
-        :scroll-into-view="anchorId"
-        :scroll-with-animation="scrollWithAnimation"
-        :show-scrollbar="false"
-        :enhanced="true"
-        :style="ready ? '' : 'opacity: 0;'"
-        @scroll="onChatScroll"
-        @scrolltolower="onChatScrollToLower"
-        @click="onChatAreaClick"
-      >
-        <view v-if="(historyFailed || loadMoreFailed) && list.length > 0" :class="ns.e('history')" @click="retryHistory">
-          <text :class="ns.e('history-text')">{{ t('chat.historyFailedRetry') }}</text>
-        </view>
-        <view v-else-if="hasMore" :class="ns.e('history')" @click="onLoadMore">
-          <text :class="ns.e('history-text')">{{ loadingMore ? t('conversation.loadingMore') : t('chat.loadMoreHistory') }}</text>
-        </view>
-        <view v-else-if="list.length > 0" :class="ns.e('history')">
-          <text :class="ns.e('history-text')">{{ t('conversation.noMoreHistory') }}</text>
-        </view>
-
-        <!-- 首屏历史未回包：气泡骨架占位（左右交替对话形态，对齐真实消息行布局）；不显示空态，避免「先闪暂无消息再出消息」 -->
-        <view v-if="showHistorySkeleton" :class="ns.e('skeleton')">
-          <view
-            v-for="(row, index) in skeletonRows"
-            :key="index"
-            :class="[ns.e('skeleton-row'), row.self && ns.m('skeleton-row-self'), row.kind === 'chip' && ns.m('skeleton-row-chip')]"
-          >
-            <view v-if="row.kind === 'chip'" :class="ns.e('skeleton-chip')" />
-            <template v-else>
-              <em-skeleton variant="avatar" shape="circle" width="36px" height="36px" :class="ns.e('skeleton-avatar')" />
-              <view
-                :class="[ns.e('skeleton-bubble'), row.self && ns.m('skeleton-bubble-self'), row.kind === 'image' && ns.m('skeleton-bubble-image')]"
-                :style="row.kind === 'image' ? '' : 'width: ' + row.widthRpx + 'rpx'"
-              >
-                <em-skeleton
-                  v-for="n in row.lines"
-                  :key="n"
-                  height="16px"
-                  :class="[ns.e('skeleton-text'), n < row.lines ? ns.e('skeleton-text-gap') : '']"
-                  custom-style="background-color: var(--em-bg-base)"
+          <!-- 历史失败：toast + 点击重试（已缓存消息时改为顶部重试行，不遮消息） -->
+          <view v-else-if="list.length === 0 && (historyFailed || loadMoreFailed)" :class="ns.e('history-error')">
+            <em-empty icon="circle-bang" size="large" :description="t('chat.historyFailed')">
+              <view :class="ns.e('history-retry')">
+                <em-button
+                  type="outline"
+                  size="medium"
+                  pill
+                  :text="t('chat.retry')"
+                  :disabled="historyLoading"
+                  @click="retryHistory"
                 />
               </view>
-            </template>
+            </em-empty>
           </view>
-        </view>
 
-        <!-- 未登录是独立状态：不进入历史请求、不展示网络错误，宿主可经 unauthorized 接管登录 -->
-        <view v-else-if="unauthorized" :class="ns.e('history-error')">
-          <em-empty icon="person" size="large" :description="t('chat.unauthorized')" />
-        </view>
-
-        <!-- 消息为空的宿主自定义出口（默认 em-empty 空态；必须等首次历史请求成功后才展示） -->
-        <slot v-else-if="list.length === 0 && historySettled && !historyFailed && !loadMoreFailed" name="empty">
-          <em-empty icon="bubble-rect-2" size="large" :description="t('chat.noMessages')" />
-        </slot>
-
-        <!-- 历史失败：toast + 点击重试（已缓存消息时改为顶部重试行，不遮消息） -->
-        <view v-else-if="list.length === 0 && (historyFailed || loadMoreFailed)" :class="ns.e('history-error')">
-          <em-empty icon="circle-bang" size="large" :description="t('chat.historyFailed')">
-            <view :class="ns.e('history-retry')">
-              <em-button
-                type="outline"
-                size="medium"
-                pill
-                :text="t('chat.retry')"
-                :disabled="historyLoading"
-                @click="retryHistory"
-              />
-            </view>
-          </em-empty>
-        </view>
-
-        <view
-          v-for="m in list"
-          :key="m.localId"
-        >
-          <!-- 时间分隔条：首条必显，相邻消息间隔超过 uiConfig.timeDividerInterval（默认 5 分钟）插入（对齐 vue 版 message-list divider） -->
-          <view v-if="dividerBefore[m.localId] === true" :class="ns.e('divider')">
-            <text :class="ns.e('divider-text')">{{ formatDividerTime(m.time) }}</text>
-          </view>
           <view
-            :id="msgAnchorId(m)"
-            :class="[ns.e('msg'), m.self && ns.m('msg-self'), (m.status === MESSAGE_STATUS.RECALLED || m.type === MESSAGE_TYPE.NOTICE) && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && highlightPulseOn && ns.m('msg-highlight')]"
+            v-for="m in list"
+            :key="m.localId"
           >
-          <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
-            <text :class="ns.e('recalled-text')">{{ senderNameOf(m) }} {{ t('message.recalled') }}</text>
-            <!-- 重新编辑（M2.20）：仅自己撤回的文本墓碑（vue 对齐），点击回显输入框、作为新消息发送 -->
-            <view v-if="showReedit(m)" :class="ns.e('recalled-reedit')" @click="onReeditMessage(m)">
-              <text :class="ns.e('recalled-reedit-text')">{{ t('message.reedit') }}</text>
+            <!-- 时间分隔条：首条必显，相邻消息间隔超过 uiConfig.timeDividerInterval（默认 5 分钟）插入（对齐 vue 版 message-list divider） -->
+            <view v-if="dividerBefore[m.localId] === true" :class="ns.e('divider')">
+              <text :class="ns.e('divider-text')">{{ formatDividerTime(m.time) }}</text>
             </view>
-          </view>
-          <!-- 群系统通知（本地灰条，不落服务端）：居中 chip 形态同撤回提示条；无头像无气泡，长按菜单禁用 -->
-          <view v-else-if="m.type === MESSAGE_TYPE.NOTICE" :class="ns.e('notice')">
-            <em-text :text="m.text" :text-class="ns.e('notice-text')" :text-style="noticeTextStyle" :class="ns.e('notice-text-host')" />
-          </view>
-          <template v-else>
-            <em-avatar :src="avatarOf(m.from)" :name="senderNameOf(m)" :size="36" :shape="avatarShape" />
-            <view :class="[ns.e('content'), m.self && ns.m('content-self')]">
-              <!-- 群聊发送者昵称行（己方不显示；senderNameMode 控制显隐，伪装模式预留 'on-change' 档） -->
-              <em-text v-if="showSenderName(m)" :text="senderNameOf(m)" :text-class="ns.e('sender-name')" :text-style="senderNameTextStyle" :class="ns.e('sender-name-host')" />
-              <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
-              <view :class="[ns.e('bubble-row'), statusAtEnd && ns.m('bubble-row-status-end')]">
-                <!-- 发送中/失败是独立关键状态，恒展示，不受 showReadStatus 展示开关控制；
-                     图标名与附加文案可经 config.messageStatus 覆盖（icons/texts），位置可镜像到气泡右侧 -->
-                <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="stateClass('failed')" @click="onFailedTap(m)">
-                  <EmIcon :name="statusIconOf('failed', 'circle-bang')" :size="14" :class="ns.e('state-icon-failed')" />
-                  <text v-if="statusTextOf('failed') !== ''" :class="ns.e('state-text')">{{ statusTextOf('failed') }}</text>
-                </view>
-                <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="stateClass('sending')">
-                  <EmIcon :name="statusIconOf('sending', 'loading-arc-normal')" :size="14" :class="ns.e('state-icon-sending')" />
-                  <text v-if="statusTextOf('sending') !== ''" :class="ns.e('state-text')">{{ statusTextOf('sending') }}</text>
-                </view>
-                <!-- 单聊已读回执：仅最新一条己方已发送消息展示（对齐 vue 版 readIconDisplay 'latest'），未读空心圆/已读对勾 -->
-                <view v-else-if="showReadState(m)" :class="stateClass(readKindOf(m))">
-                  <EmIcon :name="readIconOf(m)" :size="14" :class="[ns.e('state-icon'), ns.m(isPeerRead(m) ? 'state-icon-read' : 'state-icon-unread')]" />
-                  <text v-if="statusTextOf(readKindOf(m)) !== ''" :class="ns.e('state-text')">{{ statusTextOf(readKindOf(m)) }}</text>
-                </view>
-                <!-- 富格式流式气泡（customType='markdown' 等）由宿主经 #stream-message 插槽接管；
-                     未提供插槽时回落内核纯文本气泡（内容仍随分片增长） -->
-                <slot v-if="m.type === MESSAGE_TYPE.TEXT && isRichStream(m.stream)" name="stream-message" :message="m">
+            <view
+              :id="msgAnchorId(m)"
+              :class="[ns.e('msg'), m.self && ns.m('msg-self'), (m.status === MESSAGE_STATUS.RECALLED || m.type === MESSAGE_TYPE.NOTICE) && ns.m('msg-recalled'), highlightId !== '' && highlightId === m.localId && highlightPulseOn && ns.m('msg-highlight')]"
+            >
+            <view v-if="m.status === MESSAGE_STATUS.RECALLED" :class="ns.e('recalled')">
+              <text :class="ns.e('recalled-text')">{{ senderNameOf(m) }} {{ t('message.recalled') }}</text>
+              <!-- 重新编辑（M2.20）：仅自己撤回的文本墓碑（vue 对齐），点击回显输入框、作为新消息发送 -->
+              <view v-if="showReedit(m)" :class="ns.e('recalled-reedit')" @click="onReeditMessage(m)">
+                <text :class="ns.e('recalled-reedit-text')">{{ t('message.reedit') }}</text>
+              </view>
+            </view>
+            <!-- 群系统通知（本地灰条，不落服务端）：居中 chip 形态同撤回提示条；无头像无气泡，长按菜单禁用 -->
+            <view v-else-if="m.type === MESSAGE_TYPE.NOTICE" :class="ns.e('notice')">
+              <em-text :text="m.text" :text-class="ns.e('notice-text')" :text-style="noticeTextStyle" :class="ns.e('notice-text-host')" />
+            </view>
+            <template v-else>
+              <em-avatar :src="avatarOf(m.from)" :name="senderNameOf(m)" :size="36" :shape="avatarShape" />
+              <view :class="[ns.e('content'), m.self && ns.m('content-self')]">
+                <!-- 群聊发送者昵称行（己方不显示；senderNameMode 控制显隐，伪装模式预留 'on-change' 档） -->
+                <em-text v-if="showSenderName(m)" :text="senderNameOf(m)" :text-class="ns.e('sender-name')" :text-style="senderNameTextStyle" :class="ns.e('sender-name-host')" />
+                <!-- 气泡行：状态图标（仅己方）落在气泡末尾左侧、与气泡底边对齐（对齐 vue 版 inline 状态列） -->
+                <view :class="[ns.e('bubble-row'), statusAtEnd && ns.m('bubble-row-status-end')]">
+                  <!-- 发送中/失败是独立关键状态，恒展示，不受 showReadStatus 展示开关控制；
+                       图标名与附加文案可经 config.messageStatus 覆盖（icons/texts），位置可镜像到气泡右侧 -->
+                  <view v-if="m.self && m.status === MESSAGE_STATUS.FAILED" :class="stateClass('failed')" @click="onFailedTap(m)">
+                    <EmIcon :name="statusIconOf('failed', 'circle-bang')" :size="14" :class="ns.e('state-icon-failed')" />
+                    <text v-if="statusTextOf('failed') !== ''" :class="ns.e('state-text')">{{ statusTextOf('failed') }}</text>
+                  </view>
+                  <view v-else-if="m.self && m.status === MESSAGE_STATUS.SENDING" :class="stateClass('sending')">
+                    <EmIcon :name="statusIconOf('sending', 'loading-arc-normal')" :size="14" :class="ns.e('state-icon-sending')" />
+                    <text v-if="statusTextOf('sending') !== ''" :class="ns.e('state-text')">{{ statusTextOf('sending') }}</text>
+                  </view>
+                  <!-- 单聊已读回执：仅最新一条己方已发送消息展示（对齐 vue 版 readIconDisplay 'latest'），未读空心圆/已读对勾 -->
+                  <view v-else-if="showReadState(m)" :class="stateClass(readKindOf(m))">
+                    <EmIcon :name="readIconOf(m)" :size="14" :class="[ns.e('state-icon'), ns.m(isPeerRead(m) ? 'state-icon-read' : 'state-icon-unread')]" />
+                    <text v-if="statusTextOf(readKindOf(m)) !== ''" :class="ns.e('state-text')">{{ statusTextOf(readKindOf(m)) }}</text>
+                  </view>
+                  <!-- 富格式流式气泡（customType='markdown' 等）由宿主经 #stream-message 插槽接管；
+                       未提供插槽时回落内核纯文本气泡（内容仍随分片增长） -->
+                  <slot v-if="m.type === MESSAGE_TYPE.TEXT && isRichStream(m.stream)" name="stream-message" :message="m">
+                    <em-text-message
+                      :message="m"
+                      :mention-contacts="mentionContacts"
+                      @long-press="onLongPressMessage"
+                      @mention-click="onMentionClick"
+                    />
+                  </slot>
                   <em-text-message
+                    v-else-if="m.type === MESSAGE_TYPE.TEXT"
                     :message="m"
                     :mention-contacts="mentionContacts"
                     @long-press="onLongPressMessage"
                     @mention-click="onMentionClick"
                   />
-                </slot>
-                <em-text-message
-                  v-else-if="m.type === MESSAGE_TYPE.TEXT"
-                  :message="m"
-                  :mention-contacts="mentionContacts"
-                  @long-press="onLongPressMessage"
-                  @mention-click="onMentionClick"
-                />
-                <em-image-message
-                  v-else-if="m.type === MESSAGE_TYPE.IMAGE"
-                  :message="m"
-                  @preview="onPreview"
-                  @long-press="onLongPressMessage"
-                />
-                <em-audio-message
-                  v-else-if="m.type === MESSAGE_TYPE.AUDIO"
-                  :message="m"
-                  @long-press="onLongPressMessage"
-                />
-                <em-video-message
-                  v-else-if="m.type === MESSAGE_TYPE.VIDEO"
-                  :message="m"
-                  @preview="onVideoPreview"
-                  @long-press="onLongPressMessage"
-                />
-                <em-file-message
-                  v-else-if="m.type === MESSAGE_TYPE.FILE"
-                  :message="m"
-                  @download="onFileDownload"
-                  @long-press="onLongPressMessage"
-                />
-                <!-- 未识别消息类型：默认不支持占位气泡，宿主可经 #custom-message 插槽自定义渲染（作用域传 message） -->
-                <!-- 自定义消息（custom）：业务卡片统一出口，宿主经 #custom-message 按 customEvent 判别渲染；
-                     外层 view 承接原生 longpress（事件冒泡），宿主卡片内容也能打开长按菜单（业务动作/引用/删除） -->
-                <view v-else :class="ns.e('custom')" @longpress="onLongPressMessage(m)">
-                  <slot name="custom-message" :message="m">
-                    <view :class="[ns.e('bubble'), 'em-bubble']">
-                      <text :class="ns.e('text')">{{ m.type === MESSAGE_TYPE.CUSTOM ? t('message.custom') : t('message.unsupported') }}</text>
-                    </view>
-                  </slot>
+                  <em-image-message
+                    v-else-if="m.type === MESSAGE_TYPE.IMAGE"
+                    :message="m"
+                    @preview="onPreview"
+                    @long-press="onLongPressMessage"
+                  />
+                  <em-audio-message
+                    v-else-if="m.type === MESSAGE_TYPE.AUDIO"
+                    :message="m"
+                    @long-press="onLongPressMessage"
+                  />
+                  <em-video-message
+                    v-else-if="m.type === MESSAGE_TYPE.VIDEO"
+                    :message="m"
+                    @preview="onVideoPreview"
+                    @long-press="onLongPressMessage"
+                  />
+                  <em-file-message
+                    v-else-if="m.type === MESSAGE_TYPE.FILE"
+                    :message="m"
+                    @download="onFileDownload"
+                    @long-press="onLongPressMessage"
+                  />
+                  <!-- 未识别消息类型：默认不支持占位气泡，宿主可经 #custom-message 插槽自定义渲染（作用域传 message） -->
+                  <!-- 自定义消息（custom）：业务卡片统一出口，宿主经 #custom-message 按 customEvent 判别渲染；
+                       外层 view 承接原生 longpress（事件冒泡），宿主卡片内容也能打开长按菜单（业务动作/引用/删除） -->
+                  <view v-else :class="ns.e('custom')" @longpress="onLongPressMessage(m)">
+                    <slot name="custom-message" :message="m">
+                      <view :class="[ns.e('bubble'), 'em-bubble']">
+                        <text :class="ns.e('text')">{{ m.type === MESSAGE_TYPE.CUSTOM ? t('message.custom') : t('message.unsupported') }}</text>
+                      </view>
+                    </slot>
+                  </view>
+                </view>
+                <!-- 群消息已读人数（enableGroupReadReceipt 开启时）：己方已发送消息下方展示累计已读人数，
+                     来源 = 群回执事件（服务端下发累计值）或进会话时批量查询补齐 -->
+                <view v-if="showGroupReadCount(m)" :class="[ns.e('group-read'), m.self && ns.m('group-read-self')]">
+                  <text :class="ns.e('group-read-text')">{{ t('message.groupReadCount', { count: m.groupReadCount ?? 0 }) }}</text>
+                </view>
+                <!-- 审核替换标识：SDK isContentReplaced=true（历史/编辑事件/发送回包）时提示发送方内容被改动 -->
+                <view v-if="m.contentReplaced === true" :class="[ns.e('moderated'), m.self && ns.m('moderated-self')]">
+                  <EmIcon name="shield" :size="12" :class="ns.e('moderated-icon')" />
+                  <text :class="ns.e('moderated-text')">{{ t('message.moderated') }}</text>
+                </view>
+                <!-- 置顶角标（M2.20）：气泡上方小图钉，覆盖全部消息类型（对齐 vue 版 message-bubble-wrapper） -->
+                <view v-if="m.pinned === true" :class="[ns.e('pin-badge'), m.self && ns.m('pin-badge-self')]">
+                  <EmIcon name="pin" :size="10" />
+                </view>
+                <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧；点击定位原消息 -->
+                <view v-if="m.quote != null" :class="[ns.e('quote'), m.self && ns.m('quote-self')]" @click="onQuoteClick(m)">
+                  <view :class="[ns.e('quote-line'), m.self && ns.m('quote-line-self')]"></view>
+                  <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="20" :class="[ns.e('quote-icon'), m.self && ns.m('quote-icon-self')]" />
+                  <em-text :lines="2" :text-class="quoteTextClass(m)" :text-style="quoteTextStyle(m)" :class="ns.e('quote-host')">
+                    <text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text>
+                  </em-text>
                 </view>
               </view>
-              <!-- 群消息已读人数（enableGroupReadReceipt 开启时）：己方已发送消息下方展示累计已读人数，
-                   来源 = 群回执事件（服务端下发累计值）或进会话时批量查询补齐 -->
-              <view v-if="showGroupReadCount(m)" :class="[ns.e('group-read'), m.self && ns.m('group-read-self')]">
-                <text :class="ns.e('group-read-text')">{{ t('message.groupReadCount', { count: m.groupReadCount ?? 0 }) }}</text>
-              </view>
-              <!-- 审核替换标识：SDK isContentReplaced=true（历史/编辑事件/发送回包）时提示发送方内容被改动 -->
-              <view v-if="m.contentReplaced === true" :class="[ns.e('moderated'), m.self && ns.m('moderated-self')]">
-                <EmIcon name="shield" :size="12" :class="ns.e('moderated-icon')" />
-                <text :class="ns.e('moderated-text')">{{ t('message.moderated') }}</text>
-              </view>
-              <!-- 置顶角标（M2.20）：气泡上方小图钉，覆盖全部消息类型（对齐 vue 版 message-bubble-wrapper） -->
-              <view v-if="m.pinned === true" :class="[ns.e('pin-badge'), m.self && ns.m('pin-badge-self')]">
-                <EmIcon name="pin" :size="10" />
-              </view>
-              <!-- 引用卡：气泡外、气泡下方（对齐 vue 版 quote-card）；己方 row-reverse 竖杠落到右侧；点击定位原消息 -->
-              <view v-if="m.quote != null" :class="[ns.e('quote'), m.self && ns.m('quote-self')]" @click="onQuoteClick(m)">
-                <view :class="[ns.e('quote-line'), m.self && ns.m('quote-line-self')]"></view>
-                <EmIcon v-if="hasQuoteIcon(m)" :name="quoteIconName(m)" :size="20" :class="[ns.e('quote-icon'), m.self && ns.m('quote-icon-self')]" />
-                <em-text :lines="2" :text-class="quoteTextClass(m)" :text-style="quoteTextStyle(m)" :class="ns.e('quote-host')">
-                  <text :class="ns.e('quote-sender')">{{ quoteSender(m) }}</text><text :class="ns.e('quote-preview')">{{ quoteSuffix(m.quote) }}</text>
-                </em-text>
-              </view>
+            </template>
             </view>
-          </template>
           </view>
-        </view>
 
-        <!-- 滚底锚点：scroll-into-view 定位目标（Android 蒸汽端 scroll-top 超大值只在赋值瞬间钳位、
-             内容未布局时钳到 0 且后续不重钳，大值技巧失效；锚点方案同机已被引用定位验证可用） -->
-        <view :id="BOTTOM_ANCHOR_ID" :class="ns.e('bottom-anchor')"></view>
-      </scroll-view>
+          <!-- 滚底锚点：scroll-into-view 定位目标（Android 蒸汽端 scroll-top 超大值只在赋值瞬间钳位、
+               内容未布局时钳到 0 且后续不重钳，大值技巧失效；锚点方案同机已被引用定位验证可用） -->
+          <view :id="BOTTOM_ANCHOR_ID" :class="ns.e('bottom-anchor')"></view>
+        </scroll-view>
+
+        <!-- 水印覆盖层（#watermark）：铺满 stage、pointer-events:none 穿透、裁切旋转溢出；层级低于库内弹层基准 2000 -->
+        <view v-if="hasWatermark" :class="ns.e('watermark')">
+          <slot name="watermark" :conversation-id="conversationId">
+            <em-watermark
+              :text="wmText"
+              :font-size="wmFontSize"
+              :opacity="wmOpacity"
+              :rotate="wmRotate"
+              :color="wmColor"
+            />
+          </slot>
+        </view>
+      </view>
 
       <!-- 断连/重连提示：顶部 banner 之外的「消息待发」语义补充，贴输入栏上方（不遮消息区） -->
       <view v-if="networkHint !== ''" :class="[ns.e('network-hint'), networkOffline && ns.m('network-hint-offline')]">
@@ -397,6 +414,7 @@ import EmConnectionBanner from '../../em-connection-banner/em-connection-banner.
 import EmPopup from '../../em-popup/em-popup.vue'
 import EmMentionPicker from '../../em-mention-picker/em-mention-picker.vue'
 import EmPinnedBar from '../../em-pinned-bar/em-pinned-bar.vue'
+import EmWatermark from '../../em-watermark/em-watermark.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONNECTION_STATUS, CONVERSATION_TYPE, ERROR_CODE, FILE_SEND_CONCURRENCY, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
 import type { ConversationTypeValue, MessageMenuKeyValue } from '../../../libs/constants'
@@ -404,7 +422,7 @@ import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVid
 import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
 import { errorCodeOf, sendFailureKeyOf, sendFailureKeyOfCode } from '../../../libs/utils/error'
-import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmInputFeatures, EmMessageItem, EmMessageMenuExtra, EmMessageStatusKind, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, EmUserPresentation, MentionContact } from '../../../libs/types'
+import type { EmActionSheetAction, EmAvatarShape, EmChatComposerPanel, EmChatComposerPanelKind, EmChatComposerTouchEvent, EmInputFeatures, EmMessageItem, EmMessageMenuExtra, EmMessageStatusKind, EmPinnedMessageItem, EmPinnedRow, EmQuickReply, EmQuickReplyMode, EmQuoteInfo, EmSenderNameMode, EmUserPresentation, EmWatermarkOptions, MentionContact } from '../../../libs/types'
 import { messageStore } from '../../../libs/store/message'
 import { conversationStore } from '../../../libs/store/conversation'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
@@ -417,6 +435,7 @@ import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
 import { useKeyboardHeight } from '../../../libs/use/useKeyboardHeight'
+import { useWatermark } from '../../../libs/use/useWatermark'
 import { useChatComposer } from '../../../libs/use/useChatComposer'
 import { formatDividerTime } from '../../../libs/utils/time'
 import { isRichStream } from '../../../libs/utils/stream'
@@ -490,6 +509,9 @@ interface Props {
   quickReplyMode?: EmQuickReplyMode
   /** 消息长按菜单追加的业务动作（M2.12）：追加在内置项之后，命中时 emit message-menu 由宿主处理 */
   extraMessageMenus?: EmMessageMenuExtra[]
+  /** 组件级水印：字符串=文案；对象=可调样式；不传不渲染；空串=不显示（运行期开关）。
+   *  覆盖 nav / 连接条 / banner / 公告 / 置顶 / 消息列表，不含输入栏、面板与弹层 */
+  watermark?: string | EmWatermarkOptions
   customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
@@ -759,6 +781,17 @@ const networkHint = computed(() => {
 // 插槽 scope（EmChatInputBarScope）透出；壳节点 :style=composerShellStyle 负责键盘顶起与安全区。
 // 默认路径（无插槽）渲染 em-chat-inputbar，collapseSignal 模式与此前完全一致（零回归）。
 const slots = useSlots()
+
+// 水印（M2.27）：slot 存在性为实例级常量；文案为空串时 em-watermark 自行隐藏，壳节点不增删。
+// 覆盖层挂在 __stage（nav → 消息列表）内，底边即输入栏上沿，天然不含输入栏/面板/弹层
+const {
+  hasWatermark,
+  text: wmText,
+  fontSize: wmFontSize,
+  opacity: wmOpacity,
+  rotate: wmRotate,
+  color: wmColor
+} = useWatermark({ watermark: () => props.watermark, hasSlot: slots.watermark != null })
 const hasCustomInputBar = slots['input-bar'] != null
 const composer = hasCustomInputBar
   ? useChatComposer({

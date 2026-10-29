@@ -167,6 +167,7 @@ function onOpenInfo(id: string) {
 | `quickReplies` | `EmQuickReply[]` | `[]` | 输入栏上方常用语，空数组不渲染；条目为 `{ label, text? }` |
 | `quickReplyMode` | `EmQuickReplyMode` | `'fill'` | `'fill'` 替换草稿（用户可编辑后再发）；`'send'` 直接发送 |
 | `extraMessageMenus` | `EmMessageMenuExtra[]` | `[]` | 长按菜单追加的业务动作，可带 `types` 限定消息类型；内置 key（copy/quote/edit/pin/download/recall/delete）不可覆盖 |
+| `watermark` | `string \| EmWatermarkOptions` | 未设置 | 组件级水印：字符串=文案、对象=可调样式，空串不显示；覆盖导航栏/连接条/横幅/公告/置顶/消息列表，**不含输入栏、面板与弹层**。不传则不渲染（零开销） |
 
 ## Events
 
@@ -192,6 +193,7 @@ function onOpenInfo(id: string) {
 | `input-toolbar` | 无 | 输入栏上方固定区，随键盘一起上移、不参与消息滚动。用于「发订单」「发病例」等业务快捷入口 |
 | `title` | `{ name: string, ext?: Record<string, unknown>, conversationId: string }` | 整标题自绘（导航栏标题位）。缺省回落内置标题（`title` prop > 会话/群/用户昵称回落链）；`ext` 为 `setConversationPresentation` / `setGroupPresentation` 注入的业务载荷 |
 | `input-bar` | `EmChatInputBarScope` | 整栏替换默认输入栏，结构/样式全自绘；键盘避让、面板互斥、录音、禁言、@、草稿等行为经作用域契约由库内保持，详见「整栏自绘输入栏」 |
+| `watermark` | `{ conversationId: string }` | 水印覆盖层，铺满消息内容区（导航栏 → 消息列表），`pointer-events: none` 不响应交互；缺省渲染 `em-watermark` 平铺，可整层自绘（图片/业务 logo） |
 
 ### 插槽示例
 

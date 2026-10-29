@@ -96,6 +96,7 @@ function onBack() {
 | `title` | `string` | `''` | 导航标题覆盖；空串使用内置群组标题 |
 | `showNameInput` | `boolean` | `false` | 建群面板显示群名称输入框；关闭时始终使用自动群名。输入上限 255 字符 |
 | `showSettings` | `boolean` | `false` | 建群面板显示「公开群」「允许成员邀请」两个开关；关闭时不展示，按 `false` 创建 |
+| `watermark` | `string \| EmWatermarkOptions` | 未设置 | 组件级水印：字符串=文案、对象=可调样式，空串不显示；覆盖导航栏/连接条/横幅/公告/置顶/消息列表，**不含输入栏、面板与弹层**。不传则不渲染（零开销） |
 
 ## Events
 
@@ -107,7 +108,11 @@ function onBack() {
 
 ## Slots
 
-本页不对外提供插槽。建群面板顶部的群名/开关表单是组件自身实现，不需要宿主注入。
+| 插槽 | 作用域 | 说明 |
+|---|---|---|
+| `watermark` | `{ keyword: string }` | 水印覆盖层，铺满导航栏/搜索/群列表，`pointer-events: none` 不响应交互；缺省渲染 `em-watermark` |
+
+建群面板顶部的群名/开关表单是组件自身实现，不需要宿主注入。
 
 ## 建群流程
 

@@ -167,6 +167,13 @@
           "style": {
             "navigationBarTitleText": "Text 测量探针"
           }
+        },
+        {
+          "path": "pages/watermark-probe/watermark-probe",
+          "style": {
+            "navigationBarTitleText": "水印穿透探针",
+            "navigationStyle": "custom"
+          }
         }
       ]
     },

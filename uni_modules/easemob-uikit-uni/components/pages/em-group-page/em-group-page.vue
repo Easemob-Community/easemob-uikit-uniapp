@@ -2,55 +2,71 @@
   <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
     <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
-      <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧「+」建群 -->
-      <em-nav-bar
-        :title="title !== '' ? title : t('group.title')"
-        action-icon="circle-plus"
-        @back="emit('back')"
-        @action="onOpenCreate"
-      />
-
-      <em-search-bar v-model="keyword" :placeholder="t('group.searchPlaceholder')" />
-
-      <scroll-view :class="ns.e('scroll')" scroll-y @scrolltolower="onScrollToLower">
-        <!-- 群同步骨架：条目形态对齐真实群条目（方形头像 + 群名 + 右侧人数，部分群无人数），逐行变宽 -->
-        <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
-          <view v-for="(nameWidth, index) in SKELETON_NAME_WIDTHS" :key="index" :class="ns.e('skeleton-item')">
-            <em-skeleton variant="avatar" shape="square" width="48px" height="48px" />
-            <view :class="ns.e('skeleton-lines')">
-              <em-skeleton :width="nameWidth" height="16px" />
-            </view>
-            <em-skeleton v-if="SKELETON_COUNT_ROWS[index]" width="28px" height="12px" :class="ns.e('skeleton-count')" />
-          </view>
-        </view>
-        <em-empty
-          v-else-if="syncFailed && groupStore.items.length === 0"
-          icon="circle-bang"
-          :description="t('common.syncFailed')"
-        >
-          <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList(true)" />
-        </em-empty>
-        <em-empty
-          v-else-if="groupStore.loaded && items.length === 0"
-          icon="person-double"
-          :description="keyword.trim() !== '' ? t('group.noSearchResult') : t('group.empty')"
+      <!-- 水印 stage：内容区定位上下文（底边即水印下边界，不含弹层）；不加 overflow 以免裁掉组件探出元素 -->
+      <view :class="ns.e('stage')">
+        <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧「+」建群 -->
+        <em-nav-bar
+          :title="title !== '' ? title : t('group.title')"
+          action-icon="circle-plus"
+          @back="emit('back')"
+          @action="onOpenCreate"
         />
 
-        <!-- 群条目：头像 + 群名 + 人数 meta（对齐 vue 版 group-item-default 排版） -->
-        <view
-          v-for="entry in items"
-          :key="entry.group.groupId"
-          :class="ns.e('item')"
-          @click="emit('click-group', entry.group.groupId)"
-        >
-          <em-avatar :src="entry.avatar" :name="entry.name" :size="48" shape="square" />
-          <em-text :text="entry.name" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
-          <text v-if="entry.group.memberCount > 0" :class="ns.e('count')">{{ entry.group.memberCount }}</text>
-        </view>
+        <em-search-bar v-model="keyword" :placeholder="t('group.searchPlaceholder')" />
 
-        <!-- 触底加载 footer：SDK 本地全量返回，hasMore 恒 false（契约预留，恒不触发加载） -->
-        <em-load-more v-if="items.length > 0" :state="loadMoreState" @load="onLoadMore" />
-      </scroll-view>
+        <scroll-view :class="ns.e('scroll')" scroll-y @scrolltolower="onScrollToLower">
+          <!-- 群同步骨架：条目形态对齐真实群条目（方形头像 + 群名 + 右侧人数，部分群无人数），逐行变宽 -->
+          <view v-if="syncing && items.length === 0" :class="ns.e('skeleton')">
+            <view v-for="(nameWidth, index) in SKELETON_NAME_WIDTHS" :key="index" :class="ns.e('skeleton-item')">
+              <em-skeleton variant="avatar" shape="square" width="48px" height="48px" />
+              <view :class="ns.e('skeleton-lines')">
+                <em-skeleton :width="nameWidth" height="16px" />
+              </view>
+              <em-skeleton v-if="SKELETON_COUNT_ROWS[index]" width="28px" height="12px" :class="ns.e('skeleton-count')" />
+            </view>
+          </view>
+          <em-empty
+            v-else-if="syncFailed && groupStore.items.length === 0"
+            icon="circle-bang"
+            :description="t('common.syncFailed')"
+          >
+            <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList(true)" />
+          </em-empty>
+          <em-empty
+            v-else-if="groupStore.loaded && items.length === 0"
+            icon="person-double"
+            :description="keyword.trim() !== '' ? t('group.noSearchResult') : t('group.empty')"
+          />
+
+          <!-- 群条目：头像 + 群名 + 人数 meta（对齐 vue 版 group-item-default 排版） -->
+          <view
+            v-for="entry in items"
+            :key="entry.group.groupId"
+            :class="ns.e('item')"
+            @click="emit('click-group', entry.group.groupId)"
+          >
+            <em-avatar :src="entry.avatar" :name="entry.name" :size="48" shape="square" />
+            <em-text :text="entry.name" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
+            <text v-if="entry.group.memberCount > 0" :class="ns.e('count')">{{ entry.group.memberCount }}</text>
+          </view>
+
+          <!-- 触底加载 footer：SDK 本地全量返回，hasMore 恒 false（契约预留，恒不触发加载） -->
+          <em-load-more v-if="items.length > 0" :state="loadMoreState" @load="onLoadMore" />
+        </scroll-view>
+
+        <!-- 水印覆盖层（#watermark）：铺满 stage、pointer-events:none 穿透、裁切旋转溢出；层级低于库内弹层基准 2000 -->
+        <view v-if="hasWatermark" :class="ns.e('watermark')">
+          <slot name="watermark" :keyword="keyword">
+            <em-watermark
+              :text="wmText"
+              :font-size="wmFontSize"
+              :opacity="wmOpacity"
+              :rotate="wmRotate"
+              :color="wmColor"
+            />
+          </slot>
+        </view>
+      </view>
 
       <!-- 建群弹层（控制器裁定落在本组件内）：em-select-contact multiple + #panel-top 注入群名/开关表单
            （对齐 vue create-group-modal = contact-transfer-modal + panel-top 的移动端形态；
@@ -95,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, useSlots } from 'vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmButton from '../../em-button/em-button.vue'
@@ -103,6 +119,7 @@ import EmLoadMore from '../../em-load-more/em-load-more.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmSelectContact from '../../em-select-contact/em-select-contact.vue'
+import EmWatermark from '../../em-watermark/em-watermark.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmText from '../../em-text/em-text.vue'
 import { EmKit } from '../../../libs'
@@ -113,10 +130,11 @@ import { primaryColorStyle } from '../../../libs/store/config'
 import { avatarOf } from '../../../libs/store/user'
 import { TEXT_STYLE_NAME } from '../../../libs/style/textStyles'
 import type { LoadMoreStateValue } from '../../../libs/constants'
-import type { EmGroup, EmSelectContactItem } from '../../../libs/types'
+import type { EmGroup, EmSelectContactItem, EmWatermarkOptions } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
+import { useWatermark } from '../../../libs/use/useWatermark'
 
 defineOptions({ styleIsolation: 'app-and-page' })
 
@@ -127,11 +145,13 @@ interface Props {
   showNameInput?: boolean
   /** 建群面板是否显示群设置区（公开群/允许成员邀请开关，对齐 vue config.showSettings，默认 false） */
   showSettings?: boolean
+  /** 组件级水印：字符串=文案；对象=可调样式；不传不渲染；空串=不显示（运行期开关） */
+  watermark?: string | EmWatermarkOptions
   customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   title: '',
   showNameInput: false,
   showSettings: false,
@@ -156,6 +176,17 @@ const syncFailed = computed(() => groupStore.syncFailed)
 const syncPending = ref(false)
 const syncing = computed(() => groupStore.syncing || syncPending.value)
 const keyword = ref('')
+
+// 水印（M2.27）：slot 存在性为实例级常量；文案为空串时 em-watermark 自行隐藏，壳节点不增删
+const slots = useSlots()
+const {
+  hasWatermark,
+  text: wmText,
+  fontSize: wmFontSize,
+  opacity: wmOpacity,
+  rotate: wmRotate,
+  color: wmColor
+} = useWatermark({ watermark: () => props.watermark, hasSlot: slots.watermark != null })
 
 async function syncList(manual = false): Promise<void> {
   if (syncPending.value) return

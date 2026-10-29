@@ -2,43 +2,61 @@
   <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
     <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
-      <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧 person/plus 添加好友（对齐 vue address-book header-extra） -->
-      <em-nav-bar
-        :title="title !== '' ? title : t('contact.title')"
-        :show-back="false"
-        action-icon="person-plus"
-        @action="emit('add')"
-      />
-
-      <!-- 搜索只过滤入口项（label/key 命中，对齐 vue 版 address-book home 语义） -->
-      <em-search-bar v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
-
-      <scroll-view :class="ns.e('scroll')" scroll-y>
-        <em-contact-nav :entries="entries" @entry-click="onEntryClick" />
-        <em-empty
-          v-if="entries.length === 0"
-          icon="search"
-          :description="t('contact.noSearchResult')"
+      <!-- 水印 stage：nav → 列表的定位上下文；底边即页面可视底，覆盖层不越过它 -->
+      <view :class="ns.e('stage')">
+        <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）：右侧 person/plus 添加好友（对齐 vue address-book header-extra） -->
+        <em-nav-bar
+          :title="title !== '' ? title : t('contact.title')"
+          :show-back="false"
+          action-icon="person-plus"
+          @action="emit('add')"
         />
-      </scroll-view>
+
+        <!-- 搜索只过滤入口项（label/key 命中，对齐 vue 版 address-book home 语义） -->
+        <em-search-bar v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
+
+        <scroll-view :class="ns.e('scroll')" scroll-y>
+          <em-contact-nav :entries="entries" @entry-click="onEntryClick" />
+          <em-empty
+            v-if="entries.length === 0"
+            icon="search"
+            :description="t('contact.noSearchResult')"
+          />
+        </scroll-view>
+
+        <!-- 水印覆盖层（#watermark：铺满 nav/搜索/入口列表，pointer-events:none 穿透；层级低于弹层基准 2000） -->
+        <view v-if="hasWatermark" :class="ns.e('watermark')">
+          <slot name="watermark" :keyword="keyword">
+            <em-watermark
+              :text="wmText"
+              :font-size="wmFontSize"
+              :opacity="wmOpacity"
+              :rotate="wmRotate"
+              :color="wmColor"
+            />
+          </slot>
+        </view>
+      </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useSlots } from 'vue'
 import EmContactNav from '../../em-contact-nav/em-contact-nav.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
 import EmNavBar from '../../em-nav-bar/em-nav-bar.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
+import EmWatermark from '../../em-watermark/em-watermark.vue'
 import { CONTACT_ENTRY_KEY } from '../../../libs/constants'
 import { contactStore, pendingInviteCount } from '../../../libs/store/contact'
 import { primaryColorStyle } from '../../../libs/store/config'
 import { groupStore } from '../../../libs/store/group'
-import type { EmContactNavEntry } from '../../../libs/types'
+import type { EmContactNavEntry, EmWatermarkOptions } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
+import { useWatermark } from '../../../libs/use/useWatermark'
 
 // 通讯录入口页（对齐 vue 版 address-book-container home 视图）：
 // 三入口顺序 = 好友列表 / 群组 / 新请求（对齐 vue entryOrder contact/group/notice，黑名单为二期裁剪项）；
@@ -49,11 +67,13 @@ defineOptions({ styleIsolation: 'app-and-page' })
 interface Props {
   /** 导航标题覆盖，空串回落 i18n */
   title?: string
+  /** 组件级水印：字符串=文案；对象=可调样式；不传不渲染；空串=不显示（运行期开关） */
+  watermark?: string | EmWatermarkOptions
   customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   title: '',
   customClass: '',
   customStyle: ''
@@ -69,6 +89,17 @@ const { themeClass } = useTheme()
 const { t } = useLocale()
 
 const keyword = ref('')
+
+// 水印（M2.27）：slot 存在性为实例级常量；文案为空串时 em-watermark 自行隐藏，壳节点不增删
+const slots = useSlots()
+const {
+  hasWatermark,
+  text: wmText,
+  fontSize: wmFontSize,
+  opacity: wmOpacity,
+  rotate: wmRotate,
+  color: wmColor
+} = useWatermark({ watermark: () => props.watermark, hasSlot: slots.watermark != null })
 
 const allEntries = computed<EmContactNavEntry[]>(() => {
   const pendingCount = pendingInviteCount()

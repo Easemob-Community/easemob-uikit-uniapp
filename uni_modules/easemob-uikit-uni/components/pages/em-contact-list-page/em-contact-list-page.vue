@@ -2,77 +2,93 @@
   <view :class="[ns.b(), themeClass, customClass]" :style="customStyle">
     <!-- primaryColor 内联变量挂内层：蒸汽端同节点 class 变量会顶掉内联变量（坑集 §5k） -->
     <view :class="ns.e('brand-scope')" :style="primaryColorStyle()">
-      <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）；返回动作以 back 事件透出，路由由宿主接线 -->
-      <em-nav-bar :title="t('contact.entryContact')" @back="emit('back')" />
+      <!-- 水印 stage：内容区定位上下文（底边即水印下边界，不含弹层）；不加 overflow 以免裁掉组件探出元素 -->
+      <view :class="ns.e('stage')">
+        <!-- 自绘导航栏（宿主页面需配 navigationStyle:custom / App titleNView:false）；返回动作以 back 事件透出，路由由宿主接线 -->
+        <em-nav-bar :title="t('contact.entryContact')" @back="emit('back')" />
 
-      <em-search-bar v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
+        <em-search-bar v-model="keyword" :placeholder="t('contact.searchPlaceholder')" />
 
-      <view :class="ns.e('body')">
-        <scroll-view
-          :class="ns.e('scroll')"
-          scroll-y
-          :scroll-into-view="scrollIntoId"
-          :scroll-with-animation="scrollAnim"
-        >
-          <!-- 好友同步骨架：分组头 + 单行名字条目（对齐真实字母分组列表；真实条目仅一行名字），逐行变宽 -->
-          <view v-if="syncing && groups.length === 0" :class="ns.e('skeleton')">
-            <view
-              v-for="(row, index) in SKELETON_ROWS"
-              :key="index"
-              :class="[ns.e('skeleton-row'), row.kind === 'header' && ns.m('skeleton-row-header')]"
-            >
-              <view v-if="row.kind === 'header'" :class="ns.e('skeleton-header-bar')" />
-              <template v-else>
-                <em-skeleton variant="avatar" shape="circle" width="48px" height="48px" />
-                <view :class="ns.e('skeleton-lines')">
-                  <em-skeleton :width="row.width" height="16px" />
-                </view>
-              </template>
-            </view>
-          </view>
-          <em-empty
-            v-else-if="syncFailed && contactStore.items.length === 0"
-            icon="circle-bang"
-            :description="t('common.syncFailed')"
+        <view :class="ns.e('body')">
+          <scroll-view
+            :class="ns.e('scroll')"
+            scroll-y
+            :scroll-into-view="scrollIntoId"
+            :scroll-with-animation="scrollAnim"
           >
-            <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
-          </em-empty>
-          <em-empty
-            v-else-if="contactStore.loaded && groups.length === 0"
-            icon="person-single"
-            :description="keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty')"
-          />
-
-          <view v-for="group in groups" :key="group.key">
-            <!-- 分组锚点 id 供索引条 scroll-into-view 定位 -->
-            <view :id="anchorId(group.key)" :class="ns.e('group-header')">
-              <text :class="ns.e('group-header-text')">{{ group.key }}</text>
-            </view>
-            <view
-              v-for="c in group.items"
-              :key="c.userId"
-              :class="ns.e('item')"
-              @touchstart="onTouchStart"
-              @click="onSelect(c)"
-              @longpress="onLongPress(c)"
-            >
-              <em-avatar :src="avatarOfItem(c)" :name="nameOf(c)" :size="48" />
-              <view :class="ns.e('item-body')">
-                <em-text :text="nameOf(c)" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
+            <!-- 好友同步骨架：分组头 + 单行名字条目（对齐真实字母分组列表；真实条目仅一行名字），逐行变宽 -->
+            <view v-if="syncing && groups.length === 0" :class="ns.e('skeleton')">
+              <view
+                v-for="(row, index) in SKELETON_ROWS"
+                :key="index"
+                :class="[ns.e('skeleton-row'), row.kind === 'header' && ns.m('skeleton-row-header')]"
+              >
+                <view v-if="row.kind === 'header'" :class="ns.e('skeleton-header-bar')" />
+                <template v-else>
+                  <em-skeleton variant="avatar" shape="circle" width="48px" height="48px" />
+                  <view :class="ns.e('skeleton-lines')">
+                    <em-skeleton :width="row.width" height="16px" />
+                  </view>
+                </template>
               </view>
             </view>
-          </view>
+            <em-empty
+              v-else-if="syncFailed && contactStore.items.length === 0"
+              icon="circle-bang"
+              :description="t('common.syncFailed')"
+            >
+              <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
+            </em-empty>
+            <em-empty
+              v-else-if="contactStore.loaded && groups.length === 0"
+              icon="person-single"
+              :description="keyword.trim() !== '' ? t('contact.noSearchResult') : t('contact.empty')"
+            />
 
-          <!-- 底部「没有更多了」（对齐 vue 版 contact-list no-more；SDK 本地全量无分页，恒 noMore 态） -->
-          <em-load-more v-if="groups.length > 0" :state="LOAD_MORE_STATE.NO_MORE" />
-        </scroll-view>
+            <view v-for="group in groups" :key="group.key">
+              <!-- 分组锚点 id 供索引条 scroll-into-view 定位 -->
+              <view :id="anchorId(group.key)" :class="ns.e('group-header')">
+                <text :class="ns.e('group-header-text')">{{ group.key }}</text>
+              </view>
+              <view
+                v-for="c in group.items"
+                :key="c.userId"
+                :class="ns.e('item')"
+                @touchstart="onTouchStart"
+                @click="onSelect(c)"
+                @longpress="onLongPress(c)"
+              >
+                <em-avatar :src="avatarOfItem(c)" :name="nameOf(c)" :size="48" />
+                <view :class="ns.e('item-body')">
+                  <em-text :text="nameOf(c)" :text-class="ns.e('name')" :text-style="nameTextStyle" :class="ns.e('name-host')" />
+                </view>
+              </view>
+            </view>
 
-        <em-alphabet-nav
-          v-if="groups.length > 0"
-          :active-key="activeKey"
-          :dim-keys="dimKeys"
-          @jump="onJump"
-        />
+            <!-- 底部「没有更多了」（对齐 vue 版 contact-list no-more；SDK 本地全量无分页，恒 noMore 态） -->
+            <em-load-more v-if="groups.length > 0" :state="LOAD_MORE_STATE.NO_MORE" />
+          </scroll-view>
+
+          <em-alphabet-nav
+            v-if="groups.length > 0"
+            :active-key="activeKey"
+            :dim-keys="dimKeys"
+            @jump="onJump"
+          />
+        </view>
+
+        <!-- 水印覆盖层（#watermark）：铺满 stage、pointer-events:none 穿透、裁切旋转溢出；层级低于库内弹层基准 2000 -->
+        <view v-if="hasWatermark" :class="ns.e('watermark')">
+          <slot name="watermark" :keyword="keyword">
+            <em-watermark
+              :text="wmText"
+              :font-size="wmFontSize"
+              :opacity="wmOpacity"
+              :rotate="wmRotate"
+              :color="wmColor"
+            />
+          </slot>
+        </view>
       </view>
 
       <em-action-sheet
@@ -109,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useSlots, watch } from 'vue'
 import EmAlphabetNav from '../../em-alphabet-nav/em-alphabet-nav.vue'
 import EmAvatar from '../../em-avatar/em-avatar.vue'
 import EmEmpty from '../../em-empty/em-empty.vue'
@@ -120,19 +136,21 @@ import EmLoadMore from '../../em-load-more/em-load-more.vue'
 import EmSearchBar from '../../em-search-bar/em-search-bar.vue'
 import EmSkeleton from '../../em-skeleton/em-skeleton.vue'
 import EmPopup from '../../em-popup/em-popup.vue'
+import EmWatermark from '../../em-watermark/em-watermark.vue'
 import { EmKit } from '../../../libs'
 import { ALPHABET_KEYS, CONTACT_MENU_KEY, LOAD_MORE_STATE } from '../../../libs/constants'
 import type { ContactMenuKeyValue } from '../../../libs/constants'
 import { contactStore } from '../../../libs/store/contact'
 import { primaryColorStyle, useConfig } from '../../../libs/store/config'
 import { avatarOf, displayNameOf } from '../../../libs/store/user'
-import type { EmActionSheetAction, EmContactItem } from '../../../libs/types'
+import type { EmActionSheetAction, EmContactItem, EmWatermarkOptions } from '../../../libs/types'
 import { useNamespace } from '../../../libs/use/useNamespace'
 import { useTheme } from '../../../libs/use/useTheme'
 import { useLocale } from '../../../libs/use/useLocale'
 import { useLongPressClickGuard } from '../../../libs/use/useLongPressClickGuard'
 import { groupContacts, matchContact } from '../../../libs/utils/pinyin'
 import { TEXT_STYLE_NAME } from '../../../libs/style/textStyles'
+import { useWatermark } from '../../../libs/use/useWatermark'
 
 // 好友完整列表页（自 em-contact-page 入口化重构平移）：字母分组 + 索引条 + 搜索 + 长按删除
 defineOptions({ styleIsolation: 'app-and-page' })
@@ -142,6 +160,8 @@ interface Props {
   menuKeys?: ContactMenuKeyValue[]
   /** 首次挂载自动读好友快照，默认 true；宿主可关闭后自行控制同步时机 */
   autoSync?: boolean
+  /** 组件级水印：字符串=文案；对象=可调样式；不传不渲染；空串=不显示（运行期开关） */
+  watermark?: string | EmWatermarkOptions
   customClass?: string   // 宿主自定义类，追加到根节点 class（H5 与小程序页面级样式生效；跨端覆盖优先 customStyle）
   customStyle?: string   // 宿主自定义内联样式，拼接到根节点 style 末尾（五端生效，var() 可用）
 }
@@ -173,6 +193,17 @@ const syncFailed = computed(() => contactStore.syncFailed)
 const syncPending = ref(false)
 const syncing = computed(() => contactStore.syncing || syncPending.value)
 const keyword = ref('')
+
+// 水印（M2.27）：slot 存在性为实例级常量；文案为空串时 em-watermark 自行隐藏，壳节点不增删
+const slots = useSlots()
+const {
+  hasWatermark,
+  text: wmText,
+  fontSize: wmFontSize,
+  opacity: wmOpacity,
+  rotate: wmRotate,
+  color: wmColor
+} = useWatermark({ watermark: () => props.watermark, hasSlot: slots.watermark != null })
 
 async function syncList(): Promise<void> {
   if (syncPending.value) return

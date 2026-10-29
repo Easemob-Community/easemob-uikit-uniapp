@@ -355,6 +355,18 @@ import {
 
 `EmQuickReplyMode = 'fill' | 'send'`。
 
+### `EmWatermarkOptions`
+
+页面级组件 `watermark` prop 的对象形态（传字符串等价于 `{ text }`）；缺省内容由 `em-watermark` 平铺。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `text` | `string` | 水印文案（通常为昵称 + userId）；空串不显示，可作运行期开关 |
+| `fontSize` | `number` | 字号 px，默认 12 |
+| `opacity` | `number` | 整层不透明度，默认 0.08 |
+| `rotate` | `number` | 整层旋转角度（度），默认 -20 |
+| `color` | `string` | 文字颜色，默认 `var(--em-text-primary)` |
+
 ### `EmChatInputBarScope`
 
 `em-chat-page` `#input-bar` 整栏自绘插槽的作用域契约（用法与示例见 [聊天页](./PAGES-CHAT.md)「整栏自绘输入栏」）。

@@ -1,6 +1,6 @@
 <template>
   <view class="page" :class="themeClass">
-    <em-contact-list-page @select="onSelect" @back="onBack" />
+    <em-contact-list-page :watermark="watermarkText" @select="onSelect" @back="onBack" />
   </view>
 </template>
 
@@ -8,8 +8,11 @@
 import { onLoad } from '@dcloudio/uni-app'
 import { EmKit, CONNECTION_STATUS, CONVERSATION_TYPE } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
+import { useDemoWatermark } from '@/common/watermark-demo'
 
 const { themeClass } = useDemoTheme()
+// 组件级水印（M2.27）：开关在「我的」页；关闭时为空串
+const { text: watermarkText } = useDemoWatermark()
 
 onLoad(() => {
   if (EmKit.state.status !== CONNECTION_STATUS.ONLINE) {

@@ -36,6 +36,23 @@
 
       <view class="mine__group">
         <view class="mine__group-head">
+          <text class="mine__group-title">组件级水印</text>
+        </view>
+        <view class="mine__cell mine__cell--theme" @click="onToggleWatermark">
+          <view class="mine__cell-main">
+            <text class="mine__cell-label">会话 / 聊天 / 好友 / 群组 / 通讯录</text>
+            <text class="mine__cell-desc">{{ watermarkEnabled ? '已开启：' + watermarkText : '已关闭：开启后上述页面平铺当前账号水印（聊天页不含输入栏）' }}</text>
+          </view>
+          <em-icon
+            :name="watermarkEnabled ? 'circle-checked-filled' : 'circle-empty'"
+            :size="20"
+            :color="watermarkEnabled ? 'var(--em-primary-color)' : 'var(--em-icon-muted)'"
+          />
+        </view>
+      </view>
+
+      <view class="mine__group">
+        <view class="mine__group-head">
           <text class="mine__group-title">AI 流式消息</text>
         </view>
         <view class="mine__cell mine__cell--theme" @click="onToggleStream">
@@ -86,9 +103,18 @@ import { computed } from 'vue'
 import { EmKit, avatarOf, displayNameOf, setConfig, useConfig, CONNECTION_STATUS, THEME_MODE } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmThemePreference } from '@/uni_modules/easemob-uikit-uni/libs'
 import { useDemoTheme } from '@/common/theme'
+import { useDemoWatermark } from '@/common/watermark-demo'
 
 // 默认 auto：跟随系统深浅色；light/dark 为宿主强制档（选择持久化在设备本地）
 const { themeStore, themeClass, setTheme } = useDemoTheme()
+
+// 组件级水印开关（M2.27）：偏好持久化；各页面把 text 透传给 watermark prop
+const { enabled: watermarkEnabled, text: watermarkText, toggle: toggleWatermark } = useDemoWatermark()
+
+function onToggleWatermark() {
+  toggleWatermark()
+  uni.showToast({ title: watermarkEnabled.value ? '已开启水印' : '已关闭水印', icon: 'none' })
+}
 
 // AI 流式消息运行时开关（演示 EmKitConfig.enableStreamMessage 的运行时覆盖能力）
 const { config } = useConfig()
