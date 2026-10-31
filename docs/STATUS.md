@@ -1125,3 +1125,10 @@
   2. 若某端穿透失效：该端不能上覆盖层，需另立「垫底水印」方案（内容容器加 `position:relative;z-index:1`，水印层 `z-index:0`），视觉会被不透明卡片/气泡遮挡，属降级而非等价实现。
   3. 五端视觉验收：暗色模式可读、四角无空洞、瓦片不压住输入框/弹层；聊天页 stage 包裹后键盘避让、滚底锚点、引用定位、多选栏、`#input-bar` 自绘栏逐项回归。
   4. H5 桌面端窗口缩放不重排行列（移动优先，明确不支持）；如宿主需要，二期加 `uni.onWindowResize`（需先确认各端实现）。
+
+## 2026-10-31 修复 H5 原生 tabBar 深色染色被切 tab 冲掉（useThemeChrome 持久化守护）
+
+- **缺陷**：H5 端切到深色后，切换 tab 时原生 tabBar 会变回 pages.json 浅色。根因：uni-app x 的 H5 runtime 未实现 `uni.setTabBarStyle`（构建产物验证零匹配），tabBar 文字色是 Vue 响应式内联绑定（颜色状态只来自 pages.json 浅色配置，选中 label 无区分 class）；`syncH5Chrome()` 只在 onShow/主题变化时执行一次，切 tab 时 `selectedIndex` 变化触发重渲染，用浅色值重绑内联样式把覆盖冲掉。
+- **修复**（`libs/use/useThemeChrome.ts`，行为增强、API 不变）：WEB 端新增进程级单例 MutationObserver，观察 body 子树中触及 `.uni-tabbar` 的变化（label style/class 重绑、整棵重挂载的 added/removedNodes），setTimeout(0) 去抖后重染；写回同值不产生 mutation record，不会自激。遵守 libs 纪律：纯 ts、索引 for、条件编译收口 WEB。
+- **验证**：`build mp-weixin` 全绿（含 11 项防回归）；`build web` 卡在与本次无关的预存问题——`demo/node_modules/easemob-websdk@5.1.3` 的 `chunks/common-DHQukb7J.js` 在本机 web 编译链报 `Identifier "h" has already been declared`；已用 `git checkout` 回退本文件复验失败依旧（与改动无关），且与外部可运行 demo 的同名 chunk 逐字节一致，判断为本机 web 编译环境问题，待查。
+- **同步**：修复后的 `useThemeChrome.ts` 已拷贝到宿主示例工程 `easemob-uniappx-demo-534/uni_modules`（此前宿主侧的 `common/h5-tabbar-theme.ts` 临时补丁已删除，改由 uikit 内建能力承担）。
