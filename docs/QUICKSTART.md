@@ -12,8 +12,9 @@
 
 | 你的目标 | 推荐入口 |
 |---|---|
-| 只要一个可运行的单聊天页 | 使用仓库 `templates/chat-only`（[模板源码与说明](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only)），修改 appkey、token 接口和对端资料 |
+| 只要一个可运行的单聊天页 | 使用仓库 `templates/chat-only`（[模板源码与说明](https://github.com/Easemob-Community/easemob-uikit-uniapp/tree/main/templates/chat-only)），修改 appkey、token 接口和对端资料 |
 | 搭建完整 IM | 按本文接入，页面组合与事件处理参考仓库 `demo/` |
+| 让 AI 辅助接入或排错 | 安装并按场景使用 [Agent Skills](./GUIDE-AGENT-SKILLS.md) |
 | 已有业务页，直进单聊 | 使用单聊天模板，或阅读 [多场景接入](./GUIDE-MULTI-SCENARIO.md) 手动集成 |
 
 `em-chat-page` 面向整页使用；嵌入半屏、弹窗或侧栏请使用原子组件自行组合。
@@ -320,23 +321,25 @@ H5 的 `history` 路由需要服务端 fallback 到 `index.html`；本地静态�
 
 ### 8.2 微信小程序
 
+新工程建议复制 `templates/chat-only`，模板已同时配置 `sub-im` 页面分包和 `sub-sdk` SDK 分包。安装依赖并填写 `common/im-config.ts` 后，在模板根目录执行：
+
 ```bash
-scripts/uni.sh build mp-weixin
+npm run dev:mp      # HBX dev + 分包 watch
+npm run build:mp    # HBX build + SDK 后处理 + 完整检查
+npm run check:mp    # 单独复查 build 产物
 ```
 
-用微信开发者工具打开 `demo/unpackage/dist/build/mp-weixin`。首次接入必须完成 SDK 分包：
+使用 HBuilderX GUI 开发时，保持 `npm run watch:mp` 运行，再从 HBX 运行到微信开发者工具。开发产物在 `unpackage/dist/dev/mp-weixin`，构建产物在 `unpackage/dist/build/mp-weixin`。
 
-- 宿主 `pages.json` 声明 `sub-sdk` 分包 + `preloadRule`；
-- 构建后跑 `scripts/prepare-sdk-subpackage.mjs`（或按 [SDK 分包指引](./GUIDE-WEAPP-SDK-SUBPACKAGE.md) 手工处理）；
-- 主包必须 ≤ 1.5MB（本仓库防回归脚本会断言）。
-
-报错 `module 'sub-sdk/im-sdk.js' is not defined` 表示分包文件缺失或 `preloadRule` 未生效。
+完整 IM 页面组合参考 `demo/`。既有工程需要手工声明实际页面路由，再复用统一脚本；配置、脚本复制和报错诊断见 [微信小程序分包接入](./GUIDE-WEAPP-SDK-SUBPACKAGE.md)。
 
 ### 8.3 App（Android / iOS / 鸿蒙）
 
 用 HBuilderX 打开 `demo/` 或宿主工程，运行到真机。鸿蒙签名步骤见 [HARMONY-REALDEVICE-RUN.md](./HARMONY-REALDEVICE-RUN.md)。
 
 App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克风（语音）均在用户主动操作时申请；若自行裁剪 manifest，保留 `CAMERA` / `RECORD_AUDIO` / 相册读取权限，否则对应功能会失败。iOS 另需在 `app-ios.distribute.privacyDescription` 声明 `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` / `NSMicrophoneUsageDescription`（`NSPhotoLibraryAddUsageDescription` 按需），改后重新云打包或重打自定义基座才生效；示例工程已配置。
+
+鸿蒙权限写在工程根目录的 `harmony-configs/entry/src/main/module.json5`，节点 `requestPermissions`，语音与拍摄分别需要 `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`（都带 `reason` 与 `usedScene.inuse`，`reason` 指向 `resources/base/element/string.json` 的条目）。漏声明时系统直接拒绝，表现为「录音失败」或点拍摄无反应。该目录被**整份覆盖**到生成工程而非按节点合并，文件要包含完整的 `module` 结构；`ohos.permission.INTERNET` 等框架已加的权限不要重复声明；相册无需声明（走系统 Picker）。示例工程已按此配置。
 
 视频消息依赖内置模块 `uni-video`。uni-app x 会按代码用量摇树：自定义基座如果是在接入视频组件之前打的，`<video>` 会被降级为普通 `<view>`，表现为点开播放器后全屏黑屏。接入视频后重新打一次自定义基座即可；需要提前固定模块时在 `manifest.json` 的 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`，示例工程已配置。
 

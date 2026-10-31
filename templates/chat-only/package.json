@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
+  "scripts": {
+    "dev:mp": "node scripts/mp-weixin.mjs dev",
+    "build:mp": "node scripts/mp-weixin.mjs build",
+    "check:mp": "node scripts/mp-weixin.mjs check",
+    "watch:mp": "node scripts/mp-weixin.mjs watch"
+  },
   "dependencies": {
     "easemob-websdk": "5.1.3"
   }

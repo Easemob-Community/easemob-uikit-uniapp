@@ -4,7 +4,13 @@ AI 客服、IM 内 AI 对话、分段生成内容这类场景，模型输出是�
 
 流式内容由**业务服务端**调用模型后经环信 RESTful 下发，客户端只收不发；UIKit 负责接收、合并、节流刷新与默认渲染。
 
-> 相关页面：[配置参考](./CONFIG.md) · [消息与扩展协议](./MESSAGING.md) · [聊天页](./PAGES-CHAT.md) · [EmKit API](./API-KIT.md) · [类型与常量](./API-TYPES.md) · [平台能力与差异](./PLATFORM.md) · [示例工程](./DEMO.md)
+> 相关页面：[配置参考](./CONFIG.md) · [消息与扩展协议](./MESSAGING.md) · [聊天页](./PAGES-CHAT.md) · [EmKit 消息操作](./API-KIT-MESSAGE-OPERATIONS.md) · [消息类型与常量](./API-TYPES-MESSAGES.md) · [平台能力与差异](./PLATFORM.md) · [示例工程](./DEMO.md)
+
+## 界面预览
+
+<DocsImage src="assets/shots/android/l2-android-ai-stream-3frames.webp" alt="AI 流式消息三态：光标、终态收敛、异常提示" :width="720" :height="1766" eager />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
 
 ## 能力
 

@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "$string:app_name"
+    },
+    {
+      "name": "reason_microphone",
+      "value": "发送语音消息时需要录制声音"
+    },
+    {
+      "name": "reason_camera",
+      "value": "拍摄照片或视频时需要访问相机"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # 消息与扩展协议
 
-这页讲消息从发送到渲染的完整模型，以及引用、@ 提及、自定义消息、本地提示、流式消息这些扩展点。发送 API 的签名见 [EmKit API](./API-KIT.md)，消息字段见 [类型与常量](./API-TYPES.md)。
+这页讲消息从发送到渲染的完整模型，以及引用、@ 提及、自定义消息、本地提示、流式消息这些扩展点。发送 API 的签名见 [EmKit 发送消息 API](./API-KIT-MESSAGES.md)，消息字段见 [消息类型与常量](./API-TYPES-MESSAGES.md)。
 
 ## 1. 消息模型
 
@@ -38,7 +38,7 @@ await EmKit.sendFile('user-b', CONVERSATION_TYPE.SINGLE_CHAT, file)
 
 - 单聊 `to` 为对方 userId，群聊 `to` 为 groupId。
 - 媒体对象来自 `chooseImage` / `chooseVideo` / `chooseFile` 或输入栏事件。
-- App 端文件选择由宿主注册附件能力（`EmKit.setAttachmentProvider`）；`EmKit.sendFile` 接收 `{ path, name, size, mimeType?, temporary?, release? }`，`temporary` 附件在发送成功后由 UIKit 回调 `release` 清理，失败时保留供重发。详见 [EmKit API · 附件能力注入](./API-KIT.md)。
+- App 端文件选择由宿主注册附件能力（`EmKit.setAttachmentProvider`）；`EmKit.sendFile` 接收 `{ path, name, size, mimeType?, temporary?, release? }`，`temporary` 附件在发送成功后由 UIKit 回调 `release` 清理，失败时保留供重发。详见 [EmKit 附件能力注入](./API-KIT-MESSAGES.md#emkitsetattachmentproviderprovider--pickattachmentsoptions--resolveattachmenturi-options)。
 - 发送成功后返回 `EmMessageItem`；失败会抛错，聊天页同时把消息置为 `failed` 并显示重发入口。
 - 附件消息发送中，SDK 回传 `onFileUploadProgress` 时会把百分比写入 `EmMessageItem.uploadProgress`（0-100），图片/视频气泡蒙层与文件气泡会显示进度；发送结束（成功或失败）后该字段清空。
 

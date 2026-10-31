@@ -2,7 +2,7 @@
 
 面向**用 AI 把 `easemob-uikit-uni` 接进宿主工程**的开发者与编码代理。每个目录是一份可独立加载的 `SKILL.md`，包含触发条件、接入步骤、可复制代码、组件契约、坑与验收清单。
 
-> 版本基线：`easemob-uikit-uni` **1.0.0-rc.1** · `easemob-websdk` **5.1.3** · HBuilderX **5.21+**（uni-app x 蒸汽模式）。
+> 版本基线：`easemob-uikit-uni` **1.0.0-rc.2** · `easemob-websdk` **5.1.3** · HBuilderX **5.21+**（uni-app x 蒸汽模式）。
 
 ## 与仓库 `.agents/skills/` 的区别
 
@@ -64,5 +64,5 @@ AppKey 用环境变量注入，token 由我们服务端 POST /api/im/token 返�
 - 组件契约来自 `uni_modules/easemob-uikit-uni/components/pages/**` 与 `libs/types`、`libs/constants`。
 - 接入步骤与平台边界以 `docs/QUICKSTART.md`、`docs/GUIDE-MULTI-SCENARIO.md`、`docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md` 为准。
 - 版本升级或契约变更时，先改源码与上述文档，再同步本目录；描述里的触发词要包含真实报错原文，方便 AI 命中。
-- 各端真机验证状态见 `docs/STATUS.md`；技能里只承诺「源码已支持」，不替真机状态打包票。
-- 改完跑 `node scripts/check-skills.mjs`：校验 frontmatter、目录同名、描述长度、代码围栏与本地链接。
+- 技能只描述源码已支持的能力；各端实际验证范围以公开平台文档为准。
+- 改完先运行 `node scripts/sync-skills-docs.mjs` 再跑 `node scripts/check-skills.mjs`：校验 frontmatter、目录同名、描述长度、代码围栏、本地链接与公开文档新鲜度。

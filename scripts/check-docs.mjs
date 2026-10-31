@@ -135,21 +135,29 @@ for (const page of pages) {
   }
 }
 
-const sidebarItems = []
-const guideGroups = manifest.locale?.themeConfig?.sidebar?.['/uniapp/guide/'] ?? []
-for (const group of guideGroups) {
-  for (const item of group.items ?? []) sidebarItems.push(item)
+function sidebarLink(page) {
+  if (page.to.endsWith('/index.md')) return `/${page.to.slice(0, -'index.md'.length)}`
+  return `/${page.to.replace(/\.md$/, '')}`
 }
-const sidebarLinks = new Set(sidebarItems.map(item => item.link))
+
+const sidebarLinks = new Set()
+function collectSidebarLinks(items) {
+  for (const item of items) {
+    if (item.link) sidebarLinks.add(item.link)
+    if (item.items) collectSidebarLinks(item.items)
+  }
+}
+const sidebarGroups = Object.values(manifest.locale?.themeConfig?.sidebar ?? {}).flat()
+for (const group of sidebarGroups) collectSidebarLinks(group.items ?? [])
 for (const page of pages) {
   if (page.sidebar === false) continue
-  const expected = `/${page.to.replace(/\.md$/, '')}`
+  const expected = sidebarLink(page)
   if (!sidebarLinks.has(expected)) {
     fail(`sidebar 缺少页面：${page.text}（${expected}）`)
   }
 }
 for (const link of sidebarLinks) {
-  const matched = pages.some(page => `/${page.to.replace(/\.md$/, '')}` === link)
+  const matched = pages.some(page => sidebarLink(page) === link)
   if (!matched) fail(`sidebar 含未登记链接：${link}`)
 }
 
@@ -160,8 +168,9 @@ if (typeof editPattern !== 'function') {
   for (const page of pages) {
     try {
       const url = editPattern({ relativePath: page.to })
-      if (!url.endsWith(`/${page.source}`)) {
-        fail(`editLink 映射不一致：${page.to} -> ${url}（期望以 ${page.source} 结尾）`)
+      const editSource = page.editSource ?? page.source
+      if (!url.endsWith(`/${editSource}`)) {
+        fail(`editLink 映射不一致：${page.to} -> ${url}（期望以 ${editSource} 结尾）`)
       }
     } catch (error) {
       fail(`editLink 缺少映射：${page.to}（${error.message}）`)
@@ -172,7 +181,7 @@ if (typeof editPattern !== 'function') {
 for (const page of pages) {
   if (!page.source.endsWith('.md')) continue
   const from = `./${basename(page.source)}`
-  const to = `./${basename(page.to)}`
+  const to = sidebarLink(page)
   if (from !== to && manifest.markdownReplacements?.[from] !== to) {
     fail(`markdownReplacements 缺少：${from} -> ${to}`)
   }
@@ -181,6 +190,17 @@ for (const page of pages) {
 // ---------- 4. 链接 ----------
 const publicSourcePaths = new Set(publicSources)
 const assetEntry = manifest.entries.find(entry => entry.from === 'docs/assets')
+const repositoryAddressFiles = [
+  ...publicMarkdown,
+  resolve(root, 'uni_modules/easemob-uikit-uni/readme.md'),
+  resolve(root, 'uni_modules/easemob-uikit-uni/package.json'),
+]
+for (const file of repositoryAddressFiles) {
+  const rel = relative(root, file).replaceAll('\\', '/')
+  if (read(file).includes('https://github.com/easemob/easemob-uikit-uniapp')) {
+    fail(`${rel}: 使用旧 uniApp 仓库地址，请改为 Easemob-Community/easemob-uikit-uniapp`)
+  }
+}
 for (const file of publicMarkdown) {
   const rel = relative(root, file).replaceAll('\\', '/')
   const text = read(file)
@@ -245,10 +265,13 @@ const classBody = kitSource.slice(classStart, classEnd)
 const methodNames = new Set()
 for (const match of classBody.matchAll(/^  (?:async )?([a-zA-Z][A-Za-z0-9]*)\(/gm)) methodNames.add(match[1])
 for (const match of classBody.matchAll(/^  get ([a-zA-Z][A-Za-z0-9]*)\b/gm)) methodNames.add(match[1])
-const apiDoc = existsSync(resolve(docsRoot, 'API-KIT.md')) ? read(resolve(docsRoot, 'API-KIT.md')) : ''
+const apiDoc = publicMarkdown
+  .filter(file => basename(file).startsWith('API'))
+  .map(file => read(file))
+  .join('\n')
 for (const name of methodNames) {
   const mentioned = apiDoc.includes('EmKit.' + name) || apiDoc.includes('`' + name + '`') || apiDoc.includes('`' + name + '(')
-  if (!mentioned) fail(`EmKit 方法 ${name} 未出现在 API-KIT.md`)
+  if (!mentioned) fail(`EmKit 方法 ${name} 未出现在拆分后的 API 文档`)
 }
 
 const typesSource = read(resolve(libsRoot, 'types', 'index.ts'))
@@ -267,6 +290,20 @@ const configDoc = existsSync(resolve(docsRoot, 'CONFIG.md')) ? read(resolve(docs
 for (const name of configFieldNames) {
   if (!configDoc.includes('`' + name + '`')) fail(`配置字段 ${name} 未出现在 CONFIG.md`)
 }
+
+const composerSource = read(resolve(libsRoot, 'use', 'useChatComposer.ts'))
+const composerResult = composerSource.match(/export interface UseChatComposerResult \{([\s\S]*?)\n\}/)
+const composerDoc = read(resolve(docsRoot, 'API-COMPOSABLES.md'))
+if (composerResult) {
+  for (const match of composerResult[1].matchAll(/^  ([a-zA-Z][A-Za-z0-9]*)\??:/gm)) {
+    if (!composerDoc.includes('`' + match[1] + '`')) fail(`useChatComposer 返回字段 ${match[1]} 未出现在 API-COMPOSABLES.md`)
+  }
+}
+if (!composerDoc.includes('它不返回 `draft`、`quote` 或 `send`')) {
+  fail('API-COMPOSABLES.md 必须区分 useChatComposer 返回值与 #input-bar 插槽作用域')
+}
+const stateDoc = read(resolve(docsRoot, 'API-KIT-STATE.md'))
+if (!stateDoc.includes('EmKit.state.userId !==')) fail('API-KIT-STATE.md 登录状态判断方向错误')
 
 // ---------- 输出 ----------
 if (errors.length > 0) {

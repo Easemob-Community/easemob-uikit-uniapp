@@ -1,0 +1,112 @@
+{
+  "$comment": "多图对照的合成规格：把两张（或多张）真机截图按等高并排拼成一张，产出 docs/assets/shots/compare/<name>.webp。图中不写任何文字，平台说明写在 Markdown 图注里。源图均相对 reports/assets/shots/。",
+  "height": 1400,
+  "gap": 24,
+  "composites": [
+    {
+      "name": "cmp-conversation-list",
+      "shots": [
+        "android/l3-android-conversation-light.png",
+        "harmony/l3-harmony-conversation-light.png"
+      ]
+    },
+    {
+      "name": "cmp-chat",
+      "shots": [
+        "android/l3-android-chat-bubbles.png",
+        "harmony/l3-harmony-chat-bubbles.png"
+      ]
+    },
+    {
+      "name": "cmp-chat-info",
+      "shots": [
+        "android/l3-android-chat-info.png",
+        "harmony/l3-harmony-chat-info.png"
+      ]
+    },
+    {
+      "name": "cmp-addressbook",
+      "shots": [
+        "android/l3-android-addressbook.png",
+        "harmony/l3-harmony-addressbook.png"
+      ]
+    },
+    {
+      "name": "cmp-groups",
+      "shots": [
+        "android/l3-android-groups.png",
+        "harmony/l3-harmony-groups.png"
+      ]
+    },
+    {
+      "name": "cmp-conversation-dark",
+      "shots": [
+        "android/l3-android-conversation-dark.png",
+        "harmony/l3-harmony-conversation-dark.png"
+      ]
+    },
+    {
+      "name": "cmp-login",
+      "shots": [
+        "android/l1-android-login.png",
+        "harmony/l1-harmony-login.png"
+      ]
+    },
+    {
+      "name": "cmp-conversation-empty",
+      "shots": [
+        "android/l1-android-conversation-empty.png",
+        "harmony/l1-harmony-conversation-empty.png"
+      ]
+    },
+    {
+      "name": "cmp-empty-with-retry",
+      "shots": [
+        "android/l2-android-empty-with-retry.png",
+        "harmony/l2-harmony-empty-with-retry.png"
+      ]
+    },
+    {
+      "name": "cmp-chat-panels",
+      "shots": [
+        "android/l1-android-chat-emoji.png",
+        "android/l1-android-chat-media-panel.png"
+      ]
+    },
+    {
+      "name": "cmp-voice-file",
+      "shots": [
+        "harmony/l1-harmony-chat-voice.png",
+        "harmony/l1-harmony-chat-file.png"
+      ]
+    },
+    {
+      "name": "cmp-atoms",
+      "shots": [
+        "android/l2-android-atoms-avatar-icon.png",
+        "android/l2-android-atoms-empty-skeleton.png"
+      ]
+    },
+    {
+      "name": "cmp-states",
+      "shots": [
+        "android/l2-android-states-button-loading.png",
+        "android/l2-android-states-picker.png"
+      ]
+    },
+    {
+      "name": "cmp-contact-entries",
+      "shots": [
+        "android/l1-android-contact-list.png",
+        "android/l1-android-group-list.png"
+      ]
+    },
+    {
+      "name": "cmp-conversation-search",
+      "shots": [
+        "android/l1-android-conversation-search.png",
+        "android/l1-android-conversation-tab-single.png"
+      ]
+    }
+  ]
+}

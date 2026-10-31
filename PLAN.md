@@ -355,6 +355,19 @@ easemob-uikit-uniapp/
 - **明确不做**：全局 `EmKit.init` 级水印开关、垫底（behind）模式、canvas / dataURI 背景 / UTS 原生插件、漂移动画、聊天信息页与新的朋友页接入（二期按需）。
 - **门禁**：`build web` + `build mp-weixin` 11 项防回归全绿 + H5 产物伺服 200 + `check-docs` + `check-app-module-graph`；App 三端 `pointer-events` 穿透、布局与键盘回归真机待验（记 STATUS，未实测端不得记为已解决）。
 
+### M2.28：微信小程序双分包低操作接入（2026-10-31 立项）
+
+- **范围**：chat-only 模板同时预置 `sub-im` 页面分包与 `sub-sdk` SDK 分包；提供自包含 `dev:mp/build:mp/check:mp/watch:mp`；后处理覆盖公共/私有项目配置并监控配置漂移；检查器区分编译失败、分包声明、SDK 产物、配置覆盖与主包超限；根仓库、宿主 Skill、模板脚本单源同步。
+- **明确不做**：自动改写任意宿主 `pages.json`、路由或 tabBar；另建完整 IM 模板；改变 UIKit SDK 异步加载协议；新增运行时依赖。
+- **门禁**：脚本负例单测、模板 web/mp 构建、双分包产物检查、watch 删除/改配自愈、demo 构建与文档/Skills/发布检查。
+
+### M2.29：HBuilderX 5.34 H5 websdk 构建兼容（2026-10-31 立项）
+
+- **背景**：HBuilderX 5.34 的 Web 编译链解析 websdk 5.1.3 压缩 ESM chunk 时误报 `Identifier "h" has already been declared`，阻塞 demo 与 chat-only 的 H5 门禁。
+- **范围**：新增共享 H5 构建包装器，仅在构建期间用 HBuilderX 自带 esbuild 将 SDK 根入口重打包为单文件；构建成功或失败均恢复原始 `node_modules` 文件；demo 与模板门禁共用该路径。
+- **明确不做**：提交或长期改写 `node_modules`、升级 websdk、修改 UIKit 运行时 SDK 加载协议、新增运行时依赖。
+- **门禁**：包装器恢复语义单测、demo 与模板 web/mp 构建、H5 静态伺服 200、文档/Skills/发布检查。
+
 ### M3：组件沉淀与发布
 
 - 原子组件沉淀（em-*-message 气泡族、输入栏等从页面级组件解耦）；pages_init.json 页面模板注册

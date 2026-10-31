@@ -21,13 +21,15 @@ description: Use when 要把 easemob-uikit-uni 接入宿主 uni-app x 工程（�
 
 | # | 信息 | 用途 | 缺失时怎么办 |
 |---|---|---|---|
-| 1 | 环信 **AppKey** | `EmKit.init({ appkey })` | 用占位符 `YOUR_APPKEY` 并标 TODO，不要编造 |
+| 1 | 环信 **AppKey** | `EmKit.init({ appkey })` | 用占位符 `YOUR_APPKEY` 并明确标记待填写，不要编造 |
 | 2 | **token 签发接口** | 客户端拿 `userId + token` 登录 | 用 `POST /api/im/token` 占位；生产 token **必须服务端签发** |
 | 3 | userId 来源 | 宿主账号体系与 IM userId 的映射 | 明确是复用业务 userId 还是另建映射 |
 | 4 | 入口形态 | 完整 IM（会话列表）还是业务页直进聊天 | 决定接 `em-conversation-page` 还是只接 `em-chat-page` |
 | 5 | 目标端 | H5 / 微信小程序 / App（Android/iOS/鸿蒙） | 小程序必须额外做 SDK 分包；App 需真机 |
 
 用户没说清就先问；不要在未确认 token 接口的情况下写死假 token 进业务代码。
+
+边界补充：私有部署（自定义 IM / REST 服务器地址）当前版本不支持——`EmKit.init` 不透传服务器地址配置，仅连接默认公有云 endpoint。需要私有部署时先与环信确认版本支持。
 
 ## 3. 环境自检
 
@@ -38,6 +40,13 @@ description: Use when 要把 easemob-uikit-uni 接入宿主 uni-app x 工程（�
 | 蒸汽模式 | `"uni-app-x": { "vapor": true }` | 见 `demo/manifest.json` |
 | Node.js | 18+ | `node -v` |
 | 环信 SDK | `easemob-websdk` **精确 5.1.3** | `package.json` 不带 `^`/`~` |
+
+**用 CLI 构建 H5 还要补一个开关**：CLI（`uni build -p web`）下 Web 蒸汽模式以**工程根目录存在 `.vapor` 文件**为准——不读 `manifest.json` 的 `vapor` 字段。缺失时会静默退回 VDOM 模式，构建期直接报错（典型报错见 `em-host-troubleshooting` 的构建期症状）。HBuilderX GUI 构建无需关心。
+
+```bash
+# 工程根目录；空文件，提交进仓库
+touch .vapor
+```
 
 ## 4. 安装
 
@@ -59,6 +68,27 @@ your-app/
 - `easemob-websdk` 是 **peer 依赖**，UIKit 不自带，也不允许再装第二份。
 - UIKit 零运行时依赖；不要为它引入 UI 库、请求库或状态库。
 - 小程序端不要自己 `import 'easemob-websdk'`（会进主包）；UIKit 已内置跨分包加载，见 `em-host-mp-subpackage`。
+
+### 4.1 平台权限声明（宿主必做）
+
+UIKit 本身不带任何权限声明——权限属于宿主工程。漏声明时**系统直接拒绝**，UIKit 只能弹 toast，看不出是配置问题：
+
+| 平台 | 要写在哪 | 必填项 |
+|---|---|---|
+| Android | `manifest.json` → `app-android.distribute.permissions` | `CAMERA`、`RECORD_AUDIO`、相册读取 |
+| iOS | `manifest.json` → `app-ios.distribute.privacyDescription` | `NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSPhotoLibraryUsageDescription`（写入相册再加 `NSPhotoLibraryAddUsageDescription`） |
+| 鸿蒙 | 工程根目录 `harmony-configs/entry/src/main/module.json5` → `requestPermissions` | `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`（都要带 `reason` 与 `usedScene.inuse`，`reason` 指向 `resources/base/element/string.json` 里的条目） |
+| 微信小程序 | 微信公众平台「用户隐私保护指引」+ `app.json` 的 `permission` / `requiredPrivateInfos` | 麦克风、相机、相册按实际用到声明 |
+| H5 | 无需声明 | 不录音、不写相册 |
+
+**鸿蒙特有坑（必读）**：
+
+- HBuilderX 是把 `harmony-configs/` 下的文件**整份覆盖**到生成工程，**不是按节点合并**。只放一段 `requestPermissions` 会把 `abilities` 等结构打掉，工程直接坏。必须提供**完整**的 `module` 配置（可直接拿生成工程的 `entry/src/main/module.json5` 改）。
+- 不要重复声明 `ohos.permission.INTERNET` / `GET_NETWORK_INFO`，框架会加。
+- 相册**不用**声明权限：`uni.chooseImage` 在鸿蒙走系统 Picker，官方明确无需申请。只有「拍摄」需要 `CAMERA`。
+- 用户授权类权限声明后，按住说话会**自动弹出系统授权框**（正文即 `reason` 的文案），无需自己写 UTS 插件请求。
+
+**症状对照**：按住说话立刻「录音失败」→ 麦克风未声明；点「拍摄」无反应或黑屏 → 相机未声明（iOS 还会因 `privacyDescription` 缺失报 `config error`）。
 
 ## 5. pages.json：easycom、页面、导航
 
@@ -168,6 +198,11 @@ onLaunch(() => {
 })
 </script>
 ```
+
+### init 时机：appkey 固定 vs 运行时可知
+
+- **appkey 编译期固定**（绝大多数宿主）：按上面在 `App.uvue` 的 `onLaunch` 里调一次，填入真实 appkey。
+- **appkey 运行时才知道**（用户在登录页输入 / 环境配置下发）：把 `EmKit.init()` 延后到**首次登录提交时、`EmKit.login()` 之前**调用，仍保证每个进程只生效一次；`logout()` 后直接重新 `login()`，不要再次 `init()`。官方 demo 即此写法。
 
 ### 生命周期硬规则
 

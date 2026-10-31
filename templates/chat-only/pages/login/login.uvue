@@ -36,7 +36,7 @@ async function requestToken(id: string): Promise<string> {
 
 function openChat(): void {
   uni.reLaunch({
-    url: `/pages/chat/chat?conversationId=${encodeURIComponent(peerId.value)}&peerName=${encodeURIComponent(IM_CONFIG.peerName)}&peerAvatar=${encodeURIComponent(IM_CONFIG.peerAvatar)}`
+    url: `/sub-im/pages/chat/chat?conversationId=${encodeURIComponent(peerId.value)}&peerName=${encodeURIComponent(IM_CONFIG.peerName)}&peerAvatar=${encodeURIComponent(IM_CONFIG.peerAvatar)}`
   })
 }
 

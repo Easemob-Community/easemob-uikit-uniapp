@@ -37,14 +37,23 @@
               </view>
             </view>
           </view>
-          <view v-else-if="syncFailed && conversationStore.items.length === 0">
-            <em-empty icon="circle-bang" :description="t('common.syncFailed')">
-              <em-button type="outline" size="medium" pill :text="t('common.retry')" :loading="syncing" :disabled="syncing" @click="syncList" />
-            </em-empty>
-          </view>
-          <view v-else-if="conversationStore.loaded && items.length === 0">
+          <!-- 空态：不依赖 loaded（首批数据可能由会话更新事件写入，loaded 未置真时也要能显示空态）
+               0 条会话是正常状态，不是「拉取失败」：同步失败时也落在这里，只在空态里挂一个「重试」，
+               不再整页替换成红叉（历史上空账号会被永久卡在失败页，见 RD-12）。 -->
+          <view v-else-if="!syncing && items.length === 0">
             <slot name="empty">
-              <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText" />
+              <em-empty :icon="keyword.trim() !== '' ? 'search' : 'list-bullet'" :description="emptyTipText">
+                <em-button
+                  v-if="syncFailed && keyword.trim() === ''"
+                  type="outline"
+                  size="medium"
+                  pill
+                  :text="t('common.retry')"
+                  :loading="syncing"
+                  :disabled="syncing"
+                  @click="syncList"
+                />
+              </em-empty>
             </slot>
           </view>
 

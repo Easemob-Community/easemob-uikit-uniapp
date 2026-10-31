@@ -1,0 +1,616 @@
+<template>
+  <view class="seed" :class="themeClass">
+    <view class="seed__bar" :style="'padding-top:' + safeTop + 'px'">
+      <text class="seed__title">截图数据种子</text>
+      <text class="seed__sub">当前账号 {{ me === '' ? '未登录' : me }} · 仅开发用，不进公开文档</text>
+    </view>
+
+    <view class="seed__form">
+      <input class="seed__input" v-model="peer" placeholder="对端 userId（单聊必填）" />
+      <input class="seed__input" v-model="memberText" placeholder="建群初始成员，逗号分隔（可选）" />
+    </view>
+
+    <scroll-view class="seed__body" scroll-y>
+      <view class="seed__group">
+        <text class="seed__group-title">会话修饰（影响会话列表呈现）</text>
+        <view class="seed__row">
+          <button class="seed__btn" :disabled="busy" @click="onPin(true)">置顶</button>
+          <button class="seed__btn seed__btn--plain" :disabled="busy" @click="onPin(false)">取消置顶</button>
+        </view>
+        <view class="seed__row">
+          <button class="seed__btn" :disabled="busy" @click="onMute(true)">免打扰</button>
+          <button class="seed__btn seed__btn--plain" :disabled="busy" @click="onMute(false)">取消免打扰</button>
+        </view>
+      </view>
+
+      <view class="seed__group">
+        <text class="seed__group-title">单聊文本样本（7 条：长文/链接/换行/emoji/长英文词）</text>
+        <button class="seed__btn seed__btn--wide" :disabled="busy" @click="onSeedTexts">灌入文本样本</button>
+      </view>
+
+      <view class="seed__group">
+        <text class="seed__group-title">引用 + 自定义卡片（3 张不同业务卡）</text>
+        <button class="seed__btn seed__btn--wide" :disabled="busy" @click="onSeedQuoteAndCards">灌入引用与卡片</button>
+      </view>
+
+      <view class="seed__group">
+        <text class="seed__group-title">附件样本（下载后上传，失败会记日志）</text>
+        <input class="seed__input" v-model="imageUrl" placeholder="图片 URL" />
+        <input class="seed__input" v-model="videoUrl" placeholder="视频 URL" />
+        <input class="seed__input" v-model="fileUrl" placeholder="文件 URL" />
+        <view class="seed__row">
+          <button class="seed__btn" :disabled="busy" @click="onSeedImage">发图片</button>
+          <button class="seed__btn" :disabled="busy" @click="onSeedVideo">发视频</button>
+          <button class="seed__btn" :disabled="busy" @click="onSeedFile">发文件</button>
+        </view>
+      </view>
+
+      <view class="seed__group">
+        <text class="seed__group-title">群样本（建群 + 公告 + @ 提及）</text>
+        <button class="seed__btn seed__btn--wide" :disabled="busy" @click="onSeedGroup">建群并灌入群消息</button>
+      </view>
+
+      <view class="seed__group">
+        <text class="seed__group-title">状态样本（调试：骨架屏抓拍）</text>
+        <button class="seed__btn seed__btn--wide" :disabled="busy" @click="onHoldSkeleton">骨架屏保持 12 秒并跳会话页</button>
+      </view>
+
+      <view class="seed__group">
+        <text class="seed__group-title">清理</text>
+        <button class="seed__btn seed__btn--plain seed__btn--wide" :disabled="busy" @click="onClearMessages">清空当前单聊记录</button>
+      </view>
+    </scroll-view>
+
+    <!-- 日志固定在外层底部：不进滚动区，保证按钮坐标稳定（自动化点击依赖） -->
+    <view class="seed__log-box">
+      <text class="seed__group-title">运行日志</text>
+      <scroll-view class="seed__log" scroll-y>
+        <text class="seed__log-line" v-for="(line, i) in logs" :key="i">{{ line }}</text>
+        <text class="seed__log-line seed__log-line--empty" v-if="logs.length === 0">（结果输出到这里）</text>
+      </scroll-view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { EmKit, CONVERSATION_TYPE, conversationStore, getSafeAreaTop } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { ConversationTypeValue, EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
+import { useDemoTheme } from '@/common/theme'
+
+// 截图种子页（开发验证页，非产品功能）：一键把会话灌成「截图可用」的饱满状态。
+// 双账号模型：以 A 登录时对 B 灌数据生成己方消息；切到 B 再跑一次即让 A 端出现未读/@我。
+// 纪律：组件脚本不用 for-of（避免降级 helper 落点漂移），顺序发送用索引 for + await。
+
+const { themeClass } = useDemoTheme()
+
+const SINGLE: ConversationTypeValue = CONVERSATION_TYPE.SINGLE_CHAT
+const GROUP: ConversationTypeValue = CONVERSATION_TYPE.GROUP_CHAT
+
+const safeTop = getSafeAreaTop()
+const peer = ref('')
+const memberText = ref('')
+const busy = ref(false)
+const logs = ref<string[]>([])
+
+const imageUrl = ref('https://picsum.photos/seed/emkit/720/480')
+const videoUrl = ref('https://www.w3schools.com/html/mov_bbb.mp4')
+// 文件样本：w3schools 的 horse.pdf 已 404（返回 HTML），改用 w3.org 的 13KB dummy.pdf
+const fileUrl = ref('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf')
+
+const me = computed(() => EmKit.state.userId)
+
+const TEXT_SAMPLES: string[] = [
+  '在吗？想咨询一下这个订单的进度。',
+  '这是一条用来验证多行气泡排版的长消息：环信 uni-app x UIKit 同时支持 Android、iOS、鸿蒙、H5 与微信小程序五个端，气泡宽度、行高、行尾缺字、换行与省略号都必须在真机上逐一核对，否则很容易出现桌面端正常、真机裁切的情况。',
+  'English long word test: https://www.easemob.com/product/im?from=uikit&channel=screenshot&campaign=realdevice',
+  '官网地址 https://www.easemob.com 可以直接点开。',
+  '第一行\n第二行\n第三行（手动换行）',
+  'emoji 测试 😀🎉👍🔥 以及符号 ¥1,280 · 10-20 14:06',
+  '短句'
+]
+
+interface CardSample {
+  event: string
+  ext: Record<string, unknown>
+}
+
+const CARD_SAMPLES: CardSample[] = [
+  {
+    event: 'orderCard',
+    ext: {
+      title: '订单 · 待发货',
+      subtitle: '九成新公路车 · ¥1,280',
+      badge: '待发货',
+      icon: 'cart-filled',
+      fields: [
+        { label: '订单号', value: 'SO-20261020-001' },
+        { label: '配送', value: '顺丰 · 预计明天' }
+      ],
+      footer: '需要修改地址请在发货前提出',
+      actionText: '查看物流',
+      actionKey: 'order-logistics'
+    }
+  },
+  {
+    event: 'medicalCase',
+    ext: {
+      title: '病例摘要 · 初诊',
+      subtitle: '患者 王先生 · 42 岁',
+      badge: '仅医生可见',
+      icon: 'doc-filled',
+      fields: [
+        { label: '主诉', value: '反复咳嗽两周' },
+        { label: '建议', value: '胸片 + 血常规' }
+      ],
+      footer: '本条信息仅医患双方可见'
+    }
+  },
+  {
+    event: 'resumeCard',
+    ext: {
+      title: '张伟 · 资深前端',
+      subtitle: '8 年经验 · 期望 25-30K · 两周到岗',
+      badge: '已投递',
+      icon: 'contacts-filled',
+      fields: [
+        { label: '技能', value: 'TypeScript / Vue / uni-app' },
+        { label: '学历', value: '本科 · 计算机' }
+      ],
+      actionText: '约面试',
+      actionKey: 'interview-invite'
+    }
+  }
+]
+
+function log(line: string): void {
+  logs.value.push(line)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+function target(): string {
+  const id = peer.value.trim()
+  if (id === '') {
+    log('✗ 请先填对端 userId')
+  }
+  return id
+}
+
+function guard(): boolean {
+  if (EmKit.state.userId === '') {
+    log('✗ 未登录，先到登录页登录')
+    return false
+  }
+  if (busy.value) {
+    return false
+  }
+  return true
+}
+
+function parseMembers(): string[] {
+  const raw = memberText.value.trim()
+  if (raw === '') {
+    return []
+  }
+  const parts = raw.split(',')
+  const result: string[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const one = parts[i].trim()
+    if (one !== '') {
+      result.push(one)
+    }
+  }
+  return result
+}
+
+async function onPin(pinned: boolean): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  try {
+    await EmKit.pinConversation(id, SINGLE, pinned)
+    log(`${pinned ? '✓ 已置顶' : '✓ 已取消置顶'} ${id}`)
+  } catch (e) {
+    log('✗ 置顶失败：' + String(e))
+  }
+  busy.value = false
+}
+
+async function onMute(muted: boolean): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  try {
+    await EmKit.setConversationMuted(id, SINGLE, muted)
+    log(`${muted ? '✓ 已免打扰' : '✓ 已取消免打扰'} ${id}`)
+  } catch (e) {
+    log('✗ 免打扰失败：' + String(e))
+  }
+  busy.value = false
+}
+
+async function onSeedTexts(): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  log('开始灌入文本样本…')
+  for (let i = 0; i < TEXT_SAMPLES.length; i++) {
+    try {
+      await EmKit.sendText(id, SINGLE, TEXT_SAMPLES[i])
+      log(`✓ 文本 ${i + 1}/${TEXT_SAMPLES.length}`)
+    } catch (e) {
+      log(`✗ 文本 ${i + 1} 失败：` + String(e))
+    }
+    await sleep(240)
+  }
+  log('文本样本完成')
+  busy.value = false
+}
+
+async function onSeedQuoteAndCards(): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  let origin: EmMessageItem | null = null
+  try {
+    origin = await EmKit.sendText(id, SINGLE, '这句话会被下一条消息引用，用来展示引用条与点击定位原文。')
+    log('✓ 已发被引用句')
+  } catch (e) {
+    log('✗ 被引用句失败：' + String(e))
+  }
+  await sleep(240)
+  if (origin != null) {
+    try {
+      await EmKit.sendText(id, SINGLE, '这条是引用回复：收到，我帮你确认一下。', EmKit.makeQuote(origin))
+      log('✓ 已发引用回复')
+    } catch (e) {
+      log('✗ 引用回复失败：' + String(e))
+    }
+    await sleep(240)
+  }
+  for (let i = 0; i < CARD_SAMPLES.length; i++) {
+    const card = CARD_SAMPLES[i]
+    try {
+      await EmKit.sendCustom(id, SINGLE, card.event, { cardId: card.event + '-seed' }, card.ext)
+      log(`✓ 卡片 ${i + 1}/${CARD_SAMPLES.length} ${card.event}`)
+    } catch (e) {
+      log(`✗ 卡片 ${card.event} 失败：` + String(e))
+    }
+    await sleep(240)
+  }
+  busy.value = false
+}
+
+interface DownloadResult {
+  path: string
+  size: number
+}
+
+// 文件气泡对 fileSize 有校验（4.x/5.x 均不可为 0），下载结果不一定带大小，按「下载返回 → getFileInfo → 兜底」三级取
+function probeFileSize(path: string): Promise<number> {
+  return new Promise((resolve) => {
+    const api = uni as unknown as Record<string, unknown>
+    const fn = api['getFileInfo']
+    if (typeof fn !== 'function') {
+      resolve(0)
+      return
+    }
+    try {
+      (fn as (options: Record<string, unknown>) => void)({
+        filePath: path,
+        success: (r: unknown) => {
+          const d = r as Record<string, unknown>
+          const s = d['size']
+          resolve(typeof s === 'number' && s > 0 ? s : 0)
+        },
+        fail: () => {
+          resolve(0)
+        }
+      })
+    } catch (e) {
+      resolve(0)
+    }
+  })
+}
+
+function downloadToTemp(url: string): Promise<DownloadResult> {
+  const targetUrl = url.trim()
+  if (targetUrl === '') {
+    return Promise.resolve({ path: '', size: 0 })
+  }
+  return new Promise((resolve) => {
+    uni.downloadFile({
+      url: targetUrl,
+      success: (res: unknown) => {
+        const data = res as Record<string, unknown>
+        const path = data['tempFilePath']
+        const rawSize = data['fileSize']
+        const size = typeof rawSize === 'number' ? rawSize : 0
+        resolve({ path: typeof path === 'string' ? path : '', size })
+      },
+      fail: (err: unknown) => {
+        log('✗ 下载失败：' + JSON.stringify(err))
+        resolve({ path: '', size: 0 })
+      }
+    })
+  })
+}
+
+async function resolveSize(downloaded: DownloadResult): Promise<number> {
+  if (downloaded.size > 0) {
+    return downloaded.size
+  }
+  const probed = await probeFileSize(downloaded.path)
+  return probed > 0 ? probed : 65536
+}
+
+async function onSeedImage(): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  const downloaded = await downloadToTemp(imageUrl.value)
+  if (downloaded.path !== '') {
+    const size = await resolveSize(downloaded)
+    try {
+      await EmKit.sendImage(id, SINGLE, { path: downloaded.path, name: 'seed.jpg', size, webFile: null })
+      log('✓ 图片已发')
+    } catch (e) {
+      log('✗ 图片发送失败：' + String(e))
+    }
+  }
+  busy.value = false
+}
+
+async function onSeedVideo(): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  const downloaded = await downloadToTemp(videoUrl.value)
+  if (downloaded.path !== '') {
+    const size = await resolveSize(downloaded)
+    try {
+      await EmKit.sendVideo(id, SINGLE, { path: downloaded.path, name: 'seed.mp4', duration: 10, width: 640, height: 360, size })
+      log('✓ 视频已发')
+    } catch (e) {
+      log('✗ 视频发送失败：' + String(e))
+    }
+  }
+  busy.value = false
+}
+
+async function onSeedFile(): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  const downloaded = await downloadToTemp(fileUrl.value)
+  if (downloaded.path !== '') {
+    const size = await resolveSize(downloaded)
+    try {
+      await EmKit.sendFile(id, SINGLE, { path: downloaded.path, name: '产品说明.pdf', size })
+      log('✓ 文件已发')
+    } catch (e) {
+      log('✗ 文件发送失败：' + String(e))
+    }
+  }
+  busy.value = false
+}
+
+async function onSeedGroup(): Promise<void> {
+  if (!guard()) {
+    return
+  }
+  busy.value = true
+  const members = parseMembers()
+  let groupId = ''
+  try {
+    groupId = await EmKit.createGroup({ name: '截图用群 · 项目协作', description: '用于真机群形态截图', members })
+    log('✓ 已建群 ' + groupId)
+  } catch (e) {
+    log('✗ 建群失败：' + String(e))
+  }
+  await sleep(300)
+  if (groupId !== '') {
+    try {
+      await EmKit.updateGroupAnnouncement(groupId, '本周五 18:00 前提交周报，逾期视为未完成。')
+      log('✓ 已写群公告')
+    } catch (e) {
+      log('✗ 群公告失败：' + String(e))
+    }
+    await sleep(240)
+    const mentions: string[] = []
+    for (let i = 0; i < members.length; i++) {
+      mentions.push(members[i])
+    }
+    const atPart = mentions.length > 0 ? '@' + mentions[0] + ' ' : ''
+    try {
+      await EmKit.sendText(groupId, GROUP, atPart + '群公告已更新，请确认排期。', undefined, mentions)
+      log('✓ 已发 @ 提及消息')
+    } catch (e) {
+      log('✗ @ 消息失败：' + String(e))
+    }
+  }
+  busy.value = false
+}
+
+// 骨架屏抓拍（L1-06）：真实同步窗口只有几十毫秒，靠连拍很难稳定命中。
+// 这里把 store 临时置成「正在同步 + 列表为空」，跳回会话页，留出 12 秒窗口；到时自动恢复原列表。
+let skeletonHoldTimer = 0
+
+function onHoldSkeleton(): void {
+  const snapshot = conversationStore.items.slice()
+  conversationStore.items = []
+  conversationStore.syncing = true
+  log(`⏳ 骨架屏保持 12 秒（原 ${snapshot.length} 条，窗口结束自动恢复）`)
+  if (skeletonHoldTimer !== 0) {
+    clearTimeout(skeletonHoldTimer)
+    skeletonHoldTimer = 0
+  }
+  skeletonHoldTimer = setTimeout(() => {
+    skeletonHoldTimer = 0
+    conversationStore.syncing = false
+    conversationStore.items = snapshot
+    log('✓ 已恢复会话列表')
+  }, 12000)
+  uni.switchTab({ url: '/pages/conversation/conversation' })
+}
+
+async function onClearMessages(): Promise<void> {
+  const id = target()
+  if (id === '' || !guard()) {
+    return
+  }
+  busy.value = true
+  try {
+    await EmKit.clearConversationMessages(id, SINGLE)
+    log('✓ 已清空当前单聊记录 ' + id)
+  } catch (e) {
+    log('✗ 清空失败：' + String(e))
+  }
+  busy.value = false
+}
+</script>
+
+<style>
+@import '@/uni_modules/easemob-uikit-uni/libs/style/variables.css';
+
+.seed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--em-bg-secondary);
+}
+
+.seed__bar {
+  display: flex;
+  flex-direction: column;
+  padding: var(--em-spacing-3) var(--em-spacing-4);
+  background-color: var(--em-bg-base);
+}
+
+.seed__title {
+  font-family: var(--em-font-family);
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: var(--em-font-weight-semibold);
+  color: var(--em-text-primary);
+}
+
+.seed__sub {
+  margin-top: 2px;
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-11);
+  line-height: 16px;
+  color: var(--em-text-tertiary);
+}
+
+.seed__form {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--em-spacing-4) var(--em-spacing-2);
+  background-color: var(--em-bg-base);
+}
+
+.seed__input {
+  height: 40px;
+  margin-top: var(--em-spacing-2);
+  padding: 0 var(--em-spacing-3);
+  border-radius: var(--em-radius);
+  background-color: var(--em-bg-secondary);
+  color: var(--em-text-primary);
+  font-size: var(--em-font-size-13);
+}
+
+.seed__body {
+  flex: 1;
+  height: 0;
+}
+
+.seed__group {
+  display: flex;
+  flex-direction: column;
+  margin: var(--em-spacing-3) var(--em-spacing-4) 0;
+  padding: var(--em-spacing-3);
+  border-radius: 12px;
+  background-color: var(--em-bg-base);
+}
+
+.seed__group-title {
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-13);
+  line-height: 19px;
+  font-weight: var(--em-font-weight-medium);
+  color: var(--em-text-primary);
+}
+
+.seed__row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: var(--em-spacing-2);
+}
+
+.seed__btn {
+  flex: 1;
+  height: 36px;
+  margin-right: var(--em-spacing-2);
+  border-radius: var(--em-radius);
+  background-color: var(--em-primary-color);
+  color: var(--em-text-inverse);
+  font-size: var(--em-font-size-13);
+}
+
+.seed__btn--plain {
+  background-color: var(--em-bg-secondary);
+  color: var(--em-text-primary);
+}
+
+.seed__btn--wide {
+  margin-top: var(--em-spacing-2);
+  margin-right: 0;
+}
+
+.seed__log-box {
+  display: flex;
+  flex-direction: column;
+  margin: var(--em-spacing-3) var(--em-spacing-4);
+  padding: var(--em-spacing-3);
+  border-radius: 12px;
+  background-color: var(--em-bg-base);
+}
+
+.seed__log-line {
+  margin-top: 4px;
+  font-family: var(--em-font-family);
+  font-size: var(--em-font-size-11);
+  line-height: 16px;
+  color: var(--em-text-secondary);
+}
+
+.seed__log-line--empty {
+  color: var(--em-text-tertiary);
+}
+
+.seed__log {
+  height: 132px;
+  margin-top: 4px;
+}
+</style>

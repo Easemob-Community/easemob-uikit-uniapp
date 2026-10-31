@@ -1126,9 +1126,195 @@
   3. 五端视觉验收：暗色模式可读、四角无空洞、瓦片不压住输入框/弹层；聊天页 stage 包裹后键盘避让、滚底锚点、引用定位、多选栏、`#input-bar` 自绘栏逐项回归。
   4. H5 桌面端窗口缩放不重排行列（移动优先，明确不支持）；如宿主需要，二期加 `uni.onWindowResize`（需先确认各端实现）。
 
+## 2026-10-29 鸿蒙真机截图基线 + 截图数据种子页
+
+- **范围**：截图台本见 `reports/screenshot-scope.md`（L0 门面 / L1 页面 / L2 特性 / L3 多端矩阵 30 张 / L4 内部验收）。决策：L3 拍满 6 屏 × 5 端、门面用五端横排、**文档主图必须真机**（H5 不作主图）、主端 = 鸿蒙。
+- **新增开发验证页** `demo/sub-im/pages/seed/seed.uvue`（`pages.json` 注册 + `spike` 页入口）：一键把会话灌成截图可用状态。覆盖会话置顶/免打扰、7 条文本样本（长文/链接/手动换行/emoji/长英文词）、引用 + 3 张宿主卡片（`orderCard`/`medicalCase`/`resumeCard`）、图片/视频/文件（下载后上传）、建群 + 公告 + @ 提及、清空记录。
+- **种子页三个坑**：
+  1. 日志区若放在滚动内容里并自动滚底，日志每增一行按钮就位移 → 自动化点击必错位。已改为**页面底部固定面板**（与 body 的 scroll-view 同级）。
+  2. 文件气泡 `sendFile` 校验 `fileSize` 不可为 0（图片/视频可传 0，故两者从未暴露此限）。`uni.downloadFile` 返回值不保证带大小，按「downloadFile.fileSize → `uni.getFileInfo` → 兜底 65536」三级取。
+  3. `EmKit` 是**具名导出**（`export const EmKit = new EmKitImpl()`），demo 内一律 `import { EmKit }`，不要写成 default。
+- **鸿蒙通道实测**（BLK-AL00 / API 24 / hdc 3.2.0b，随 DevEco 自带）：`hdc shell snapshot_display` 截屏、`uitest uiInput`（click/longClick/swipe/drag/inputText/keyEvent）、`uitest dumpLayout` 元素树三条全通，**能力与 adb 同级**。限制：`dumpLayout` 不暴露 `button` 内 `<text>` 的文本，按文本定位不可用，只能按坐标点击（因此页面布局稳定性是自动化的硬前提）。
+- **iOS 通道实测**（iPhone 14 Pro / Xcode 27.1）：`xcrun devicectl device capture screenshot` 可用（1179×2556），`device process launch` 可拉起已装的 `com.Sheffi.EasemobIMLab`；但**设备锁屏时只能截到锁屏**，且 devicectl 无任何点击/滑动能力。
+- **首轮产物**：`reports/assets/shots/harmony/` —— 六屏基线（`l3-harmony-*`：会话浅色 / 聊天气泡 / 聊天信息 / 好友列表 / 群组列表 / 会话深色）+ `l2-harmony-custom-cards`（卡片特写）+ `l4-harmony-quote-defect`（缺陷证据）。注意 `reports/` 在 `.gitignore` 内，属工作区资产、不入库。
+- **真机问题**：鸿蒙引用卡 2 行截断时**不显示省略号**，末字被直接切掉（`l4-harmony-quote-defect.png`）。**已核对 vue 权威源码：引用卡在气泡下方、竖杠在右、文字右对齐均为设计如此（`quote-card--right` 即 `row-reverse + text-align: right`），不是缺陷**；唯一偏差是 `-webkit-line-clamp: 2` 在浏览器会自动补 `…`，鸿蒙没有。详见 `reports/realdevice-issues.md`。
+- **教训**：第一次凭截图判读把「设计如此」误判成缺陷，已按 vue 源码修正。真机问题记录必须附权威对照结论。
+- **数据面缺口**：会话列表仅 3 条（1 单聊 / 1 群 / 1 自聊），且聊天全部为己方消息（对端无回复）——当前不具备做门面图与页面主图的内容量，需第二账号补对端消息与更多会话。
+- **对端驱动方案（已验证）**：用第二账号（`hfp`）在 **H5** 上登录充当对端，经 Chrome CDP（`Runtime.evaluate` 填表单 + `dispatchEvent('input')` 让 v-model 生效，再点发送位 `.em-chat-inputbar__tool` 末位）脚本化发消息，鸿蒙端作主端接收。这样两端对发、未读徽标、双向气泡全部可脚本产出，不必人工点手机。
+  - 登录表单三输入框顺序固定为 `appkey / userId / token`；发送后输入框清空即视为成功。
+  - **未读只在「已登录且不在会话内」时累计**：先杀掉进程再让对方发消息，重新登录后未读不会出现，做未读态必须先保持登录再发。
+  - 凭据处理：token 只走运行期环境变量与内存，不入仓库；已核对 `git log --all -S` 无提交记录。
+- **第二轮产物替换**：`l3-harmony-conversation-light` 换成带未读徽标的版本；`l3-harmony-chat-bubbles` 换成双向气泡（左右两侧同屏）；新增 `l1-harmony-chat-menu`（长按四项菜单）、`l1-harmony-chat-emoji`（表情面板）。
+- **截图期临时改动**：`demo/common/ai-stream-demo.ts` 的 `AI_STREAM_FAB_VISIBLE` 需临时置 `false`，否则「AI 演示」浮钮会压住气泡；抓完已还原为 `true`（该文件无残留 diff）。
+- **问题登记处**：真机验收问题统一记 `reports/realdevice-issues.md`（RD-01…RD-07），供后续集中修复批次逐条处理。当前 **已确认产品缺陷 1 条（RD-01 鸿蒙引用卡无省略号）、待确认 2 条（RD-02 离线消息未读清零、RD-03 群历史为空）、工具链 4 条**。
+- **两处误判已纠正并记入「已排除」**：①「自检页标题渲染错字」是低分辨率预览误读；②「引用卡位置/对齐是缺陷」经 vue 源码对照为设计如此。**规则：真机问题必须先放大原图 + 对照 vue 源码，才能定性为缺陷。**
+- **数据面补齐（第三轮）**：会话列表由 3 条扩到 7 条（对 `lp1 / pfh2 / wf1 / wyq1` 各灌一轮并按会话补差异化收尾句，避免摘要全为「短句」）；四类附件气泡（文本/图片/视频/文件）齐备，**仅缺语音**（需真实录音）；未读徽标 + tabBar 角标已出图。
+- **新增产物**：`l1-harmony-chat-file`（文件气泡，9.3 KB 真实大小，验证 `sendFile` 的 fileSize 修复）、`l3-harmony-conversation-light`（7 条 + 未读）、`l3-harmony-conversation-dark`（7 条深色）。`reports/` 在 `.gitignore` 内，属工作区资产。
+- **鸿蒙录音不可用（RD-08，已修待验证）**：根因是**鸿蒙工程从未声明麦克风权限**——生成工程 `module.json5` 的 `requestPermissions` 只有 `INTERNET`，设备 `reqPermissionDetails` 也无麦克风，`demo/harmony-configs/` 一直是空目录。已新增 `demo/harmony-configs/entry/src/main/module.json5`（完整 module 配置 + `ohos.permission.MICROPHONE` + `reason`/`usedScene`）与对应 `string.json`（`reason_microphone`）。
+  - **关键认知**：HBuilderX 对 `harmony-configs` 是 `copyDirectoryEx` **整文件覆盖**（仅 `entryability/EntryAbility.ets`、`index.generated.ets`、两个 `www` 目录在保留清单内），**不是按节点合并**；只放 `requestPermissions` 片段会打掉 `abilities`。因此必须给完整文件。
+  - 另：`requestPermissions` 不要重复 `ohos.permission.INTERNET`（框架已加），本机设备曾见 `GET_NETWORK_INFO` 由基座补。
+  - **待验证**：重新「运行到鸿蒙」后 ①`bm dump` 出现 `MICROPHONE`；②首次录音是否弹系统授权；③若仍失败则需补运行时申请（鸿蒙 user_grant 走 `abilityAccessCtrl`，DCloud 文档指引用 UTS 插件）。
+  - **验证结论（同日晚，全部通过）**：`reqPermissionDetails` 已含 `MICROPHONE` 且 reason/usedScene 正确；首次长按**确实弹出系统授权框**（正文为配置的「发送语音消息时需要录制声音」），说明 **RecorderManager 会自动做运行时申请，无需 UTS 插件**；点允许后按住 2 秒成功发出 `▶ 2″` 语音气泡。
+  - **自建构建-安装链路（免 GUI）**：签名材料在 `~/Library/Application Support/HBuilder X/extensions/launcher/agc-certs/`，`dist/dev/app-harmony/build-profile.json5` 带完整 `signingConfigs`；用 DevEco 的 node + `hvigorw.js`（`DEVECO_SDK_HOME` 指向 DevEco sdk）`assembleHap --mode module -p buildMode=debug` 可自签，再 `hdc install -r entry-default-signed.hap`。注意 `uni.sh build app-harmony` 只出 assets、**不组装 `entry/`**，必须借「运行到鸿蒙」留下的已组装工程改配置再重打包。
+- **语音气泡截图手法（RD-07 结案）**：`uitest uiInput drag 540 2204 541 2205 200`（位移 1px + 最低速度）等效长按约 2 秒；`longClick` 太快会被「说话时间太短」丢弃，`swipe` 起止点相同无效。
+- **相机权限同类补齐**：`ohos.permission.CAMERA` 原本同样缺失（「拍摄」入口会以同样方式失败），已与 MICROPHONE 一并写入 `harmony-configs` 并重签安装；设备端 `reqPermissions` = `CAMERA / GET_NETWORK_INFO / INTERNET / MICROPHONE`。相册无需权限（走系统 Picker）。
+- **语音气泡已入图**：`l1-harmony-chat-voice`；至此「黄总」会话具备文本 / 图片 / 视频 / 文件 / 语音五类气泡 + 自定义卡片，L0-03 气泡全家福素材齐备（仅受 RD-04 浮钮遮挡影响，需关浮钮后重拍）。
+- **权限说明落地到 UIKit 自身的 6 个面**（此前只有 `PLATFORM.md` 一带而过，且完全没提鸿蒙）：
+  1. `uni_modules/easemob-uikit-uni/readme.md` ——「已知限制」补鸿蒙一条（整文件覆盖 + 相册免声明）；
+  2. `docs/QUICKSTART.md` —— App 端权限段补鸿蒙 `harmony-configs` 写法规约；
+  3. `docs/HARMONY-REALDEVICE-RUN.md` —— 新增 **5.1 权限声明**：完整 json5 示例、三个坑、`bm dump` 排查命令；并把原文「首次运行生成 `harmony-configs/`（空目录属正常）」改成「不要空着」——这句正是 RD-08 的认知源头；
+  4. `docs/FAQ.md` ——「图片/语音/视频发送失败」补鸿蒙配置前提；
+  5. `skills/em-host-integration` —— 新增 **4.1 平台权限声明（宿主必做）**，五端对照表 + 鸿蒙特有坑 + 症状对照；
+  6. `skills/em-host-troubleshooting` —— 新增 **9.3 录音/拍摄权限专项**，症状→根因→修复表，并给出判断口诀「系统根本不弹窗=声明问题；弹过窗但被拒=用户态问题」。
+  - `package.json` 的 `dcloudext.declaration.permissions` 原本已含「相机、相册、麦克风」，无需改（该字段描述**用到了什么**，不是**怎么声明**）。
+  - 结论口径：**权限属于宿主工程，UIKit 不能替宿主声明，但必须把「必做项 + 漏声明的症状」写清楚**，否则宿主只会看到一句「录音失败」。门禁：`check-docs` 29 页 ✓、`check-skills` 8 个技能 ✓。
+- **本轮补拍（L1 其余屏）**：`l1-harmony-conversation-pinned`（置顶态：灰底 + pin 图标，且置顶会话稳居首位）、`l1-harmony-chat-dark`（深色聊天页，无浮钮）。至此鸿蒙素材 15 张。
+- **新缺陷 RD-09（已确认，中）：会话列表空态永不显示**。搜索无结果、切到空 tab 时列表整片空白，无图标无文案。定位：模板条件是 `conversationStore.loaded && items.length === 0`，而 seed 页实测打点为 **`loaded=false syncing=false items=7`**——items 有 7 条但 `loaded` 恒 false（只在 `refreshSessionList` 与 `onSyncDataFinished` 两处置真，本流程没走这两条）。建议先去掉空态对 `loaded` 的依赖（改 `!syncing && !syncFailed && items.length===0`），再补 `loaded` 语义一致性；`em-group-page` / `em-contact-list-page` 同型写法需一并复核。**因此 L1-05「会话列表空态」暂无法产出。**
+- **骨架屏（L1-06）未产出**：需要「本地无缓存 + 正在同步」的窗口；`bm clean -d` 能造但会**连带清掉 demo 预存的 appkey/userId/token**（本次已踩，pfx 的 token 因此丢失，需重新提供）。建议后续给骨架屏加调试开关，或干脆用「登出→重登」窗口抓拍。
+- **新缺陷 RD-10（已确认，高）：鸿蒙冷启动会话列表恒失败**。全新安装或清应用数据后登录成功（我的页显示「已连接」），会话列表恒显示「列表加载失败，请重试」，重试/重启/卸载重装均无效。**对照实验**：同账号（pfh）同 token，在 H5 清 `localStorage` + IndexedDB 后登录，列表正常加载 6 条 → 排除 token/账号/冷启动因素，定位为**鸿蒙平台专属**、且仅在会话列表同步路径。旁证：鸿蒙端通讯录（好友 5 / 群 35）正常，说明连接与鉴权没问题。根因推测：`syncConversations()` 的 `chatManager.refreshSessionList()` 在无本地缓存时抛错，而 `onSyncDataFinished()` 的 `getConversationList()` 未被用作兜底。**该问题阻塞全部剩余鸿蒙截图。**
+- **本地凭据**：新增 `local.credentials.sh`（已被 `.gitignore` 的 `local.credentials.*` 覆盖），存放 `EM_APPKEY` / `EM_PFH_TOKEN` / `EM_HFP_TOKEN`，登录脚本统一 `source` 读取；已核对 `git status` 不含该文件。
+- **RD-10 真因（用户纠正，我上一版判断错误）**：不是「鸿蒙冷启动缺陷」，而是**账号 0 条会话被误判为拉取失败**。`syncConversations()` 里 `refreshSessionList()` 在无会话时返回 `undefined/null`，随后读 `.length` 抛错 → `catch` 置 `syncFailed` → 页面走「加载失败」。**空结果本应走空态。**
+  - 我此前拿「H5 清缓存后同账号正常」当反证，**该证据不成立**：H5 的清理（`localStorage` + `indexedDB.databases()`）没有真正删掉 SDK 的 IndexedDB 库，列表实际来自本地缓存。教训：判断服务端返回什么，不能只看 UI 渲染结果，要先确认本地缓存真的清空。
+- **修复（RD-10 + RD-09）**：①`refreshSessionList()` / `getConversationList()` 结果归一成数组（`?? []`），成功后显式 `syncFailed=false`；②会话页空态条件由 `conversationStore.loaded && items.length===0` 改为 `!syncing && items.length===0`，不再依赖 `loaded`。门禁：`build web` ✓ / `build mp-weixin` ✓（11 项）/ `check-docs` ✓。
+- **⚠️ 手工重编鸿蒙工程的坑（本次踩过）**：不要用「CLI 编译 → rsync 覆盖 `dist/dev/app-harmony` → hvigor 打包」这条路——launcher 的组装不止拷文件，产出的包会白屏/黑屏转圈。**必须走 HBuilderX「运行到鸿蒙」**（它会先 `deleteFiles` 再解压模板 + 拷贝 `harmony-configs`）。本次因此把设备上的包弄坏，等下一次「运行到鸿蒙」恢复。
+- **`position: sticky` 蒸汽端已定性**：构建 `app-harmony` 时编译器直接报 `property value 'sticky' is not supported`，即 `em-contact-list-page` 组头吸顶在 App 端不生效（原「待验」项可结案）。若需吸顶须改占位 + 覆盖层自绘方案。
+- **公开文档补漏**：`docs/PLATFORM.md` 原文只提 Android 权限声明与 iOS 用途描述，缺鸿蒙；已补「鸿蒙权限声明」段落（`harmony-configs/entry/src/main/module.json5` 的 `requestPermissions`、整文件覆盖语义、签名文件 `build-profile.json5` 已被 gitignore 而权限配置需随仓库分发）。`check-docs` 仍 29 页通过。
+
+## 2026-10-29 鸿蒙重编复验：会话列表同步异常真因（RD-11）
+
+- **前提**：用户手动「运行到鸿蒙」后包恢复正常（不再是黑屏转圈），`demo/unpackage/dist/dev/app-harmony/build-profile.json5` 时间戳显示 13:53 重新组装，编译产物 `assets/uni_modules/easemob-uikit-uni/libs/chat/conversation.js` 已含 `?? []` 归一化，确认 RD-09/RD-10 的改动已进包。参考：手工 CLI 重编会打出坏包，**只能走 HBuilderX「运行到鸿蒙」**（上一条已记）。
+- **复验结论：0 会话仍然显示「列表加载失败」，且 1 条会话时同步同样失败。** 用 demo 自带「我的 → 导出调试日志」拿到原生日志（沙盒 `files/emkit-logs-*.txt`，adb 侧可直接 `hdc file recv` 拉取），两段对照：
+  ```
+  # 0 条会话
+  [debug] [chat] onConversationListUpdate, count: 0
+  [warn]  [chat] conversation sync failed: fallback Object entries is not supported IsJSUint8Array or IsJSUint16Array
+  # 1 条会话（先自己发一条再冷启动）
+  [debug] [chat] onConversationListUpdate, count: 1
+  [warn]  [chat] conversation sync failed: fallback Object entries is not supported IsJSUint8Array or IsJSUint16Array
+  ```
+  → **与「有没有会话」无关**，是鸿蒙上会话列表同步每次都抛异常；0 条只是让失败在 UI 上可见（有本地缓存时列表照常渲染、失败被吞）。
+- **定位**：`stage=fallback` 是 SDK 自己的错误包装，异常抛在 SDK 的 session-list 同步管线内部（`onConversationListUpdate` 之后约 8ms）；文案 `Object entries is not supported IsJSUint8Array or IsJSUint16Array` 是 **ArkTS 运行时**对 `Object.entries()` 的报错（V8/JSC 不会产出这句），指向**类型化数组**入参。UIKit 编译产物里 `Object.entries` 命中数为 0；SDK 侧候选点是 `chunks/session-list-query-*.js` 的 `stableStringify` / `stripUndefined`，以及 `chunks/common-*.js` 的日志脱敏器（把 `Uint8Array` 当普通对象喂给 `Object.entries`）。
+- **最可疑触发条件：`sdkLogLevel: 'DEBUG'`**。SDK 的 `Ve.debug()` 先判级别再 `emit()`，只有 DEBUG 才会跑脱敏 `Fe()`。`demo/pages/login/login.uvue` 之前显式传了 `'DEBUG'`（UIKit 默认 `'WARN'`），是唯一非常规项。
+- **本轮代码改动（等下一次「运行到鸿蒙」验证）**：
+  1. `demo/pages/login/login.uvue`：`sdkLogLevel` 改 `'WARN'`，并写明原因与「需要 SDK 原始日志时临时改 DEBUG、只在非鸿蒙端复现」。
+  2. `demo/common/ai-stream-demo.ts`：`AI_STREAM_FAB_VISIBLE` 置 `false`（截图窗口用，RD-04 浮钮遮挡；出图后再定是修偏移还是恢复）。
+- **RD-11 已登记**：`reports/realdevice-issues.md`，状态「待确认」，含复现步骤、原生日志摘录、候选修复（demo 不开 DEBUG / 上游脱敏器对 `ArrayBuffer.isView` 短路 / `syncConversations` 失败回退本地快照）。
+- **RD-10 结论修正（第三次）**：`?? []` 归一化仍然是对的方向（防御空结果），但**不是鸿蒙红叉的原因**；「0 会话 → 空态」这条链在鸿蒙上仍被 RD-11 挡着，未通过验收。验收口径已写进清单：0 条属于正常空态，必须显示「暂无会话」。
+- **本轮新增真机素材**（`reports/assets/shots/harmony/`，共 27 张）：`l1-harmony-login`（登录页标准态）、`l1-harmony-contact-list`（好友列表 + 字母索引条）、`l1-harmony-group-list`（群卡片流 + 建群入口）、`l1-harmony-new-requests-empty`（新请求空态）、`l1-harmony-chat-media-panel`（相册/拍摄/视频/文件）、`l1-harmony-chat-info`（免打扰 + 置顶双开 + 清空/删除/删好友）、`l1-harmony-conversation-pinned-muted`（置顶灰底 + 免打扰图标）、`l1-harmony-conversation-tab-single`（筛选 tab 单聊）、`l1-harmony-conversation-tab-unread-empty`（未读 tab 空态）、`l1-harmony-conversation-search`（搜索过滤）。**仍缺**：L1-05 会话列表空态（被 RD-11 挡）、L1-06 骨架屏（窗口太短，需加调试开关或登出重登抢拍）、L1-17 新请求待处理双按钮（需对端发起好友申请）。
+- **设备侧可复用的确定性坐标/路径**：底部 tabBar 文本中心 `y=2294`（x：会话 181 / 联系人 541 / 我的 904）；好友列表行 `y=499`、群组列表 `y=703`、新请求 `y=906`；聊天页「+」`(988,2290)`、会话列表「＋」`(988,177)`；日志导出后文件在 `/data/app/el2/100/base/uni.app.UNI08EF252/files/emkit-logs-*.txt`。
+- **deliverable 提醒**：`reports/` 仍在 `.gitignore`，截图与问题清单都是工作区资产，不进版本库。
+
+## 2026-10-29 RD-11 复验通过：sdkLogLevel=DEBUG 是鸿蒙同步失败的真凶
+
+- **验证手段**：改 `demo/pages/login/login.uvue` 的 `sdkLogLevel` 为 `'WARN'` 后重编，用同账号登录 → 会话列表**一次拉到 8 条服务端会话**（本地缓存里原本没有这些会话），导出日志里 `Object entries` 出现 **0 次**。RD-11 结案：SDK DEBUG 级日志脱敏对二进制帧调 `Object.entries`，ArkTS 抛错并把同步打断；UIKit 默认值本来就是 `WARN`，只有 demo 开了 DEBUG。
+- **同时结掉的两个旧账**：
+  - 「0 条会话 = 列表加载失败」在真机上**首次看到正确空态**（浅色 + 深色两张图）。此前两次「已修」的判断都不成立，第三次才落到真实链路。
+  - 顺手确认 `AI_STREAM_FAB_VISIBLE=false` 生效：聊天页不再有浮钮遮挡。
+- **新缺陷 RD-12（高，已修待验）**：传输层同步偶发失败（日志 `sync websocket retry exhausted`，3 次重试耗尽）时，`em-conversation-page` 会把**整页**替换成「列表加载失败，请重试」；且这个失败分支排在空态分支之前 → 空账号一旦失败就永久停在红叉，点重试也只回到同一画面。证据：同一份日志里四次失败，其中一次发生在**有 1 条会话**时，说明不是空账号专属。
+  - **修复**：删掉独立失败分支，空态统一由 `!syncing && items.length === 0` 呈现；仅当 `syncFailed` 且无搜索关键词时，在空态里挂一个「重试」。0 条会话永远看到「没有会话」，不再被失败态劫持。
+  - 门禁：`build web` ✓ / `build mp-weixin` ✓（11 项）/ `check-docs` ✓（29 页）。
+- **待查**：`sync websocket retry exhausted` 本身是服务端限流（本轮短时间内反复登录/删会话/切页触发同步）还是客户端问题，需要一次独立复现；不影响本次渲染层修复。
+- **文档补漏（宿主向）**：`docs/FAQ.md`「会话列表为空」补两条（鸿蒙别开 `sdkLogLevel:'DEBUG'`；空列表与同步失败是两种状态）；`docs/HARMONY-REALDEVICE-RUN.md` 新增 **5.2 SDK 调试日志：鸿蒙上不要开 DEBUG**，含排查路径。
+- **新增/替换素材**：`l1-harmony-conversation-empty`（浅色空态）、`l1-harmony-conversation-empty-dark`（深色空态）、`l1-harmony-conversation-list`（8 条服务端会话，置顶/免打扰齐备）、`l3-harmony-conversation-light` / `l3-harmony-conversation-dark` 用 8 条版本替换。鸿蒙素材现 30 张。
+- **骨架屏（L1-06）仍缺**：seed 页已加「骨架屏保持 12 秒并跳会话页」按钮（`conversationStore.items=[]` + `syncing=true`，12 秒后自动恢复），但本轮触发时正好撞上 RD-12 的失败态，页面显示的是红叉而不是骨架。RD-12 修完再抓。
+- **删会话做空态的代价与恢复**：为产出空态把账号下 8 条会话全部删除（服务端也删），已用「发一条消息」重新造出 1 条；后续如需多会话列表，用 seed 页 + H5 对端重灌。
+
+## 2026-10-29 RD-12 复验通过 + L1 会话列表三态补齐
+
+- **RD-12 已修已验**：复验时日志仍报 `sync websocket retry exhausted`（同步确实失败），但页面呈现是**空态「没有会话」+「重试」**，不再是整页红叉。证据图 `l2-harmony-empty-with-retry.png`。渲染层修复生效，传输层抖动不再劫持整页。
+- **L1 三态补齐**（此前连续两轮卡住的项）：
+  - `l1-harmony-conversation-empty.png` / `l1-harmony-conversation-empty-dark.png` —— 0 条会话空态（浅色/深色），不再出现「列表加载失败」。
+  - `l1-harmony-conversation-skeleton.png` —— 首次同步骨架屏（6 行：圆头像 + 双行骨架 + 时间占位 + 未读圆点）。抓拍方式：从「我的」切回会话页触发 `onMounted → syncList()`，用**无间隔连拍**命中；真实窗口约 1 帧（~120ms），seed 页的「保持 12 秒」按钮会被随后到达的 `onSyncDataFinished` 立刻取消，靠它抓不到（该按钮对「慢网」场景仍有效，只是本地同步太快）。
+- **教训**：判断「同步失败」要看日志，不要看 UI——同一张「没有会话」空态，可能是同步成功后的空列表，也可能是同步失败后的降级呈现（此时带「重试」）。
+- **鸿蒙素材现有 31 张**（`reports/assets/shots/harmony/`）。仍缺：L1-13 群形态（公告 + @ + 群已读，需有公告的群）、L1-17 新请求待处理双按钮（需对端发起好友申请）、L1-10 已读/发送失败（需断网造失败气泡）、L0 门面图（需五端素材齐）。
+- **待查（不影响交付）**：`sync websocket retry exhausted` 的稳定性——本轮复验期间又出现两次，且发生在 0 条会话时；需确认是服务端对高频登录/同步的限流，还是 SDK 同步通道自身重试策略问题。
+
+## 2026-10-29 Android 真机接入：L3 六屏 + L1 九屏，并复现同步失败
+
+- **设备**：HLK-AL00 / Android 10 / 1080×2340 @480dpi，`adb` 全通（截屏/点击/输入/滑动/uiautomator）。APK 由用户「运行到 Android」装出（14:34，bundle `uni.app.UNI08EF252`，与鸿蒙同 id），**已含本轮全部修复**。
+- **数据清理**：Android 首次登录时发现两条会话的摘要被**日志文本**污染（此前鸿蒙侧导出日志把全文写进剪贴板，输入时被 IME 粘进输入框发出）。处理方式：删掉受污染会话 → 用 seed 页按 `userId` 重灌中文样本（`hfp`=黄总、`lp1`=lp1），得到干净的文本/emoji/图片/视频/文件五类内容。
+  - 顺手修掉一个数据坑：seed 页默认的文件 URL `https://www.w3schools.com/html/horse.pdf` 已 404，导致「文件」样本一直失败；换成 `https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf`（13KB）后成功，气泡显示「产品说明.pdf / 64.0 KB」。
+- **新增素材（`reports/assets/shots/android/`，15 张）**：
+  - L3 六屏：`l3-android-conversation-light` / `chat-bubbles` / `chat-info` / `addressbook` / `groups` / `conversation-dark`；
+  - L1：`login`、`chat-bubbles`、`chat-info`、`chat-emoji`、`chat-media-panel`、`contact-list`、`group-list`、`conversation-search`、`conversation-tab-single`。
+- **同步问题在 Android 同样出现（重要）**：导出日志里 `conversation sync failed: fallback sync websocket retry exhausted` **8 次**，且与鸿蒙同一账号同一时刻。`sync websocket request sent {attempt:3,maxAttempts:3}` → `closed after complete` → 失败，说明**传输层失败是跨端的**，不是鸿蒙专有；鸿蒙只是「本地缓存为空」时把失败暴露成红叉。相应结论已写回 `reports/realdevice-issues.md` RD-12。
+  - 同时反证 RD-11：Android 日志里 `Object entries` **0 次**，确认那是 ArkTS 运行时限制。
+- **工具链限制（新登记 RD-13）**：`adb` 的长按注入（`input swipe` 同点/1px、`input motionevent DOWN…UP`）**都不触发** uni-app x 的 longpress，Android 侧抓不到「长按菜单」；鸿蒙的 `uitest uiInput drag` 可以。该类截图暂由鸿蒙承担，Android 若要补需换 uiautomator2/scrcpy。
+- **仍未产出**：L1-05 空态（Android 侧需清空会话，会连带影响鸿蒙同账号数据，暂缓）、L1-08 长按菜单（RD-13）、L1-10 已读/发送失败、L1-13 群形态（缺带公告的群）、L1-17 好友申请（需对端发起）。
+
+## 2026-10-29 Android 空列表复验：失败非必现、渲染已兜住
+
+- **背景**：用户手动把 Android 侧会话删空，要求观察空列表是否也出现鸿蒙那类问题。
+- **结论**（同一账号、同一构建，15:01–15:04）：
+  1. **冷启动 + 登录 → 空态正常**：显示「没有会话」，日志 `onConversationListUpdate, count: 0`，失败 0 次。
+  2. **连续切页触发同步 → 4 次里 1 次失败**（`sync websocket retry exhausted`）；此刻 UI 显示**空态 + 重试**（`l2-android-empty-with-retry.png`），**不是红叉** → RD-12 渲染修复在 Android 同样生效。
+  3. **「重试」链路有效**：点击后日志确实追加了同步请求（07:02:53 / 07:03:16 各失败一次），只是这段窗口内连续失败 3 次——失败会**成簇**，不是每次必现。
+  4. **再冷启动后第一次同步又成功**（failures 0）→ 与「0 条会话必失败」无关。
+- **定性**：会话列表同步失败是**跨端、间歇、成簇**的传输层问题（一次性 WebSocket `wss://…/ws?…` 请求发出后连接被关闭、应答未回，重试 3 次耗尽）。UIKit 已把「一次失败」降级为空态 + 重试，不再整页红叉；根因需 SDK/服务端侧修。
+- **新增素材**：`l1-android-conversation-empty.png`（Android 空态）、`l2-android-empty-with-retry.png`（Android 失败降级态）。
+- **Android 素材累计 17 张**，L3 六屏齐全。
+
+## 2026-10-29 Android 补拍 L2 特性专题层：lab 页直出，L2 十项补齐
+
+- **做法**：L2 全部走 demo 已有 lab 页（`我的 → 样式实验室 / IM 场景实验室`），**不改代码、不造数据**，靠 `adb` 点击 + 滚动拼接产出。滚动拼接采用**慢拖（1400ms / 600px）+ 逐帧位移测量 + 空白行落刀**，避免甩动惯性导致的错位；`input swipe` 快拖带惯性会让每屏位移不一致（实测 913/25/831 乱跳）。
+- **新增素材 19 张**（`reports/assets/shots/android/`）：
+  - L2-04 `l2-android-ai-stream-{typing,done,error}.png` + `l2-android-ai-stream-3frames.png`（光标态/终态/异常态三帧竖排）。
+  - L2-09 `l2-android-atoms-{avatar-icon,empty-skeleton}.png`（原子组件陈列；长图方案被 RD-14 的末端裁切挡掉，改两屏定格）。
+  - L2-08 `l2-android-states-{button-loading,load-more,picker}.png`（按钮 loading / 触底失败重试 / 选人弹层已选态）。
+  - L2-07 `l2-android-primary-color.png`（同屏对比 #33B1FF 默认 vs #24F26C 业务主色）+ 两张原图。
+  - L2-10 `l2-android-scenarios-list.png` + `l2-android-scenario-detail.png`（六场景卡片流 + 在线客服业务上下文页）。
+  - L2-03 `l2-android-input-toolbar.png`（#banner + 输入栏发卡胶囊「发订单/发工单/退款审核」+ 快捷回复条「查询订单/退换货/人工客服」+ 场景开关）。
+  - L2-01/02 `l2-android-custom-card-closeup.png`（单卡近景）+ `l2-android-custom-cards.png`（14 种卡片 + 未注册回落，1080×12373 长图，含 `orderCard…demoUnregisteredCard` 全部 event 标签）。
+  - L2-05 `l2-android-watermark-chat.png`（聊天页水印平铺，**输入栏区无水印**，与 `COMPONENTS-CHAT` 契约一致）。
+  - L2-06 `l2-android-i18n-{en,zh-en}.png`（中英同屏对照：好友列表/群组列表/新请求）。
+- **两处值得写进文档/坑集的观察**：
+  1. **主色不驱动己方气泡底色**：把 `primaryColor` 改成绿色后，头像、筛选胶囊、按钮、索引条全部跟随，但**己方气泡仍是 `#009EFF`**（`--em-bubble-bg-self` 是独立静态变量，不参与 primary 派生）。宿主换肤要改气泡必须单独覆盖该变量。
+  2. **原生 tabBar 不吃 i18n**：切到 English 后页面内文案全变，底部 `会话/联系人/我的` 三个 tab 仍是中文（来自 `pages.json`，不走运行时 locale）。
+- **新登记缺陷**：RD-14（lab 页 `scroll-view + min-height:100vh` 内容末端被裁，原子组件页最后一段 `em-skeleton` 滚不到、卡片页页脚被切）、RD-15（选人弹层底部「确认」点不动、顶部关闭可点，待定位是滚动容器裁点击区还是 `em-button` disabled→enabled 状态残留；需在「邀请入群」真实链路复验）。
+- **状态**：L2 十项在 Android 侧全部有图；L1-06 骨架屏在 Android **抓不到**（缓存直出，切 tab 不出现骨架窗口），该类图继续用鸿蒙 `l1-harmony-conversation-skeleton.png`。
+
+## 2026-10-29 截图进文档栈：新增发布流水线 + 界面截图页
+
+- **目标**：把 Android / 鸿蒙两端的真机截图从内部工作区（`reports/assets/shots/`，gitignored）搬进对外文档栈，并搭一套「后续每端截图直接落位」的机制。
+- **新增发布流水线（`scripts/`）**：
+  - `sync-shots.mjs`：扫**公开页里的实际引用**（`assets/shots/...`），反查内部原图 → 统一压缩 → 写到 `docs/assets/shots/`；`--check` 校验引用完整性 + 孤儿文件。用「文档引用什么就发布什么」代替维护图片清单，避免资产与文档漂移。
+  - `shots-publish.py`：单图压缩（Pillow，**WebP q82、最大宽 750**；实测 750 宽聊天页 404KB PNG → 53KB WebP）。
+  - `shots-compose.py` + `shots-compose.json`：把多张截图按**等高并排**拼成一张对照图（图内不写字，平台说明写进 Markdown 图注）。
+  - 产出规模：**20 张单图 + 15 张对照图，合计 792KB**（若全部按单图发布是 46 张 / 1616KB）。
+- **新增公开页 `docs/SCREENSHOTS.md`**（站点 `/uniapp/guide/screenshots`，侧边栏新增「界面参考」分组、顶部导航新增「截图」）：阅读约定 + 六屏 × 双端对照 + 页面主流程补充状态 + 专题图索引 + 拍摄口径。manifest 的 `pages` / `editLink` 字面量 / `em-public-docs` skill 的文档地图同步登记。
+- **页内预览**：`PLATFORM`、`PAGES-CONVERSATION`、`PAGES-CHAT`、`PAGES-CHAT-INFO`、`PAGES-CONTACTS`、`PAGES-GROUPS`、`THEME-I18N`、`COMPONENTS-BASIC`、`COMPONENTS-CHAT`、`AI-STREAM`、`GUIDE-MULTI-SCENARIO` 各加一节「界面预览」，每页 1–3 张，细节图留在各自能力页而不是堆在画廊里。
+- **站点验证**：`easemob-community-docs` 侧 `content:sync` + `content:check` + `pnpm build` 全绿；构建产物里 46 张图全部命中 hashed 资源、无 404。
+- **一条工具经验**：用 headless Chrome 截图核对长文档页时，不加 `--virtual-time-budget` 会拍到「图片未解码」的占位（alt 文字 + 破图标），看起来像图挂了；加 `--virtual-time-budget=12000` 后同一构建正常渲染。**判断图是否可用要看 DOM/资产，不要只看一张 headless 截图**。
+- **遗留**：H5 / iOS / 小程序三端的截图目录（`docs/assets/shots/{h5,ios,mp-weixin}/`）与对照规格留空位，补拍后加一行引用即可，无需改流水线。
+
+## 2026-10-31 Agent Skills 公开文档同步
+
+- 新增 `scripts/sync-skills-docs.mjs`：从 `skills/README.md` 与 8 份宿主技能生成 `GUIDE-AGENT-SKILLS` + `SKILLS-*` 共 9 个公开页；移除 frontmatter、重写技能/公开文档链接，`--check` 拦截缺失或过期产物。
+- `check-skills` 纳入生成新鲜度检查；`check-release` 覆盖全部宿主技能版本基线，统一为 `1.0.0-rc.2`；技能公开措辞清理阶段与内部状态引用。
+- manifest 新增「AI 接入 Skills」导航组，生成页通过 `editSource` 回源对应技能；首页与快速开始补入口。
+- 社区文档站同步前执行技能检查，并补生成、路由与编辑回源回归测试；自定义站壳 `docs-context.ts` 登记新分类，修复页面可打开但分类导航/左侧页面树缺失的问题。
+- 验证：门户 `pnpm test` 181/181、`content:sync`、`content:check`、生产 `pnpm build` 全绿；浏览器走查桌面/390px、明暗主题、技能地图、移动抽屉与集成/小程序/排错详情页。
+
 ## 2026-10-31 修复 H5 原生 tabBar 深色染色被切 tab 冲掉（useThemeChrome 持久化守护）
 
 - **缺陷**：H5 端切到深色后，切换 tab 时原生 tabBar 会变回 pages.json 浅色。根因：uni-app x 的 H5 runtime 未实现 `uni.setTabBarStyle`（构建产物验证零匹配），tabBar 文字色是 Vue 响应式内联绑定（颜色状态只来自 pages.json 浅色配置，选中 label 无区分 class）；`syncH5Chrome()` 只在 onShow/主题变化时执行一次，切 tab 时 `selectedIndex` 变化触发重渲染，用浅色值重绑内联样式把覆盖冲掉。
 - **修复**（`libs/use/useThemeChrome.ts`，行为增强、API 不变）：WEB 端新增进程级单例 MutationObserver，观察 body 子树中触及 `.uni-tabbar` 的变化（label style/class 重绑、整棵重挂载的 added/removedNodes），setTimeout(0) 去抖后重染；写回同值不产生 mutation record，不会自激。遵守 libs 纪律：纯 ts、索引 for、条件编译收口 WEB。
 - **验证**：`build mp-weixin` 全绿（含 11 项防回归）；`build web` 卡在与本次无关的预存问题——`demo/node_modules/easemob-websdk@5.1.3` 的 `chunks/common-DHQukb7J.js` 在本机 web 编译链报 `Identifier "h" has already been declared`；已用 `git checkout` 回退本文件复验失败依旧（与改动无关），且与外部可运行 demo 的同名 chunk 逐字节一致，判断为本机 web 编译环境问题，待查。
 - **同步**：修复后的 `useThemeChrome.ts` 已拷贝到宿主示例工程 `easemob-uniappx-demo-534/uni_modules`（此前宿主侧的 `common/h5-tabbar-theme.ts` 临时补丁已删除，改由 uikit 内建能力承担）。
+
+
+## 2026-10-31 微信小程序双分包低操作接入（M2.28）
+
+- **真实根因沉淀**：外部宿主实测公共 `project.config.json` 已关闭 ignore、但 `project.private.config.json` 仍为 true，私有覆盖导致异步 SDK 被剔除；另一故障为模板 `v-else-if` 缺相邻 `v-if` 导致 HBX 中断，微信随后报 app.json 缺失。两类问题均已转成脚本检查与文档诊断，不再只归因 preload。
+- **脚本单源**：prepare 支持仓库位置参数与宿主 flags，写 SDK 前校验 app.json/project.config，patch 公共和已存在私有配置；watch 同时跟踪 app.json、SDK 与两层配置。check 新增分包声明/preload、必需导出、私有配置和 app.json 单一诊断。新增 `mp-weixin.mjs` 统一 dev/build/check/watch，`sync-mp-subpackage.mjs --check` 保证根仓库、宿主 Skill、chat-only 三处脚本字节一致。
+- **chat-only 双分包**：聊天页迁到 `sub-im/pages/chat/chat`，登录路由同步；模板自包含 `dev:mp/build:mp/check:mp/watch:mp`。新工程复制即用，既有工程手工声明路由后复用脚本，不自动改写任意 pages.json。
+- **文档**：QUICKSTART、双分包指南、FAQ、宿主 mp/troubleshooting Skills、插件 readme 统一新命令和排错；Skills 公开页重新生成；模板 README 覆盖 CLI 与 HBX GUI watch 两条路径。
+- **验证**：`node --test scripts/test-mp-subpackage.mjs` 11/11（配置覆盖、私有缺省、app.json 缺失、旧位置参数、npm 命令、同步负例、双分包结构、watch 静止、混合新旧路由拒绝）；demo `build mp-weixin` 全绿，主包 1016KB、分包合计 1451KB；chat-only `build:mp` 全绿，主包 717KB、分包合计 1240KB，sub-im 聊天页声明与产物存在；dev watch 删除 SDK + 私有 ignore 改回 true 后自动恢复，成功后无外部变化不再重写；登录源码与编译产物均校验 sub-im 路由；docs/skills/release/config 检查通过；外部宿主真实登录与真实会话列表已验证。
+- **独立阻塞**：demo 与模板 `build web` 仍命中已记录的 HBuilderX 5.34 websdk chunk `Identifier "h" has already been declared`；`audit-usage` 仍报本任务前已有的 `em-watermark` 未归类。未修改第三方 SDK 或水印能力清单。chat-only 未配置专用测试账号，未宣称模板真实收发已验证。
+
+## 2026-10-31 HBuilderX 5.34 H5 websdk 构建兼容（M2.29）
+
+- **根因**：HBuilderX 5.34 Web 编译链无法解析 websdk 5.1.3 的压缩 ESM chunk，报 `Identifier "h" has already been declared`；同一源码在仅临时重打包 SDK 根入口后构建通过，确认不是 UIKit 页面改动导致。
+- **修复**：新增 `scripts/web-sdk-build.mjs`，仅在 Web 构建期间用 HBuilderX 自带 esbuild 把 SDK 根入口重打包为单文件；成功或失败均恢复原始 `node_modules` 文件。`scripts/uni.sh build web` 与 `check-template.mjs` 共用该包装器，不提交或长期改写依赖。
+- **测试**：`test-web-sdk-build.mjs` 覆盖构建期使用单文件、成功恢复、失败恢复与不遗留备份；与分包测试合计 13/13 通过。
+- **验证**：demo `build web` 通过，H5 静态伺服 HTTP 200；`build mp-weixin` 全绿（主包 1016KB、分包合计 1451KB）；chat-only 完整 web/mp 门禁通过；docs/skills/release/config 检查通过，发布检查保留既有 keyPassword 历史警告。

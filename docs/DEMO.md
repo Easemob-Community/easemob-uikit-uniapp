@@ -9,7 +9,7 @@
 | 起点 | 适用目标 | 包含内容 |
 |---|---|---|
 | `demo/`（本页） | 查看完整 IM、组件能力与业务扩展示例 | 会话、聊天、通讯录、群组、场景实验室与样式实验室 |
-| [`templates/chat-only`](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only) | 只需一个单聊页面，或先跑通最小业务链路再扩展 | 登录恢复、单聊根页与微信小程序 SDK 分包，不含完整 IM 页面 |
+| [`templates/chat-only`](https://github.com/Easemob-Community/easemob-uikit-uniapp/tree/main/templates/chat-only) | 只需一个单聊页面，或先跑通最小业务链路再扩展 | 登录恢复、单聊根页与微信小程序 SDK 分包，不含完整 IM 页面 |
 
 两者都是宿主侧工程示例，不属于 UIKit 插件本体。只需单聊时不必从 Demo 手工删减；需要完整页面或扩展能力时，直接使用 Demo 对照接线。
 

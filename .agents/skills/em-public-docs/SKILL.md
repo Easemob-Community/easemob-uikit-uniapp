@@ -48,13 +48,15 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 
 ## 3. 公开文档地图
 
-所有源文件在 `docs/`，站点路径在 `uniapp/guide/`（首页映射到 `uniapp/index.md`）。
+所有源文件在 `docs/`。指南站点路径在 `uniapp/guide/`，API 参考同时提供 `uniapp/api/` 命名空间（首页映射到 `uniapp/index.md`）。
 
 | 源文件 | 站点路径 | 内容边界 |
 |---|---|---|
 | `HOME.md` | `/uniapp/` | 产品定位、能力总览、文档入口 |
 | `QUICKSTART.md` | `/guide/quickstart` | 空工程到收发消息的最小链路 |
 | `CONCEPTS.md` | `/guide/concepts` | 分层架构、生命周期、数据流、页面模型、接入形态 |
+| `GUIDE-AGENT-SKILLS.md` | `/guide/agent-skills` | Agent Skills 安装与技能地图；由 `skills/README.md` 生成 |
+| `SKILLS-*.md` | `/guide/skills-*` | 各接入技能全文；由对应 `skills/em-host-*/SKILL.md` 生成，编辑回源技能文件 |
 | `PAGES-CONVERSATION.md` | `/guide/pages-conversation` | 会话列表页 |
 | `PAGES-CHAT.md` | `/guide/pages-chat` | 聊天页 |
 | `PAGES-CHAT-INFO.md` | `/guide/pages-chat-info` | 聊天信息/群资料页 |
@@ -65,8 +67,14 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 | `COMPONENTS-CONVERSATION.md` | `/guide/components-conversation` | 会话与导航组件 |
 | `COMPONENTS-CHAT.md` | `/guide/components-chat` | 聊天输入/气泡/消息组件 |
 | `COMPONENTS-CONTACT.md` | `/guide/components-contact` | 联系人/群组/选人组件 |
-| `API-KIT.md` | `/guide/api-kit` | EmKit 门面 API |
-| `API-TYPES.md` | `/guide/api-types` | 类型与常量 |
+| `API.md` | `/uniapp/api/` | API 总览与分类入口 |
+| `API-COMPONENTS.md` | `/uniapp/api/components` | 组件家族索引，不复制 props 表 |
+| `API-COMPOSABLES.md` | `/uniapp/api/composables` | 主题、语言、未读与聊天输入行为 |
+| `API-UTILS.md` | `/uniapp/api/utils` | 展示、平台、媒体、存储与日志工具 |
+| `API-KIT.md` | `/guide/api-kit` | EmKit 兼容索引与共同约束 |
+| `API-KIT-STATE/LIFECYCLE/MESSAGES/MESSAGE-OPERATIONS/CONVERSATIONS/CONTACTS/GROUPS/LOGS.md` | `/uniapp/api/kit-*` | 按业务域拆分的 EmKit 方法、参数、返回值与示例 |
+| `API-TYPES.md` | `/guide/api-types` | 类型兼容索引与导入说明 |
+| `API-TYPES-MESSAGES/CONVERSATIONS/CONTACTS-GROUPS/COMPONENTS/THEME/PLATFORM.md` | `/uniapp/api/types-*` | 按领域拆分的类型、字段与常量 |
 | `CONFIG.md` | `/guide/config` | 初始化/行为/UI 配置 |
 | `MESSAGING.md` | `/guide/messaging` | 消息模型、发送、引用/@/自定义/通知/流式协议 |
 | `THEME-I18N.md` | `/guide/theme-i18n` | 主题、明暗模式、国际化 |
@@ -79,6 +87,7 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 | `GUIDE-ON-DEMAND.md` | `/guide/on-demand` | 按需接入与包体积：什么自动裁剪、什么始终全量、怎么自查 |
 | `HARMONY-REALDEVICE-RUN.md` | `/guide/harmony-realdevice-run` | 鸿蒙真机与签名 |
 | `DEMO.md` | `/guide/demo` | Demo 工程与场景实验室 |
+| `SCREENSHOTS.md` | `/guide/screenshots` | 按 Android／HarmonyOS 切换的真机截图（核心界面 + 页面主流程 + 特性专题），图放 `docs/assets/shots/<platform>/` |
 | `../uni_modules/easemob-uikit-uni/changelog.md` | `/guide/changelog` | 对外更新日志 |
 
 新增页面时同步更新本表、`docs/docs.manifest.mjs` 的 `pages` 清单、以及同组页面的交叉链接。
@@ -113,7 +122,7 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 - 不引用本机绝对路径，不写“见某台机器上的 vue 源码”。
 - 链接一律使用同目录相对源文件名（如 `./PAGES-CHAT.md`），由 manifest 的 `markdownReplacements` 改写到站点 slug；不使用 `/Users/...`、不使用 `../README.md`。
 - **例外：`HOME.md`**（映射到 `/uniapp/index.md`，与 guide 不同目录）正文链接用站点绝对路径（如 `/uniapp/guide/pages-chat`），避免相对路径改写后指向 `/uniapp/quickstart`。
-- 图片放 `docs/assets/`，在 manifest 里已整体映射到 `uniapp/guide/assets`；正文用 `./assets/xxx.png`。
+- 图片放 `docs/assets/`，在 manifest 里已整体映射到 `uniapp/guide/assets`。公开页统一使用 `DocsImage`，填写图片真实像素宽高等比例展示，例如 `<DocsImage src="assets/example.webp" alt="示例界面" :width="750" :height="1625" />`；首屏主图可添加 `eager`，其余图片保持默认懒加载。
 
 ### 4.3 页面模板
 
@@ -203,9 +212,9 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 1. **确认范围**：读 `git diff` / `git log`，列出新增或变更的组件、API、配置、平台能力、页面。
 2. **提取契约**：按第 2 节读源码；不要从旧文档反推。
 3. **对照文档地图**：确定要改的页面；新能力若是独立主题，新增页面并登记，而不是把内容塞进 QUICKSTART。
-4. **写作**：套用模板；限制只用“当前版本 + 平台范围”陈述；补最小可运行示例。
-5. **登记 manifest**：`docs/docs.manifest.mjs` 的 `pages` 增加 `{ source, to, group, text }`；首页 `sidebar:false`。entries/sidebar/editLink/markdownReplacements 自动派生；`editLink` 函数内的 `sourcePath` 字面量映射也要补一行（函数必须自包含）。
-6. **跑校验**：`node scripts/check-docs.mjs`。它会检查内部术语、链接、侧边栏/编辑链接、组件与 EmKit/配置覆盖。
+4. **写作**：套用模板；限制只用“当前版本 + 平台范围”陈述；补最小可运行示例。修改 `skills/` 后不手改对应公开页，运行 `node scripts/sync-skills-docs.mjs` 重新生成总览与详情。
+5. **登记 manifest**：`docs/docs.manifest.mjs` 的 `pages` 增加 `{ source, to, group, text }`；API 页同时声明 `apiGroup`，由同一元数据派生 `/uniapp/guide/` 与 `/uniapp/api/` 两套 sidebar，不另写重复链接清单。首页 `sidebar:false`。生成页用 `editSource` 指向 Skills 源文件。entries/sidebar/editLink/markdownReplacements 自动派生；`editLink` 函数内的 `sourcePath` 字面量映射也要补一行（函数必须自包含）。新增侧边栏分组时，还要在门户 `.vitepress/theme/docs-context.ts` 登记分类与路由匹配，否则页面可打开但分类导航和左侧页面树为空。
+6. **跑校验**：`node scripts/check-docs.mjs`。它会检查内部术语、链接、侧边栏/编辑链接、组件与 EmKit/配置覆盖；改 Skills 时同时运行 `node scripts/check-skills.mjs` 检查生成新鲜度。
 7. **同步站点**：在 `easemob-community-docs` 仓库执行 `node scripts/sync-content.mjs`（或 `pnpm content:sync`），确认 `.content/uniapp/` 出现新页面。
 8. **构建**：`pnpm build`（需要 Vue 仓库依赖；会重建 `.content`）。至少保证 `content:check` 与 VitePress build 通过。
 9. **页面走查**：打开 `pnpm dev` 或 preview，检查侧边栏、页面标题、代码块、内部链接、移动端宽度。
@@ -217,7 +226,8 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 # 公开边界 + 覆盖检查 + 内部术语
 node scripts/check-docs.mjs
 
-# 技能包结构（改 skills/ 时）
+# 技能包结构与公开文档新鲜度（改 skills/ 时先重新生成）
+node scripts/sync-skills-docs.mjs
 node scripts/check-skills.mjs
 
 # 站点同步与构建（在 ../easemob-community-docs）
@@ -230,7 +240,8 @@ pnpm build
 
 - `docs/` 下每个 `.md` 要么在 manifest `pages` 中，要么在内部文档白名单（`STATUS/PLAN/SPIKE/REVIEW/RELEASE/EVAL`）；新页面漏登记会报错。
 - 每个组件目录名（`em-*`）至少在一篇公开页出现；新增组件必须补文档。
-- `EmKitImpl` 的每个公开方法、`EmKitConfig`/`EmUiConfig` 的每个字段至少在一篇公开页出现。
+- `EmKitImpl` 的每个公开方法必须在拆分后的 `API*.md` 聚合内容中出现，不再只检查 `API-KIT.md`；`EmKitConfig`/`EmUiConfig` 的每个字段至少在 `CONFIG.md` 出现。sidebar 校验递归读取嵌套分组并规范化 `/index` 路由。
+- `UseChatComposerResult` 的每个返回字段必须在 `API-COMPOSABLES.md` 出现，并明确区分 composable 返回值与 `#input-bar` 插槽作用域；`API-KIT-STATE.md` 必须保持 `EmKit.state.userId !== ''` 的登录判断方向。
 - 公开 Markdown 里的相对链接必须指向已登记页面或已映射资产。
 - 禁止词按第 4.1 节扫描（忽略代码块）。
 

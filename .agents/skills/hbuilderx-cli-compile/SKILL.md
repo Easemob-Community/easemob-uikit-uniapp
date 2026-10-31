@@ -21,6 +21,7 @@ scripts/uni.sh build mp-weixin  # 微信小程序出包 → demo/unpackage/dist/
 ## 已知限制（实测）
 
 - **`dev web` 不转换 .uts 入口**：dev server 对 main.uts 原样输出 → 浏览器白页。H5 验证走 `build web` + 静态伺服：`cd demo/unpackage/dist/build/web && python3 -m http.server 5180`
+- **5.34 解析 websdk 压缩 chunk 失败**：`build web` 统一经 `scripts/web-sdk-build.mjs`，构建期间用内置 esbuild 重打包 SDK 根入口，结束恢复原文件；不要在其他脚本里绕过该包装器直接调 Web CLI。
 - **`build -p app` 不可用**：CLI 直编 App 端缺 vue 解析等 GUI 管线环节，别用；App 端一律 HBuilderX GUI「运行/发行」
 - 蒸汽工程编 web/mp 输出标注「VDOM模式」→ 官方预期（蒸汽视图层目前仅 App 端）
 

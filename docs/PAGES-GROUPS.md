@@ -4,6 +4,12 @@
 
 页面组件位于 `uni_modules/easemob-uikit-uni/components/pages/em-group-page/em-group-page.vue`，通常由群组页面壳承载（例如 `sub-im/pages/group/group.uvue`），也常被通讯录入口页的「群组」入口直接路由到。
 
+## 界面预览
+
+<DocsImage src="assets/shots/android/l1-android-group-list.webp" alt="群组列表（Android 真机）" :width="750" :height="1625" eager />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## 页面位置与接入方式
 
 - 页面组件在 `components/pages/` 下，需要 `pages.json` 的 custom easycom 规则（见 [快速开始](./QUICKSTART.md) 3.1 节）。
@@ -152,5 +158,5 @@ function onBack() {
 - [通讯录与好友](./PAGES-CONTACTS.md)
 - [会话列表页](./PAGES-CONVERSATION.md)
 - [联系人与群组组件](./COMPONENTS-CONTACT.md)
-- [EmKit API](./API-KIT.md)
-- [类型与常量](./API-TYPES.md)
+- [EmKit 群组 API](./API-KIT-GROUPS.md)
+- [用户、联系人与群组类型](./API-TYPES-CONTACTS-GROUPS.md)

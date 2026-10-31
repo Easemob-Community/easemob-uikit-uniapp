@@ -1,0 +1,484 @@
+{
+  "generatedBy": "scripts/sync-shots.mjs",
+  "format": "webp",
+  "maxWidth": 750,
+  "composites": [
+    {
+      "ref": "assets/shots/compare/cmp-atoms.webp",
+      "sources": [
+        "android/l2-android-atoms-avatar-icon.png",
+        "android/l2-android-atoms-empty-skeleton.png"
+      ],
+      "referencedBy": [
+        "docs/COMPONENTS-BASIC.md"
+      ]
+    },
+    {
+      "ref": "assets/shots/compare/cmp-chat-info.webp",
+      "sources": [
+        "android/l3-android-chat-info.png",
+        "harmony/l3-harmony-chat-info.png"
+      ],
+      "referencedBy": [
+        "docs/PLATFORM.md"
+      ]
+    },
+    {
+      "ref": "assets/shots/compare/cmp-chat.webp",
+      "sources": [
+        "android/l3-android-chat-bubbles.png",
+        "harmony/l3-harmony-chat-bubbles.png"
+      ],
+      "referencedBy": [
+        "docs/PLATFORM.md"
+      ]
+    },
+    {
+      "ref": "assets/shots/compare/cmp-conversation-list.webp",
+      "sources": [
+        "android/l3-android-conversation-light.png",
+        "harmony/l3-harmony-conversation-light.png"
+      ],
+      "referencedBy": [
+        "docs/PLATFORM.md"
+      ]
+    },
+    {
+      "ref": "assets/shots/compare/cmp-states.webp",
+      "sources": [
+        "android/l2-android-states-button-loading.png",
+        "android/l2-android-states-picker.png"
+      ],
+      "referencedBy": [
+        "docs/COMPONENTS-BASIC.md"
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "ref": "assets/shots/android/l1-android-chat-bubbles.webp",
+      "source": "reports/assets/shots/android/l1-android-chat-bubbles.png",
+      "width": 750,
+      "bytes": 57676,
+      "referencedBy": [
+        "docs/PAGES-CHAT.md"
+      ],
+      "sourceMtime": "2026-10-29T06:45:20.747Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-chat-emoji.webp",
+      "source": "reports/assets/shots/android/l1-android-chat-emoji.png",
+      "width": 750,
+      "bytes": 76310,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:50:14.050Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-chat-info.webp",
+      "source": "reports/assets/shots/android/l1-android-chat-info.png",
+      "width": 750,
+      "bytes": 18986,
+      "referencedBy": [
+        "docs/PAGES-CHAT-INFO.md"
+      ],
+      "sourceMtime": "2026-10-29T06:45:39.945Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-chat-media-panel.webp",
+      "source": "reports/assets/shots/android/l1-android-chat-media-panel.png",
+      "width": 750,
+      "bytes": 39882,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:50:14.143Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-contact-list.webp",
+      "source": "reports/assets/shots/android/l1-android-contact-list.png",
+      "width": 750,
+      "bytes": 20738,
+      "referencedBy": [
+        "docs/PAGES-CONTACTS.md",
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:46:07.985Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-conversation-empty.webp",
+      "source": "reports/assets/shots/android/l1-android-conversation-empty.png",
+      "width": 750,
+      "bytes": 15142,
+      "referencedBy": [
+        "docs/PAGES-CONVERSATION.md",
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T07:01:39.330Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-conversation-list.webp",
+      "source": "reports/assets/shots/android/l1-android-conversation-list.png",
+      "width": 750,
+      "bytes": 25736,
+      "referencedBy": [
+        "docs/PAGES-CONVERSATION.md"
+      ],
+      "sourceMtime": "2026-10-29T06:50:52.021Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-conversation-search.webp",
+      "source": "reports/assets/shots/android/l1-android-conversation-search.png",
+      "width": 750,
+      "bytes": 15638,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:48:48.581Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-conversation-tab-single.webp",
+      "source": "reports/assets/shots/android/l1-android-conversation-tab-single.png",
+      "width": 750,
+      "bytes": 19368,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:47:25.353Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-group-list.webp",
+      "source": "reports/assets/shots/android/l1-android-group-list.png",
+      "width": 750,
+      "bytes": 35660,
+      "referencedBy": [
+        "docs/PAGES-GROUPS.md",
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:46:20.436Z"
+    },
+    {
+      "ref": "assets/shots/android/l1-android-login.webp",
+      "source": "reports/assets/shots/android/l1-android-login.png",
+      "width": 750,
+      "bytes": 29232,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:45:20.801Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-ai-stream-3frames.webp",
+      "source": "reports/assets/shots/android/l2-android-ai-stream-3frames.png",
+      "width": 720,
+      "bytes": 73674,
+      "referencedBy": [
+        "docs/AI-STREAM.md"
+      ],
+      "sourceMtime": "2026-10-29T07:14:40.872Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-custom-card-closeup.webp",
+      "source": "reports/assets/shots/android/l2-android-custom-card-closeup.png",
+      "width": 720,
+      "bytes": 22978,
+      "referencedBy": [
+        "docs/GUIDE-MULTI-SCENARIO.md"
+      ],
+      "sourceMtime": "2026-10-29T07:26:06.203Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-custom-cards.webp",
+      "source": "reports/assets/shots/android/l2-android-custom-cards.png",
+      "width": 720,
+      "bytes": 178258,
+      "referencedBy": [
+        "docs/GUIDE-MULTI-SCENARIO.md"
+      ],
+      "sourceMtime": "2026-10-29T07:25:52.781Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-empty-with-retry.webp",
+      "source": "reports/assets/shots/android/l2-android-empty-with-retry.png",
+      "width": 750,
+      "bytes": 16016,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T07:02:37.224Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-i18n-zh-en.webp",
+      "source": "reports/assets/shots/android/l2-android-i18n-zh-en.png",
+      "width": 750,
+      "bytes": 6090,
+      "referencedBy": [
+        "docs/THEME-I18N.md"
+      ],
+      "sourceMtime": "2026-10-29T07:29:00.677Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-input-toolbar.webp",
+      "source": "reports/assets/shots/android/l2-android-input-toolbar.png",
+      "width": 750,
+      "bytes": 57802,
+      "referencedBy": [
+        "docs/COMPONENTS-CHAT.md"
+      ],
+      "sourceMtime": "2026-10-29T07:28:11.963Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-primary-color.webp",
+      "source": "reports/assets/shots/android/l2-android-primary-color.png",
+      "width": 750,
+      "bytes": 11840,
+      "referencedBy": [
+        "docs/THEME-I18N.md"
+      ],
+      "sourceMtime": "2026-10-29T07:20:26.609Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-scenario-detail.webp",
+      "source": "reports/assets/shots/android/l2-android-scenario-detail.png",
+      "width": 750,
+      "bytes": 49060,
+      "referencedBy": [
+        "docs/GUIDE-MULTI-SCENARIO.md"
+      ],
+      "sourceMtime": "2026-10-29T07:26:22.836Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-scenarios-list.webp",
+      "source": "reports/assets/shots/android/l2-android-scenarios-list.png",
+      "width": 750,
+      "bytes": 59510,
+      "referencedBy": [
+        "docs/GUIDE-MULTI-SCENARIO.md"
+      ],
+      "sourceMtime": "2026-10-29T07:20:57.975Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-states-load-more.webp",
+      "source": "reports/assets/shots/android/l2-android-states-load-more.png",
+      "width": 750,
+      "bytes": 28472,
+      "referencedBy": [
+        "docs/COMPONENTS-BASIC.md"
+      ],
+      "sourceMtime": "2026-10-29T07:18:40.172Z"
+    },
+    {
+      "ref": "assets/shots/android/l2-android-watermark-chat.webp",
+      "source": "reports/assets/shots/android/l2-android-watermark-chat.png",
+      "width": 750,
+      "bytes": 62868,
+      "referencedBy": [
+        "docs/COMPONENTS-CHAT.md"
+      ],
+      "sourceMtime": "2026-10-29T07:29:48.050Z"
+    },
+    {
+      "ref": "assets/shots/android/l3-android-addressbook.webp",
+      "source": "reports/assets/shots/android/l3-android-addressbook.png",
+      "width": 750,
+      "bytes": 20738,
+      "referencedBy": [
+        "docs/PAGES-CONTACTS.md",
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:46:07.945Z"
+    },
+    {
+      "ref": "assets/shots/android/l3-android-chat-bubbles.webp",
+      "source": "reports/assets/shots/android/l3-android-chat-bubbles.png",
+      "width": 750,
+      "bytes": 57676,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:45:20.658Z"
+    },
+    {
+      "ref": "assets/shots/android/l3-android-chat-info.webp",
+      "source": "reports/assets/shots/android/l3-android-chat-info.png",
+      "width": 750,
+      "bytes": 18986,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:45:39.913Z"
+    },
+    {
+      "ref": "assets/shots/android/l3-android-conversation-dark.webp",
+      "source": "reports/assets/shots/android/l3-android-conversation-dark.png",
+      "width": 750,
+      "bytes": 26368,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:46:41.639Z"
+    },
+    {
+      "ref": "assets/shots/android/l3-android-conversation-light.webp",
+      "source": "reports/assets/shots/android/l3-android-conversation-light.png",
+      "width": 750,
+      "bytes": 25736,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:45:51.182Z"
+    },
+    {
+      "ref": "assets/shots/android/l3-android-groups.webp",
+      "source": "reports/assets/shots/android/l3-android-groups.png",
+      "width": 750,
+      "bytes": 35660,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:46:20.398Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l1-harmony-chat-file.webp",
+      "source": "reports/assets/shots/harmony/l1-harmony-chat-file.png",
+      "width": 750,
+      "bytes": 49428,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T03:35:39.490Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l1-harmony-chat-menu.webp",
+      "source": "reports/assets/shots/harmony/l1-harmony-chat-menu.png",
+      "width": 750,
+      "bytes": 31452,
+      "referencedBy": [
+        "docs/PAGES-CHAT.md",
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T03:23:47.981Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l1-harmony-chat-voice.webp",
+      "source": "reports/assets/shots/harmony/l1-harmony-chat-voice.png",
+      "width": 750,
+      "bytes": 46922,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T03:46:20.625Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l1-harmony-conversation-empty.webp",
+      "source": "reports/assets/shots/harmony/l1-harmony-conversation-empty.png",
+      "width": 750,
+      "bytes": 16000,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:12:09.894Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l1-harmony-conversation-pinned-muted.webp",
+      "source": "reports/assets/shots/harmony/l1-harmony-conversation-pinned-muted.png",
+      "width": 750,
+      "bytes": 18318,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:03:46.174Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l1-harmony-conversation-skeleton.webp",
+      "source": "reports/assets/shots/harmony/l1-harmony-conversation-skeleton.png",
+      "width": 750,
+      "bytes": 15972,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:23:10.174Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l1-harmony-login.webp",
+      "source": "reports/assets/shots/harmony/l1-harmony-login.png",
+      "width": 750,
+      "bytes": 32278,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T05:55:44.151Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l2-harmony-empty-with-retry.webp",
+      "source": "reports/assets/shots/harmony/l2-harmony-empty-with-retry.png",
+      "width": 750,
+      "bytes": 16930,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:22:14.505Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l3-harmony-addressbook.webp",
+      "source": "reports/assets/shots/harmony/l3-harmony-addressbook.png",
+      "width": 750,
+      "bytes": 21082,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T03:15:22.371Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l3-harmony-chat-bubbles.webp",
+      "source": "reports/assets/shots/harmony/l3-harmony-chat-bubbles.png",
+      "width": 750,
+      "bytes": 48260,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T03:23:47.658Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l3-harmony-chat-info.webp",
+      "source": "reports/assets/shots/harmony/l3-harmony-chat-info.png",
+      "width": 750,
+      "bytes": 18188,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T03:15:22.227Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l3-harmony-conversation-dark.webp",
+      "source": "reports/assets/shots/harmony/l3-harmony-conversation-dark.png",
+      "width": 750,
+      "bytes": 39602,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:11:05.952Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l3-harmony-conversation-light.webp",
+      "source": "reports/assets/shots/harmony/l3-harmony-conversation-light.png",
+      "width": 750,
+      "bytes": 49960,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T06:10:13.640Z"
+    },
+    {
+      "ref": "assets/shots/harmony/l3-harmony-groups.webp",
+      "source": "reports/assets/shots/harmony/l3-harmony-groups.png",
+      "width": 750,
+      "bytes": 38160,
+      "referencedBy": [
+        "docs/SCREENSHOTS.md"
+      ],
+      "sourceMtime": "2026-10-29T03:15:22.516Z"
+    }
+  ]
+}

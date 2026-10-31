@@ -7,6 +7,22 @@
 > [!WARNING]
 > **仅支持 uni-app x 蒸汽模式（Vapor）**：DCloud 官方已于 2024 年停止 nvue 与 5+ 的维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台的维护（见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可方便升级。本插件不提供经典 uni-app（Vue2/Vue3、nvue）与 vdom 模式的兼容，下表环境要求以蒸汽编译目标为准。
 
+## 界面预览
+
+同一套组件在两端渲染同一屏（左 Android、右 HarmonyOS），完整六屏对照与更多状态见[界面截图](./SCREENSHOTS.md)。
+
+**会话列表**（左 Android、右 HarmonyOS）：
+
+<DocsImage src="assets/shots/compare/cmp-conversation-list.webp" alt="会话列表双端对照" :width="1299" :height="1400" eager />
+
+**聊天**：
+
+<DocsImage src="assets/shots/compare/cmp-chat.webp" alt="聊天双端对照" :width="1299" :height="1400" />
+
+**聊天信息**：
+
+<DocsImage src="assets/shots/compare/cmp-chat-info.webp" alt="聊天信息双端对照" :width="1299" :height="1400" />
+
 ## 环境要求
 
 | 项 | 要求 | 说明 |
@@ -73,7 +89,7 @@ const canOpenFile = PLATFORM_CAPABILITIES.fileOpen         // 全端为 false
 | `filePick` | `boolean` | 小程序、H5 `true`；App `false` | 是否有内置文件选择器；App 端注册附件能力后入口由 `EmKit.canPickAttachment` 变为 `true` |
 | `fileOpen` | `boolean` | 全端 `false` | 文件**单击**打开/下载开关（当前版本不提供）；长按菜单的「下载」不读该开关，始终按平台能力执行 |
 
-App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应式的 `canPickAttachment()`），不要只看 `PLATFORM_CAPABILITIES.filePick`。宿主注册方式见 [EmKit API · 附件能力注入](./API-KIT.md)。
+App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应式的 `canPickAttachment()`），不要只看 `PLATFORM_CAPABILITIES.filePick`。宿主注册方式见 [EmKit 附件能力注入](./API-KIT-MESSAGES.md#emkitsetattachmentproviderprovider--pickattachmentsoptions--resolveattachmenturi-options)。
 
 其余差异（键盘、安全区、主题跟随、分包加载）不是布尔开关，而是平台分支内置行为，宿主无需判断。
 
@@ -89,7 +105,7 @@ App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应�
 - **视频组件与基座**：`<video>` 属于内置模块 `uni-video`，会参与模块摇树。自定义基座若是在接入视频组件之前打的，组件会被降级成普通 `<view>`，表现为点开播放器后全屏黑屏；接入视频后重新打一次自定义基座即可，或在 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`。示例工程已配置。
 - **视频播放链路**：App 端先把视频整包下载到本地 `.mp4` 再交给 `video` 播放（EaseMob chatfiles 直链不支持 Range、无扩展名，远程直接播会停在 `00:00`）；下载期显示进度，关闭会中止下载。因此大视频需要等待完整下载后才能起播，这是服务端不支持 Range 时的预期行为。
 - **iOS 15+ / Android 6+**：低于该版本的系统不在支持范围。
-- **文件发送**：App 端没有跨端内置的系统文件选择器。宿主安装文件选择器插件后，用 `EmKit.setAttachmentProvider()` 注册选择/复制/清理能力，输入栏「文件」格才会出现；UIKit 不静态依赖插件，未注册时入口保持隐藏。接入示例见 [EmKit API · 附件能力注入](./API-KIT.md)。附件上传由 `uni.uploadFile` 以原生方式读取本地路径；SDK 的 md5 预检在路径不在 uni 文件系统可读范围时会自动跳过，不影响发送。
+- **文件发送**：App 端没有跨端内置的系统文件选择器。宿主安装文件选择器插件后，用 `EmKit.setAttachmentProvider()` 注册选择/复制/清理能力，输入栏「文件」格才会出现；UIKit 不静态依赖插件，未注册时入口保持隐藏。接入示例见 [EmKit 附件能力注入](./API-KIT-MESSAGES.md#emkitsetattachmentproviderprovider--pickattachmentsoptions--resolveattachmenturi-options)。附件上传由 `uni.uploadFile` 以原生方式读取本地路径；SDK 的 md5 预检在路径不在 uni 文件系统可读范围时会自动跳过，不影响发送。
 
 ### 鸿蒙（HarmonyOS）
 
@@ -126,7 +142,9 @@ App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应�
 | 微信小程序 | 相机、相册读写、录音 | 用户主动使用对应入口时由微信授权弹窗申请 | 同上 |
 | H5 | 浏览器文件选择授权；不涉及摄像头/麦克风/相册写入（不录音、不写相册） | 点击「图片/视频/文件」入口或下载附件时 | 不选文件即不上传；下载由浏览器接管 |
 
-App 端发布前需要在打包配置中声明相机、录音与相册用途（Android 权限声明、iOS 用途描述）；未声明时系统会直接拒绝，表现为「点选图没反应」。插件市场声明中已注明：相机、相册、麦克风仅在用户主动发送图片/视频/语音时调用，拒绝后对应功能不可用，不影响文本收发。
+App 端发布前需要在打包配置中声明相机、录音与相册用途（Android 权限声明、iOS 用途描述，鸿蒙见下条）；未声明时系统会直接拒绝，表现为「点选图没反应」或「按住说话后提示录音失败」。插件市场声明中已注明：相机、相册、麦克风仅在用户主动发送图片/视频/语音时调用，拒绝后对应功能不可用，不影响文本收发。
+
+**鸿蒙权限声明**：鸿蒙的权限必须写进工程配置才会被系统识别，路径是工程根目录的 `harmony-configs/entry/src/main/module.json5`，节点为 `requestPermissions`。语音消息需要 `ohos.permission.MICROPHONE`（用户授权类，需同时提供 `reason` 指向的字符串资源）；未声明时录音会被系统直接拒绝，UIKit 只能提示「录音失败」。注意 HBuilderX 是把 `harmony-configs` 下的文件**整份覆盖**到生成工程，而非按节点合并，因此该文件需要包含完整的 `module` 配置（`abilities` 等），不要只放权限片段；`requestPermissions` 里也无需重复框架已声明的 `ohos.permission.INTERNET`。签名用的 `harmony-configs/build-profile.json5` 已被 `.gitignore` 排除，权限配置则需要随仓库分发。
 
 **iOS 拍摄黑屏**：iOS 在用户拒绝相机授权后，系统仍可能拉起拍摄页并停在纯黑画面（且不再弹窗），看起来像「摄像头调起了但是黑的」。`em-chat-page` 在调起相机前会读 `uni.getAppAuthorizeSetting().cameraAuthorized`：`denied` 弹窗引导到系统设置（`uni.openAppAuthorizeSetting`），`config error` 提示安装包缺少权限描述；`not determined` 仍交给系统首次弹窗。发布包还需要在 `manifest.json` 的 `app-ios.distribute.privacyDescription` 中声明 `NSCameraUsageDescription`（相册/麦克风同理），改完需重新云打包或重打自定义基座才生效。iOS 模拟器没有摄像头，拍摄必为黑屏，请用真机验证。
 

@@ -4,6 +4,18 @@
 
 页面组件位于 `uni_modules/easemob-uikit-uni/components/pages/em-conversation-page/em-conversation-page.vue`，在宿主工程中通常由一个薄页面壳承载（例如 `pages/conversation/conversation.uvue`），页面壳负责 tabBar、登录校验与路由，列表本身由组件负责。
 
+## 界面预览
+
+会话列表（Android 真机）：
+
+<DocsImage src="assets/shots/android/l1-android-conversation-list.webp" alt="会话列表" :width="750" :height="1625" eager />
+
+新账号空态（Android 真机）：
+
+<DocsImage src="assets/shots/android/l1-android-conversation-empty.webp" alt="会话空态" :width="750" :height="1625" />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## 页面位置与接入方式
 
 - 页面组件在 `components/pages/` 下，easycom 默认扫描不到，需要在 `pages.json` 增加 custom 规则（见 [快速开始](./QUICKSTART.md) 3.1 节）。
@@ -143,6 +155,6 @@ function onMenu(key: string) {
 - [聊天信息与群资料](./PAGES-CHAT-INFO.md)
 - [通讯录与好友](./PAGES-CONTACTS.md)
 - [会话与导航组件](./COMPONENTS-CONVERSATION.md)
-- [EmKit API](./API-KIT.md)
+- [EmKit 会话 API](./API-KIT-CONVERSATIONS.md)
 - [配置参考](./CONFIG.md)
 - [快速开始](./QUICKSTART.md)

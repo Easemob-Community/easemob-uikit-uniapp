@@ -64,7 +64,7 @@ UIKit 的输入栏使用手动避让：输入框 `adjust-position=false`，按�
 
 **规避**：弹层树常驻挂载——页面挂载时就把节点建好，关闭态用根节点内联样式（如 `top: 200%`）把整棵树移到视口下方（不绘制、不吃点击），打开/关闭只改这一个内联样式。进场动画用 JS 逐帧写内联位移，并保证任意一帧写入丢失时终态仍可见；不要依赖「隐藏初始态 + 挂载后翻 class」的 CSS 动画写法（App 端 CSS 动画不执行，见 [平台能力与差异](./PLATFORM.md)）。
 
-**全屏弹层的顶部安全区**：由内容节点自己注入 `padding-top: getSafeAreaTop()`（`getSafeAreaTop` 见 [EmKit API](./API-KIT.md)），内容高度同步扣除同一值；iOS 蒸汽端全屏弹层容器的 padding 不参与布局，不能靠弹层容器承载顶部安全区，否则底部确认键会被顶出屏。
+**全屏弹层的顶部安全区**：由内容节点自己注入 `padding-top: getSafeAreaTop()`（`getSafeAreaTop` 见 [工具函数](./API-UTILS.md#平台与媒体)），内容高度同步扣除同一值；iOS 蒸汽端全屏弹层容器的 padding 不参与布局，不能靠弹层容器承载顶部安全区，否则底部确认键会被顶出屏。
 
 ### App 端多行输入框高度异常 / 无底色无占位符
 
@@ -152,6 +152,8 @@ UIKit 默认在 `EmKit.init()` 时向 SDK 注入固定 deviceId（`enableDeviceI
 - 是否关闭了 `em-conversation-page` 的 `autoSync`；关闭后需要自己调 `EmKit.syncConversations()`。
 - 从聊天页返回时，是否在 `onShow` 补调 `syncConversations()`。
 - 用 `logLevel: 'debug'` 看同步日志与错误。
+- **鸿蒙端不要开 `sdkLogLevel: 'DEBUG'`**：SDK 的 DEBUG 级日志脱敏会对二进制帧调用 `Object.entries`，而 ArkTS 运行时不支持该用法，会抛 `Object entries is not supported` 并让会话列表同步整体失败（列表退化为本地缓存，缓存为空时看起来像「加载失败」）。UIKit 默认 `sdkLogLevel` 就是 `WARN`，需要 SDK 原始日志请在其它端复现。
+- **空列表与同步失败是两种状态**：没有任何会话时页面显示空态；同步失败时也落在空态上，只在空态里多一个「重试」入口，不会整页替换成错误提示。所以看到空态但确认账号里有会话时，先看日志里有没有 `conversation sync failed`。
 
 ### 好友/群列表为空
 
@@ -229,6 +231,8 @@ App 未内置通用文件选择器。宿主注册附件 provider 且当前可用
 
 检查对应平台权限：相机、相册、麦克风。用户拒绝权限后，对应功能不可用，但不影响文本收发。小程序还需要检查域名白名单与上传配置。
 
+鸿蒙还有一个额外前提：权限必须写进工程配置才会被系统识别。语音与拍摄要在 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions` 声明 `ohos.permission.MICROPHONE` / `ohos.permission.CAMERA`；没声明时系统不弹窗、直接拒绝，现象就是「录音失败」或点拍摄无反应。具体写法与两个坑（整文件覆盖、相册无需权限）见 [鸿蒙真机运行](./HARMONY-REALDEVICE-RUN.md)。用 `hdc shell bm dump -n <bundleName>` 可确认权限是否真的进了安装包。
+
 ### 点击「拍摄」调起摄像头后是黑屏
 
 先确认不是 iOS 模拟器（模拟器没有摄像头，必黑）。真机上 iOS 在相机权限被拒绝后仍会打开拍摄页并停在黑屏，且系统不再弹窗；UIKit 会在调起前预检 `uni.getAppAuthorizeSetting().cameraAuthorized`，`denied` 时引导去系统设置。若状态是 `config error`，说明安装包没有声明 `NSCameraUsageDescription`，需要在 `manifest.json` 的 `app-ios.distribute.privacyDescription` 补上并重新打包/重打自定义基座。
@@ -268,14 +272,18 @@ UIKit 已处理 H5 长按后补发 click 的冲突。如果宿主自定义了长
 
 ### `module 'sub-sdk/im-sdk.js' is not defined`
 
-说明 SDK 分包文件缺失或预下载未生效：
+按当前实际打开的 dev/build 产物目录检查：
 
-1. 宿主 `pages.json` 是否声明 `sub-sdk` 分包与 `preloadRule`；
-2. 构建后是否执行 `prepare-sdk-subpackage.mjs`；
-3. 开发模式是否保持 watch 后处理进程；
-4. 主包是否超过 1.5MB。
+1. `sub-sdk/im-sdk.js` 是否存在，dev 重编译期间是否保持 `dev:mp` 或 `watch:mp`；
+2. `pages.json` 是否声明 `sub-sdk` 普通分包与 `preloadRule`；
+3. `project.config.json` 的两个 ignore 项是否均为 `false`；
+4. 如果存在 `project.private.config.json`，其中两个 ignore 项是否也为 `false`——私有配置会覆盖公共配置。
 
-完整步骤见 [微信小程序 SDK 分包](./GUIDE-WEAPP-SDK-SUBPACKAGE.md)。
+直接运行 `npm run build:mp` 可完成编译、后处理和检查；单独复查用 `npm run check:mp`。完整步骤见 [微信小程序分包接入](./GUIDE-WEAPP-SDK-SUBPACKAGE.md)。
+
+### 微信提示“项目根目录未找到 `app.json`”
+
+这不是分包加载错误，而是 HBX 没有生成完整产物。先查看并修复 HBX 控制台中的模板或脚本编译错误，再重新执行 `npm run build:mp`。不要手工创建一个空 `app.json` 绕过编译。
 
 ### 主包超过 1.5MB
 

@@ -183,7 +183,10 @@ async function onLogin() {
   }
   logging.value = true
   try {
-    EmKit.init({ appkey: appkey.value, enableReadReceipt: true, logLevel: 'debug', sdkLogLevel: 'DEBUG', inputFeatures: { inputMode: CHAT_INPUT_MODE.MULTILINE } })
+    // sdkLogLevel 取 WARN：鸿蒙上 SDK 的 DEBUG 级日志脱敏会命中 ArkTS 的 Object.entries 限制，
+    // 抛「Object entries is not supported」并打断会话列表同步（内部记录 reports/realdevice-issues.md RD-11）。
+    // 需要 SDK 原始日志时临时改 DEBUG，并优先在非鸿蒙端复现。
+    EmKit.init({ appkey: appkey.value, enableReadReceipt: true, logLevel: 'debug', sdkLogLevel: 'WARN', inputFeatures: { inputMode: CHAT_INPUT_MODE.MULTILINE } })
     await EmKit.login({ userId: userId.value, token: token.value })
     setStorage(KEY_APPKEY, appkey.value)
     setStorage(KEY_USERID, userId.value)

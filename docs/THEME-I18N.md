@@ -2,6 +2,18 @@
 
 UIKit 内置明暗主题与中英文文案。页面级组件根节点已经绑定主题 class，宿主通常只需要初始化一次、把 `themeClass` 绑到自己的页面根节点，并在设置页调用 `setTheme()`。
 
+## 界面预览
+
+改主色后，头像、筛选胶囊、按钮、索引条等派生强调色实时跟随（默认 `#33B1FF` → 业务主色 `#24F26C`）：
+
+<DocsImage src="assets/shots/android/l2-android-primary-color.webp" alt="主色定制对比" :width="750" :height="158" eager />
+
+`locale` 切换后页面内文案即时生效（左中文、右英文）；底部原生 tabBar 的文案来自 `pages.json`，需要宿主自行配置多语言：
+
+<DocsImage src="assets/shots/android/l2-android-i18n-zh-en.webp" alt="中英文对照" :width="750" :height="256" />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## 1. 主题模型
 
 | 概念 | 说明 |

@@ -13,6 +13,7 @@
       <!-- #endif -->
       <button class="spike__btn spike__btn--plain spike__btn--entry" @click="onOpenStyleLab">样式实验室 →</button>
       <button class="spike__btn spike__btn--plain spike__btn--entry" @click="onOpenTextProbe">Text 测量探针 →</button>
+      <button class="spike__btn spike__btn--plain spike__btn--entry" @click="onOpenSeed">截图数据种子 →</button>
     </view>
 
     <view class="spike__form">
@@ -121,6 +122,10 @@ function onOpenStyleLab() {
 
 function onOpenTextProbe() {
   uni.navigateTo({ url: '/sub-im/pages/text-probe/text-probe' })
+}
+
+function onOpenSeed() {
+  uni.navigateTo({ url: '/sub-im/pages/seed/seed' })
 }
 
 // #ifdef MP-WEIXIN

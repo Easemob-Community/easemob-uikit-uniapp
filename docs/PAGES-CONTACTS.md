@@ -10,6 +10,18 @@
 
 三个页面组件都在 `components/pages/` 下，需要 `pages.json` 的 custom easycom 规则（见 [快速开始](./QUICKSTART.md) 3.1 节）；都自带 `em-nav-bar`，路由设 `navigationStyle: "custom"`，App 端同时设 `app-plus.titleNView: false`。
 
+## 界面预览
+
+通讯录入口（Android 真机）：
+
+<DocsImage src="assets/shots/android/l1-android-contact-list.webp" alt="通讯录入口" :width="750" :height="1625" eager />
+
+好友列表 + 字母索引条（Android 真机）：
+
+<DocsImage src="assets/shots/android/l3-android-addressbook.webp" alt="好友列表" :width="750" :height="1625" />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## 宿主接线总表
 
 | 页面与控件 | 事件或默认行为 | 宿主必须做什么 | 不接的后果 |
@@ -305,6 +317,6 @@ function onBack() {
 - [群组列表与建群](./PAGES-GROUPS.md)
 - [聊天信息与群资料](./PAGES-CHAT-INFO.md)
 - [联系人与群组组件](./COMPONENTS-CONTACT.md)
-- [EmKit API](./API-KIT.md)
-- [类型与常量](./API-TYPES.md)
+- [EmKit 联系人 API](./API-KIT-CONTACTS.md)
+- [用户、联系人与群组类型](./API-TYPES-CONTACTS-GROUPS.md)
 - [快速开始](./QUICKSTART.md)

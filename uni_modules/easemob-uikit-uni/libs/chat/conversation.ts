@@ -72,8 +72,11 @@ export class EmConversationDomain {
     try {
       const chatManager = await this.messages.readyChatManager()
       if (!isCurrent()) return
-      const items = await chatManager.refreshSessionList()
+      // 空结果是正常状态（新账号还没有会话），不是失败：SDK 在无会话时可能返回 undefined/null，
+      // 直接读 .length 会抛错并被 catch 误判成「拉取失败」，这里统一归一成数组。
+      const rawItems = await chatManager.refreshSessionList()
       if (!isCurrent()) return
+      const items = rawItems ?? []
       logger.info('syncConversations done, count:', items.length)
       conversationStore.items = items.map((c) => this.toConversationItem(
         c,
@@ -81,6 +84,7 @@ export class EmConversationDomain {
         pinSettlementRevisionByConversationId[c.conversationId] ?? 0
       ))
       conversationStore.loaded = true
+      conversationStore.syncFailed = false
       ensureUserInfos(conversationStore.items.filter((c) => c.chatType === CONVERSATION_TYPE.SINGLE_CHAT).map((c) => c.conversationId))
       this.syncConversationMuteStates(expectedEpoch)
     } catch (e) {
@@ -109,7 +113,8 @@ export class EmConversationDomain {
       conversationStore.syncFailed = true
       return
     }
-    const items = manager.getConversationList()
+    const rawItems = manager.getConversationList()
+    const items = rawItems ?? []
     conversationStore.items = items.map((c) => this.toConversationItem(c))
     conversationStore.loaded = true
     conversationStore.syncFailed = false

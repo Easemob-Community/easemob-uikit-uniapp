@@ -1,40 +1,48 @@
 ---
 name: em-mp-subpackage
-description: Use when working on easemob-uikit-uni WeChat Mini Program packaging（SDK 分包异步化、主包体积、prepare/check 脚本、sub-sdk/im-sdk.js、跨分包 require、EmKit.whenReady 加载态、升级 websdk 版本、mp-weixin 构建报错如 "module 'sub-sdk/im-sdk.js' is not defined"）。环信 uni UIKit 小程序 SDK 分包机制全解。
+description: Use when working on easemob-uikit-uni WeChat Mini Program packaging（SDK/页面分包、主包体积、prepare/check/mp-weixin 脚本、sub-sdk/im-sdk.js、project.private.config.json、跨分包 require、dev watch、mp 构建报错）。环信 uni UIKit 小程序分包机制全解。
 ---
 
-# em-mp-subpackage — 微信小程序 SDK 分包异步化（M2.8 定案）
+# em-mp-subpackage — 微信小程序双分包与宿主接入
 
-> 宿主接入指引另见 `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md`（实施指引/验证方法/报错排查表/升级回滚）；编译器行为实测事实见 `docs/SPIKE-SDK-SUBPACKAGE.md`。本文面向库仓开发。
+> 宿主公开指引：`docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md`；宿主 Skill：`skills/em-host-mp-subpackage/SKILL.md`。公开 Skills 文档由 `scripts/sync-skills-docs.mjs` 生成，不手改。
 
 ## 目标与现状
 
-websdk 5.1.3 IIFE 873KB 完全移出主包：demo mp-weixin 主包 1768KB→**493KB**（vendor.js 942KB→169KB）；sub-sdk 分包内 `im-sdk.js` 1234KB（esbuild 降级 es2017 后）。主包红线 ≤1.5MB，`scripts/check-mp-size.mjs` 构建后自动断言。
+websdk 5.1.3 IIFE 873KB 完全移出主包，经 esbuild 降级为 sub-sdk 约 1234KB。chat-only 同时包含 `sub-im` 页面分包与 `sub-sdk` SDK 分包，可作为新宿主的最小双分包工程。主包红线 ≤1.5MB。
 
-## 机制三件套
+## 机制
 
-1. **`scripts/prepare-sdk-subpackage.mjs`**（`uni.sh build mp-weixin` 构建后自动执行）：
-   - 校验 IIFE 全局名 `IMSDK` → 追加 `module.exports`（CommonJS 跨分包 require 前提）
-   - HBuilderX 内置 esbuild 降 es2017（IIFE 含 `?.`/`??`，旧基础库真机 SyntaxError）
-   - 拷入产物 `sub-sdk/im-sdk.js`
-   - **patch `project.config.json` 关 `ignoreDevUnusedFiles/ignoreUploadUnusedFiles`**——异步 require 文件不在静态依赖图，不关会被依赖分析剔除，报 `module 'sub-sdk/im-sdk.js' is not defined`（本仓实测坑）
-2. **`scripts/check-mp-size.mjs`** 防回归 11 项：锁版断言 / module.exports / 无 `?.` 残留 / 忽略项关闭 / 主包 ≤1.5MB / vendor 无 `msync` 特征串 / 跨分包 require 存活 / `node --check` 语法。
-3. **`libs/client/sdk.ts` —— 全库唯一 websdk 运行时导入收口**：
-   - `#ifndef MP-WEIXIN`：静态直通（零行为变更）
-   - `#ifdef MP-WEIXIN`：模块级持有 + `ensureSdkModule()`（Promise 缓存 / 失败重置 / `REQUIRED_EXPORTS` 导出校验）
-   - 默认走微信原生跨分包 `require(path, cb, fail)` 回调式加载；**裸 require 可存活于 .uvue/.ts，路径相对编译产物中的调用文件**（sdk.ts 编译后在 `uni_modules/.../libs/client/` 下 → `../../../../sub-sdk/im-sdk.js`；分包内页面 → `../../../`；TS 侧 `@ts-ignore`）
-   - `EmKitConfig.sdkLoader` / `sdkModule` 注入口：宿主自管理加载（MP 专属）
+1. **根仓库脚本单源**：
+   - `scripts/prepare-sdk-subpackage.mjs`：IIFE 全局名校验、追加 CJS 导出、ES2017 降级、必需导出真实 require、写 `sub-sdk/im-sdk.js`、patch 公共/私有项目配置。
+   - `scripts/check-mp-size.mjs`：app.json 前置诊断、分包声明/preload、SDK 文件与导出、公共/私有 ignore、主包体积、主包 SDK 特征串、跨分包 require、JS 语法。
+   - `scripts/mp-weixin.mjs`：宿主 `dev/build/check/watch` 编排。
+   - `scripts/sync-mp-subpackage.mjs`：同步到 `skills/em-host-mp-subpackage/scripts/` 与 `templates/chat-only/scripts/`；`--check` 纳入模板门禁，三处字节一致。
+2. **配置硬约束**：`project.config.json` 与已存在的 `project.private.config.json` 中 `ignoreDevUnusedFiles/ignoreUploadUnusedFiles` 必须为 false。私有配置覆盖公共配置；异步 require 文件不在静态依赖图，开启任一忽略项都可能报 `module 'sub-sdk/im-sdk.js' is not defined`。
+3. **watch**：同时跟踪 app.json、SDK 文件与两层配置，dev 重发删文件或开发者工具改配置都会触发自愈；不是只看 app.json mtime。
+4. **加载器**：`libs/client/sdk.ts` 仍是全库唯一 websdk 运行时导入收口；MP 使用 `../../../../sub-sdk/im-sdk.js` 回调式跨分包 require，Promise 缓存/失败重置/导出校验与 `sdkLoader/sdkModule` 注入口不变。
 
-## 就绪门（EmClient 三阶段）
+## 宿主命令
 
-`init()` 同步部分（applyKitConfig/logger 级别）保持同步；`ChatClient.init` 推迟到 `whenReady()`（load → init → login 各缓存 Promise，失败清缓存可重试）。门面 `EmKit.init` 内挂 bind 续体（时序先于业务调用）；所有依赖 SDK 的异步方法前置 `await whenReady()`；宿主加载态占位用 `EmKit.whenReady()`。
+模板 `package.json`：
 
-## demo 接线
+- `npm run dev:mp`：prepare watch + HBX CLI dev，退出回收 watch。
+- `npm run build:mp`：HBX build → prepare → check。
+- `npm run check:mp`：检查 build 产物。
+- `npm run watch:mp`：仅 watch dev 产物，配合 HBuilderX GUI。
 
-pages.json 两个普通分包：`sub-im`（chat/chat-info/contact-requests/spike/style-lab 五页；tabBar 三页 + login 留主包）与 `sub-sdk`（占位页 + SDK 文件）；`preloadRule` 在登录页预下载 sub-sdk；spike 页有「加载 SDK 分包探针」按钮。
+HBX 非默认路径用 `HBUILDERX_PATH`；单独指定 esbuild 用 `ESBUILD_BIN`。prepare 同时兼容仓库位置参数与宿主 `--project/--out/--sdk/--esbuild`。
 
-## 维护要点
+## 模板与页面分包
 
-- **升级 websdk**：改 demo/package.json 精确版本 + 库 peer 声明 + login 页头 `SDK_VERSION` 常量，三处同步；跑 `build mp-weixin` 看防回归全绿。
-- **踩坑二（已自动化）**：`dist/dev` 的 dev watch 全量重发会抹掉 `sub-sdk/im-sdk.js`——CLI 走 `uni.sh dev mp-weixin` 会自动伴随 `prepare-sdk-subpackage.mjs --watch`（轮询 app.json，重发后自动重拷）；HBuilderX GUI 起的 dev 需手动 `node scripts/prepare-sdk-subpackage.mjs demo/unpackage/dist/dev/mp-weixin --watch`，否则报 `module 'sub-sdk/im-sdk.js' is not defined`。
-- **待验**：iOS/Android 真机语法兼容与收发回归、双端登录互发实测。
+- `templates/chat-only/sub-im/pages/chat/chat.uvue`：聊天页；登录跳 `/sub-im/pages/chat/chat`。
+- `sub-im` 与 `sub-sdk` 均 `independent:false`；SDK 加载页保留在 `sub-sdk/pages/placeholder`。
+- `scripts/check-template.mjs` 检查源码路径、脚本同步、web/mp 构建、编译后 app.json 双分包和实际聊天页产物。
+- 既有宿主不自动改写 `pages.json`/tabBar/路由；文档给声明示例与统一脚本。
+
+## 排错与验证
+
+- `node --test scripts/test-mp-subpackage.mjs`：配置覆盖、私有文件缺省、app.json 缺失、旧位置参数、npm 命令、同步负例、双分包结构。
+- app.json 缺失 = 上游 HBX 编译失败，检查器应只给这一可操作诊断，不能手补空文件。
+- watch 验证：删除 dev SDK、把私有 ignore 改回 true，应自动恢复。
+- 完整门禁：demo `build web + build mp-weixin`、模板检查、docs/skills/release/config/audit。主包与实测阻塞记 `docs/STATUS.md`，未实测的真实账号链路不得宣称通过。

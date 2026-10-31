@@ -1,11 +1,11 @@
 ---
 name: em-host-troubleshooting
-description: Use when easemob-uikit-uni 接入后出现白屏、输入栏消失、双导航栏、会话/好友列表为空、登录后被踢回、发送失败、收不到消息、未读不消、视频播放黑屏/卡 loading/画面不动、小程序 module 'sub-sdk/im-sdk.js' is not defined、SyntaxError 或主题/语言异常，需要按症状定位根因并给出修复步骤。
+description: Use when easemob-uikit-uni 接入后出现白屏、输入栏消失、双导航栏、会话/好友列表为空、登录后被踢回、发送失败、收不到消息、未读不消、视频播放黑屏/卡 loading/画面不动、小程序 module 'sub-sdk/im-sdk.js' is not defined、SyntaxError 或主题/语言异常，或 H5 构建直接失败（VDOM模式、Identifier "h" has already been declared、"default" is not exported by App.uvue），需要按症状定位根因并给出修复步骤。
 ---
 
 # 接入排错与平台边界
 
-> 基线：UIKit `1.0.0-rc.1` · websdk `5.1.3`。先按第 1 节收集信息，再用第 2 节分流；不要凭感觉改代码。
+> 基线：UIKit `1.0.0-rc.2` · websdk `5.1.3`。先按第 1 节收集信息，再用第 2 节分流；不要凭感觉改代码。
 
 ## 1. 先收集 6 项信息
 
@@ -50,6 +50,21 @@ console.log('im state', {
 └── 主包超限 → 同上
 ```
 
+### 2.1 构建期症状（编译直接失败，与运行时无关）
+
+| 报错原文 | 根因 | 修复 |
+|---|---|---|
+| 构建日志第一行打「VDOM模式」，但工程是蒸汽模式 | CLI 下 Web 蒸汽模式以工程根目录的 `.vapor` 文件为开关，缺失时静默退回 VDOM | 工程根目录创建空文件 `.vapor` 并提交进仓库；HBuilderX GUI 构建无此问题 |
+| `[uts] node_modules/easemob-websdk/chunks/*.js：Identifier "h" has already been declared` | HBuilderX 的 uts 编译器解析不了 SDK 的压缩 chunk（5.34 出现，旧版本正常），宿主工程与官方 demo 都会命中 | 用 esbuild 把 SDK 入口重打包成单文件并原位替换（命令见下）；恢复时删掉 `node_modules/easemob-websdk` 重新 `npm install` 即可 |
+| `"default" is not exported by App.uvue?vue&type=script&setup=true&vapor=true&lang.uts`（页面文件同理） | vapor-web 模式下 `lang="uts"` 的 `<script setup>` 块不产出 default export（5.34 出现，旧版本正常） | 报错页面的 `<script setup>` 改 `lang="ts"`；`common/` 下的 `.uts` 工具模块不受影响，不用改 |
+
+```bash
+# 在宿主工程根目录执行：重打包 websdk 入口，绕过压缩 chunk 的解析问题
+cd node_modules/easemob-websdk
+cp index.js index.js.orig
+npx esbuild index.js.orig --loader:.orig=js --bundle --format=esm --outfile=index.js
+```
+
 ## 3. 白屏 / 布局
 
 | 症状 | 根因 | 修复 |
@@ -88,7 +103,7 @@ console.log('im state', {
 | 撤回项不出现 | 超过 2 分钟窗口 / 非己方消息 | 正常限制，可用 `recallTimeLimit` 调整 |
 | 历史消息加载失败 | 网络 / 游标异常 | 点空态「重试」，看 `loadHistory` 日志 |
 | 非当前会话历史变少 | 内存只保留最近 100 条 | 正常限制；完整历史需宿主自持久化 |
-| 消息列表长会话卡顿 | `scroll-view` 全量渲染 | 1.0 已知限制，长列表优化在后续版本 |
+| 消息列表长会话卡顿 | `scroll-view` 全量渲染 | 当前版本需控制单会话消息规模；完整历史由宿主持久化并按需展示 |
 | 宿主自己收到两次消息 | 宿主又注册了一套 SDK 事件 | 只通过 UIKit 的 `EmKit.onMessage` 订阅，不要重复 `addEventHandler` |
 
 ## 6. 会话列表 / 未读
@@ -132,7 +147,9 @@ console.log('im state', {
 
 | 症状 | 根因 | 修复 |
 |---|---|---|
-| `module 'sub-sdk/im-sdk.js' is not defined` | 文件缺失 / 被依赖分析剔除 / dev 抹掉 | 见 `em-host-mp-subpackage` |
+| `module 'sub-sdk/im-sdk.js' is not defined` | 文件缺失 / 公共或私有配置开启未使用文件忽略 / dev 重发 | 跑统一 prepare/check；见 `em-host-mp-subpackage` |
+| 项目根目录未找到 `app.json` | HBX 编译中断，产物不完整 | 先修 HBX 的模板/脚本错误，不要手补空文件 |
+| 聊天页迁移后跳转不存在 | 仍使用主包旧路径 | 改为 `/sub-im/pages/chat/chat` 或宿主实际分包路径 |
 | `SyntaxError: Unexpected token .` | 分包产物未降级 es2017 | 重跑后处理 |
 | 主包 > 2MB | SDK 静态进主包 | 分包异步化 |
 | 分包面板没有 `/sub-sdk/` | `subPackages` 写法错 / pages 为空 | 对照分包技能第 4 节 |
@@ -157,6 +174,19 @@ console.log('im state', {
 | 文件提示「已下载，但当前类型无法打开」 | 微信小程序仅支持 doc/docx/xls/xlsx/ppt/pptx/pdf；App 会交给系统尝试 | 小程序换支持的类型或由宿主自行打开；App 检查系统是否有对应查看器 |
 | H5 点击下载后在新标签页打开 | 跨域直链的 `download` 属性被浏览器忽略 | 预期行为；服务端返回 `Content-Disposition: attachment` 可强制下载 |
 
+## 9.3 录音 / 拍摄权限专项
+
+| 症状 | 根因 | 修复 |
+|---|---|---|
+| 鸿蒙按住说话立刻提示「录音失败」 | 工程没声明 `ohos.permission.MICROPHONE`，系统不弹窗直接拒绝 | 在 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions` 补 `MICROPHONE`（带 `reason` + `usedScene.inuse`），并给 `string.json` 加 `reason` 文案；**文件要完整**，该目录是整文件覆盖 |
+| 鸿蒙点「拍摄」无反应 | 同上，缺 `ohos.permission.CAMERA` | 同上补 `CAMERA` |
+| 按上面改完仍失败 | 改的是仓库里的 `harmony-configs`，但没重新组装工程 | 必须重新「运行到鸿蒙」（`uni.sh build app-harmony` 只出 assets、不组装 `entry/`）；用 `hdc shell bm dump -n <bundle>` 核对 `reqPermissionDetails` 是否已含目标权限 |
+| 鸿蒙编包里 `module.json5` 的 `abilities` 全没了 / 启动崩溃 | 只把 `requestPermissions` 片段放进 `harmony-configs`，整份覆盖把结构打掉 | 复制生成工程的完整 `module.json5` 再改；别重复声明 `INTERNET` / `GET_NETWORK_INFO` |
+| 安卓真机录音无反应 | `RECORD_AUDIO` 未声明或用户拒绝 | 检查 `manifest.json` → `app-android.distribute.permissions`；拒绝后引导到系统设置 |
+| iOS 录音无反应 / 拍摄黑屏且不再弹窗 | `privacyDescription` 缺对应用途描述，或用户已拒绝 | 补 `NSMicrophoneUsageDescription` / `NSCameraUsageDescription` 后重打自定义基座；拒绝态引导 `uni.openAppAuthorizeSetting` |
+
+> 判断口诀：**系统根本不弹窗 = 声明问题；弹过窗但被拒 = 用户态问题（要引导设置）**。UIKit 侧只在失败时 toast「录音失败」，不会替你申请或跳设置。
+
 ## 10. 平台能力矩阵（1.0 如实告知）
 
 | 能力 | H5 | 微信小程序 | App（Android/iOS/鸿蒙） |
@@ -172,7 +202,7 @@ console.log('im state', {
 
 不支持的能力已直接隐藏入口，不会出现「点一下只弹暂不支持」。App 文件入口是否显示用 `EmKit.canPickAttachment`（或响应式 `canPickAttachment()`）判断，不要只看 `PLATFORM_CAPABILITIES.filePick`。
 
-## 11. 一期已知限制
+## 11. 当前版本已知限制
 
 - `@` 提及为**追加式插入**（uni `<input>` 无光标位置 API）；
 - App 视频先整包下载再播（chatfiles 直链不支持 Range），大视频需等待；文件下载走长按菜单「下载」：App/小程序保存相册或下载后打开文档，H5 走浏览器下载；App 文件选择需宿主注册附件 provider，未注册或不可用时入口隐藏；
@@ -208,5 +238,5 @@ const path = await EmKit.exportLogs()   // H5 下载；小程序/App 文件路�
 ## 14. 什么时候该停手
 
 - 报错来自 UIKit 内部且可稳定复现：收集日志与最小复现，交给 UIKit 维护方；不要在宿主里改 `uni_modules` 源码。
-- 真机差异（文本裁切/键盘/动画）属于 UIKit 已知坑：先确认版本，再按仓库 `docs/STATUS.md` 的已知降级处理。
+- 真机差异（文本裁切/键盘/动画）：先确认版本，再按[常见问题](../../docs/FAQ.md)与[平台能力与差异](../../docs/PLATFORM.md)中的当前边界处理。
 - 平台根本限制（如 H5 无录音、uni input 无光标 API）：不要硬绕，向用户说明并提供替代交互。

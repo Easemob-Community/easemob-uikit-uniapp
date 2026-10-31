@@ -4,6 +4,18 @@
 
 本页组件均符合 easycom 目录约定，可直接写标签；引入方式见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。整页实现见 [聊天页](./PAGES-CHAT.md)。
 
+## 界面预览
+
+输入栏业务入口与快捷回复（`#input-toolbar` 胶囊 + `quickReplies` 话术条）：
+
+<DocsImage src="assets/shots/android/l2-android-input-toolbar.webp" alt="输入栏业务入口与快捷回复" :width="750" :height="1625" eager />
+
+组件级水印：会话、聊天、好友、群组、通讯录五个面平铺账号水印；**聊天页输入栏区域不铺水印**：
+
+<DocsImage src="assets/shots/android/l2-android-watermark-chat.webp" alt="聊天页组件级水印" :width="750" :height="1625" />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## em-chat-inputbar
 
 输入栏：文本输入、语音按住说话、emoji 面板、"+" 媒体面板、纸飞机发送键、引用条、快捷回复条与禁用态。

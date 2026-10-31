@@ -54,7 +54,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5180/   # 200
 | 宽屏 | 不支持（H5 仅移动端） |
 | 权限声明 | 相机、相册、麦克风（用户主动发图片/视频/语音时） |
 | 数据声明 | 插件不采集；消息经宿主集成的环信 SDK 传输至宿主配置的服务端 |
-| 仓库 | `https://github.com/easemob/easemob-uikit-uniapp` |
+| 仓库 | `https://github.com/Easemob-Community/easemob-uikit-uniapp` |
 | License | MIT |
 
 - [ ] 插件市场「更新日志」与 `changelog.md` 首节一致

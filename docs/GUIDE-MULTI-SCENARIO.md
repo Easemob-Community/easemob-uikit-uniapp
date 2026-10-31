@@ -7,7 +7,7 @@
 
 配套阅读：[聊天页](./PAGES-CHAT.md)（`em-chat-page` 全部契约）、[消息与扩展协议](./MESSAGING.md)（custom/ext/引用协议）、[EmKit API](./API-KIT.md)、[配置参考](./CONFIG.md)、[AI 流式消息](./AI-STREAM.md)、[示例工程](./DEMO.md)。
 
-如果暂时只需跑通一个 1v1 聊天页，可以从仓库 [chat-only 模板](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only) 开始；需要在该最小链路上加入业务上下文、自定义卡片、快捷回复或业务菜单时，再按本页扩展。
+如果暂时只需跑通一个 1v1 聊天页，可以从仓库 [chat-only 模板](https://github.com/Easemob-Community/easemob-uikit-uniapp/tree/main/templates/chat-only) 开始；需要在该最小链路上加入业务上下文、自定义卡片、快捷回复或业务菜单时，再按本页扩展。
 
 ## 1. 接入模型（三步）
 
@@ -276,7 +276,7 @@ function onComposerSelect(key: string): void {
 
 示例工程参考：`demo/components/demo-composer-bar`（横向胶囊条）+ `demo/sub-im/pages/chat/chat.uvue` 的 `#input-toolbar` 接线；入口清单来自场景目录里每条卡片的 `entryLabel` / `entryIcon`，新增一种卡片就自动多一个入口。
 
-![输入栏业务入口（宿主注入 #input-toolbar）](assets/scene-lab-composer.png)
+<DocsImage src="assets/scene-lab-composer.png" alt="输入栏业务入口（宿主注入 #input-toolbar）" :width="500" :height="192" />
 
 ## 5. 会话页改造点
 
@@ -440,7 +440,7 @@ EmKit.setGroupPresentation(groupId, { ext: { tag: '3 床家属群' } })
 </em-chat-info-page>
 ```
 
-清除注入传 `null`（如退出业务态时还原默认展示）：`EmKit.setConversationPresentation(peerId, null)`。登出/换账号后注入清空，在 `login` 成功后重新注入。API 细节见 [EmKit 门面](./API-KIT.md)。
+清除注入传 `null`（如退出业务态时还原默认展示）：`EmKit.setConversationPresentation(peerId, null)`。登出/换账号后注入清空，在 `login` 成功后重新注入。API 细节见 [EmKit 会话 API](./API-KIT-CONVERSATIONS.md)。
 
 ## 6. AI 流式回复
 
@@ -505,9 +505,9 @@ markdown 等富格式气泡由 `#stream-message` 插槽接管（不接管时回�
 | 家校沟通 | 群聊 | 班级公告、@老师、成员昵称行、作业卡、请假审批卡 |
 | 兴趣社群 | 群聊 | 群公告、@群主、活动卡、装备清单卡 |
 
-![IM 场景实验室 · 场景列表](assets/scene-lab-gallery.png)
+<DocsImage src="assets/scene-lab-gallery.png" alt="IM 场景实验室 · 场景列表" :width="500" :height="900" />
 
-![二手交易 · 业务详情页](assets/scene-lab-detail-trade.png)
+<DocsImage src="assets/scene-lab-detail-trade.png" alt="二手交易 · 业务详情页" :width="500" :height="1250" />
 
 体验路径：
 
@@ -518,9 +518,19 @@ markdown 等富格式气泡由 `#stream-message` 插槽接管（不接管时回�
 
 免登录看卡片：列表页顶部「自定义卡片预览」→ `sub-im/pages/scenario/cards`，用宿主 `demo-card` 直接渲染 14 种卡片与未知事件回落：
 
-![自定义卡片预览（宿主自绘，免登录）](assets/scene-lab-cards.png)
+<DocsImage src="assets/scene-lab-cards.png" alt="自定义卡片预览（宿主自绘，免登录）" :width="500" :height="900" />
 
 14 种卡片与「未知事件 → [自定义消息]」的完整长图见 [scene-lab-cards-all.png](assets/scene-lab-cards-all.png)（含 5 种视觉族、字段/角标/主次按钮与手机号脱敏）。
+
+真机实拍（Android）：
+
+| 场景列表（六种业务） | 在线客服：业务上下文页 |
+|---|---|
+| <DocsImage src="assets/shots/android/l2-android-scenarios-list.webp" alt="IM 场景实验室 · 真机" :width="750" :height="1625" /> | <DocsImage src="assets/shots/android/l2-android-scenario-detail.webp" alt="在线客服业务页 · 真机" :width="750" :height="1625" /> |
+
+| 自定义卡片近景（退款审核） | 14 种卡片长图 |
+|---|---|
+| <DocsImage src="assets/shots/android/l2-android-custom-card-closeup.webp" alt="自定义卡片近景" :width="720" :height="635" /> | <DocsImage src="assets/shots/android/l2-android-custom-cards.webp" alt="14 种自定义卡片" :width="720" :height="8112" /> |
 
 架构：场景数据集中在 `demo/common/scenario-catalog.ts`（业务字段、能力点、横幅、话术、入口胶囊文案、每场景 2–3 条卡片的 event/params/ext、菜单），卡片解析在 `demo/common/demo-card-data.ts`，呈现组件在 `demo/components/demo-card`（均为宿主侧代码，不进 UIKit）；列表页 `scenario.uvue` → 详情页 `detail.uvue` → 共享聊天页 `chat.uvue?scenario=<key>`。**新增场景只需加一条 catalog 配置 + 一条宿主卡片分支，不复制聊天页**——这正是 UIKit 可组合性的演示。
 

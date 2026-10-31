@@ -35,14 +35,15 @@
 
 - `docs/STATUS.md` — 进度日志（按时间线）、待验项汇总、已验证基线（**接活前先扫一眼**）
 - `PLAN.md` — 立项计划书（决策表/范围/路线/门禁的唯一权威）
-- `skills/` — **宿主接入向** Agent Skills（对外分发，入口 `em-host-integration`；与 `.agents/skills/` 内部开发技能分开维护，改动后跑 `node scripts/check-skills.mjs`）
+- `skills/` — **宿主接入向** Agent Skills（对外分发，入口 `em-host-integration`；与 `.agents/skills/` 内部开发技能分开维护，改动后跑 `node scripts/sync-skills-docs.mjs` 与 `node scripts/check-skills.mjs`）
 - `docs/docs.manifest.mjs` — 独立文档门户公开清单、页面映射、nav/sidebar 与回源编辑链接；站壳在同级仓库 `../easemob-community-docs`，内部规划/验证材料不得加入 entries
 - `scripts/check-docs.mjs` — 对外文档门禁（内部术语/链接/组件/API/配置覆盖/manifest 一致性）
 - **对外页面**（全部登记在 manifest，禁止直接改 `.content`）：
   - 入门：`docs/QUICKSTART.md`、`docs/CONCEPTS.md`、`docs/HOME.md`
+  - AI 接入：`docs/GUIDE-AGENT-SKILLS.md`、`docs/SKILLS-*.md`（由 `scripts/sync-skills-docs.mjs` 从 `skills/` 生成，禁止手改生成页）
   - 页面：`docs/PAGES-CONVERSATION.md`、`PAGES-CHAT.md`、`PAGES-CHAT-INFO.md`、`PAGES-CONTACTS.md`、`PAGES-GROUPS.md`
   - 组件：`docs/COMPONENTS.md`、`COMPONENTS-BASIC.md`、`COMPONENTS-CONVERSATION.md`、`COMPONENTS-CHAT.md`、`COMPONENTS-CONTACT.md`
-  - API/配置：`docs/API-KIT.md`、`API-TYPES.md`、`CONFIG.md`、`MESSAGING.md`
+  - API/配置：`docs/API.md` 总览；`API-KIT.md`、`API-TYPES.md` 兼容索引；`API-KIT-*.md` 按业务域拆分的 EmKit 参考；`API-TYPES-*.md` 按领域拆分的类型参考；`API-COMPONENTS.md`、`API-COMPOSABLES.md`、`API-UTILS.md`；`CONFIG.md`、`MESSAGING.md`。新页面同时登记 `group` 与 `apiGroup`，由同一 `pages` 元数据派生 guide/API 两套 sidebar
   - 设计与运行：`docs/THEME-I18N.md`、`DESIGN-TOKENS.md`、`GUIDE-STYLING.md`、`PLATFORM.md`、`FAQ.md`
   - 进阶：`docs/GUIDE-MULTI-SCENARIO.md`、`AI-STREAM.md`、`GUIDE-WEAPP-SDK-SUBPACKAGE.md`、`HARMONY-REALDEVICE-RUN.md`、`DEMO.md`
 - **内部材料（禁止进入公开 entries）**：`docs/RELEASE-1.0.md`、`docs/SPIKE-SDK-CONNECTIVITY.md`、`docs/SPIKE-SDK-SUBPACKAGE.md`、`docs/EVAL-MULTI-SCENARIO.md`、`docs/REVIEW-1.0-READINESS.md`、`docs/DX-REVIEW.md`、`docs/DX-REMEDIATION.md`

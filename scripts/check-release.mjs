@@ -46,7 +46,15 @@ if (!existsSync(resolve(root, 'docs/QUICKSTART.md'))) fail('缺少 docs/QUICKSTA
 const versionReferences = [
   'AGENTS.md',
   'docs/QUICKSTART.md',
+  'skills/README.md',
   'skills/em-host-integration/SKILL.md',
+  'skills/em-host-conversation-chat/SKILL.md',
+  'skills/em-host-contacts-groups/SKILL.md',
+  'skills/em-host-business-extension/SKILL.md',
+  'skills/em-host-ai-stream/SKILL.md',
+  'skills/em-host-theme-i18n/SKILL.md',
+  'skills/em-host-mp-subpackage/SKILL.md',
+  'skills/em-host-troubleshooting/SKILL.md',
   'uni_modules/easemob-uikit-uni/libs/constants/index.ts'
 ]
 for (const rel of versionReferences) {

@@ -5,8 +5,22 @@ description: Use when 在微信小程序接入 easemob-uikit-uni 遇到主包超
 
 # 微信小程序：SDK 分包异步化
 
-> 基线：UIKit `1.0.0-rc.1` · websdk `5.1.3` · 微信基础库 **≥ 2.11.2**。
+> 基线：UIKit `1.0.0-rc.2` · websdk `5.1.3` · 微信基础库 **≥ 2.11.2**。
 > 只有微信小程序需要这一步；H5 / App 跳过。UIKit 已内置跨分包加载器，宿主**不改业务代码**。
+
+## 0. 首选：统一命令与双分包模板
+
+新工程优先复制 `templates/chat-only`，已同时配置 `sub-im` 页面分包和 `sub-sdk` SDK 分包。填写业务配置后使用：
+
+```bash
+npm run dev:mp      # HBX dev + 分包 watch
+npm run build:mp    # HBX build + 后处理 + 检查
+npm run check:mp    # 单独复查 build 产物
+```
+
+HBuilderX GUI 开发时保持 `npm run watch:mp` 运行，再从 HBX 编译。开发打开 `unpackage/dist/dev/mp-weixin`，构建打开 `unpackage/dist/build/mp-weixin`。
+
+既有工程按第 4 节声明实际路由，把本技能 `scripts/` 下的 `mp-weixin.mjs`、`prepare-sdk-subpackage.mjs`、`check-mp-size.mjs` 复制到宿主 `scripts/`，配置上述 npm 命令。不要自动改写宿主的 `pages.json`、tabBar 或路由。
 
 ## 1. 为什么必须做
 
@@ -79,7 +93,7 @@ description: Use when 在微信小程序接入 easemob-uikit-uni 遇到主包超
 
 ### 5.1 使用随技能提供的脚本
 
-把 `scripts/prepare-sdk-subpackage.mjs` 复制到宿主工程的 `scripts/`，构建后执行：
+把本技能 `scripts/` 下的三个脚本复制到宿主工程的 `scripts/`。构建后处理用法：
 
 ```bash
 # 默认：当前工程 + unpackage/dist/build/mp-weixin
@@ -104,28 +118,27 @@ node scripts/prepare-sdk-subpackage.mjs --esbuild /path/to/esbuild
 2. 追加 `module.exports = IMSDK;`；
 3. 用 esbuild 降级到 **es2017 + cjs**（IIFE 内含 `?.`/`??`，旧基础库会 `SyntaxError`）；
 4. 写入 `<out>/sub-sdk/im-sdk.js`；
-5. 用 Node 真正 `require` 一遍，校验 `ChatClient/ChatManager/...` 导出齐全，并关闭 `project.config.json` 的两个 ignore 开关。
+5. 用 Node 真正 `require` 一遍校验必需导出，并关闭 `project.config.json` 与已存在的 `project.private.config.json` 中两个 ignore 开关；私有配置会覆盖公共配置。
 
 ### 5.2 挂到构建流程
 
 HBuilderX CLI：
 
 ```bash
-# 构建后
-scripts/uni.sh build mp-weixin   # 本仓库脚本已内置后处理
-# 宿主工程可写成 npm script / CI step
-node scripts/prepare-sdk-subpackage.mjs
+npm run dev:mp      # 开发：watch + HBX dev
+npm run build:mp    # 构建：HBX build + prepare + check
+npm run check:mp    # 单独检查 build 产物
 ```
 
 HBuilderX GUI / dev：
 
-- GUI 的 dev 编译**不会**自动跑构建后处理（产物会被整体重发，`im-sdk.js` 被抹掉）；
-- 开发期另开一个终端跑 `node scripts/prepare-sdk-subpackage.mjs --watch`，它轮询产物 `app.json`，重编译后自动补文件；
-- 或每次 dev 编译后手动跑一次（不推荐，容易忘）。
+- GUI 的 dev 编译不会自动跑构建后处理，另开终端保持 `npm run watch:mp`；
+- watch 同时跟踪 `app.json`、SDK 文件和两层项目配置，重编译或配置被改写后自动恢复；
+- 如果只需手动后处理 dev 产物，执行 `node scripts/prepare-sdk-subpackage.mjs --out unpackage/dist/dev/mp-weixin --watch`。
 
 ### 5.3 不要手改产物
 
-`sub-sdk/im-sdk.js`、`project.config.json` 都是构建产物；每次编译会重新生成。所有改动必须放在后处理脚本里。
+`sub-sdk/im-sdk.js`、`project.config.json`、`project.private.config.json` 都是构建/工具产物。正式修改放在源码配置和后处理脚本里，不在 `unpackage/` 中长期维护。
 
 ## 6. 业务代码：不需要改
 
@@ -212,7 +225,10 @@ iOS/Android 各扫一次预览码，重点看旧机型（es2017 就是为旧 JSC
 
 | 报错 | 根因 | 修复 |
 |---|---|---|
-| `module 'sub-sdk/im-sdk.js' is not defined` | ① 文件不在当前打开的产物目录；② 依赖分析把文件剔除；③ dev 编译抹掉了文件 | 先 `ls` 确认文件存在；再查 `ignoreDevUnusedFiles`/`ignoreUploadUnusedFiles`；dev 跑 `--watch` |
+| `module 'sub-sdk/im-sdk.js' is not defined` | 文件不在当前 dev/build 目录、公共/私有配置开启 ignore、dev 重发 | 先确认文件，再跑 prepare/check；dev 保持 `dev:mp` 或 `watch:mp` |
+| 公共配置已是 false 仍报模块未定义 | `project.private.config.json` 覆盖公共配置 | 用当前 prepare 同时修两层配置 |
+| 项目根目录未找到 `app.json` | HBX 编译中断，产物不完整 | 先修 HBX 模板/脚本错误，不要手补空文件 |
+| 聊天页迁移后跳转不存在 | 仍使用主包旧路径 | 改为 `/sub-im/pages/chat/chat` 或实际分包路径 |
 | 真机 `SyntaxError: Unexpected token .` | 分包产物仍含 `?.`/`??` | 确认 esbuild 降级真的执行（检查产物） |
 | `ChatClient is undefined` | IIFE 全局名变了 / 没追加 `module.exports` / 模块被 default 包装 | 核对全局名；`mod?.default ?? mod` |
 | 登录报「call EmKit.init() first」 | 没等到 whenReady 就调 SDK 方法 | 业务入口统一 `await whenReady()`（UIKit 已做，检查是否绕过） |
@@ -237,8 +253,9 @@ iOS/Android 各扫一次预览码，重点看旧机型（es2017 就是为旧 JSC
 ## 11. 验收清单
 
 - [ ] 主包 ≤ 1.5MB（留余量），分包面板出现 `/sub-sdk/`
+- [ ] 页面分包使用普通分包，跳转路径包含实际分包 root
 - [ ] `sub-sdk/im-sdk.js` 存在、非 0 字节、含 `module.exports`
-- [ ] `project.config.json` 两个 ignore 开关为 `false`
+- [ ] 公共配置与已存在的私有配置中，两个 ignore 开关均为 `false`
 - [ ] 模拟器登录、收发、断网重连通过
 - [ ] iOS/Android 真机各一次冒烟
 - [ ] 弱网/首次未预下载时有加载态，失败可重试

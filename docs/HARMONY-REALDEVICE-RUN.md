@@ -107,8 +107,53 @@ export PATH="$PATH:<DevEco Studio>/Contents/sdk/default/openharmony/toolchains"
 ## 5. 运行到真机
 
 1. 手机开开发者模式 → 开 USB 调试 → 数据线连电脑；`hdc list targets` 能看到设备序列号即连接成功（无线调试：手机 设置→系统→开发者选项→无线调试 取 IP:端口）。
-2. HBuilderX【运行 → 运行到鸿蒙】→ 选真机 → 差量缓存 + debug 模式 → 构建安装。首次运行自动生成 `demo/harmony-configs/`（空目录属正常）。
+2. HBuilderX【运行 → 运行到鸿蒙】→ 选真机 → 差量缓存 + debug 模式 → 构建安装。首次运行会自动生成 `demo/harmony-configs/`；**这个目录不要空着**，语音与拍摄依赖其中的权限声明，见 5.1。
 3. 升级 HBuilderX 后或出现怪异问题时，选「清空缓存」重建。
+
+### 5.1 权限声明（语音 / 拍摄必须）
+
+鸿蒙的权限必须先写进工程配置，系统才可能授权；漏声明时连弹窗都不会出现，只会表现为「录音失败」或点拍摄没反应。
+
+文件位置与节点：
+
+```text
+harmony-configs/
+└── entry/src/main/
+    ├── module.json5                        ← requestPermissions
+    └── resources/base/element/string.json  ← reason 文案
+```
+
+```json5
+// module.json5 片段（实际文件必须包含完整的 module 结构）
+"requestPermissions": [
+  {
+    "name": "ohos.permission.MICROPHONE",
+    "reason": "$string:reason_microphone",
+    "usedScene": { "abilities": ["EntryAbility"], "when": "inuse" }
+  },
+  {
+    "name": "ohos.permission.CAMERA",
+    "reason": "$string:reason_camera",
+    "usedScene": { "abilities": ["EntryAbility"], "when": "inuse" }
+  }
+]
+```
+
+三个容易踩的点：
+
+1. **整份覆盖，不是合并**：HBuilderX 用 `copyDirectoryEx` 把 `harmony-configs` 下的文件整体覆盖到生成工程，只保留 4 个特定路径。所以 `module.json5` 必须给**完整内容**（`abilities`、`pages`、`mainElement` 一个不能少），只贴一段 `requestPermissions` 会把工程打坏。最省事的做法是拿生成工程的 `entry/src/main/module.json5` 复制出来改。
+2. **别重复声明框架权限**：`ohos.permission.INTERNET`、`GET_NETWORK_INFO` 由框架/基座添加，重复写会冲突。
+3. **相册不用声明**：`uni.chooseImage` 在鸿蒙走系统 Picker，无需权限；只有「拍摄」要 `CAMERA`。
+
+声明正确后，第一次按住说话会弹出系统授权框，正文就是 `reason` 指向的文案；不需要自己写 UTS 插件去请求。示例工程已按此配置（`demo/harmony-configs/`）。
+
+> 排查命令：`hdc shell bm dump -n <bundleName> | grep -A3 reqPermissionDetails` 可确认权限是否真的进了安装包。注意 `uni.sh build app-harmony` 只产出 assets、不组装 `entry/`，验证权限必须走「运行到鸿蒙」或对已组装工程重打包。
+
+### 5.2 SDK 调试日志：鸿蒙上不要开 DEBUG
+
+`EmKit.init` 的 `sdkLogLevel` 在鸿蒙端请保持默认 `WARN`。SDK 的 DEBUG 级日志脱敏会对二进制帧调用 `Object.entries`，而 ArkTS 运行时不支持该用法，会抛 `Object entries is not supported`，异常沿同步管线向上冒泡，表现为**会话列表同步整体失败**（列表只剩本地缓存；缓存为空时看起来就是「加载失败」）。
+
+排查方法：`logLevel: 'debug'` 下导出日志（示例工程「我的 → 导出调试日志」），搜 `Object entries`。
 
 ## 6. 备注
 

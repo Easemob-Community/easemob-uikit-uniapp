@@ -186,7 +186,7 @@ uni.navigateTo({
 })
 ```
 
-聊天页自身完成进入会话、历史、未读、发送。业务上下文可通过 `sendText` 的 `ext`、`#banner`、`title` 等注入。详见 [多场景接入](./GUIDE-MULTI-SCENARIO.md)。如果需要包含登录恢复、聊天页和小程序分包的完整工程，可直接使用仓库 [`templates/chat-only`](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only)。
+聊天页自身完成进入会话、历史、未读、发送。业务上下文可通过 `sendText` 的 `ext`、`#banner`、`title` 等注入。详见 [多场景接入](./GUIDE-MULTI-SCENARIO.md)。如果需要包含登录恢复、聊天页和小程序分包的完整工程，可直接使用仓库 [`templates/chat-only`](https://github.com/Easemob-Community/easemob-uikit-uniapp/tree/main/templates/chat-only)。
 
 ### 7.3 只用数据层
 

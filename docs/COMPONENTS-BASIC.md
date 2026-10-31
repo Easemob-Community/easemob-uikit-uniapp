@@ -4,6 +4,22 @@
 
 本页所有组件都符合 easycom 目录约定，`pages.json` 打开 `autoscan` 后可直接写标签；也可以显式 `import` 后局部注册。引入方式与选型见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。
 
+## 界面预览
+
+**头像 / 图标 / 空态 / 骨架屏**（左：`em-avatar` 与 `em-icon`；右：`em-empty` 与 `em-skeleton`）：
+
+<DocsImage src="assets/shots/compare/cmp-atoms.webp" alt="原子组件陈列" :width="1316" :height="1400" eager />
+
+**边缘状态**（左：`em-button` 的 loading；右：选人弹层的已选态——已选头像条 + 底部计数按钮）：
+
+<DocsImage src="assets/shots/compare/cmp-states.webp" alt="按钮 loading 与选人弹层已选态" :width="1316" :height="1400" />
+
+触底加载失败态（点击「加载失败，点击重试」→ LOADING 转圈 → 回错误态）：
+
+<DocsImage src="assets/shots/android/l2-android-states-load-more.webp" alt="触底失败重试" :width="750" :height="1625" />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## em-action-sheet
 
 底部动作菜单：一行标题 + 若干动作 + 取消项。适合会话行长按菜单、群成员操作菜单这类"选一个动作"的场景。

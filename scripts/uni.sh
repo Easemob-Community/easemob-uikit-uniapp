@@ -59,7 +59,11 @@ if [ "$MODE" = "dev" ]; then
   fi
   exec node node_modules/.bin/uni -p "$PLATFORM"
 else
-  node node_modules/.bin/uni build -p "$PLATFORM"
+  if [ "$PLATFORM" = "web" ]; then
+    node "$ROOT/scripts/web-sdk-build.mjs" "$ROOT/demo"
+  else
+    node node_modules/.bin/uni build -p "$PLATFORM"
+  fi
 fi
 
 # 构建后处理：mp-weixin 产物注入 SDK 普通分包（PLAN.md M2.8，分包异步化）+ 防回归检查

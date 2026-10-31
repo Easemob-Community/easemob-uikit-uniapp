@@ -4,6 +4,12 @@
 
 页面组件位于 `uni_modules/easemob-uikit-uni/components/pages/em-chat-info-page/em-chat-info-page.vue`，同目录下的 `em-group-info-blocks.vue`、`em-group-field-dialog.vue`、`em-group-members-view.vue` 是页面内聚拆分，不单独对外暴露页面级契约。
 
+## 界面预览
+
+<DocsImage src="assets/shots/android/l1-android-chat-info.webp" alt="聊天信息（Android 真机）" :width="750" :height="1625" eager />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## 页面位置与接入方式
 
 - 页面组件在 `components/pages/` 下，需要 `pages.json` 的 custom easycom 规则（见 [快速开始](./QUICKSTART.md) 3.1 节）。
@@ -201,7 +207,7 @@ function onChatMember(userId: string) {
 ### 全员禁言
 
 - 当前版本中，聊天信息页不提供「全员禁言」开关；群被设为全员禁言后，非群主/管理员的聊天页输入栏会自动禁用并提示。
-- 需要在业务侧控制时，调用 `EmKit.muteAllGroupMembers(groupId)` / `EmKit.unmuteAllGroupMembers(groupId)`；群数据更新后聊天页的禁用态会随响应式数据自动生效（详见 [EmKit API](./API-KIT.md)）。
+- 需要在业务侧控制时，调用 `EmKit.muteAllGroupMembers(groupId)` / `EmKit.unmuteAllGroupMembers(groupId)`；群数据更新后聊天页的禁用态会随响应式数据自动生效（详见 [EmKit 群组 API](./API-KIT-GROUPS.md)）。
 
 ## 宿主接线
 
@@ -231,6 +237,6 @@ function onChatMember(userId: string) {
 - [会话列表页](./PAGES-CONVERSATION.md)
 - [群组列表与建群](./PAGES-GROUPS.md)
 - [联系人与群组组件](./COMPONENTS-CONTACT.md)
-- [EmKit API](./API-KIT.md)
-- [类型与常量](./API-TYPES.md)
+- [EmKit 群组 API](./API-KIT-GROUPS.md)
+- [用户、联系人与群组类型](./API-TYPES-CONTACTS-GROUPS.md)
 - [快速开始](./QUICKSTART.md)

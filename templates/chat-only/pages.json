@@ -3,13 +3,17 @@
     {
       "path": "pages/login/login",
       "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/chat/chat",
-      "style": { "navigationBarTitleText": "聊天", "navigationStyle": "custom" }
     }
   ],
   "subPackages": [
+    {
+      "root": "sub-im",
+      "name": "sub-im",
+      "independent": false,
+      "pages": [
+        { "path": "pages/chat/chat", "style": { "navigationBarTitleText": "聊天", "navigationStyle": "custom" } }
+      ]
+    },
     {
       "root": "sub-sdk",
       "name": "sub-sdk",

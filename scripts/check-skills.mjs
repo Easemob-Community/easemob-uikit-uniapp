@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { syncSkillsDocs } from './sync-skills-docs.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const skillsRoot = resolve(root, 'skills')
@@ -97,6 +98,12 @@ dirs.forEach((dir) => {
 // README 里的技能链接
 const readme = resolve(skillsRoot, 'README.md')
 if (existsSync(readme)) checkLinks(readFileSync(readme, 'utf8'), readme)
+
+try {
+  syncSkillsDocs({ check: true })
+} catch (error) {
+  errors.push(error.message)
+}
 
 if (errors.length > 0) {
   console.error(`✗ 技能校验失败（${errors.length} 项）：`)

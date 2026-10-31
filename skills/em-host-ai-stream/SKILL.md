@@ -5,7 +5,7 @@ description: Use when 用 easemob-uikit-uni 接入 AI 流式消息（Stream Mess
 
 # AI 流式消息（Stream Message）
 
-> 基线：UIKit `1.0.0-rc.1`（M2.13）。数据链路与纯文本渲染**内置，零配置可用**；markdown 等富格式由宿主插槽接管。
+> 基线：UIKit `1.0.0-rc.2`。数据链路与纯文本渲染**内置，零配置可用**；markdown 等富格式由宿主插槽接管。
 > 前置：已完成 `em-host-integration` 的初始化与登录。
 
 ## 1. 数据流（先理解职责）

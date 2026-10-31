@@ -23,7 +23,7 @@
 
 ## 按接入形态选择
 
-- **只要单聊天页**：使用仓库 [`templates/chat-only`](https://github.com/easemob/easemob-uikit-uniapp/tree/main/templates/chat-only)，包含登录恢复、聊天页、小程序分包与构建检查。
+- **只要单聊天页**：使用仓库 [`templates/chat-only`](https://github.com/Easemob-Community/easemob-uikit-uniapp/tree/main/templates/chat-only)，包含登录恢复、聊天页、小程序分包与构建检查。
 - **完整 IM**：按下方步骤接入，页面组合参考仓库 `demo/`。
 - **业务页直进单聊**：使用 chat-only，或按仓库 `docs/GUIDE-MULTI-SCENARIO.md` 手动集成。
 
@@ -147,13 +147,17 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue) {
 
 > **关键**：页面根节点必须有确定高度（`height: 100%` 且父级 flex 链完整），否则列表/输入栏会被压成 0 高，表现为白屏。
 
-### 6. 微信小程序 SDK 分包
+### 6. 微信小程序页面与 SDK 分包
 
-小程序主包 2MB 限制下，websdk 不能静态进主包。UIKit 已内置跨分包异步加载入口，宿主只需：
+小程序主包 2MB 限制下，websdk 不能静态进主包。新工程可直接使用 `templates/chat-only`，已预置 `sub-im` 页面分包、`sub-sdk` SDK 分包和统一命令：
 
-1. 用 `scripts/prepare-sdk-subpackage.mjs` 把 SDK IIFE 处理为 `sub-sdk/im-sdk.js`；
-2. `pages.json` 声明 `sub-sdk` 分包与 `preloadRule`；
-3. 无需改业务代码，`EmKit.init()` / `login()` 会自动等待 SDK 就绪。
+```bash
+npm run dev:mp      # HBX dev + 分包 watch
+npm run build:mp    # HBX build + 后处理 + 检查
+npm run check:mp    # 复查 build 产物
+```
+
+HBuilderX GUI 开发时保持 `npm run watch:mp` 运行。既有工程需按实际路由声明普通分包，并复制统一脚本；后处理会同时维护公共和私有项目配置，避免 SDK 被“忽略未使用文件”剔除。无需改 UIKit 业务代码，`EmKit.init()` / `login()` 会自动等待 SDK 就绪。
 
 完整步骤、体积阈值与排错见仓库 `docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md`。
 
@@ -197,6 +201,7 @@ EmKit.setAttachmentProvider({
 - H5 为移动端布局，未做桌面宽屏适配。
 - 语音发送仅 App/小程序；录音 60s 上限自动发送，麦克风权限失败只 toast（不自动跳系统设置）。
 - iOS 相机权限被拒绝后，系统拍摄页可能停在黑屏且不再弹窗；UIKit 在拍摄前预检 `uni.getAppAuthorizeSetting`，`denied` 时弹窗引导去设置。iOS 发布包需在 `manifest.json` 的 `app-ios.distribute.privacyDescription` 声明相机/相册/麦克风用途描述，改后重新打包生效。
+- 鸿蒙的语音与拍摄需在工程 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions` 声明 `ohos.permission.MICROPHONE` 与 `ohos.permission.CAMERA`（均需带 `reason`、`usedScene.inuse`）；未声明时系统直接拒绝，表现为「录音失败」或点拍摄无反应。该目录是**整文件覆盖**而非按节点合并，文件须含完整 `module` 结构；相册无需声明权限（走系统 Picker）。
 - `@` 提及为追加式插入（uni `<input>` 无光标位置 API）；消息列表仍为 `scroll-view` 全量渲染（长会话性能优化在 1.1）。
 - 非当前会话只保留最近 100 条内存消息，回会话时重拉最新页；完整本地历史需宿主自行持久化。
 - 日志原始 payload 默认关闭（`logPayload`），生产排查请临时开启并及时关闭。

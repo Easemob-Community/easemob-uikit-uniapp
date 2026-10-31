@@ -4,6 +4,18 @@
 
 页面组件位于 `uni_modules/easemob-uikit-uni/components/pages/em-chat-page/em-chat-page.vue`，在宿主工程中由聊天页面壳承载（例如 `sub-im/pages/chat/chat.uvue`）。它不持有路由，也不感知宿主页面栈。
 
+## 界面预览
+
+五类气泡混排（Android 真机）：
+
+<DocsImage src="assets/shots/android/l1-android-chat-bubbles.webp" alt="聊天气泡" :width="750" :height="1625" eager />
+
+长按菜单（HarmonyOS 真机）：
+
+<DocsImage src="assets/shots/harmony/l1-harmony-chat-menu.webp" alt="长按菜单" :width="750" :height="1669" />
+
+更多端与更多状态见[界面截图](./SCREENSHOTS.md)。
+
 ## 页面位置与接入方式
 
 - 页面组件在 `components/pages/` 下，需要 `pages.json` 的 custom easycom 规则才能以标签形式使用（见 [快速开始](./QUICKSTART.md) 3.1 节）。
@@ -331,7 +343,7 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 </template>
 ```
 
-作用域完整字段与类型见 [EmChatInputBarScope](./API-TYPES.md)；行为核心也以 `useChatComposer` composable 导出，供完全自研聊天页的宿主复用同一套键盘/面板/录音逻辑。
+作用域完整字段与类型见 [EmChatInputBarScope](./API-TYPES-COMPONENTS.md#emchatinputbarscope)；行为核心也以 `useChatComposer` composable 导出，供完全自研聊天页的宿主复用同一套键盘/面板/录音逻辑。
 
 > [!WARNING]
 > App 端自绘注意：`textarea` 是原生组件，`flex` 尺寸与背景样式渲染不可靠——高度/灰底/圆角由包裹层 `view` 承担，textarea 自身 `width/height: 100%`、不设背景（iOS 加 `disable-default-padding`），否则多行生长态下输入区会整体不可见。详见 [常见问题](./FAQ.md)。
@@ -395,5 +407,5 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 - [AI 流式消息](./AI-STREAM.md)
 - [聊天与消息组件](./COMPONENTS-CHAT.md)
 - [多场景接入](./GUIDE-MULTI-SCENARIO.md)
-- [EmKit API](./API-KIT.md)
+- [EmKit 消息操作 API](./API-KIT-MESSAGE-OPERATIONS.md)
 - [配置参考](./CONFIG.md)
