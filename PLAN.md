@@ -368,6 +368,12 @@ easemob-uikit-uniapp/
 - **明确不做**：提交或长期改写 `node_modules`、升级 websdk、修改 UIKit 运行时 SDK 加载协议、新增运行时依赖。
 - **门禁**：包装器恢复语义单测、demo 与模板 web/mp 构建、H5 静态伺服 200、文档/Skills/发布检查。
 
+### M2.30：通用 Switch 原子组件（2026-11-03 立项）
+
+- **范围**：新增 `em-switch`（`v-model`、medium/small、disabled/loading、customClass/customStyle），默认复刻 36×20 紧凑轨道与 12px 圆钮，颜色接入明暗 token；loading 复用 `useSpinRotation`。聊天详情免打扰/置顶与建群公开群/允许邀请共 4 个开关统一替换；style-lab 增加交互预览，公开文档、能力清单与 changelog 同步。验证后精准同步到宿主 `easemob-uniappx-demo-534`，宿主登录 dev 模式 2 个页面级开关一并收编，不覆盖宿主其他改动。
+- **明确不做**：搬运参考工程登录页 dev 配置、修改当前登录流程、新增运行时依赖、组件测试脚手架或新路由。
+- **门禁**：能力清单/主题/文档检查、demo 与宿主 web/mp 构建、H5 静态伺服 200 与实际交互；真实账号和未运行的真机端不得记为已验证。
+
 ### M2.31：默认输入栏与图片消息通用注入点（2026-11-04 立项）
 
 - **范围**：`em-chat-inputbar` 新增 `#emoji-panel`（scope：emojis/disabled/selectEmoji/closePanel/notifyDisabledTap），`em-chat-page` 仅在宿主提供时转发；`em-chat-page` 新增 `#image-message`（scope：message/preview/longPress），缺省均保持内置 UI。`EmKit.sendImage` 增可选 `ext`，支持 http(s) `originalUrl` 与 GIF 识别；`EmMessageItem` 增 `originalUrl/isGif` 并在发送、接收、历史与失败重发中保留。宿主在自身 Demo 实现 GIF 面板、协议与气泡，可复用 vue 版 `ext.isSticker` 图片消息协议。

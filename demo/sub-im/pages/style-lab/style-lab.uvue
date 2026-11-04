@@ -87,7 +87,7 @@ const ENTRIES: LabEntry[] = [
   {
     path: '/sub-im/pages/style-lab/states',
     name: '通用提交态与错误态',
-    desc: '按钮 loading 旋转 / 触底加载错误重试 / 选人提交态',
+    desc: 'Switch 状态 / 按钮 loading / 触底错误重试 / 选人提交态',
     icon: 'circle-bang',
     accent: '#EAB308'
   }

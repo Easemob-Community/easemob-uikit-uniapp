@@ -201,7 +201,7 @@ EmKit.setAttachmentProvider({
 - H5 为移动端布局，未做桌面宽屏适配。
 - 语音发送仅 App/小程序；录音 60s 上限自动发送，麦克风权限失败只 toast（不自动跳系统设置）。
 - iOS 相机权限被拒绝后，系统拍摄页可能停在黑屏且不再弹窗；UIKit 在拍摄前预检 `uni.getAppAuthorizeSetting`，`denied` 时弹窗引导去设置。iOS 发布包需在 `manifest.json` 的 `app-ios.distribute.privacyDescription` 声明相机/相册/麦克风用途描述，改后重新打包生效。
-- 鸿蒙的语音与拍摄需在工程 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions` 声明 `ohos.permission.MICROPHONE` 与 `ohos.permission.CAMERA`（均需带 `reason`、`usedScene.inuse`）；未声明时系统直接拒绝，表现为「录音失败」或点拍摄无反应。该目录是**整文件覆盖**而非按节点合并，文件须含完整 `module` 结构；相册无需声明权限（走系统 Picker）。
+- 鸿蒙需在工程 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions` 声明 `ohos.permission.MICROPHONE`（语音）、`ohos.permission.CAMERA`（拍摄）与 `ohos.permission.GET_NETWORK_INFO`（网络状态检测；生成工程已包含时保留即可）。麦克风与相机需带 `$string:` 资源形式的 `reason` 和 `usedScene.inuse`，并在 `resources/base/element/string.json` 配置文案。未声明时系统直接拒绝，不会出现授权弹窗，表现为「录音失败」或点拍摄无反应。该目录是**整文件覆盖**而非按节点合并，文件须含完整 `module` 结构并保留已有权限。选择相册/文件走系统 Picker，保存图片/视频走系统保存确认框，均无需额外声明相册或文件权限。完整示例与拒绝后的处理见 `docs/HARMONY-REALDEVICE-RUN.md`。
 - `@` 提及为追加式插入（uni `<input>` 无光标位置 API）；消息列表仍为 `scroll-view` 全量渲染（长会话性能优化在 1.1）。
 - 非当前会话只保留最近 100 条内存消息，回会话时重拉最新页；完整本地历史需宿主自行持久化。
 - 日志原始 payload 默认关闭（`logPayload`），生产排查请临时开启并及时关闭。

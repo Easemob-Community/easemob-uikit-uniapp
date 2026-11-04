@@ -91,7 +91,7 @@
 | mp-weixin `onKeyboardHeightChange` 回调与面板跟随观感 | 小程序 | |
 | iOS/Android 真机 SDK 分包语法兼容与收发回归、双端互发 | App + 小程序 | |
 | 菜单裁剪/feature 开关/自定义消息插槽冒烟 | H5/mp | |
-| switch `color=var(--em-primary-color)` 与 em-badge mp 真机视觉 | mp | |
+| em-switch 与 em-badge mp 真机视觉 | mp | em-switch H5 明暗与交互已验（2026-11-03）；mp/App 真机待验 |
 | Android 重连回归（SPIKE 记录）；iOS 端整体待验 | App | |
 | iOS 真机复跑：登录成功（登录链路已不依赖 `uni-getNetworkType` 基座模块）、登录页输入框/聚焦态观感 | iOS | 2026-10-21 首次 iOS 运行暴露，已修（见文末同日条目） |
 | iOS 缺 `uni-getNetworkType` 模块基座下的断网/恢复重连（网络监听降级为心跳重连） | iOS | 同上 |
@@ -1318,6 +1318,22 @@
 - **修复**：新增 `scripts/web-sdk-build.mjs`，仅在 Web 构建期间用 HBuilderX 自带 esbuild 把 SDK 根入口重打包为单文件；成功或失败均恢复原始 `node_modules` 文件。`scripts/uni.sh build web` 与 `check-template.mjs` 共用该包装器，不提交或长期改写依赖。
 - **测试**：`test-web-sdk-build.mjs` 覆盖构建期使用单文件、成功恢复、失败恢复与不遗留备份；与分包测试合计 13/13 通过。
 - **验证**：demo `build web` 通过，H5 静态伺服 HTTP 200；`build mp-weixin` 全绿（主包 1016KB、分包合计 1451KB）；chat-only 完整 web/mp 门禁通过；docs/skills/release/config 检查通过，发布检查保留既有 keyPassword 历史警告。
+
+## 2026-11-03 通用 Switch 原子组件（M2.30）
+
+- **组件**：新增 `em-switch`（受控 `modelValue` + `update:modelValue`/`change`，medium 36×20 / small 28×16、12px 圆钮、disabled/loading、customClass/customStyle）；关闭轨道走新 token `--em-switch-off-bg`，开启跟随 `--em-primary-color`，loading 复用 `useSpinRotation`，不依赖 CSS 关键帧。
+- **应用**：聊天详情免打扰/置顶 2 个原生 switch 统一替换，事件参数改为 boolean，请求中 loading 防重；建群公开群/允许邀请 2 个 48×28 自绘开关统一替换，保留整行点击，以普通 view 的 `@click.stop` 防双触发，旧样式与 helper 删除。
+- **预览与文档**：style-lab states 增 6 组实际可点状态；组件总览、基础组件、设计 token、changelog、能力清单和内部组件结构 skill 同步。
+- **验证**：`check-theme-locale-contract`、`check-docs`、`git diff --check` 通过；`build web` 通过、H5 静态伺服 200；`build mp-weixin` 全绿（主包 1026KB、分包合计 1455KB）。H5 实际点击 medium/small 状态正确，medium change 单次计数，disabled/loading 四例点击均不增发事件，明暗视觉正常。独立复核发现自定义组件上的 stop 在 mp 编译为 `catchclick`，改普通 view 包裹后复验产物为 2 个 `catchtap`、0 个 `catchclick`。
+- **宿主同步**：`easemob-uniappx-demo-534` 的 7 个 UIKit 文件已逐字节同步；登录 dev 的持久化配置/私有服务器 2 个页面级开关收编为 `em-switch`，以 `custom-style` 保留原深色半透明配色，旧样式与 handler 删除，宿主其他未提交改动未触碰。宿主生产 web 构建与静态伺服 200 通过；mp 编译、SDK 分包/配置/语法检查通过，产物确认登录 2 个 `em-switch`、建群 2 个 `catchtap`。宿主主包 1648KB，超过 1.5MB 检查阈值，未为追求绿灯裁剪宿主功能；隐藏 dev 入口未能通过自动化浏览器展开，宿主登录运行时切换未记为已验证。
+- **待验**：App 三端/mp 真机视觉与交互；真实账号下聊天详情请求中防重/失败回滚，以及 `showSettings=true` 时建群整行点击不双触发；宿主登录 dev 两开关与私有服务器字段联动。`audit-usage` 仍只报本任务前已有的 `em-watermark` 未归类，本次未修改该既有项。
+
+## 2026-11-03 鸿蒙权限文档补全与校正
+
+- **外部宿主问题**：`easemob-uniappx-demo-534` 的 `harmony-configs/` 为空，实际生成的 `module.json5` 只声明 `INTERNET`，导致录音运行时授权直接失败且从未出现系统弹窗。已在外部宿主补齐 `MICROPHONE`、`CAMERA`、`GET_NETWORK_INFO` 与中英文 `reason` 资源；重新编译后的真机结果由宿主验证。
+- **事实校正**：鸿蒙运行时源码明确对录音调用 `requestSystemPermission(MICROPHONE)`，网络状态模块调用 `requestSystemPermission(GET_NETWORK_INFO)`。因此文档不再笼统写「`GET_NETWORK_INFO` 由框架/基座添加、不要重复声明」，改为以实际生成文件为准、缺失时显式补齐；整文件覆盖时必须保留已有 `INTERNET` 等权限。
+- **权限边界**：选择图片/视频走系统 Photo Picker，文件选择走系统文件 Picker，保存图片/视频走 `showAssetsCreationDialog`，均无需额外相册/文件权限；UIKit 仅写剪贴板，无需 `READ_PASTEBOARD`。
+- **文档落点**：更新 `HARMONY-REALDEVICE-RUN.md` 的声明/运行时授权/拒绝后处理与完整示例、插件 README、`em-host-integration` 与 `em-host-troubleshooting`；重新生成 Skills 公开页，8 个技能结构校验通过。
 
 ## 2026-11-03 修复 App 端 emoji 面板字形裁切
 

@@ -136,6 +136,6 @@ export const FEATURES = [
 // 共用原子组件：不属于任何单一能力，审计报告里单独列「原子层」，不参与能力判定。
 export const ATOMIC_COMPONENTS = [
   'em-icon', 'em-text', 'em-avatar', 'em-badge', 'em-button', 'em-empty', 'em-popup',
-  'em-action-sheet', 'em-load-more', 'em-nav-bar', 'em-search-bar', 'em-skeleton',
+  'em-action-sheet', 'em-load-more', 'em-nav-bar', 'em-search-bar', 'em-skeleton', 'em-switch',
   'em-connection-banner', 'em-select-contact', 'em-contact-nav', 'em-alphabet-nav'
 ]

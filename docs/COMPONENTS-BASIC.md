@@ -1,6 +1,6 @@
 # 基础组件
 
-这页是 13 个通用原子组件的契约参考：`em-action-sheet`、`em-avatar`、`em-badge`、`em-button`、`em-empty`、`em-icon`、`em-load-more`、`em-nav-bar`、`em-popup`、`em-search-bar`、`em-skeleton`、`em-text`、`em-watermark`。它们不连 store、不碰路由，props 进、events 出，可以直接嵌进宿主自己的界面。
+这页是 14 个通用原子组件的契约参考：`em-action-sheet`、`em-avatar`、`em-badge`、`em-button`、`em-empty`、`em-icon`、`em-load-more`、`em-nav-bar`、`em-popup`、`em-search-bar`、`em-skeleton`、`em-switch`、`em-text`、`em-watermark`。它们不连 store、不碰路由，props 进、events 出，可以直接嵌进宿主自己的界面。
 
 本页所有组件都符合 easycom 目录约定，`pages.json` 打开 `autoscan` 后可直接写标签；也可以显式 `import` 后局部注册。引入方式与选型见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。
 
@@ -326,6 +326,32 @@ function onSelect(action: EmActionSheetAction): void {
 ```
 
 **行为与平台**：底色用 `--em-bg-hover`，块圆角用 `--em-skeleton-line-radius`，明暗模式自动跟随；`avatar` 默认 40×40，`text` 与 `paragraph` 的单行高度为 `1em`（跟随父级字号）。`paragraph` 行间距 8px、末行宽 60%，`rows` 会做 `Math.max(1, Math.floor(rows))` 收敛，传 0 或负数也至少渲染一行。骨架块是静态的，不播放扫光动画，各端渲染一致。
+
+## em-switch
+
+开关：两档紧凑尺寸，支持 `v-model`、禁用与加载态，适合设置行和表单中的二元选项。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `modelValue` | `boolean` | `false` | 开关状态，配合 `v-model` 双向绑定 |
+| `size` | `'medium' \| 'small'` | `'medium'` | 轨道尺寸：36×20 / 28×16px |
+| `disabled` | `boolean` | `false` | 禁用：降低透明度且不派发事件 |
+| `loading` | `boolean` | `false` | 加载态：圆钮内显示旋转图标且不派发事件 |
+| `customClass` / `customStyle` | `string` | `''` | 根节点样式透出，见 [样式定制](./GUIDE-STYLING.md) |
+
+| 事件 | 载荷 | 说明 |
+|---|---|---|
+| `update:modelValue` | `value: boolean` | 点击可用开关时派发切换后的值 |
+| `change` | `value: boolean` | 紧随 `update:modelValue` 派发，用于业务回调 |
+
+无插槽。
+
+```vue
+<em-switch v-model="muted" :loading="saving" @change="onMutedChange" />
+<em-switch v-model="enabled" size="small" />
+```
+
+**行为与平台**：组件是受控组件，内部不保存第二份状态；`disabled` 或 `loading` 时点击不会切换，也不会派发事件。关闭轨道色使用 `--em-switch-off-bg`，开启轨道色跟随 `--em-primary-color`，圆钮为 12px。loading 图标由 JS 逐帧驱动旋转，不依赖 CSS 关键帧动画；过渡不可用的平台直接呈现最终开关位置。
 
 ## em-text
 

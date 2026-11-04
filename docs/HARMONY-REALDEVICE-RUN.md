@@ -110,9 +110,20 @@ export PATH="$PATH:<DevEco Studio>/Contents/sdk/default/openharmony/toolchains"
 2. HBuilderX【运行 → 运行到鸿蒙】→ 选真机 → 差量缓存 + debug 模式 → 构建安装。首次运行会自动生成 `demo/harmony-configs/`；**这个目录不要空着**，语音与拍摄依赖其中的权限声明，见 5.1。
 3. 升级 HBuilderX 后或出现怪异问题时，选「清空缓存」重建。
 
-### 5.1 权限声明（语音 / 拍摄必须）
+### 5.1 权限声明与授权处理
 
-鸿蒙的权限必须先写进工程配置，系统才可能授权；漏声明时连弹窗都不会出现，只会表现为「录音失败」或点拍摄没反应。
+鸿蒙权限分为**安装包声明**和**运行时授权**两步。`module.json5` 未声明权限时，运行时请求会被系统直接拒绝，授权弹窗不会出现，UIKit 只能收到失败回调并提示「录音失败」或「图片选择失败」。这不是用户拒绝，也不需要先写 UTS 插件排查。
+
+| UIKit 能力 | 权限 | 配置要求 | 授权表现 |
+|---|---|---|---|
+| 语音消息录音 | `ohos.permission.MICROPHONE` | `reason` + `usedScene.when = "inuse"` | 首次录音弹出系统授权框 |
+| 拍摄图片 | `ohos.permission.CAMERA` | `reason` + `usedScene.when = "inuse"` | 首次拍摄弹出系统授权框 |
+| 网络状态监听、发送前网络预检 | `ohos.permission.GET_NETWORK_INFO` | 只需声明 `name` | 系统授权，不弹用户授权框 |
+| 网络请求 | `ohos.permission.INTERNET` | 只需声明 `name`；保留生成工程已有声明 | 不弹用户授权框 |
+
+`GET_NETWORK_INFO` 是否由框架或基座自动加入取决于实际工程，应以生成后的 `module.json5` 为准；没有时必须显式补上，否则网络状态检测会失败或降级。
+
+#### 配置文件与写法
 
 文件位置与节点：
 
@@ -123,9 +134,12 @@ harmony-configs/
     └── resources/base/element/string.json  ← reason 文案
 ```
 
+先把生成工程中对应的完整文件复制到上述目录，再增加权限。`module.json5` 中的 `requestPermissions` 示例（实际文件必须保留完整的 `module` 结构）：
+
 ```json5
-// module.json5 片段（实际文件必须包含完整的 module 结构）
 "requestPermissions": [
+  { "name": "ohos.permission.INTERNET" },
+  { "name": "ohos.permission.GET_NETWORK_INFO" },
   {
     "name": "ohos.permission.MICROPHONE",
     "reason": "$string:reason_microphone",
@@ -139,13 +153,33 @@ harmony-configs/
 ]
 ```
 
-三个容易踩的点：
+`reason` 必须使用 `$string:` 资源引用，不能直接填写中文。`resources/base/element/string.json` 示例：
 
-1. **整份覆盖，不是合并**：HBuilderX 用 `copyDirectoryEx` 把 `harmony-configs` 下的文件整体覆盖到生成工程，只保留 4 个特定路径。所以 `module.json5` 必须给**完整内容**（`abilities`、`pages`、`mainElement` 一个不能少），只贴一段 `requestPermissions` 会把工程打坏。最省事的做法是拿生成工程的 `entry/src/main/module.json5` 复制出来改。
-2. **别重复声明框架权限**：`ohos.permission.INTERNET`、`GET_NETWORK_INFO` 由框架/基座添加，重复写会冲突。
-3. **相册不用声明**：`uni.chooseImage` 在鸿蒙走系统 Picker，无需权限；只有「拍摄」要 `CAMERA`。
+```json
+{
+  "string": [
+    { "name": "reason_microphone", "value": "发送语音消息时需要录制声音" },
+    { "name": "reason_camera", "value": "拍摄照片或视频时需要访问相机" }
+  ]
+}
+```
 
-声明正确后，第一次按住说话会弹出系统授权框，正文就是 `reason` 指向的文案；不需要自己写 UTS 插件去请求。示例工程已按此配置（`demo/harmony-configs/`）。
+实际文件还要保留原有的 `module_desc`、`EntryAbility_desc`、`EntryAbility_label`。需要英文文案时，可在 `resources/en_US/element/string.json` 放同名条目；资源优先级与目录规则遵循鸿蒙规范。
+
+#### 覆盖规则与免权限能力
+
+1. **整份覆盖，不是合并**：HBuilderX 用 `copyDirectoryEx` 把 `harmony-configs` 下的文件整体覆盖到生成工程，只保留 4 个特定路径。所以 `module.json5` 必须给**完整内容**（`abilities`、`pages`、`mainElement` 一个不能少），只贴一段 `requestPermissions` 会把工程打坏。同理，覆盖时要保留生成工程已有的 `INTERNET` 等声明。
+2. **选择相册和文件不用声明权限**：`uni.chooseImage` / `uni.chooseVideo` 走系统 Picker，`uni.chooseFile` 走系统文件选择器，均无需申请相册或文件读取权限。
+3. **保存图片/视频也不用声明相册权限**：当前鸿蒙运行时通过系统 `showAssetsCreationDialog` 让用户确认保存，不需要额外声明 `READ_IMAGEVIDEO` / `WRITE_IMAGEVIDEO`。
+4. **复制文本不需要读取剪贴板权限**：UIKit 只调用 `setClipboardData`，不调用读取剪贴板 API，无需声明 `READ_PASTEBOARD`。
+
+#### 生效与拒绝后的处理
+
+修改 `harmony-configs` 后必须重新执行「运行到鸿蒙」，重新组装、构建并安装应用；不要直接修改 `unpackage/`，也不要只做 JS 热更新。首次录音或拍摄时，RecorderManager / 系统拍摄能力会自动发起运行时授权，弹窗正文就是 `reason` 指向的文案。
+
+如果系统弹窗曾经出现、但用户选择了拒绝，之后可能不再弹窗。这属于用户授权状态问题，应引导用户到系统设置中开启；UIKit 当前只在失败时显示 toast，不会自动跳转设置。若从未弹窗，则优先检查安装包是否缺少权限声明。
+
+示例工程的语音与拍摄声明见 `demo/harmony-configs/`。
 
 > 排查命令：`hdc shell bm dump -n <bundleName> | grep -A3 reqPermissionDetails` 可确认权限是否真的进了安装包。注意 `uni.sh build app-harmony` 只产出 assets、不组装 `entry/`，验证权限必须走「运行到鸿蒙」或对已组装工程重打包。
 

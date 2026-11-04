@@ -8,6 +8,35 @@
     </view>
 
     <view class="lab__section">
+      <text class="lab__section-title">em-switch（v-model / small / disabled / loading）</text>
+      <view class="lab__switch-row">
+        <text class="lab__switch-label">medium：{{ switchOn ? '开启' : '关闭' }}</text>
+        <em-switch v-model="switchOn" @change="onSwitchChange" />
+      </view>
+      <view class="lab__switch-row">
+        <text class="lab__switch-label">small：{{ switchSmall ? '开启' : '关闭' }}</text>
+        <em-switch v-model="switchSmall" size="small" />
+      </view>
+      <view class="lab__switch-row">
+        <text class="lab__switch-label">disabled off（点击不计数）</text>
+        <em-switch :model-value="false" disabled @change="onSwitchChange" />
+      </view>
+      <view class="lab__switch-row">
+        <text class="lab__switch-label">disabled on（点击不计数）</text>
+        <em-switch :model-value="true" disabled @change="onSwitchChange" />
+      </view>
+      <view class="lab__switch-row">
+        <text class="lab__switch-label">loading off（点击不计数）</text>
+        <em-switch :model-value="false" loading @change="onSwitchChange" />
+      </view>
+      <view class="lab__switch-row">
+        <text class="lab__switch-label">loading on（点击不计数）</text>
+        <em-switch :model-value="true" loading @change="onSwitchChange" />
+      </view>
+      <text class="lab__demo-meta">medium change 事件已触发 {{ switchChangeCount }} 次</text>
+    </view>
+
+    <view class="lab__section">
       <text class="lab__section-title">em-load-more 错误态（点击重试 → LOADING 转圈 → 回错误态）</text>
       <view class="lab__demo-item">
         <em-load-more :state="loadState" @load="onLoadRetry" />
@@ -38,6 +67,14 @@ import { useDemoTheme } from '@/common/theme'
 
 const { themeClass } = useDemoTheme()
 const { t } = useLocale()
+
+const switchOn = ref(true)
+const switchSmall = ref(false)
+const switchChangeCount = ref(0)
+
+function onSwitchChange(): void {
+  switchChangeCount.value += 1
+}
 
 // 重试走真实状态流转：ERROR → 点击切 LOADING（spinner 转圈）→ 1.2s 后回 ERROR，验证四态收口
 const loadState = ref<LoadMoreStateValue>(LOAD_MORE_STATE.ERROR)
@@ -112,6 +149,19 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   margin-bottom: var(--em-spacing-3);
+}
+
+.lab__switch-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-height: 36px;
+}
+
+.lab__switch-label {
+  flex: 1;
+  font-size: var(--em-font-size-13);
+  color: var(--em-text-primary);
 }
 
 .lab__demo-meta {

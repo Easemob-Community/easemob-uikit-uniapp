@@ -77,18 +77,19 @@ UIKit 本身不带任何权限声明——权限属于宿主工程。漏声明�
 |---|---|---|
 | Android | `manifest.json` → `app-android.distribute.permissions` | `CAMERA`、`RECORD_AUDIO`、相册读取 |
 | iOS | `manifest.json` → `app-ios.distribute.privacyDescription` | `NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSPhotoLibraryUsageDescription`（写入相册再加 `NSPhotoLibraryAddUsageDescription`） |
-| 鸿蒙 | 工程根目录 `harmony-configs/entry/src/main/module.json5` → `requestPermissions` | `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`（都要带 `reason` 与 `usedScene.inuse`，`reason` 指向 `resources/base/element/string.json` 里的条目） |
+| 鸿蒙 | 工程根目录 `harmony-configs/entry/src/main/module.json5` → `requestPermissions` | `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`（都要带 `reason` 与 `usedScene.inuse`，`reason` 指向 `resources/base/element/string.json` 里的条目）；生成工程未包含 `ohos.permission.GET_NETWORK_INFO` 时也要补上 |
 | 微信小程序 | 微信公众平台「用户隐私保护指引」+ `app.json` 的 `permission` / `requiredPrivateInfos` | 麦克风、相机、相册按实际用到声明 |
 | H5 | 无需声明 | 不录音、不写相册 |
 
 **鸿蒙特有坑（必读）**：
 
-- HBuilderX 是把 `harmony-configs/` 下的文件**整份覆盖**到生成工程，**不是按节点合并**。只放一段 `requestPermissions` 会把 `abilities` 等结构打掉，工程直接坏。必须提供**完整**的 `module` 配置（可直接拿生成工程的 `entry/src/main/module.json5` 改）。
-- 不要重复声明 `ohos.permission.INTERNET` / `GET_NETWORK_INFO`，框架会加。
-- 相册**不用**声明权限：`uni.chooseImage` 在鸿蒙走系统 Picker，官方明确无需申请。只有「拍摄」需要 `CAMERA`。
-- 用户授权类权限声明后，按住说话会**自动弹出系统授权框**（正文即 `reason` 的文案），无需自己写 UTS 插件请求。
+- HBuilderX 是把 `harmony-configs/` 下的文件**整份覆盖**到生成工程，**不是按节点合并**。只放一段 `requestPermissions` 会把 `abilities` 等结构打掉，工程直接坏。必须提供**完整**的 `module` 配置（可直接拿生成工程的 `entry/src/main/module.json5` 改），并保留已有 `INTERNET` 等声明。
+- `GET_NETWORK_INFO` 用于网络状态监听和发送前预检，是否由框架/基座自动加入以实际生成文件为准；缺失时显式补上。它属于系统授权，不会弹用户授权框。
+- 选择相册和文件**不用**声明权限：`uni.chooseImage` / `uni.chooseVideo` / `uni.chooseFile` 走系统 Picker。保存图片/视频走系统保存确认框，也无需声明 `READ_IMAGEVIDEO` / `WRITE_IMAGEVIDEO`。
+- UIKit 只写剪贴板、不读取，无需声明 `READ_PASTEBOARD`。
+- 用户授权类权限声明后，按住说话或首次拍摄会**自动弹出系统授权框**（正文即 `reason` 的文案），无需自己写 UTS 插件请求；修改后必须重新「运行到鸿蒙」组装安装，JS 热更新不会改变安装包权限。
 
-**症状对照**：按住说话立刻「录音失败」→ 麦克风未声明；点「拍摄」无反应或黑屏 → 相机未声明（iOS 还会因 `privacyDescription` 缺失报 `config error`）。
+**症状对照**：从未弹授权框且按住说话立刻「录音失败」→ 优先检查麦克风声明；点「拍摄」无反应或黑屏 → 检查相机声明（iOS 还会因 `privacyDescription` 缺失报 `config error`）。如果弹窗曾出现但被用户拒绝，应引导到系统设置开启，与漏声明是两种处理路径。
 
 ## 5. pages.json：easycom、页面、导航
 

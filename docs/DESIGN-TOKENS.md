@@ -91,6 +91,7 @@ const { themeClass } = useTheme()
 | `--em-bg-hover` | 按下 / 悬停底（也用于骨架屏底色） | `#F5F5F5` | `#2A2A30` |
 | `--em-bg-active` | 选中底 | `rgba(51, 177, 255, 0.12)` | `#0D2840` |
 | `--em-control-bg` | 控件填充（默认按钮、对方气泡、引用块） | `#F3F4F6` | `#333537` |
+| `--em-switch-off-bg` | Switch 关闭态轨道 | `#E3E6E8` | `rgba(255, 255, 255, 0.12)` |
 
 > 暗色的 `--em-bg-active` 是固定藏青值，不由主色派生；改品牌色时它不会跟着变。
 

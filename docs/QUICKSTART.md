@@ -77,6 +77,7 @@ UIKit 不会预置页面清单：`pages.json` 里声明了哪些页面，就只�
   "path": "pages/chat/chat",
   "style": {
     "navigationStyle": "custom",
+    "disableScroll": true,
     "app-plus": { "titleNView": false }
   }
 }
@@ -84,7 +85,22 @@ UIKit 不会预置页面清单：`pages.json` 里声明了哪些页面，就只�
 
 `app-plus.titleNView` 只对经典 App 端生效；uni-app x 蒸汽端以 `navigationStyle: "custom"` 为准。
 
-### 3.3 页面高度
+### 3.3 关闭页面整体回弹
+
+UIKit 整页组件由内部的 `scroll-view` 承担滚动。会话、聊天、通讯录等宿主页面的 `style` 中应设置 `"disableScroll": true`，禁止页面容器在顶部或底部继续整体拖动：
+
+```json
+{
+  "style": {
+    "navigationStyle": "custom",
+    "disableScroll": true
+  }
+}
+```
+
+鸿蒙深色页面如果没有关闭该行为，上下回弹时可能露出默认白色窗口底色。`disableScroll` 只禁止宿主页面整体滚动，不影响会话、消息等内部列表。该配置需要逐页设置，写在 `globalStyle` 中无效；需要使用页面级下拉刷新的宿主页面不要开启。
+
+### 3.4 页面高度
 
 **这是最常见的白屏原因**。会话页、聊天页的根节点必须撑满页面，且父级 flex 链完整：
 

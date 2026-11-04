@@ -175,14 +175,16 @@ npx esbuild index.js.orig --loader:.orig=js --bundle --format=esm --outfile=inde
 
 | 症状 | 根因 | 修复 |
 |---|---|---|
-| 鸿蒙按住说话立刻提示「录音失败」 | 工程没声明 `ohos.permission.MICROPHONE`，系统不弹窗直接拒绝 | 在 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions` 补 `MICROPHONE`（带 `reason` + `usedScene.inuse`），并给 `string.json` 加 `reason` 文案；**文件要完整**，该目录是整文件覆盖 |
-| 鸿蒙点「拍摄」无反应 | 同上，缺 `ohos.permission.CAMERA` | 同上补 `CAMERA` |
-| 按上面改完仍失败 | 改的是仓库里的 `harmony-configs`，但没重新组装工程 | 必须重新「运行到鸿蒙」（`uni.sh build app-harmony` 只出 assets、不组装 `entry/`）；用 `hdc shell bm dump -n <bundle>` 核对 `reqPermissionDetails` 是否已含目标权限 |
-| 鸿蒙编包里 `module.json5` 的 `abilities` 全没了 / 启动崩溃 | 只把 `requestPermissions` 片段放进 `harmony-configs`，整份覆盖把结构打掉 | 复制生成工程的完整 `module.json5` 再改；别重复声明 `INTERNET` / `GET_NETWORK_INFO` |
+| 鸿蒙按住说话立刻提示「录音失败」，且从未弹授权框 | 工程没声明 `ohos.permission.MICROPHONE`，系统直接拒绝 | 在 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions` 补 `MICROPHONE`（带 `$string:` 资源形式的 `reason` + `usedScene.inuse`），并给 `resources/base/element/string.json` 加文案；**文件要完整**，该目录是整文件覆盖 |
+| 鸿蒙点「拍摄」无反应，且从未弹授权框 | 同上，缺 `ohos.permission.CAMERA` | 同上补 `CAMERA` |
+| 鸿蒙网络状态不更新或网络探测不可用 | 生成工程缺 `ohos.permission.GET_NETWORK_INFO` | 在 `requestPermissions` 补 `GET_NETWORK_INFO`（只需 `name`）；不要假设框架或基座一定已添加，以实际生成文件为准 |
+| 按上面改完仍失败 | 改的是仓库里的 `harmony-configs`，但没重新组装工程，或只做了 JS 热更新 | 必须重新「运行到鸿蒙」（`uni.sh build app-harmony` 只出 assets、不组装 `entry/`）；用 `hdc shell bm dump -n <bundle>` 核对 `reqPermissionDetails` 是否已含目标权限 |
+| 鸿蒙编包里 `module.json5` 的 `abilities` 全没了 / 启动崩溃 | 只把 `requestPermissions` 片段放进 `harmony-configs`，整份覆盖把结构打掉 | 复制生成工程的完整 `module.json5` 再改，并保留已有 `INTERNET` 等声明 |
+| 鸿蒙授权框曾出现，用户拒绝后不再出现 | 系统记住了拒绝状态 | 引导到系统设置开启；不是继续补声明或重复调用录音 |
 | 安卓真机录音无反应 | `RECORD_AUDIO` 未声明或用户拒绝 | 检查 `manifest.json` → `app-android.distribute.permissions`；拒绝后引导到系统设置 |
 | iOS 录音无反应 / 拍摄黑屏且不再弹窗 | `privacyDescription` 缺对应用途描述，或用户已拒绝 | 补 `NSMicrophoneUsageDescription` / `NSCameraUsageDescription` 后重打自定义基座；拒绝态引导 `uni.openAppAuthorizeSetting` |
 
-> 判断口诀：**系统根本不弹窗 = 声明问题；弹过窗但被拒 = 用户态问题（要引导设置）**。UIKit 侧只在失败时 toast「录音失败」，不会替你申请或跳设置。
+> 判断口诀：**系统从未弹窗 = 优先查声明；弹过窗但被拒 = 查用户授权状态并引导设置**。RecorderManager / 系统拍摄能力会自动发起运行时授权，无需另写 UTS 插件；UIKit 侧只在失败时 toast「录音失败」，不会自动跳设置。选择相册/文件和保存图片/视频均走系统 Picker 或确认框，不要为了这些路径额外添加相册、文件或读取剪贴板权限。
 
 ## 10. 平台能力矩阵（1.0 如实告知）
 

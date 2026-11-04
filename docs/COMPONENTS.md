@@ -93,6 +93,7 @@ import EmGroupInfoBlocks from '@/uni_modules/easemob-uikit-uni/components/pages/
 | `em-popup` | 弹层容器：底部/居中、遮罩、安全区、全屏、层级与 tabBar 处理 |
 | `em-search-bar` | 搜索输入条：圆角条 + 前置搜索图标，`v-model` 双向绑定 |
 | `em-skeleton` | 骨架屏：头像块 / 单行 / 多行段落 |
+| `em-switch` | 开关：两档尺寸、禁用与加载态，`v-model` 双向绑定 |
 | `em-text` | 文本收口：单行或两行省略、长文断词、跨端文字样式双通道 |
 | `em-watermark` | 组件级水印平铺：按窗口几何铺满、整层旋转、纯 view/text 渲染 |
 
