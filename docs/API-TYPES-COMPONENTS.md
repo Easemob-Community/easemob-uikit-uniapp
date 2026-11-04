@@ -35,6 +35,14 @@
 | `rotate` | `number` | 旋转角度，默认 -20 |
 | `color` | `string` | 文字颜色，默认 `var(--em-text-primary)` |
 
+## `EmChatEmojiPanelScope`
+
+默认输入栏 `#emoji-panel` 的作用域。`emojis` 为当前字符集，`disabled` 表示禁用态；`selectEmoji(emoji)` 追加字符，`closePanel()` 关闭面板，`notifyDisabledTap()` 上报禁用操作。
+
+## `EmChatImageMessageScope`
+
+聊天页 `#image-message` 的作用域。`message` 是当前图片消息；`preview(message)` 与 `longPress(message)` 分别调用内置图片预览和消息长按菜单，宿主自绘图片气泡可按需复用。
+
 ## `EmChatInputBarScope`
 
 `em-chat-page` `#input-bar` 整栏自绘插槽的作用域契约，用法见[聊天页](./PAGES-CHAT.md)。

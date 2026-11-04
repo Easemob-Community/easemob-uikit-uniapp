@@ -20,6 +20,8 @@ import {
 | `text` | `string` | 文本内容；流式消息为当前累计全文 |
 | `url` | `string` | 图片/语音/视频/文件地址 |
 | `thumbUrl` | `string` | 缩略图/封面地址 |
+| `originalUrl` | `string` | 图片原图地址（SDK `originalImageUrl`），未携带时为空串 |
+| `isGif` | `boolean` | 是否为 GIF 图片；发送时按 File MIME 或 `.gif` 文件名/URL 识别，接收与历史读取 SDK body |
 | `width` / `height` | `number` | 图片/视频尺寸（未知为 0） |
 | `time` | `number` | 消息时间戳（毫秒） |
 | `from` / `to` | `string` | 发送方 / 接收方 |

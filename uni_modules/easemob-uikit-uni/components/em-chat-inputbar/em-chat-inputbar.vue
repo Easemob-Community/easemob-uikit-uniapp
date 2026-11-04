@@ -94,13 +94,22 @@
 
     <!-- 底部面板：emoji / 媒体二选一，同高（对齐 vue 版 h5-input 的 panel 互斥形态，占键盘位顶起输入栏） -->
     <view v-if="panel === 'emoji'" :class="ns.e('panel')" :style="panelStyle">
-      <scroll-view scroll-y :class="ns.e('emoji-scroll')">
-        <view :class="ns.e('emoji-grid')">
-          <view v-for="emoji in emojis" :key="emoji" :class="ns.e('emoji-cell')" @click="onEmoji(emoji)">
-            <text :class="ns.e('emoji-char')">{{ emoji }}</text>
+      <slot
+        name="emoji-panel"
+        :emojis="emojis"
+        :disabled="disabled"
+        :select-emoji="onEmoji"
+        :close-panel="closeEmojiPanel"
+        :notify-disabled-tap="notifyDisabledTap"
+      >
+        <scroll-view scroll-y :class="ns.e('emoji-scroll')">
+          <view :class="ns.e('emoji-grid')">
+            <view v-for="emoji in emojis" :key="emoji" :class="ns.e('emoji-cell')" @click="onEmoji(emoji)">
+              <text :class="ns.e('emoji-char')">{{ emoji }}</text>
+            </view>
           </view>
-        </view>
-      </scroll-view>
+        </scroll-view>
+      </slot>
     </view>
     <view v-else-if="panel === 'media'" :class="ns.e('panel')" :style="panelStyle">
       <view :class="ns.e('media-grid')">
@@ -348,6 +357,14 @@ function onSend(): void {
 function onEmoji(emoji: string): void {
   if (guardDisabled()) return
   emit('update:modelValue', props.modelValue + emoji)
+}
+
+function closeEmojiPanel(): void {
+  panel.value = 'none'
+}
+
+function notifyDisabledTap(): void {
+  emit('disabled-tap')
 }
 
 // ========== 「+」媒体面板（格子布局，对齐 vue 版 more-grid；语音不进格子，走左侧 mic 切换） ==========

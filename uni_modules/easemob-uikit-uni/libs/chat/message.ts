@@ -587,15 +587,24 @@ export class EmMessageDomain {
     return path.indexOf('http://') === 0 || path.indexOf('https://') === 0
   }
 
-  async sendImage(to: string, chatType: ConversationTypeValue, image: EmPickedImage): Promise<EmMessageItem> {
+  async sendImage(to: string, chatType: ConversationTypeValue, image: EmPickedImage, ext?: Record<string, unknown>): Promise<EmMessageItem> {
     const chatManager = await this.readyChatManager()
-    const message = chatManager.createImageMessage({
+    const webFile = image.webFile as { type?: string } | null
+    const isGif = webFile?.type === 'image/gif' || /\.gif(?:$|\?)/i.test(image.name) || /\.gif(?:$|\?)/i.test(image.path)
+    const common = {
       conversationId: to,
       conversationType: chatType,
-      data: this.asCompatibleFile(image.path, image.name, image.size, image.webFile),
-      filename: image.name
-    })
-    return this.deliver(message, to, '', undefined, image.path, undefined, image.webFile)
+      filename: image.name,
+      ...(ext != null ? { ext } : {}),
+      ...(isGif ? { isGif: true } : {})
+    }
+    const message = image.webFile == null && this.isRemoteUrl(image.path)
+      ? chatManager.createImageMessage({ ...common, originalUrl: image.path })
+      : chatManager.createImageMessage({
+        ...common,
+        data: this.asCompatibleFile(image.path, image.name, image.size, image.webFile)
+      })
+    return this.deliver(message, to, '', undefined, image.path, undefined, image.webFile, ext)
   }
 
   async sendAudio(to: string, chatType: ConversationTypeValue, filePath: string, duration: number): Promise<EmMessageItem> {
@@ -773,6 +782,9 @@ export class EmMessageDomain {
       const full = str('bigImageUrl') !== '' ? str('bigImageUrl') : (str('originalImageUrl') !== '' ? str('originalImageUrl') : str('url'))
       // 本地 blob/临时路径优先保留用于即时预览；只有当前没有可用 URL 时才用服务端地址
       if (stored.url === '' && full !== '') stored.url = full
+      const original = str('originalImageUrl')
+      if (original !== '') stored.originalUrl = original
+      if (body['isGif'] === true) stored.isGif = true
       const thumb = str('thumbnailUrl')
       if (thumb !== '') stored.thumbUrl = thumb
       return
@@ -1243,7 +1255,8 @@ export class EmMessageDomain {
       return
     }
     let message: Message
-    const remote = this.isRemoteUrl(item.url)
+    const sourceUrl = item.type === MESSAGE_TYPE.IMAGE && item.originalUrl !== '' ? item.originalUrl : item.url
+    const remote = this.isRemoteUrl(sourceUrl)
     const cachedFile = this.uploadFileByLocalId[localId] ?? null
     // 文本/自定义消息没有本地媒体文件，不走媒体可用性校验
     const isTextLike = item.type === MESSAGE_TYPE.TEXT || item.type === MESSAGE_TYPE.CUSTOM
@@ -1254,15 +1267,18 @@ export class EmMessageDomain {
     }
     const name = item.fileName !== ''
       ? item.fileName
-      : (item.url !== '' ? item.url.slice(item.url.lastIndexOf('/') + 1) : 'file')
+      : (sourceUrl !== '' ? sourceUrl.slice(sourceUrl.lastIndexOf('/') + 1) : 'file')
     if (item.type === MESSAGE_TYPE.IMAGE) {
+      const ext = Object.keys(item.ext).length > 0 ? { ...item.ext } : undefined
       message = remote
-        ? chatManager.createImageMessage({ conversationId, conversationType: chatType, originalUrl: item.url, filename: name })
+        ? chatManager.createImageMessage({ conversationId, conversationType: chatType, originalUrl: sourceUrl, filename: name, ext, isGif: item.isGif })
         : chatManager.createImageMessage({
           conversationId,
           conversationType: chatType,
           data: this.asCompatibleFile(item.url, name, 0, cachedFile ?? await this.webFileOf(item.url, name)),
-          filename: name
+          filename: name,
+          ext,
+          isGif: item.isGif
         })
     } else if (item.type === MESSAGE_TYPE.AUDIO) {
       message = remote
@@ -1403,6 +1419,8 @@ export class EmMessageDomain {
       text,
       url: '',
       thumbUrl: '',
+      originalUrl: '',
+      isGif: false,
       width: 0,
       height: 0,
       time: Date.now(),
@@ -1436,6 +1454,8 @@ export class EmMessageDomain {
       text: '',
       url: '',
       thumbUrl: '',
+      originalUrl: '',
+      isGif: false,
       width: 0,
       height: 0,
       time: message.timestamp,
@@ -1468,6 +1488,8 @@ export class EmMessageDomain {
       const body = message.body as ImageMessageBody
       item.url = body.localUrl !== '' ? body.localUrl : (body.bigImageUrl ?? body.originalImageUrl ?? body.thumbnailUrl ?? '')
       item.thumbUrl = body.thumbnailUrl ?? item.url
+      item.originalUrl = body.originalImageUrl ?? ''
+      item.isGif = body.isGif === true
       item.width = body.width ?? 0
       item.height = body.height ?? 0
     } else if (mtype === 'voice' || mtype === 'audio') {

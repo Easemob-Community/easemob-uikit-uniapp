@@ -205,6 +205,8 @@ function onOpenInfo(id: string) {
 | `input-toolbar` | 无 | 输入栏上方固定区，随键盘一起上移、不参与消息滚动。用于「发订单」「发病例」等业务快捷入口 |
 | `title` | `{ name: string, ext?: Record<string, unknown>, conversationId: string }` | 整标题自绘（导航栏标题位）。缺省回落内置标题（`title` prop > 会话/群/用户昵称回落链）；`ext` 为 `setConversationPresentation` / `setGroupPresentation` 注入的业务载荷 |
 | `input-bar` | `EmChatInputBarScope` | 整栏替换默认输入栏，结构/样式全自绘；键盘避让、面板互斥、录音、禁言、@、草稿等行为经作用域契约由库内保持，详见「整栏自绘输入栏」 |
+| `emoji-panel` | `EmChatEmojiPanelScope` | 替换默认输入栏的 emoji 内容区；外壳仍负责面板高度、键盘互斥与禁用态。scope 提供 `emojis`、`selectEmoji`、`closePanel`、`disabled`、`notifyDisabledTap`，未提供时显示内置字符网格 |
+| `image-message` | `EmChatImageMessageScope` | 接管单条图片消息渲染；scope 提供 `message`、`preview`、`longPress`，未提供时显示内置图片气泡。宿主自绘时可继续调用预览与长按，保留消息菜单 |
 | `watermark` | `{ conversationId: string }` | 水印覆盖层，铺满消息内容区（导航栏 → 消息列表），`pointer-events: none` 不响应交互；缺省渲染 `em-watermark` 平铺，可整层自绘（图片/业务 logo） |
 
 ### 插槽示例

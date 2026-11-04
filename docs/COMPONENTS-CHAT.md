@@ -45,7 +45,9 @@
 | `disabled-tap` | — | 禁用态下的任何操作尝试，宿主据此提示 |
 | `quick-reply` | `item: EmQuickReply` | 点选快捷回复；填草稿还是直接发送由宿主决定；`submitting=true` 时不派发 |
 
-无插槽。
+| 插槽 | 作用域 | 说明 |
+|---|---|---|
+| `emoji-panel` | `EmChatEmojiPanelScope` | 替换 emoji 内容区，缺省渲染内置字符网格。`selectEmoji(emoji)` 追加字符并保留禁用守卫，`closePanel()` 关闭面板，`disabled/notifyDisabledTap` 用于宿主自绘内容的禁用处理；面板高度与键盘互斥仍由输入栏管理 |
 
 `EmInputFeatures` 的字段：
 

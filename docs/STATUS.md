@@ -1332,3 +1332,12 @@
 - **录音浮层**：移除输入栏上方会使整栏长高的提示行，改为屏幕 40% 高度处的居中浮层（32px 麦克风 + 秒数 + 上滑/松开取消提示），取消态使用主色边框/图标/秒数。展示计时按 200ms 采样、以实际开始时间计算秒数，结束与卸载清理 interval；发送时长仍取平台录音结果。
 - **跨端约束**：浮层常驻挂载，关闭仅以 `top: 200%` 移出视口，规避蒸汽端新建浮层偶发丢渲染；公开 props/emits、`useChatComposer` 状态机和自绘输入栏 scope 均未改。
 - **验证**：`git diff --check`、`build web`、`build mp-weixin` 全绿（14 项分包/语法/体积检查通过，主包 1027KB、分包合计 1455KB），H5 静态伺服 HTTP 200；同步到外部宿主 `easemob-uniappx-demo-534` 后，用户复测认可本轮改造效果。
+
+
+## 2026-11-04 默认输入栏/图片消息通用注入与宿主 GIF Demo（M2.31）
+
+- **UIKit 仅开扩展点**：`em-chat-inputbar` 新增 `#emoji-panel`（字符、禁用、选择、关闭与禁用上报 scope，缺省原网格），chat-page 仅在宿主提供时转发；chat-page 新增 `#image-message`（message/preview/longPress scope，缺省原图片气泡）。`EmKit.sendImage` 增可选 `ext`，远程图片走 `originalUrl`，按 MIME/文件名识别 GIF；`EmMessageItem.originalUrl/isGif` 贯通发送、接收、历史与失败重发。未新增 stickerPacks、GIF 组件或 sticker 摘要特判。
+- **宿主实现**：真正 GIF 功能仅在 `easemob-uniappx-demo-534`：`common/demo-stickers.ts` 自定义 `ext.isSticker=true` 图片协议与发送，3 张 GIF/封面，顶部纯图标 Emoji/表情 tab（按用户微信截图调整），Demo 自绘 120px 原图 aspectFit 气泡且不预览，普通图片回落内置组件。H5 资源先 fetch 转 File，App/小程序走本地文件。
+- **跨端修复**：App/mp 不支持插槽处的 `v-bind="scope"`，源仓库与宿主均改为逐项显式 props（源 mp 构建曾按预期失败，修复后通过）。鸿蒙实测发现面板空白，产物确认 `sub-im/static` 未复制：App 改读主包 `static/emojis`，H5/mp 继续读 `sub-im/static`，宿主 prepare 删除 mp 主包重复素材。另一定位问题为 HBuilderX 5.34 对 barrel 导入的函数型 scope props 报 EISDIR，Demo 改用同构本地 Props，完整面板恢复后 H5 构建通过。
+- **验证**：新增 `test-gif-injection.mjs` 契约 3 项，与既有构建/分包测试合计 16/16 通过；docs/config/skills 校验通过，两仓 `git diff --check` 通过。源 demo web/mp 全绿（主包 1029KB、分包 1455KB），源与宿主 H5 静态伺服均 200，宿主 GIF URL 200。宿主 web/mp 编译及 SDK 分包/语法检查通过，主包 1652KB（此前已超 1.5MB，本次未裁剪宿主功能），分包 4616KB；mp 主包重复 GIF 已删除。最终审查发现 chat 门面漏转 `sendImage.ext`，已补齐源仓库与宿主并加入回归断言后复跑上述测试与构建。
+- **真机与待验**：用户已在鸿蒙全量重编译后确认面板显示正常。真实账号双端发送/接收/历史动画、失败重发与 vue 互通未运行；App/Android/iOS/mp 真机未全量验证。`audit-usage` 仍只报此前已有的 `em-watermark` 未归类，本次未修改该既有项。

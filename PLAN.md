@@ -368,6 +368,12 @@ easemob-uikit-uniapp/
 - **明确不做**：提交或长期改写 `node_modules`、升级 websdk、修改 UIKit 运行时 SDK 加载协议、新增运行时依赖。
 - **门禁**：包装器恢复语义单测、demo 与模板 web/mp 构建、H5 静态伺服 200、文档/Skills/发布检查。
 
+### M2.31：默认输入栏与图片消息通用注入点（2026-11-04 立项）
+
+- **范围**：`em-chat-inputbar` 新增 `#emoji-panel`（scope：emojis/disabled/selectEmoji/closePanel/notifyDisabledTap），`em-chat-page` 仅在宿主提供时转发；`em-chat-page` 新增 `#image-message`（scope：message/preview/longPress），缺省均保持内置 UI。`EmKit.sendImage` 增可选 `ext`，支持 http(s) `originalUrl` 与 GIF 识别；`EmMessageItem` 增 `originalUrl/isGif` 并在发送、接收、历史与失败重发中保留。宿主在自身 Demo 实现 GIF 面板、协议与气泡，可复用 vue 版 `ext.isSticker` 图片消息协议。
+- **明确不做**：UIKit 内置 `stickerPacks`、GIF 面板/气泡、sticker 配置与摘要特判、custom GIF 协议；「不做表情包」仍指不内置，宿主通用注入不受此限。不改 `#input-bar` 整栏自绘 scope，不做最近使用、四向 tab、hover 或表情商店。
+- **门禁**：契约测试、demo 与指定宿主 web/mp 构建、H5 静态伺服 200、文档/Skills/配置检查；真实账号双端互通和 App/mp 真机未实测项只记 STATUS，不宣称已解决。
+
 ### M3：组件沉淀与发布
 
 - 原子组件沉淀（em-*-message 气泡族、输入栏等从页面级组件解耦）；pages_init.json 页面模板注册

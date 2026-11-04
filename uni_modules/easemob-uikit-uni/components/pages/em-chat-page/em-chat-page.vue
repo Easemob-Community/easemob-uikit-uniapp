@@ -191,12 +191,19 @@
                     @long-press="onLongPressMessage"
                     @mention-click="onMentionClick"
                   />
-                  <em-image-message
+                  <slot
                     v-else-if="m.type === MESSAGE_TYPE.IMAGE"
+                    name="image-message"
                     :message="m"
-                    @preview="onPreview"
-                    @long-press="onLongPressMessage"
-                  />
+                    :preview="onPreview"
+                    :long-press="onLongPressMessage"
+                  >
+                    <em-image-message
+                      :message="m"
+                      @preview="onPreview"
+                      @long-press="onLongPressMessage"
+                    />
+                  </slot>
                   <em-audio-message
                     v-else-if="m.type === MESSAGE_TYPE.AUDIO"
                     :message="m"
@@ -341,7 +348,18 @@
         @mention-trigger="onMentionTrigger"
         @quick-reply="onQuickReply"
         @disabled-tap="onMuteAllTap"
-      />
+      >
+        <template v-if="$slots['emoji-panel']" #emoji-panel="scope">
+          <slot
+            name="emoji-panel"
+            :emojis="scope.emojis"
+            :disabled="scope.disabled"
+            :select-emoji="scope.selectEmoji"
+            :close-panel="scope.closePanel"
+            :notify-disabled-tap="scope.notifyDisabledTap"
+          />
+        </template>
+      </em-chat-inputbar>
 
       <!-- @提及成员选择面板（仅群聊 + enableMention 时由 mention-trigger 打开；选人后尾部追加 @{name} 空格） -->
       <em-mention-picker

@@ -41,7 +41,7 @@ await EmKit.sendText('user-b', 'singleChat', '收到', quote)
 ## `EmKit.sendImage(...)` / `sendAudio(...)` / `sendVideo(...)` / `sendFile(...)`
 
 ```ts
-EmKit.sendImage(to, chatType, image)
+EmKit.sendImage(to, chatType, image, ext?)
 EmKit.sendAudio(to, chatType, filePath, duration)
 EmKit.sendVideo(to, chatType, video)
 EmKit.sendFile(to, chatType, file)
@@ -56,7 +56,7 @@ const images = await chooseImage(1, 'album')
 await EmKit.sendImage('user-b', 'singleChat', images[0])
 ```
 
-返回 `Promise<EmMessageItem>`。语音录制仅 App/小程序，内置文件选择仅小程序/H5；App 端可注入宿主文件选择能力，详见[平台能力与差异](./PLATFORM.md)。
+返回 `Promise<EmMessageItem>`。`sendImage` 的可选 `ext` 会随消息透传并保留到失败重发；`image.path` 为 http(s) 且没有 `webFile` 时按远程原图引用，File MIME 或文件名/URL 命中 `.gif` 时设置 `isGif`，接收与历史消息可读取 `originalUrl` / `isGif`。语音录制仅 App/小程序，内置文件选择仅小程序/H5；App 端可注入宿主文件选择能力，详见[平台能力与差异](./PLATFORM.md)。
 
 ## `EmKit.setAttachmentProvider(provider)` / `pickAttachments(options)` / `resolveAttachment(uri, options?)`
 

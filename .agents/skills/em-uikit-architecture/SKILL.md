@@ -87,6 +87,7 @@ uni_modules/easemob-uikit-uni/
 - **安全区**：`useSafeArea`（`getSafeAreaBottom/Top` 读取快照）。输入栏无面板时根节点承担底部安全区；键盘弹起时键盘区已覆盖安全区不再叠加（见坑集 #3）。
 - **软键盘**：`useKeyboardHeight` 统一高度源（App/小程序；H5 运行时无 `onKeyboardHeightChange`，条件编译跳过注册，否则聊天页 setup 白屏），消费点 = chat-page 弹起滚底 + `useChatComposer` 手动避让 + 面板高度对齐 `max(kb, PANEL_MIN_HEIGHT=280)`。
 - **输入栏行为核心**：`useChatComposer`（M2.16 自 em-chat-inputbar 抽取）——键盘避让 rootStyle/panelStyle、面板三态互斥、录音手势状态机、禁用守卫的单一实现；消费点 = em-chat-inputbar + chat-page 的 `#input-bar` 整栏自绘插槽（页面实例化后经 scope 透出，scope 类型 `EmChatInputBarScope` 在 libs/types；插槽有无静态确定，同实例不可切换）。
+- **通用局部注入与图片扩展（M2.31）**：默认输入栏 `#emoji-panel`、chat-page `#image-message` 提供缺省回落的宿主自绘点；`sendImage(..., ext?)` 支持远程 `originalUrl` 与 GIF 识别，`EmMessageItem.originalUrl/isGif` 经 toMessageItem、applyMediaBody 与图片重发保留。UIKit 不识别 `ext.isSticker`，宿主 Demo 自管该业务协议与展示。
 - **日志**：`libs/utils/logger.ts` —— `createLogger(ns)` 统一 `[emkit:<ns>]` 前缀（debug 走 console.log 求全端稳定）；2000 行内存环形缓冲与 console 级别解耦；`EmKit.exportLogs()` 分端导出（H5 Blob 下载 / 小程序·App 写 USER_DATA_PATH 兜底剪贴板），配套 `getLogText/clearLogs`。
 - **主题 chrome**：`useThemeChrome({ tabBarPages, colors? })` 封装 `initTheme`、页面 `onShow` 与 `themeStore.mode` watch；App/mp 走 `syncNativeThemeUI`，H5 同步 `.uni-page-head/.uni-tabbar`，demo 通过 `demo/common/theme.ts` 消费。
 - **i18n**：`useLocale` 的 messages 为 reactive store，`mergeMessages(locale, table)` 从门面透出（zh-CN/en 内置，支持扩展 locale）；持久化偏好只在对应文案表存在时恢复，缺失 key 回退 zh-CN。

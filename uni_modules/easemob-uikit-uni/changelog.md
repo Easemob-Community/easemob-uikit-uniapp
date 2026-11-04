@@ -26,6 +26,8 @@
 
 ### 新增
 
+- **默认输入栏与图片消息通用注入点**：`em-chat-inputbar` 新增 `#emoji-panel`，`em-chat-page` 新增 `#image-message`，均保留内置渲染作为缺省回落，宿主可局部自绘而无需替换整个输入栏或消息列表。`EmKit.sendImage` 新增可选 `ext`，支持远程图片 `originalUrl` 与 GIF 识别；`EmMessageItem` 新增 `originalUrl` / `isGif`，并在接收、历史与失败重发中保留。UIKit 不内置特定表情包协议或 GIF 组件。
+
 - **组件级水印**：新增原子组件 `em-watermark`（纯 view + text 平铺，不依赖 canvas、图片或测量 API，支持字号、透明度、旋转角与颜色）；`em-conversation-page`、`em-chat-page`、`em-contact-page`、`em-contact-list-page`、`em-group-page` 新增 `watermark` prop（字符串或 `EmWatermarkOptions`）与 `#watermark` 插槽。覆盖层不响应点击、长按与滚动；聊天页只覆盖导航栏到消息列表，不含输入栏与弹层；传入空串即可关闭。需要图片或业务 logo 时用插槽整层自绘。
 - **单聊天接入与页面实例配置**：新增可运行的 `templates/chat-only`（登录恢复、单聊天页、微信小程序 SDK 分包和 web/mp 构建检查）。`em-chat-page` 新增 `showNavBar` / `showBack`、`peerName` / `peerAvatar`、页面级 `inputFeatures`（按字段覆盖全局）与 `messageMenuKeys`（数组整体覆盖当前页面）；未登录立即显示「请先登录」并发出 `unauthorized`，不再等待连接超时，登录后自动恢复历史加载。
 - **原生 SDK 实例入口**：新增 `EmKit.getSDKClient(): Promise<ChatClient>`，明确获取 UIKit 内部复用的原生客户端，便于宿主注册 SDK 事件或使用尚未封装的能力；`whenReady()` 保留且返回类型由 `unknown` 修正为 `ChatClient`。

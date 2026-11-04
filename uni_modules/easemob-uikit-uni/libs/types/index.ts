@@ -277,6 +277,10 @@ export interface EmMessageItem {
   text: string
   url: string
   thumbUrl: string
+  /** 图片原图地址（SDK originalImageUrl），未携带时为空串 */
+  originalUrl: string
+  /** 是否为 GIF 图片（SDK body.isGif 或发送文件识别结果） */
+  isGif: boolean
   width: number
   height: number
   time: number
@@ -574,6 +578,22 @@ export interface EmChatComposerTouchEvent {
 /** textarea @linechange 事件的最小结构（生长输入封顶用；官方 detail：height / heightRpx / lineCount） */
 export interface EmTextareaLineChangeEvent {
   detail: { lineCount: number, height: number, heightRpx: number }
+}
+
+/** 默认输入栏 `#emoji-panel` 的作用域；外壳继续负责面板高度、键盘互斥与禁用态。 */
+export interface EmChatEmojiPanelScope {
+  emojis: string[]
+  disabled: boolean
+  selectEmoji: (emoji: string) => void
+  closePanel: () => void
+  notifyDisabledTap: () => void
+}
+
+/** 聊天页 `#image-message` 的作用域；缺省渲染内置 em-image-message。 */
+export interface EmChatImageMessageScope {
+  message: EmMessageItem
+  preview: (message: EmMessageItem) => void
+  longPress: (message: EmMessageItem) => void
 }
 
 /**
