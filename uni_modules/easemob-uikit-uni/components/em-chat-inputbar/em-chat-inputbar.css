@@ -169,7 +169,7 @@
 
 .em-chat-inputbar__emoji-char {
   font-size: 24px;
-  line-height: 1;
+  line-height: 32px;
 }
 
 /* 媒体格子（对齐 vue 版 more-grid：4 列、56×56 圆角瓷贴 + 11px 小字） */

@@ -1318,3 +1318,10 @@
 - **修复**：新增 `scripts/web-sdk-build.mjs`，仅在 Web 构建期间用 HBuilderX 自带 esbuild 把 SDK 根入口重打包为单文件；成功或失败均恢复原始 `node_modules` 文件。`scripts/uni.sh build web` 与 `check-template.mjs` 共用该包装器，不提交或长期改写依赖。
 - **测试**：`test-web-sdk-build.mjs` 覆盖构建期使用单文件、成功恢复、失败恢复与不遗留备份；与分包测试合计 13/13 通过。
 - **验证**：demo `build web` 通过，H5 静态伺服 HTTP 200；`build mp-weixin` 全绿（主包 1016KB、分包合计 1451KB）；chat-only 完整 web/mp 门禁通过；docs/skills/release/config 检查通过，发布检查保留既有 keyPassword 历史警告。
+
+## 2026-11-03 修复 App 端 emoji 面板字形裁切
+
+- **定位**：Android / 鸿蒙真机截图中 emoji 同行上沿被整齐裁切，iOS 正常。内置 `em-chat-inputbar` 的 24px emoji 使用无单位 `line-height: 1`，24px 行盒不足以容纳 Android / 鸿蒙原生彩色字形；vue 版同字号采用 28px 行高，demo 自绘输入栏采用 32px 行高，作为工作对照。
+- **修复**：`.em-chat-inputbar__emoji-char` 改为固定 `line-height: 32px`；字号、8 列布局、48px 单元格、面板高度与交互均不变，不加平台分支。一次性样式回归断言在旧代码上按预期失败、修复后通过。
+- **验证**：`build web`、`build mp-weixin` 全绿（主包 1026KB、分包合计 1455KB），H5 静态伺服 HTTP 200，`git diff --check` 通过。
+- **实机验证**：2026-11-04 将同一修复同步到外部宿主 `easemob-uniappx-demo-534` 后，用户实机复测确认 emoji 显示正常；该症状与固定 px 行高规则已沉淀进跨端坑集。
