@@ -35,18 +35,13 @@
       </view>
     </view>
 
-    <!-- 录音提示（按住说话时显示，上滑越过阈值切换为取消文案） -->
-    <view v-if="recording" :class="ns.e('record-hint')">
-      <text :class="[ns.e('record-hint-text'), willCancel && ns.m('record-hint-text-cancel')]">{{ willCancel ? t('chat.voice.releaseToCancel') : t('chat.voice.slideUpCancel') }}</text>
-    </view>
-
     <view :class="ns.e('bar')">
-      <view v-if="showVoice" :class="[ns.e('tool'), ns.m('tool-first'), voiceMode && ns.m('tool-active')]" @click="onToggleVoiceMode">
-        <EmIcon name="mic" :size="24" />
+      <view v-if="showVoice" :class="[ns.e('tool'), ns.m('tool-first')]" @click="onToggleVoiceMode">
+        <EmIcon name="mic" :size="24" :color="voiceMode ? 'var(--em-primary-color)' : 'var(--em-text-primary)'" />
       </view>
       <view
         v-if="voiceMode"
-        :class="[ns.e('record'), recording && ns.m('record-active'), willCancel && ns.m('record-cancel')]"
+        :class="[ns.e('record'), recording && ns.m('record-active')]"
         @touchstart="onRecordTouchStart"
         @touchmove="onRecordTouchMove"
         @touchend="onRecordTouchEnd"
@@ -117,11 +112,23 @@
         </view>
       </view>
     </view>
+
+    <!-- 常驻挂载，避免蒸汽端录音开始时新建浮层偶发丢渲染 -->
+    <view
+      :class="[ns.e('record-overlay'), willCancel && ns.m('record-overlay-cancel')]"
+      :style="recording ? '' : 'top: 200%;'"
+    >
+      <view :class="ns.e('record-overlay-icon')">
+        <EmIcon name="mic" :size="32" :color="willCancel ? 'var(--em-primary-color)' : 'var(--em-text-primary)'" />
+      </view>
+      <text :class="[ns.e('record-duration'), willCancel && ns.m('record-duration-cancel')]">{{ recordDuration }}s</text>
+      <text :class="ns.e('record-overlay-hint')">{{ willCancel ? t('chat.voice.releaseToCancel') : t('chat.voice.slideUpCancel') }}</text>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, watch } from 'vue'
+import { computed, onUnmounted, ref, toRef, watch } from 'vue'
 import EmIcon from '../em-icon/em-icon.vue'
 import EmQuickReplyBar from '../em-quick-reply-bar/em-quick-reply-bar.vue'
 import EmText from '../em-text/em-text.vue'
@@ -256,6 +263,29 @@ const {
   onDisabledTap: () => emit('disabled-tap'),
   onVoiceSend: (path, duration) => emit('voice-send', path, duration)
 })
+
+const recordDuration = ref(0)
+const RECORD_TIMER_INTERVAL = 200
+let recordStartedAt = 0
+let recordTimer: ReturnType<typeof setInterval> | null = null
+
+function stopRecordTimer(): void {
+  if (recordTimer == null) return
+  clearInterval(recordTimer)
+  recordTimer = null
+}
+
+watch(recording, (active) => {
+  stopRecordTimer()
+  if (!active) return
+  recordDuration.value = 0
+  recordStartedAt = Date.now()
+  recordTimer = setInterval(() => {
+    recordDuration.value = Math.floor((Date.now() - recordStartedAt) / 1000)
+  }, RECORD_TIMER_INTERVAL)
+})
+
+onUnmounted(stopRecordTimer)
 
 function onToggleEmoji(): void {
   togglePanel('emoji')
