@@ -61,10 +61,10 @@ onUnmounted(() => {
 
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `options.userId` | `string` | 是 | 环信用户 ID |
+| `options.userId` | `string` | 是 | 环信用户 ID，请勿使用大写英文字母 `A-Z`；包含大写英文字母时，UIKit 会打印警告并强制转为小写 |
 | `options.token` | `string` | 是 | 服务端签发的用户 token |
 
-返回 `Promise<void>`。登录成功后 UIKit 会拉取自己的资料、好友快照与群快照。
+返回 `Promise<void>`。登录成功后 UIKit 会拉取自己的资料、好友快照与群快照。发生大写转换时，SDK 登录、连接状态与本人资料拉取统一使用转换后的用户 ID；纯小写及其他不含大写英文字母的输入保持原值。
 
 ## `EmKit.logout()`
 

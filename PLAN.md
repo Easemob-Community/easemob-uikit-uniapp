@@ -31,7 +31,7 @@
 |---|---|---|
 | 会话列表页 | `em-conversation-page` | 头像+未读徽标、昵称、最后消息摘要、时间、草稿、`@我` 提示、置顶/免打扰标记、会话搜索（本地过滤名称/摘要）、筛选 tab（全部/未读/@我/单聊/群组，对齐 vue conversation-tabs，纯 UI+本地过滤、数据零新增）、滑动删除、点击进入聊天 |
 | 聊天页 | `em-chat-page` | 消息列表（list-view 复用）、5 种气泡、输入栏、长按菜单（支持业务动作追加）、群公告条位、业务横幅位（`#banner`）、输入栏业务入口位（`#input-toolbar`）、下拉加载历史、自定义消息收发（`#custom-message` 插槽 + `EmKit.sendCustom`）、快捷回复条 |
-| 登录接入 | demo 内置 `pages/login` | appkey + userId + token 登录；demo 提供「测试 token 获取」入口（仅开发用） |
+| 登录接入 | demo 内置 `pages/login` | appkey + userId + token 登录；userId 包含大写英文字母时告警并强制转小写；demo 提供「测试 token 获取」入口（仅开发用） |
 
 **组件级水印（M2.27）**：会话列表 / 聊天 / 好友列表 / 群组列表 / 通讯录首页统一支持 `watermark` prop 与 `#watermark` 插槽。UIKit 只提供铺满、`pointer-events: none` 穿透、裁切的覆盖层壳（对齐 vue 版 `#watermark` 契约），默认内容由原子组件 `em-watermark` 平铺；聊天页只覆盖内容区（header / 通知条 / 消息列表），不含输入栏、面板与弹层。
 

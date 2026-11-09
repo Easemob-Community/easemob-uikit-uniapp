@@ -1358,6 +1358,30 @@
 - **验证**：新增 `test-gif-injection.mjs` 契约 3 项，与既有构建/分包测试合计 16/16 通过；docs/config/skills 校验通过，两仓 `git diff --check` 通过。源 demo web/mp 全绿（主包 1029KB、分包 1455KB），源与宿主 H5 静态伺服均 200，宿主 GIF URL 200。宿主 web/mp 编译及 SDK 分包/语法检查通过，主包 1652KB（此前已超 1.5MB，本次未裁剪宿主功能），分包 4616KB；mp 主包重复 GIF 已删除。最终审查发现 chat 门面漏转 `sendImage.ext`，已补齐源仓库与宿主并加入回归断言后复跑上述测试与构建。
 - **真机与待验**：用户已在鸿蒙全量重编译后确认面板显示正常。真实账号双端发送/接收/历史动画、失败重发与 vue 互通未运行；App/Android/iOS/mp 真机未全量验证。`audit-usage` 仍只报此前已有的 `em-watermark` 未归类，本次未修改该既有项。
 
+## 2026-11-04 文件气泡长文件名中间省略
+
+- **定位**：iOS 真机长文件名被直接裁切且扩展名不可见。`em-file-message` 信息列缺少 Vue 参考实现已有的 `min-width: 0`，长内容可撑开 flex 约束后遭裁切；仅恢复尾部省略仍不能保留文件类型。
+- **修复**：文件名展示拆为可单行省略的主体与固定保留的短扩展名，信息列和主体补齐 `min-width: 0`，扩展名禁止收缩；不按固定字符数截断，不依赖蒸汽端 `word-break`。无扩展名、点文件、末尾点及异常超长扩展名回退普通单行省略，原始 `message.fileName`、下载和组件 API 不变。
+- **验证**：`git diff --check`、`build web`、`build mp-weixin` 全绿（15 项分包/语法/体积检查通过，主包 1052KB、分包合计 1458KB），H5 静态伺服 HTTP 200，浏览器登录页运行正常。
+- **宿主同步**：两个组件文件已逐字节同步到 `easemob-uniappx-demo-534`；宿主 web/mp 编译通过，H5 静态伺服 HTTP 200，websdk 5.2.0 小程序分包生成及必需导出校验通过。宿主其他未提交改动未触碰。
+- **待验**：H5/mp 真实聊天页与 iOS 真机的长中英文文件名、短文件名、无扩展名、己方/对方及明暗主题视觉；App 需走 HBuilderX GUI 重新运行，本轮未宣称真机修复已验收。
+
+## 2026-11-05 附件下载补齐 SDK URL 与 secret 规则
+
+- **修复**：消息附件仍走 M2.24 的 `uni.downloadFile` 链路，下载前从原始 SDK 消息体取图片原图/大图/缩略图或视频/文件 URL，并按 SDK 源码规则补 `em-redirect=true` 与可选 `share-secret`；消息附件下载不需要 Bearer token。公开 API、进度回调、相册保存与文档预览行为不变。
+- **生命周期**：`store/message.ts` 按 `localId` 保存非响应式原始消息；接收/历史转换及发送/重发成功时登记或更新，删除、裁剪、清空会话和登出时清理，避免丢失 `secret` 或残留账号数据。
+- **同步**：相关实现已同步到 `easemob-uniappx-demo-534`，未带入该宿主的其他未提交改动。
+- **验证**：现有回归测试 16/16 通过；`build web`、`build mp-weixin` 全绿（15 项分包/语法/体积检查通过，主包 1053KB、分包合计 1458KB），H5 静态伺服 HTTP 200，两仓 `git diff --check` 通过。
+- **待验**：真实账号下带/不带 `secret` 的图片、视频、文件下载；App 三端及微信小程序真机的相册保存、文档打开、权限拒绝与合法域名配置。
+
+
+## 2026-11-05 登录 userId 大写归一化
+
+- **规则**：`EmKit.login` 检测到 userId 包含 ASCII 大写 `A-Z` 时，通过 `[emkit:kit]` 打印警告并强制转小写；纯小写、空字符串及无 ASCII 大写字母输入保持原值，不修改宿主传入的 options 对象。全大写 `PFH` 与混合大小写使用同一转换规则。
+- **链路**：归一化在公共门面就绪门前执行一次，SDK 登录、`connectionStore.userId`、登录成功/失败日志及 `ensureUserInfos` 统一消费转换后的 ID，token 与 `Promise<void>` 签名不变；公开生命周期 API 文档已同步。
+- **验证**：2026-11-09 全大写回归先确认 `PFH` 原样返回导致测试失败，修复后登录测试 3/3、既有测试合计 30/30、docs 检查通过。按用户要求，后续 `build web`、`build mp-weixin`、H5 静态伺服与真实账号登录收发/未读同步交由用户手动验证。
+
+
 ## 2026-11-06 M2.32 复合消息接收展示（websdk 5.2.0）
 
 - **范围**：demo、插件 peer 与 chat-only 统一精确锁 `easemob-websdk 5.2.0`；新增 `MESSAGE_TYPE.MULTI_BODY`、父消息 `segments` 与 `em-multi-body-message`，在单气泡内按序展示文本/图片/语音/视频/文件/位置/自定义七类分段。只接收与历史展示，不提供创建、发送、重发、转发或输入入口。
