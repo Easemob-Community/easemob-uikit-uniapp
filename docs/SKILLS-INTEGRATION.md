@@ -2,7 +2,7 @@
 
 # 宿主接入总纲（easemob-uikit-uni）
 
-> 适用基线：UIKit `1.0.0-rc.2` · websdk `5.1.3` · HBuilderX `5.21+` · uni-app x（Vue3、蒸汽模式）。
+> 适用基线：UIKit `1.0.0-rc.2` · websdk `5.2.0` · HBuilderX `5.21+` · uni-app x（Vue3、蒸汽模式）。
 > 本技能只做**总纲与最短可用链路**；页面细节按任务加载文末「细分技能」。
 
 ## 1. 先判断边界
@@ -36,7 +36,7 @@
 | uni-app x | 4.71+，Vue3 组合式 API | `manifest.json` |
 | 蒸汽模式 | `"uni-app-x": { "vapor": true }` | 见 `demo/manifest.json` |
 | Node.js | 18+ | `node -v` |
-| 环信 SDK | `easemob-websdk` **精确 5.1.3** | `package.json` 不带 `^`/`~` |
+| 环信 SDK | `easemob-websdk` **精确 5.2.0** | `package.json` 不带 `^`/`~` |
 
 **用 CLI 构建 H5 还要补一个开关**：CLI（`uni build -p web`）下 Web 蒸汽模式以**工程根目录存在 `.vapor` 文件**为准——不读 `manifest.json` 的 `vapor` 字段。缺失时会静默退回 VDOM 模式，构建期直接报错（典型报错见 `em-host-troubleshooting` 的构建期症状）。HBuilderX GUI 构建无需关心。
 
@@ -49,7 +49,7 @@ touch .vapor
 
 ```bash
 # 宿主工程根目录
-npm install easemob-websdk@5.1.3 --save-exact
+npm install easemob-websdk@5.2.0 --save-exact
 ```
 
 把插件放进宿主工程：
@@ -59,7 +59,7 @@ your-app/
 ├── uni_modules/
 │   └── easemob-uikit-uni/        ← 插件市场导入，或直接拷贝仓库同名目录
 ├── pages/
-└── package.json                  ← peer 依赖 easemob-websdk 5.1.3
+└── package.json                  ← peer 依赖 easemob-websdk 5.2.0
 ```
 
 - `easemob-websdk` 是 **peer 依赖**，UIKit 不自带，也不允许再装第二份。

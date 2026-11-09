@@ -109,7 +109,7 @@ import EmGroupInfoBlocks from '@/uni_modules/easemob-uikit-uni/components/pages/
 
 ## 聊天与消息组件
 
-输入栏、五类消息气泡与三个辅助组件。完整契约见 [聊天与消息组件](./COMPONENTS-CHAT.md)。
+输入栏、五类普通消息气泡、复合消息多段气泡与三个辅助组件。完整契约见 [聊天与消息组件](./COMPONENTS-CHAT.md)。
 
 | 组件 | 用途 |
 |---|---|
@@ -120,6 +120,7 @@ import EmGroupInfoBlocks from '@/uni_modules/easemob-uikit-uni/components/pages/
 | `em-video-message` | 视频气泡：封面 + 时长 + 播放入口 |
 | `em-video-preview` | 视频全屏播放器：原生 `video` 播放、关闭、加载失败提示 |
 | `em-file-message` | 文件气泡：按扩展名取图标、文件名与大小 |
+| `em-multi-body-message` | 复合消息：单气泡内按顺序展示七类分段，复用各媒体交互 |
 | `em-quick-reply-bar` | 快捷回复条：常用语胶囊，横向滚动 |
 | `em-mention-picker` | @ 提及选人弹层：搜索、成员列表、选中即回填 |
 

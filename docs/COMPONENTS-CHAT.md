@@ -1,6 +1,6 @@
 # 聊天与消息组件
 
-这页覆盖聊天页里的 9 个原子组件：输入栏 `em-chat-inputbar`、五类消息气泡（`em-text-message`、`em-image-message`、`em-audio-message`、`em-video-message`、`em-file-message`）、视频全屏播放器 `em-video-preview`、快捷回复条 `em-quick-reply-bar` 与 @ 提及选人弹层 `em-mention-picker`。它们只负责渲染与手势，消息收发、重发、引用状态都由宿主或 `em-chat-page` 管理。
+这页覆盖聊天页里的 10 个原子组件：输入栏 `em-chat-inputbar`、五类普通消息气泡（`em-text-message`、`em-image-message`、`em-audio-message`、`em-video-message`、`em-file-message`）、复合消息多段气泡 `em-multi-body-message`、视频全屏播放器 `em-video-preview`、快捷回复条 `em-quick-reply-bar` 与 @ 提及选人弹层 `em-mention-picker`。它们只负责渲染与手势，消息收发、重发、引用状态都由宿主或 `em-chat-page` 管理。
 
 本页组件均符合 easycom 目录约定，可直接写标签；引入方式见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。整页实现见 [聊天页](./PAGES-CHAT.md)。
 
@@ -290,7 +290,28 @@ function onQuickReply(item: EmQuickReply): void {
 <em-file-message :message="message" @download="downloadFile" @long-press="openMessageMenu" />
 ```
 
-**行为与平台**：发送中且 `message.uploadProgress` 有值时，在大小行下方显示上传百分比（发送结束清空）。扩展名归类决定图标与图标底色，覆盖 PDF、Excel、Word、PPT、Markdown、图片、视频、音频，其余归为通用文件；文件名缺失时显示"文件"文案。大小按 B / KB / MB 三档格式化，`fileSize` 为 0 时不显示大小行。当前版本文件卡单击不派发 `download`（`fileOpen=false`），下载入口在 `em-chat-page` 的长按菜单「下载」：App/小程序下载后尝试系统文档预览打开，H5 走浏览器下载；宿主自绘气泡可直接调用 `EmKit.downloadAttachment(message)`。H5 长按补发的 `click` 同样被吞掉。
+**行为与平台**：发送中且 `message.uploadProgress` 有值时，在大小行下方显示上传百分比（发送结束清空）。扩展名归类决定图标与图标底色，覆盖 PDF、Excel、Word、PPT、Markdown、图片、视频、音频，其余归为通用文件；文件名缺失时显示"文件"文案。大小按 B / KB / MB 三档格式化，`fileSize` 为 0 时不显示大小行。普通文件卡单击不派发 `download`（`fileOpen=false`），下载入口在 `em-chat-page` 的长按菜单「下载」：App/小程序下载后尝试系统文档预览打开，H5 走浏览器下载；复合消息内嵌文件卡点击时会派发 `download`，进入同一附件下载链路。宿主自绘气泡可直接调用 `EmKit.downloadAttachment(message)`。H5 长按补发的 `click` 同样被吞掉。
+
+## em-multi-body-message
+
+复合消息多段气泡：父消息使用一个背景与圆角，内部按 `message.segments` 的顺序展示文本、图片、语音、视频、文件、位置和自定义内容。仅用于接收展示，不提供发送能力。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `message` | `EmMessageItem` | 必填 | `type='multi_body'` 的父消息，分段从 `segments` 读取 |
+| `mentionContacts` | `MentionContact[]` | `[]` | 文本分段中的 @ 名字到 userId 的解析表 |
+
+| 事件 | 载荷 | 说明 |
+|---|---|---|
+| `long-press` | `message: EmMessageItem` | 长按任意分段均回传父消息 |
+| `preview` | `message: EmMessageItem` | 点击图片分段，载荷为该图片子项 |
+| `video-preview` | `message: EmMessageItem` | 点击视频分段，载荷为该视频子项 |
+| `file-download` | `message: EmMessageItem` | 点击文件分段，载荷为该文件子项 |
+| `mention-click` | `userId: string` | 点击文本分段中的 @ 片段 |
+
+无插槽。空分段组显示 `[复合消息]`，未知分段显示 `[暂不支持的消息]`；位置分段展示地址和经纬度，自定义分段展示事件及参数。父消息的引用、置顶、撤回、删除和菜单由 `em-chat-page` 处理。
+
+`em-text-message` / `em-image-message` / `em-audio-message` / `em-video-message` / `em-file-message` 均提供 `embedded?: boolean`（默认 `false`），供本组件移除分段自身的重复气泡壳；普通消息不传时行为与样式不变。
 
 ## em-quick-reply-bar
 

@@ -26,6 +26,8 @@
 
 ### 新增
 
+- **复合消息接收展示**：`easemob-websdk` 升级为 5.2.0；新增 `MESSAGE_TYPE.MULTI_BODY`、`EmMessageItem.segments` 与 `em-multi-body-message`，在单个气泡内按顺序展示文本、图片、语音、视频、文件、位置和自定义分段。支持会话首段摘要、全部文本分段复制、父消息引用/置顶/撤回/删除，以及分段图片预览、视频播放、语音播放和文件下载。当前不提供复合消息创建或发送能力。
+
 - **默认输入栏与图片消息通用注入点**：`em-chat-inputbar` 新增 `#emoji-panel`，`em-chat-page` 新增 `#image-message`，均保留内置渲染作为缺省回落，宿主可局部自绘而无需替换整个输入栏或消息列表。`EmKit.sendImage` 新增可选 `ext`，支持远程图片 `originalUrl` 与 GIF 识别；`EmMessageItem` 新增 `originalUrl` / `isGif`，并在接收、历史与失败重发中保留。UIKit 不内置特定表情包协议或 GIF 组件。
 
 - **通用开关组件**：新增原子组件 `em-switch`，支持 `v-model`、medium/small 两档尺寸、禁用与加载态，以及 `custom-class` / `custom-style`。聊天详情的免打扰/置顶和建群面板的公开群/允许邀请开关统一使用该组件。

@@ -13,7 +13,7 @@
 | HBuilderX | **5.21+**（推荐 5.26+；蒸汽模式硬性要求） |
 | uni-app x | HBuilderX 4.71+ |
 | Node.js | 18+（CLI 编译用） |
-| 环信 SDK | `easemob-websdk` **5.1.3**（peer 依赖） |
+| 环信 SDK | `easemob-websdk` **5.2.0**（peer 依赖） |
 | App | Android 6+ / iOS 15+ / 鸿蒙 API20+ |
 | H5 | 现代浏览器（移动端布局；未做 PC 宽屏） |
 | 小程序 | 微信小程序（SDK 需分包接入） |
@@ -49,7 +49,7 @@ scripts/                         # 编译/发布脚本
 
 完整步骤（空工程 → 登录 → 会话列表 → 聊天页 → 五端运行 → 排错）见 **[docs/QUICKSTART.md](./docs/QUICKSTART.md)**。最短路径：
 
-1. `npm install easemob-websdk@5.1.3`，把 `uni_modules/easemob-uikit-uni/` 放入宿主工程；
+1. `npm install easemob-websdk@5.2.0`，把 `uni_modules/easemob-uikit-uni/` 放入宿主工程；
 2. `pages.json` 补页面组件 easycom 规则，聊天页/详情页设 `navigationStyle: "custom"`；
 3. `App.uvue` 的 `onLaunch` 调 `initTheme()` + `EmKit.init({ appkey, onTokenWillExpire })`；
 4. 宿主服务端签发 token，登录页调 `await EmKit.login({ userId, token })` 后 `reLaunch` 到会话页；
@@ -290,7 +290,7 @@ mergeMessages('en', { 'chat.placeholder': 'Type a message…' })
 
 当前版本已提供：
 
-- 单聊全链路：会话列表（置顶/免打扰/未读/草稿）、聊天页（文本/图片/语音/视频/文件、引用/撤回/失败重发/已读回执/typing）、聊天详情、通讯录（好友列表/好友申请）
+- 单聊全链路：会话列表（置顶/免打扰/未读/草稿）、聊天页（文本/图片/语音/视频/文件、复合消息接收展示、引用/撤回/失败重发/已读回执/typing）、聊天详情、通讯录（好友列表/好友申请）
 - **群组**：群列表、建群、群聊（公告条 / @ 提及 / 成员昵称行）、群详情管理（公告编辑 / 改名 / 管理员 / 转让 / 退群解散 / 全员禁言 / 成员管理 / 邀请入群）、联系人页入口化（新请求 / 群组 / 好友列表三入口）
 - **多场景扩展**：`sendText` 业务 ext、`sendCustom` 自定义消息、`#banner` 顶部业务条、`title`/`showAction`、`insertLocalNotice` 系统提示灰条
 - **多场景增强**：单会话未读 API、`em-quick-reply-bar` 快捷回复条、`extraMessageMenus` 业务长按动作

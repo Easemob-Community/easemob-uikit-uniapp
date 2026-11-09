@@ -5,7 +5,7 @@ description: Use when 在微信小程序接入 easemob-uikit-uni 遇到主包超
 
 # 微信小程序：SDK 分包异步化
 
-> 基线：UIKit `1.0.0-rc.2` · websdk `5.1.3` · 微信基础库 **≥ 2.11.2**。
+> 基线：UIKit `1.0.0-rc.2` · websdk `5.2.0` · 微信基础库 **≥ 2.11.2**。
 > 只有微信小程序需要这一步；H5 / App 跳过。UIKit 已内置跨分包加载器，宿主**不改业务代码**。
 
 ## 0. 首选：统一命令与双分包模板
@@ -55,7 +55,7 @@ HBuilderX GUI 开发时保持 `npm run watch:mp` 运行，再从 HBX 编译。�
 | # | 条件 | 验证 |
 |---|---|---|
 | 1 | 微信基础库 ≥ 2.11.2 | 开发者工具模拟器设置 |
-| 2 | SDK 精确锁版（无 `^`/`~`） | `package.json` 为 `"5.1.3"` |
+| 2 | SDK 精确锁版（无 `^`/`~`） | `package.json` 为 `"5.2.0"` |
 | 3 | 已声明**普通分包**（`independent: false`） | 见第 4 节 |
 | 4 | 能拿到 IIFE | `node_modules/easemob-websdk/bundle/im-sdk-web.iife.js` |
 | 5 | 主包零 SDK 静态导入 | 全文搜 `from 'easemob-websdk'` |

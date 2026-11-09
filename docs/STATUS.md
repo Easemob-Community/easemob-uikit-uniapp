@@ -1357,3 +1357,13 @@
 - **跨端修复**：App/mp 不支持插槽处的 `v-bind="scope"`，源仓库与宿主均改为逐项显式 props（源 mp 构建曾按预期失败，修复后通过）。鸿蒙实测发现面板空白，产物确认 `sub-im/static` 未复制：App 改读主包 `static/emojis`，H5/mp 继续读 `sub-im/static`，宿主 prepare 删除 mp 主包重复素材。另一定位问题为 HBuilderX 5.34 对 barrel 导入的函数型 scope props 报 EISDIR，Demo 改用同构本地 Props，完整面板恢复后 H5 构建通过。
 - **验证**：新增 `test-gif-injection.mjs` 契约 3 项，与既有构建/分包测试合计 16/16 通过；docs/config/skills 校验通过，两仓 `git diff --check` 通过。源 demo web/mp 全绿（主包 1029KB、分包 1455KB），源与宿主 H5 静态伺服均 200，宿主 GIF URL 200。宿主 web/mp 编译及 SDK 分包/语法检查通过，主包 1652KB（此前已超 1.5MB，本次未裁剪宿主功能），分包 4616KB；mp 主包重复 GIF 已删除。最终审查发现 chat 门面漏转 `sendImage.ext`，已补齐源仓库与宿主并加入回归断言后复跑上述测试与构建。
 - **真机与待验**：用户已在鸿蒙全量重编译后确认面板显示正常。真实账号双端发送/接收/历史动画、失败重发与 vue 互通未运行；App/Android/iOS/mp 真机未全量验证。`audit-usage` 仍只报此前已有的 `em-watermark` 未归类，本次未修改该既有项。
+
+## 2026-11-06 M2.32 复合消息接收展示（websdk 5.2.0）
+
+- **范围**：demo、插件 peer 与 chat-only 统一精确锁 `easemob-websdk 5.2.0`；新增 `MESSAGE_TYPE.MULTI_BODY`、父消息 `segments` 与 `em-multi-body-message`，在单气泡内按序展示文本/图片/语音/视频/文件/位置/自定义七类分段。只接收与历史展示，不提供创建、发送、重发、转发或输入入口。
+- **数据与交互**：`message-body.ts` 共享普通消息与分段映射，子项保留顺序、独立 localId、附件 URL/secret；会话快照/本地重建、引用、菜单标题与置顶预览共用首段摘要。复制拼接非空文本分段；父消息承担长按/状态/撤回/删除，子段复用图片预览、视频播放、语音播放和文件下载。独立位置消息保持 `OTHER + rawType='location'`，空文本不形成可复制内容或空白气泡。
+- **组件**：五类普通气泡新增默认关闭的 `embedded`，仅复合分段移除重复壳并约束媒体宽度；普通消息路径不变。样式实验室新增七类分段、收发两侧与明暗/窄屏走查样例；公开消息模型、组件 API、宿主 Skills 与 changelog 同步。
+- **测试**：`test-multi-body-message.mjs` 11/11（真实 TS 纯函数 + EmMessageDomain 转换 + 下载 URL/secret），分包测试 11/11；docs 57 页/38 组件、Skills 8 个、模板结构、发布检查与 App 模块图通过；`git diff --check` 通过。`audit-usage` 仍只报此前已有的 `em-watermark` 未归类，本次未改。
+- **构建与可视化**：Node 22 下 demo `build web` / `build mp-weixin` 全绿，主包 1071KB、分包合计 1493KB；chat-only web/mp 全绿，主包 759KB、分包合计 1273KB；H5 静态伺服 root/components 均 200。内置浏览器实测七类分段顺序、收发两侧配色、长文件名、位置/自定义内容、390px 窄屏与暗色渲染正常。
+- **环境**：Node 26.13.0 下 HBuilderX 5.26 mp 构建在加载其 vite.config 时稳定报 `cachedDataRejected`，清项目缓存与禁用 Node 编译缓存无效；同命令切 Node 22.23.4 后通过，未改产品代码规避。
+- **待验**：未运行 Vue 5.2.0 → uni 的真实账号互发/漫游重进、真实附件下载，也未做 App 三端与微信开发者工具/真机的交互和视觉验收；上述路径不得记为已验证。

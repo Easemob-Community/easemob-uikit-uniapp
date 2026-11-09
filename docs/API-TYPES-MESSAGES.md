@@ -17,7 +17,7 @@ import {
 | `conversationId` | `string` | 所属会话 ID |
 | `chatType` | `EmChatType` | `singleChat` / `groupChat` |
 | `type` | `EmMessageType` | 见 `MESSAGE_TYPE` |
-| `text` | `string` | 文本内容；流式消息为当前累计全文 |
+| `text` | `string` | 文本内容；流式消息为当前累计全文；复合父消息为所有非空文本分段按换行拼接的复制文本 |
 | `url` | `string` | 图片/语音/视频/文件地址 |
 | `thumbUrl` | `string` | 缩略图/封面地址 |
 | `originalUrl` | `string` | 图片原图地址（SDK `originalImageUrl`），未携带时为空串 |
@@ -35,6 +35,10 @@ import {
 | `rawType` | `string` | 未识别 wire 类型原文 |
 | `customEvent` | `string` | 自定义消息事件名 |
 | `customParams` | `Record<string, string>` | 自定义消息字符串参数 |
+| `segments` | `EmMessageItem[] \| undefined` | 复合消息的有序展示分段；仅 `MULTI_BODY` 父消息携带 |
+| `latitude` / `longitude` | `number \| undefined` | 位置分段经纬度 |
+| `address` / `buildingName` | `string \| undefined` | 位置分段地址与建筑名 |
+| `attachmentSecret` | `string \| undefined` | 普通附件或复合附件分段的下载密钥 |
 | `stream` | `EmStreamInfo \| undefined` | 流式消息元信息 |
 | `modifiedInfo` | `EmMessageModifiedInfo \| undefined` | 编辑元信息 |
 | `pinned` | `boolean \| undefined` | 是否被置顶 |
@@ -115,7 +119,7 @@ import {
 
 ## 消息常量
 
-- `MESSAGE_TYPE`：`TEXT`、`IMAGE`、`AUDIO`、`VIDEO`、`FILE`、`CUSTOM`、`NOTICE`、`OTHER`。
+- `MESSAGE_TYPE`：`TEXT`、`IMAGE`、`AUDIO`、`VIDEO`、`FILE`、`CUSTOM`、`MULTI_BODY`、`LOCATION`、`NOTICE`、`OTHER`。其中 `MULTI_BODY` 只接收展示，`LOCATION` 当前仅用于复合分段。
 - `MESSAGE_STATUS`：`SENDING`、`SENT`、`FAILED`、`RECALLED`。
 - `STREAM_MESSAGE_STATUS`：`START`、`IN_PROGRESS`、`START_COMPLETED`、`COMPLETED`、`ERROR`。
 - `STREAM_CUSTOM_TYPE`：`TEXT='text'`、`MARKDOWN='markdown'`。

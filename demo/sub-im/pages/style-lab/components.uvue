@@ -27,6 +27,16 @@
     </view>
 
     <view class="lab__section">
+      <text class="lab__section-title">em-multi-body-message（复合消息：单气泡有序多段）</text>
+      <view class="lab__multi-body">
+        <em-multi-body-message :message="multiBodyMessage" />
+      </view>
+      <view class="lab__multi-body lab__multi-body--self">
+        <em-multi-body-message :message="multiBodySelfMessage" />
+      </view>
+    </view>
+
+    <view class="lab__section">
       <text class="lab__section-title">em-empty（空状态：normal / small / large）</text>
       <em-empty icon="list-bullet" :description="t('conversation.empty')" />
       <em-empty icon="search" size="small" :description="t('conversation.searchEmpty')" />
@@ -49,12 +59,56 @@
 </template>
 
 <script setup lang="ts">
-import { useLocale } from '@/uni_modules/easemob-uikit-uni/libs'
+import { MESSAGE_TYPE, useLocale } from '@/uni_modules/easemob-uikit-uni/libs'
+import type { EmMessageItem } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { EmIconName } from '@/uni_modules/easemob-uikit-uni/components/em-icon/em-icons'
 import { useDemoTheme } from '@/common/theme'
 
 const { themeClass } = useDemoTheme()
 const { t } = useLocale()
+
+function demoSegment(type: EmMessageItem['type'], localId: string, patch: Partial<EmMessageItem> = {}): EmMessageItem {
+  return {
+    id: '', localId, conversationId: 'style-lab', chatType: 'singleChat', type,
+    text: '', url: '', thumbUrl: '', originalUrl: '', isGif: false, width: 0, height: 0,
+    time: 0, from: 'designer', to: 'me', self: false, status: 'sent', quote: null,
+    duration: 0, fileName: '', fileSize: 0, ext: {}, rawType: '', customEvent: '', customParams: {},
+    ...patch
+  }
+}
+
+const multiBodyMessage: EmMessageItem = demoSegment(MESSAGE_TYPE.MULTI_BODY, 'multi-body-demo', {
+  text: '请看设计稿\n第三版已更新',
+  segments: [
+    demoSegment(MESSAGE_TYPE.TEXT, 'multi-body-demo:0', { text: '请看设计稿，图片与后续内容保持在同一个气泡内。' }),
+    demoSegment(MESSAGE_TYPE.IMAGE, 'multi-body-demo:1', {
+      url: 'https://picsum.photos/480/320', thumbUrl: 'https://picsum.photos/480/320', width: 480, height: 320
+    }),
+    demoSegment(MESSAGE_TYPE.TEXT, 'multi-body-demo:2', { text: '第三版已更新' }),
+    demoSegment(MESSAGE_TYPE.FILE, 'multi-body-demo:3', {
+      url: 'https://example.com/spec.pdf', fileName: 'multi-body-design-spec.pdf', fileSize: 2048
+    }),
+    demoSegment(MESSAGE_TYPE.AUDIO, 'multi-body-demo:4', { url: 'https://example.com/voice.amr', duration: 3 }),
+    demoSegment(MESSAGE_TYPE.VIDEO, 'multi-body-demo:5', {
+      url: 'https://www.w3schools.com/html/mov_bbb.mp4', thumbUrl: 'https://picsum.photos/240/160',
+      duration: 8, width: 640, height: 360
+    }),
+    demoSegment(MESSAGE_TYPE.LOCATION, 'multi-body-demo:6', {
+      latitude: 31.2304, longitude: 121.4737, address: '上海市徐汇区', buildingName: '环信'
+    }),
+    demoSegment(MESSAGE_TYPE.CUSTOM, 'multi-body-demo:7', { customEvent: 'userCard', customParams: { userId: 'user-1' } })
+  ]
+})
+const multiBodySelfMessage: EmMessageItem = {
+  ...multiBodyMessage,
+  localId: 'multi-body-demo-self',
+  self: true,
+  segments: multiBodyMessage.segments?.map((segment, index) => ({
+    ...segment,
+    localId: `multi-body-demo-self:${index}`,
+    self: true
+  }))
+}
 
 // 与 vue icons-v2 同名的规范键（非旧版 uni-icons 别名），用于字体走查
 const iconNames: EmIconName[] = [
@@ -142,5 +196,15 @@ const iconNames: EmIconName[] = [
 
 .lab__skeleton-block {
   margin-bottom: var(--em-spacing-4);
+}
+
+.lab__multi-body {
+  display: flex;
+  width: 480rpx;
+  margin-bottom: var(--em-spacing-3);
+}
+
+.lab__multi-body--self {
+  align-self: flex-end;
 }
 </style>

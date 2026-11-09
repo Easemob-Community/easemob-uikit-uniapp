@@ -30,7 +30,7 @@
 | HBuilderX | 5.21+（建议 5.26+） | 蒸汽模式（Vapor）的编译与真机运行依赖较新版本 |
 | uni-app x | HBuilderX 4.71+，Vue 3 组合式 API | 仅支持蒸汽模式；经典 uni-app（vue2 / vue3）与 vdom 模式不提供兼容（DCloud 2024 年已停 nvue/5+，2027 年初停 App 平台与 vdom 平台维护，见上文公告） |
 | Node.js | 18+ | 仅在 CLI 编译、分包后处理、体积校验时需要 |
-| 环信 SDK | `easemob-websdk` 5.1.3（peer 依赖） | 精确锁版；升级前先看更新日志 |
+| 环信 SDK | `easemob-websdk` 5.2.0（peer 依赖） | 精确锁版；升级前先看更新日志 |
 | 渲染模式 | uni-app x 蒸汽模式（`manifest.json` 开 `vapor`） | `.uvue` 页面 + `main.uts` 入口 |
 | Android | 6.0+ | 真机与模拟器均可 |
 | iOS | 15.0+ | 真机运行需开发者证书 |

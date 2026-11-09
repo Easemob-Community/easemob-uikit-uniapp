@@ -23,7 +23,7 @@ export const FEATURES = [
   {
     id: 'chat',
     label: '聊天页',
-    components: ['em-chat-page', 'em-chat-inputbar', 'em-text-message'],
+    components: ['em-chat-page', 'em-chat-inputbar', 'em-text-message', 'em-multi-body-message'],
     apis: [
       'loadHistory', 'sendText', 'sendCustom', 'makeQuote', 'recallMessage', 'deleteMessage',
       'modifyTextMessage', 'resendMessage', 'sendTyping', 'onMessage', 'insertLocalNotice'

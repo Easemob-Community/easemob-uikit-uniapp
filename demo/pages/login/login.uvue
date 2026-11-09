@@ -133,7 +133,7 @@ const KEY_USERID = 'emkit.userId'
 const KEY_TOKEN = 'emkit.token'
 
 // 与 demo/package.json 的 easemob-websdk 依赖版本保持一致
-const SDK_VERSION = '5.1.3'
+const SDK_VERSION = '5.2.0'
 
 // 自定义导航栏：App / 小程序给状态栏让位；H5 为 0
 const safeTop = getSafeAreaTop()

@@ -36,12 +36,12 @@
 
 ```bash
 cd your-uniapp-x-project
-npm install easemob-websdk@5.1.3
+npm install easemob-websdk@5.2.0
 ```
 
 把 `easemob-uikit-uni/` 放进宿主工程的 `uni_modules/` 目录（插件市场导入或直接拷贝仓库中的 `uni_modules/easemob-uikit-uni`）。
 
-> `easemob-websdk` 是 peer 依赖，版本精确锁定 `5.1.3`；升级前先看 UIKit 的 changelog 与对应版本发布说明。
+> `easemob-websdk` 是 peer 依赖，版本精确锁定 `5.2.0`；升级前先看 UIKit 的 changelog 与对应版本发布说明。
 
 ## 3. pages.json：easycom 与页面样式
 

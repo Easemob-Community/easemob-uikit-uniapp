@@ -7,7 +7,7 @@
 - **一套组件覆盖五端**：uni-app x 蒸汽模式（Android / iOS / 鸿蒙）、H5、微信小程序，平台差异集中在库内处理。
 - **页面级开箱即用**：会话、聊天、聊天信息、通讯录、好友申请、群组都是完整页面组件，宿主只负责路由与业务入口。
 - **业务可以逐层接管**：从全局配置、页面 props，到具名插槽、`EmKit` API、store，按需要深入到任意一层。
-- **零运行时依赖**：除 peer 依赖 `easemob-websdk@5.1.3` 外不引入第三方运行时库；状态用 Vue `reactive`，样式用 ucss 子集。
+- **零运行时依赖**：除 peer 依赖 `easemob-websdk@5.2.0` 外不引入第三方运行时库；状态用 Vue `reactive`，样式用 ucss 子集。
 
 ## 2. 分层结构
 
@@ -165,7 +165,7 @@ libs/store/* reactive 状态
 
 - **基础**：`em-avatar`、`em-badge`、`em-button`、`em-icon`、`em-text`、`em-empty`、`em-skeleton`、`em-nav-bar`、`em-popup`、`em-action-sheet`、`em-search-bar`、`em-load-more`。
 - **会话**：`em-conversation-item`、`em-conversation-tabs`、`em-connection-banner`。
-- **聊天**：`em-chat-inputbar`、5 种消息气泡、`em-quick-reply-bar`、`em-mention-picker`。
+- **聊天**：`em-chat-inputbar`、5 种普通消息气泡、复合消息多段气泡 `em-multi-body-message`、`em-quick-reply-bar`、`em-mention-picker`。
 - **联系人与群**：`em-contact-nav`、`em-alphabet-nav`、`em-select-contact`、群资料/成员相关组合组件。
 
 完整契约见 [组件参考](./COMPONENTS.md)。
