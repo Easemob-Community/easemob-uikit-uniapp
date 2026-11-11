@@ -27,6 +27,7 @@ UIKit 业务错误码（挂在 `Error.code` 上，与 SDK `errorCode` 无关）�
 - `MEDIA_UNAVAILABLE='EM_MEDIA_UNAVAILABLE'`：失败重发时本地媒体已清理且没有可复用远端 URL。
 - `DOWNLOAD_AUTH_DENIED='EM_DOWNLOAD_AUTH_DENIED'`：下载图片/视频时未授予相册权限。
 - `DOWNLOAD_UNSUPPORTED='EM_DOWNLOAD_UNSUPPORTED'`：消息没有可下载附件或 URL 为空。
+- `RECORD_CANCELLED='EM_RECORD_CANCELLED'`：录音停止等待结算时被取消；属于正常取消，内置输入栏不会将其提示为录音失败。
 
 ## 其他公共类型
 

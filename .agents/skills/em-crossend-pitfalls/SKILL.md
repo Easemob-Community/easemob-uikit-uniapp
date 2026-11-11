@@ -204,6 +204,13 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **解法**：emoji 字符使用固定 px 行高，为字形预留完整绘制空间。本库 `.em-chat-inputbar__emoji-char` 定为 `font-size:24px; line-height:32px`，仍由 48px 单元格 flex 居中；无需平台分支。
 - **纪律**：蒸汽端 emoji 与普通文本一样禁用无单位倍数行高；彩色字形要按实际装饰边界预留行盒，而不是把行高压成字号。
 
+### 5t. iOS 首次麦克风授权后持续占用、后续录音反复「过短」（2026-11-11，原生时序源码确认）
+- **症状**：首次按住说话弹出系统授权，允许后麦克风指示不消失；再次录音反复提示「录音时间太短」，杀进程重进才恢复。
+- **根因**：DCloud iOS RecorderManager 的 `start()` 先异步等待 `requestRecordPermission`，授权回调前 `audioRecorder` 为空，此时 `stop()` 是空操作；允许后仍会 `innerStart()`。下一次 `start()` 又会先停止这段遗留录音。旧 UIKit 未监听 `onStart`，且允许新一轮覆盖 `recordOptions`，旧 `onStop` 因此落入新一轮并按刚重置的开始时间算出 0 秒。
+- **解法**：JS 录音忙态覆盖「start 请求 → 原生终止」完整轮次；stop/cancel 锁存停止意图，单例 `onStart` 发现该意图时再次 stop；旧轮未终止前忽略新 start。开始后的原生错误不会立即释放 JS 忙态，而是丢弃结果并等待旧 `onStop`；启动前错误才允许立即复位。重复 stop 共享 Promise，取消/原生错误明确 reject。`useChatComposer` 在调用原生 start 前先初始化手势态，同时检查 UI 录音态与平台忙态，避免同步回调和清理期误开浮层。
+- **纪律**：不要把 `recorder.start()` 返回当作真实开始，不要用延时或放宽过短阈值掩盖授权时序；启动等待期的停止/取消必须在 `onStart` 补偿收尾，开始后的错误必须排空旧原生录音，停止 Promise 不得被覆盖或静默丢弃。
+- **验证**：`scripts/test-record-lifecycle.mjs` 用延迟 `onStart` 的 mock RecorderManager 覆盖授权期停止/取消、清理期防重、开始后错误排水、重复停止、取消/错误结算、同步回调及正常/自动停止/错误重试，13/13 通过；真机结果记 `docs/STATUS.md`。
+
 ## 小程序（mp-weixin）
 
 ### 6. 原生事件穿组件边界冒泡

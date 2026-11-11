@@ -1391,3 +1391,13 @@
 - **构建与可视化**：Node 22 下 demo `build web` / `build mp-weixin` 全绿，主包 1071KB、分包合计 1493KB；chat-only web/mp 全绿，主包 759KB、分包合计 1273KB；H5 静态伺服 root/components 均 200。内置浏览器实测七类分段顺序、收发两侧配色、长文件名、位置/自定义内容、390px 窄屏与暗色渲染正常。
 - **环境**：Node 26.13.0 下 HBuilderX 5.26 mp 构建在加载其 vite.config 时稳定报 `cachedDataRejected`，清项目缓存与禁用 Node 编译缓存无效；同命令切 Node 22.23.4 后通过，未改产品代码规避。
 - **待验**：未运行 Vue 5.2.0 → uni 的真实账号互发/漫游重进、真实附件下载，也未做 App 三端与微信开发者工具/真机的交互和视觉验收；上述路径不得记为已验证。
+
+
+## 2026-11-11 iOS 首次麦克风授权打断录音状态机修复
+
+- **根因**：DCloud iOS RecorderManager 的 `start()` 异步等待 `requestRecordPermission`；授权前 `audioRecorder` 为空，`stop()` 空操作，允许后仍会起录。UIKit 原实现未监听 `onStart`，且旧轮未终止就允许新 `start()` 覆盖回调；下一次原生 `start()` 先停旧录音，旧 `onStop` 被新一轮当成自动停止并按新开始时间算出 0 秒，表现为持续占用麦克风与反复「录音时间太短」。
+- **修复**：`libs/platform.ts` 以完整录音轮次管理忙态，stop/cancel 锁存停止意图，单例 `onStart` 对迟到启动补偿停止；旧轮未终止前忽略新 start。`useChatComposer` 手势入口增加平台忙态守卫，默认与自绘输入栏共享修复。公开方法签名、1 秒过短规则和 60 秒自动停止不变。
+- **审查补强**：开始后原生错误先进入丢弃/排水态，等旧 `onStop` 后才允许新会话，避免旧结果污染新轮；重复 `stopRecord()` 共享 Promise，取消以 `EM_RECORD_CANCELLED` 拒绝、原生错误同样拒绝，不再悬挂。composable 在原生 start 前初始化手势态，同步回调不会被后续赋值覆盖，真实失败 toast 去重，正常取消不提示失败。
+- **测试**：新增 `scripts/test-record-lifecycle.mjs`，真实打包 App 条件分支与 composable，以延迟 `onStart`、原生活跃态错误及同步回调的 mock RecorderManager 模拟时序。首轮修复前 4 个目标用例失败、3 个对照通过；审查补充的 6 个用例也均先失败后通过，最终录音专项 13/13。
+- **构建与文档**：Node 22 下全量测试 43/43；最终代码 `build web`、`build mp-weixin` 全绿（主包 1072KB、分包合计 1493KB），H5 静态伺服 HTTP 200；`check-docs` 与 `git diff --check` 通过。
+- **真机**：已确认本机有在线 iPhone；首次授权及后续录音复测由用户手动执行，Android/鸿蒙/mp 冒烟同样不记为已验证。

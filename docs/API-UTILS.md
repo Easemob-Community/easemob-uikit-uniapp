@@ -19,7 +19,7 @@
 - `chooseImage()`、`previewImage()`、`chooseVideo()`、`chooseFile()`：媒体选择与预览。
 - `getCameraAuthorizeState()`、`openAppAuthorizeSetting()`：相机授权预检与系统设置。
 - `setAttachmentProvider()`、`refreshAttachmentAvailability()`、`hasAttachmentProvider()`、`canPickAttachment()`、`attachmentCapability()`、`pickAttachments()`、`resolveAttachment()`：附件能力。
-- `startRecord()`、`stopRecord()`、`isRecording()`、`playAudio()`、`stopAudio()`：录音与播放。
+- `startRecord()`、`stopRecord()`、`isRecording()`、`playAudio()`、`stopAudio()`：录音与播放。`stopRecord()` 在同一轮停止过程中重复调用会共享同一个 Promise；录音取消时该 Promise 以 `ERROR_CODE.RECORD_CANCELLED` 拒绝，原生录音错误也会使其拒绝，调用方需要处理异常。
 - `setStorage()`、`getStorage()`：跨端本地存储。
 - `copyText(text)`：复制文本，返回 `Promise<void>`。
 - `downloadAttachment(message, options?)`：下载附件，返回 `Promise<EmMessageDownloadResult>`。
