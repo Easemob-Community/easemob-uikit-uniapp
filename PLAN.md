@@ -83,7 +83,7 @@ tiptap 富文本输入、消息编辑、消息翻译、合并转发、多选模�
 | 样式隔离 | 策略 2.0：`defineOptions({ styleIsolation: 'app-and-page' })` | 不写 `scoped` |
 | 条件编译 | 二维矩阵：模式（`UNI-APP-X`）× 平台（`APP`/`MP-WEIXIN`/`WEB`） | 微信小程序开放能力用 `#ifdef MP-WEIXIN` 叠原生 `<button>` |
 | 内置组件纪律 | 只用两边共有的内置组件；x 独占（page-container/list-view/rich-text 新特性）必须包进内部适配组件 | 适配组件清单：`EmMessageList`（list-view/scroll-view）、`EmPopup`（自研 overlay+view，**不用** page-container） |
-| SDK | 环信 websdk（npm 纯 js），作为 peer 依赖；小程序端验证既有小程序 SDK 线 | 连通性是 P0 spike |
+| SDK | 环信 websdk（npm 纯 js），作为 peer 依赖；小程序端验证既有小程序 SDK 线；`EmKitConfig.sdkInitOptions` 统一透传全部非身份类原生初始化选项，默认经 `uni.getDeviceInfo()` 写入仅含平台名的登录设备扩展 | 连通性是 P0 spike；宿主显式配置优先，UIKit 必需 Manager 与平台兼容适配按公开契约合并；默认注入不读取或上报品牌、型号和系统版本 |
 | 测试 | uni 官方自动化测试框架（一套 test.js 驱动全端）+ jest 快照（参照 uni-ui x 的 jest.config.js） | 每个 issue 修复配测试例 |
 | IDE/CI | HBuilder V 开发；CLI（`@dcloudio/uni-cli`）出包用于 CI | 锁 IDE 版本到 readme |
 | 配置体系（2026-10-15 定稿） | 三层混合：**全局 `EmKitConfig` 行为开关**（→ reactive config store，`useConfig()` 读取，`libs/store/config.ts`）+ **页面级组件呈现 props**（局部覆盖全局）+ **少量具名插槽**（自定义消息出口/empty/nav title/action） | 不做 vue 版 provider/inject 响应式重构、不做 ChatConfig 单对象大 prop 透传；原子组件不连 store（输入栏功能集走 props 传入）；`-page` 组件仍不碰路由；默认值一律与现状一致（零行为变更，纯增配置面）；formatter/@我/presence 留二期 |

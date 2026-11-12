@@ -1401,3 +1401,23 @@
 - **测试**：新增 `scripts/test-record-lifecycle.mjs`，真实打包 App 条件分支与 composable，以延迟 `onStart`、原生活跃态错误及同步回调的 mock RecorderManager 模拟时序。首轮修复前 4 个目标用例失败、3 个对照通过；审查补充的 6 个用例也均先失败后通过，最终录音专项 13/13。
 - **构建与文档**：Node 22 下全量测试 43/43；最终代码 `build web`、`build mp-weixin` 全绿（主包 1072KB、分包合计 1493KB），H5 静态伺服 HTTP 200；`check-docs` 与 `git diff --check` 通过。
 - **真机**：已确认本机有在线 iPhone；首次授权及后续录音复测由用户手动执行，Android/鸿蒙/mp 冒烟同样不记为已验证。
+
+
+## 2026-11-11 App 发行配置分级沉淀
+
+- **根因与边界**：外部宿主发行实测确认，SDK 经运行时适配对象动态调用 `connectSocket`，Android/iOS 静态摇树均可能漏掉 `uni-websocket`，导致发行包无法建立 IM 长连接；其他直接调用的网络、文件、媒体与界面模块能由 uni-app x 自动扫描，不全量显式声明。原生模块、权限与隐私声明变更必须重打自定义基座或发行包，JS 热更新不生效。
+- **必要项**：公开接入主路径明确 Android/iOS 声明 `uni-websocket`；使用 `easemob-file-picker` 时最低 Android API 24 / iOS 16；按实际功能保留相机、麦克风、相册能力和 iOS 用途描述。Android 权限以最终合并清单为准，不重复添加过宽存储权限。
+- **推荐项**：按发行渠道与 HBuilderX 支持设置 `targetSdkVersion`，64 位真机可明确 `arm64-v8a`，App 默认主题可设 `auto`，简单静态托管可用 hash 路由，网络优先 HTTPS/WSS；必须明文时单独说明 Android 原生 `usesCleartextTraffic` 配置及风险。
+- **文档落点**：更新 `QUICKSTART.md`、`PLATFORM.md`、`FAQ.md`、插件 readme、`em-host-integration` 与 `em-host-troubleshooting`，并由源 Skills 重新生成公开页；社区门户只通过同步生成，不直接编辑 `.content`。
+- **验证**：`check-docs` 57 页 / 38 组件 / 83 EmKit 方法 / 33 配置字段通过，8 个 Skills 新鲜度与结构检查通过，两仓 `git diff --check` 通过；门户 `content:sync`、`content:check`、181 项测试及 VitePress 生产构建通过，产物公开边界复查通过。测试输出仍有既有 Vue 测试桩警告与构建 chunk 体积提示，本次未处理。
+
+
+## 2026-11-12 SDK 初始化配置统一透传 + 默认登录设备扩展
+
+- **配置面**：`EmKitConfig` 新增 `sdkInitOptions`，公开类型 `EmSdkInitOptions = Omit<InitConfig, 'appKey' | 'appId'>`，WebSDK 全部非身份类原生初始化选项经统一对象展开透传；普通字段优先于 UIKit 自动值，既有 `enableDeviceInfo/deviceId/devicePlatform` 保留兼容。
+- **默认设备扩展（合规修订）**：`loginExtensionInfo = JSON.stringify({ deviceName })` 仅含归一平台名，例如 `{"deviceName":"android"}`；自动 `deviceId` 固定为 `Platform_uikitVersion_<id>` 三段式，旧六段式持久化值不再复用。`uni.getDeviceInfo` 只请求 `deviceId/platform/osName`，不读取或上报品牌、型号和系统版本。宿主显式 `sdkInitOptions` 不受影响；`enableDeviceInfo: false` 仅关闭自动设备派生。
+- **特殊合并**：`libs/client/init-options.ts` 缺省保留 conversation/contact/group 同步，显式 `enableSyncData` 完整替换；五个 UIKit 必需 Manager 保留并与宿主 Manager 按引用去重合并；`platformAdapterOptions` 普通字段透传，overrides 与既有网络/附件兼容修复组合，宿主同名能力优先。相同 base/custom overrides 引用复用组合 resolver，避免 WebSDK 单例在初始化失败重试时误判配置冲突。
+- **测试**：`test-sdk-init-options` 8 项 + `test-device-info` 合规/旧格式迁移 1 项 + 既有登录参数 3 项共 12 项通过，覆盖平台名回退、自定义扩展、原生字段透传、同步类型、Manager、两种平台 overrides 和 resolver 引用稳定性。设备测试路径由仓库位置与 `HBUILDERX_PATH` 派生，不绑定本机检出路径。
+- **文档**：PLAN / CONFIG / FAQ / API-KIT-LIFECYCLE / API-TYPES / changelog 已登记；`check-docs` 通过（57 页 / 38 组件 / 83 方法 / 34 配置字段）。Demo 内置 UIKit 已定点同步，device/types/两个新模块与源码逐字一致，client 既有的 Demo 私有差异未覆盖。
+- **门禁**：Node 22 全量 Node 测试 52/52；UIKit `build web` 成功、H5 静态伺服 HTTP 200；`build mp-weixin` 成功且 11 项分包检查通过（主包 1073KB、分包合计 1493KB）；当前 Demo H5 编译成功；`check-docs` 与两仓 `git diff --check` 通过。Node 26 下 mp 构建在 Vite 配置加载阶段报 `cachedDataRejected`，同环境切换 Node 22 后通过，确认为编译链运行时兼容问题，未改业务代码或清缓存。
+- **真实初始化边界**：以真实 `EmClient` + WebSDK 类替换 `ChatClient.init` 捕获参数，默认扩展为 `{"deviceName":"android"}`，默认 deviceId 为 `android_1.0.0-rc.2_stable-id`，完整参数不含品牌、型号或系统版本；显式扩展 `{"deviceName":"我的设备","source":"uniapp"}` 优先，`serviceConfig/enableDeliveryReceipt` 原样透传，默认/自定义 Manager 数为 5/6。未使用真实账号连接服务端，App/小程序真机设备名仍待实机核验。

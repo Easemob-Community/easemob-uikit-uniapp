@@ -173,7 +173,9 @@ HBuilderX GUI 开发时保持 `npm run watch:mp` 运行。既有工程需按实�
 | 文件消息：打开/下载 | ⏳ 仅展示 | ⏳ 仅展示 | ⏳ 仅展示 |
 | 语音消息：发送 | ⏳ 入口隐藏 | ✅ | ✅ |
 
-> **App 自定义基座**：视频播放依赖 uni-app x 内置模块 `uni-video`，该模块会按代码用量摇树。基座如果是在接入视频组件之前打的，`<video>` 会被降级为普通 `<view>`，表现为点开播放器后全屏黑屏；重新打一次自定义基座即可，或在 manifest 的 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`（示例工程已配置）。
+> **App 发行必要配置**：Android、iOS 都要在 manifest 的 `app-android` / `app-ios` → `distribute.modules` 显式声明 `"uni-websocket": {}`。环信 SDK 通过运行时适配对象调用 `connectSocket`，静态摇树可能漏掉该模块，导致发行包无法建立 IM 长连接。其他直接调用的网络、文件和媒体模块通常能自动扫描，无需全量声明。
+>
+> **App 自定义基座**：视频播放依赖 uni-app x 内置模块 `uni-video`，该模块会按代码用量摇树。基座如果是在接入视频组件之前打的，`<video>` 会被降级为普通 `<view>`，表现为点开播放器后全屏黑屏；重新打一次自定义基座即可，或在 manifest 的 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`（示例工程已配置）。原生模块配置变更不能通过 JS 热更新生效。
 
 ## App 端文件发送（宿主注入）
 

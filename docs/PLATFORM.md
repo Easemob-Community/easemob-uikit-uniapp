@@ -107,6 +107,29 @@ App 端判断「能否发文件」请用 `EmKit.canPickAttachment`（或响应�
 - **iOS 15+ / Android 6+**：低于该版本的系统不在支持范围。
 - **文件发送**：App 端没有跨端内置的系统文件选择器。宿主安装文件选择器插件后，用 `EmKit.setAttachmentProvider()` 注册选择/复制/清理能力，输入栏「文件」格才会出现；UIKit 不静态依赖插件，未注册时入口保持隐藏。接入示例见 [EmKit 附件能力注入](./API-KIT-MESSAGES.md#emkitsetattachmentproviderprovider--pickattachmentsoptions--resolveattachmenturi-options)。附件上传由 `uni.uploadFile` 以原生方式读取本地路径；SDK 的 md5 预检在路径不在 uni 文件系统可读范围时会自动跳过，不影响发送。
 
+### App 发行配置：必要与推荐
+
+**以下必要项直接影响登录或对应消息能力：**
+
+| 必要项 | 配置与适用范围 |
+|---|---|
+| IM 长连接 | Android、iOS 都在 `app-android` / `app-ios` → `distribute.modules` 显式声明 `"uni-websocket": {}`。SDK 通过运行时适配对象调用 `connectSocket`，静态摇树可能漏掉；缺失时发行包无法建立长连接 |
+| 文件插件系统版本 | 使用 `easemob-file-picker` 时最低为 Android 7（API 24）/ iOS 16；Android 在 `app-android.distribute` 设置 `"minSdkVersion": 24`。不使用该插件时，UIKit 基础环境仍为 Android 6 / iOS 15 |
+| 媒体权限与用途 | 确保最终包包含实际使用的相机、麦克风、相册能力；iOS 在 `app-ios.distribute.privacyDescription` 配置相机、相册、麦克风用途，保存到相册时还需 `NSPhotoLibraryAddUsageDescription` |
+| 原生配置生效方式 | 修改模块、权限或隐私声明后重新打自定义基座或发行包；JS 热更新不会补入原生能力 |
+
+**以下推荐项用于明确发行基线与减少平台差异：**
+
+| 推荐项 | 建议 |
+|---|---|
+| Android target API | 显式设置 `app-android.distribute.targetSdkVersion`，以发行渠道要求和当前 HBuilderX 支持为准，并回归对应系统行为 |
+| Android ABI | 64 位真机可显式设置 `abiFilters: ["arm64-v8a"]`；按真实设备需求增加其他 ABI |
+| 系统主题 | 在 `app-android` / `app-ios` 设置 `defaultAppTheme: "auto"`；微信小程序和 H5 分别开启 `darkmode` |
+| H5 路由 | 简单静态托管使用 `web.router.mode: "hash"`；`history` 需要服务端回退配置 |
+| 网络安全 | 使用 HTTPS/WSS。确实需要 HTTP/WS 时，Android 还需在原生 `AndroidManifest.xml` 的 `application` 节点设置 `android:usesCleartextTraffic="true"`，并评估明文传输风险 |
+
+`uni-network`、`uni-getNetworkType`、`uni-fileSystemManager`、`uni-media`、`uni-video` 等直接调用的模块通常会被自动扫描，不必全量显式声明。`uni-video` 在旧基座缺失时会导致播放器黑屏，可单独显式保留；自定义 UTS 插件或新增动态 `uni.xxx` 调用时，应检查实际生成清单，而不是假定所有调用都能被扫描。
+
 ### 鸿蒙（HarmonyOS）
 
 - **签名三处一致**：AGC 注册包名、HBuilderX 签名配置、构建产物 `bundleName` 必须完全一致，否则签名失败。完整步骤见[鸿蒙真机运行与签名](./HARMONY-REALDEVICE-RUN.md)。

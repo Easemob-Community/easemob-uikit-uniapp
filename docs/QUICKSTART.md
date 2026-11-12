@@ -353,11 +353,51 @@ npm run check:mp    # 单独复查 build 产物
 
 用 HBuilderX 打开 `demo/` 或宿主工程，运行到真机。鸿蒙签名步骤见 [HARMONY-REALDEVICE-RUN.md](./HARMONY-REALDEVICE-RUN.md)。
 
-App 端权限：相机（拍照/录像）、相册（选图/视频）、麦克风（语音）均在用户主动操作时申请；若自行裁剪 manifest，保留 `CAMERA` / `RECORD_AUDIO` / 相册读取权限，否则对应功能会失败。iOS 另需在 `app-ios.distribute.privacyDescription` 声明 `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` / `NSMicrophoneUsageDescription`（`NSPhotoLibraryAddUsageDescription` 按需），改后重新云打包或重打自定义基座才生效；示例工程已配置。
+#### 必要：WebSocket 模块
 
-鸿蒙权限写在工程根目录的 `harmony-configs/entry/src/main/module.json5`，节点 `requestPermissions`，语音与拍摄分别需要 `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`（都带 `reason` 与 `usedScene.inuse`，`reason` 指向 `resources/base/element/string.json` 的条目）。漏声明时系统直接拒绝，表现为「录音失败」或点拍摄无反应。该目录被**整份覆盖**到生成工程而非按节点合并，文件要包含完整的 `module` 结构；`ohos.permission.INTERNET` 等框架已加的权限不要重复声明；相册无需声明（走系统 Picker）。示例工程已按此配置。
+Android 与 iOS 都要在 `manifest.json` 显式声明 `uni-websocket`。环信 SDK 通过运行时适配对象调用 `connectSocket`，uni-app x 的静态摇树可能识别不到；缺失时调试基座可能正常，发行包却无法建立 IM 长连接：
 
-视频消息依赖内置模块 `uni-video`。uni-app x 会按代码用量摇树：自定义基座如果是在接入视频组件之前打的，`<video>` 会被降级为普通 `<view>`，表现为点开播放器后全屏黑屏。接入视频后重新打一次自定义基座即可；需要提前固定模块时在 `manifest.json` 的 `app-ios` / `app-android` → `distribute.modules`（HBuilderX 4.71 以下为 `app` → `distribute.modules`）显式声明 `"uni-video": {}`，示例工程已配置。
+```json
+{
+  "app-android": {
+    "distribute": {
+      "modules": {
+        "uni-websocket": {}
+      }
+    }
+  },
+  "app-ios": {
+    "distribute": {
+      "modules": {
+        "uni-websocket": {}
+      }
+    }
+  }
+}
+```
+
+`uni-network`、`uni-getNetworkType`、`uni-fileSystemManager`、`uni-media` 等直接调用的模块通常能被自动扫描，不需要复制一份全量模块清单。若自行封装原生插件或增加动态 `uni.xxx` 调用，应检查生成包是否包含对应模块。
+
+#### 必要：系统版本与权限
+
+- UIKit 基础环境为 Android 6+ / iOS 15+；使用 `easemob-file-picker` 时，插件把最低版本提高到 **Android 7（API 24）/ iOS 16**。此时在 `app-android.distribute` 设置 `"minSdkVersion": 24`，iOS 以插件的 `deploymentTarget` 为准。
+- Android 的相机、麦克风、相册能力由对应 uni 模块引入。不要重复添加过宽的存储权限；若自行裁剪模块或权限，需在最终合并后的 `AndroidManifest.xml` 中确认 `CAMERA`、`RECORD_AUDIO` 和实际使用的相册能力仍然存在。
+- iOS 在 `app-ios.distribute.privacyDescription` 声明 `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` / `NSMicrophoneUsageDescription`；保存图片或视频到相册时还要声明 `NSPhotoLibraryAddUsageDescription`。用途文案应与实际行为一致，例如相机写“拍摄图片或视频并发送”，不要误写成相册。
+- 鸿蒙权限写在工程根目录的 `harmony-configs/entry/src/main/module.json5` 的 `requestPermissions`：语音与拍摄分别需要 `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`，都带 `reason` 与 `usedScene.inuse`。该目录被**整份覆盖**而非按节点合并，文件必须包含完整的 `module` 结构；相册和文件选择走系统 Picker，无需额外存储权限。
+
+上述原生模块、权限和隐私配置变更后，必须重新打自定义基座或发行包，JS 热更新不会补入这些原生能力。
+
+#### 推荐：发行配置
+
+| 配置 | 建议 |
+|---|---|
+| `app-android.distribute.targetSdkVersion` | 按发行渠道与当前 HBuilderX 支持情况显式设置，并回归对应 Android 版本行为；不要只照抄固定数值。Google Play 等渠道应以其最新 target API 要求为准 |
+| `app-android.distribute.abiFilters` | 64 位真机发行可明确为 `["arm64-v8a"]`；只有实际需要时才增加 32 位或 x86/x86_64，避免无谓增大包体 |
+| `defaultAppTheme` | 需要跟随系统深浅色时，在 `app-android` / `app-ios` 设置为 `"auto"`；微信小程序另开 `mp-weixin.darkmode`，H5 另开 `web.darkmode` |
+| Web 路由 | 简单静态托管可在 `web.router` 使用 `"mode": "hash"`；使用 `history` 时由服务端配置回退到 `index.html` |
+| 网络安全 | 优先使用 HTTPS/WSS。宿主其他网络能力若必须使用 HTTP/WS，Android 9+ 还需在原生 `AndroidManifest.xml` 的 `application` 节点配置 `android:usesCleartextTraffic="true"`；不要为了省事默认全局放开 |
+
+视频消息依赖内置模块 `uni-video`。它通常会被直接组件引用自动扫描；如果旧自定义基座缺少该模块，`<video>` 会降级为普通 `<view>`，表现为播放器全屏黑屏。重新打基座即可；需要提前固定模块时，可在 `app-ios` / `app-android` → `distribute.modules` 显式声明 `"uni-video": {}`。
 
 ## 9. 排错与验收
 

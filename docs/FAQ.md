@@ -133,10 +133,10 @@ EmKit.init({
 
 ### 设备标识（deviceId）是怎么生成和持久化的
 
-UIKit 默认在 `EmKit.init()` 时向 SDK 注入固定 deviceId（`enableDeviceInfo` 总开关，默认开启，关闭则完全不注入、SDK 用默认行为）。自动派生的格式与优先级：
+UIKit 默认在 `EmKit.init()` 时向 SDK 注入固定 deviceId（`enableDeviceInfo` 总开关，默认开启，关闭则停止自动注入、SDK 用默认行为）。自动派生的格式与优先级：
 
-- **格式**：App 端（android / ios / harmonyos）且能取到设备品牌、型号、系统版本时，为六段式 `Platform_uikitVersion_brand_model_system_uuid`（例 `android_1.0.0-rc.2_Xiaomi_23127PN0CC_Android15_<uuid>`，机型/系统段不含空白字符）；机型信息任一缺失，以及 H5 / 微信小程序，退回三段式 `Platform_uikitVersion_uuid`（例 `web_1.0.0-rc.2_<uuid>`）。
-- **优先级**：已持久化值（本地存储 key `emkit.device.id`）→ `uni.getDeviceInfo()` 框架设备标识 → 自生成 UUID。一经得出即持久化，跨启动保持稳定。
+- **格式**：固定为三段式 `Platform_uikitVersion_uuid`（例 `android_1.0.0-rc.2_<uuid>`）。为避免设备型号合规风险，不包含品牌、型号或系统版本；旧六段式持久化值会自动按三段式重新派生。
+- **优先级**：当前格式的持久化值（本地存储 key `emkit.device.id`）→ `uni.getDeviceInfo()` 框架设备标识 → 自生成 UUID。一经得出即持久化，跨启动保持稳定。设备 API 只请求 `deviceId/platform/osName` 必要字段。
 - **显式覆盖**：宿主传入 `config.deviceId` 时原样使用、不加任何段；`devicePlatform` 是向环信申请注册的 1–100 编号，传入后 SDK 会把 resource 改写为 `custom<N>_` 形态。
 
 相关配置见 [配置参考 · 设备信息](./CONFIG.md#设备信息)。
@@ -226,6 +226,22 @@ App 未内置通用文件选择器。宿主注册附件 provider 且当前可用
 - 相册权限被拒绝时提示「请允许访问相册后重试」；文件单击不触发下载，下载入口只在长按菜单。
 - App 端保存相册依赖内置模块 `uni-media`、打开文档依赖 `uni-openDocument`；旧自定义基座没有这些模块时调用会失败，需要重新打自定义基座（与 `uni-video` 同理）。
 - 宿主自绘消息卡片时可以调用 `EmKit.downloadAttachment(message)`（或门面导出的 `downloadAttachment`）复用同一套下载逻辑。
+
+### 调试基座能登录，发行包却无法建立长连接
+
+先检查 Android、iOS 的 `manifest.json` 是否都在 `app-android` / `app-ios` → `distribute.modules` 中显式声明：
+
+```json
+"uni-websocket": {}
+```
+
+环信 SDK 通过运行时适配对象调用 `connectSocket`，uni-app x 的静态摇树可能识别不到，导致发行包漏掉 WebSocket 原生模块。`uni-network`、`uni-getNetworkType`、`uni-fileSystemManager`、`uni-media` 等直接调用通常能自动扫描，不需要因此复制一份全量模块清单。
+
+修改后必须重新打自定义基座或发行包，JS 热更新不会补入原生模块。若仍失败，再检查 token、网络状态与连接日志；不要通过反复 `EmKit.init()` 尝试恢复。
+
+### Android 私有服务提示 CLEARTEXT not permitted
+
+Android 9+ 发行包默认禁止 HTTP 明文请求。优先把服务切换为 HTTPS/WSS；如果宿主其他网络能力确实必须使用 HTTP/WS，在项目原生 `AndroidManifest.xml` 的 `application` 节点增加 `android:usesCleartextTraffic="true"`，然后重新打基座或发行包。该配置属于原生清单，不是 `distribute.modules` 中的模块。
 
 ### 视频点击没有播放 / App 播放器黑屏
 

@@ -13,6 +13,7 @@ import { EmKit } from '@/uni_modules/easemob-uikit-uni/libs'
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `config.appkey` | `string` | 是 | 环信 AppKey |
+| `config.sdkInitOptions` | `EmSdkInitOptions` | 否 | WebSDK 全部非身份类原生初始化选项；普通字段优先于 UIKit 默认值，Manager、同步类型和平台适配器按配置参考中的规则合并 |
 | `config.onTokenWillExpire` | `() => string \| Promise<string>` | 否 | Token 约 80% 生命周期时触发，返回新 token 后 UIKit 自动续期 |
 | `config.onTokenExpired` | `() => void` | 否 | Token 已过期、SDK 已断开时触发；UIKit 同时把状态置为 `closed` |
 | `config.enableDeviceInfo` | `boolean` | 否 | 设备信息注入总开关，默认 `true` |

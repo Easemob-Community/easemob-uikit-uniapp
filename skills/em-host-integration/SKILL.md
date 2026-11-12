@@ -69,17 +69,47 @@ your-app/
 - UIKit 零运行时依赖；不要为它引入 UI 库、请求库或状态库。
 - 小程序端不要自己 `import 'easemob-websdk'`（会进主包）；UIKit 已内置跨分包加载，见 `em-host-mp-subpackage`。
 
-### 4.1 平台权限声明（宿主必做）
+### 4.1 App 发行与权限声明（宿主必做）
 
-UIKit 本身不带任何权限声明——权限属于宿主工程。漏声明时**系统直接拒绝**，UIKit 只能弹 toast，看不出是配置问题：
+先补 Android/iOS 的 WebSocket 原生模块，再检查媒体权限。环信 SDK 通过运行时适配对象调用 `connectSocket`，静态摇树可能漏掉 `uni-websocket`；缺失时调试基座可能正常，发行包却无法建立 IM 长连接：
 
-| 平台 | 要写在哪 | 必填项 |
+```json
+{
+  "app-android": {
+    "distribute": {
+      "modules": { "uni-websocket": {} }
+    }
+  },
+  "app-ios": {
+    "distribute": {
+      "modules": { "uni-websocket": {} }
+    }
+  }
+}
+```
+
+`uni-network`、`uni-getNetworkType`、`uni-fileSystemManager`、`uni-media` 等直接调用通常能被自动扫描，不要复制全量模块清单。自定义 UTS 插件或新增动态 `uni.xxx` 调用时，检查实际生成清单。
+
+| 必要项 | 要写在哪 | 要求 |
 |---|---|---|
-| Android | `manifest.json` → `app-android.distribute.permissions` | `CAMERA`、`RECORD_AUDIO`、相册读取 |
-| iOS | `manifest.json` → `app-ios.distribute.privacyDescription` | `NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSPhotoLibraryUsageDescription`（写入相册再加 `NSPhotoLibraryAddUsageDescription`） |
-| 鸿蒙 | 工程根目录 `harmony-configs/entry/src/main/module.json5` → `requestPermissions` | `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`（都要带 `reason` 与 `usedScene.inuse`，`reason` 指向 `resources/base/element/string.json` 里的条目）；生成工程未包含 `ohos.permission.GET_NETWORK_INFO` 时也要补上 |
+| 文件插件最低版本 | `manifest.json` → `app-android.distribute.minSdkVersion`；插件 `deploymentTarget` | 使用 `easemob-file-picker` 时为 Android API 24 / iOS 16；不使用该插件时 UIKit 基础环境为 Android 6 / iOS 15 |
+| Android 媒体权限 | 最终合并后的 `AndroidManifest.xml` | 确保实际使用的 `CAMERA`、`RECORD_AUDIO`、相册能力存在；通常由 uni 模块引入，不重复添加过宽存储权限 |
+| iOS 用途描述 | `manifest.json` → `app-ios.distribute.privacyDescription` | `NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSPhotoLibraryUsageDescription`；保存到相册再加 `NSPhotoLibraryAddUsageDescription`，文案必须对应实际用途 |
+| 鸿蒙权限 | 工程根目录 `harmony-configs/entry/src/main/module.json5` → `requestPermissions` | `ohos.permission.MICROPHONE`、`ohos.permission.CAMERA`（都要带 `reason` 与 `usedScene.inuse`）；生成工程未包含 `ohos.permission.GET_NETWORK_INFO` 时也要补上 |
 | 微信小程序 | 微信公众平台「用户隐私保护指引」+ `app.json` 的 `permission` / `requiredPrivateInfos` | 麦克风、相机、相册按实际用到声明 |
 | H5 | 无需声明 | 不录音、不写相册 |
+
+修改模块、权限或隐私声明后，必须重新打自定义基座或发行包；JS 热更新不会补入原生能力。
+
+**推荐发行配置**：
+
+| 配置 | 建议 |
+|---|---|
+| `app-android.distribute.targetSdkVersion` | 按发行渠道与当前 HBuilderX 支持情况显式设置，并回归对应系统行为；不要照抄固定数值 |
+| `app-android.distribute.abiFilters` | 64 位真机发行可明确为 `["arm64-v8a"]`；按真实设备需求增加其他 ABI |
+| `defaultAppTheme` | 跟随系统主题时在 `app-android` / `app-ios` 设为 `"auto"`；微信小程序和 H5 分别开启 `darkmode` |
+| `web.router.mode` | 简单静态托管用 `"hash"`；`history` 需要服务端回退到 `index.html` |
+| HTTP/WS | 优先 HTTPS/WSS；宿主其他网络能力必须用明文时，Android 需在原生 `AndroidManifest.xml` 的 `application` 节点设置 `android:usesCleartextTraffic="true"`，不要默认全局放开 |
 
 **鸿蒙特有坑（必读）**：
 
@@ -89,7 +119,7 @@ UIKit 本身不带任何权限声明——权限属于宿主工程。漏声明�
 - UIKit 只写剪贴板、不读取，无需声明 `READ_PASTEBOARD`。
 - 用户授权类权限声明后，按住说话或首次拍摄会**自动弹出系统授权框**（正文即 `reason` 的文案），无需自己写 UTS 插件请求；修改后必须重新「运行到鸿蒙」组装安装，JS 热更新不会改变安装包权限。
 
-**症状对照**：从未弹授权框且按住说话立刻「录音失败」→ 优先检查麦克风声明；点「拍摄」无反应或黑屏 → 检查相机声明（iOS 还会因 `privacyDescription` 缺失报 `config error`）。如果弹窗曾出现但被用户拒绝，应引导到系统设置开启，与漏声明是两种处理路径。
+**症状对照**：发行包无法建连且调试基座正常 → 先查 `uni-websocket`；从未弹授权框且按住说话立刻「录音失败」→ 查麦克风声明；点「拍摄」无反应或黑屏 → 查相机声明（iOS 还会因 `privacyDescription` 缺失报 `config error`）。如果弹窗曾出现但被用户拒绝，应引导到系统设置开启，与漏声明是两种处理路径。
 
 ## 5. pages.json：easycom、页面、导航
 

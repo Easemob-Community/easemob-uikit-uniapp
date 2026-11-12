@@ -153,7 +153,16 @@ npx esbuild index.js.orig --loader:.orig=js --bundle --format=esm --outfile=inde
 | 预览总包变大 | 正常，SDK 搬到分包 | 只看主包 |
 | `require is not a function` | 基础库 < 2.11.2 | 升级微信 |
 
-## 9.1 App 视频播放专项
+## 9.1 App 发行与长连接专项
+
+| 症状 | 根因 | 修复 |
+|---|---|---|
+| 调试基座能登录，发行包无法建连或一直重连 | SDK 通过运行时适配对象调用 `connectSocket`，静态摇树漏掉 `uni-websocket` | Android/iOS 都在 `app-android` / `app-ios` → `distribute.modules` 显式声明 `"uni-websocket": {}`，重新打基座或发行包 |
+| 改完 manifest 后运行仍提示原生模块不存在 | 只做了 JS 热更新，或仍在使用旧基座 | 重新打自定义基座或发行包；原生模块、权限和隐私声明都不能靠热更新补入 |
+| 其他 uni 模块是否需要全部手动声明 | 直接调用通常会被自动扫描，全量复制清单只会增加维护成本 | 只明确保留必要模块；自定义 UTS 插件或动态 `uni.xxx` 调用以实际生成清单为准 |
+| Android 私有服务报 `CLEARTEXT communication ... not permitted` | Android 9+ 发行包默认禁止 HTTP 明文请求 | 优先 HTTPS/WSS；必须明文时在原生 `AndroidManifest.xml` 的 `application` 节点设置 `android:usesCleartextTraffic="true"` 后重打包 |
+
+## 9.2 App 视频播放专项
 
 | 症状 | 根因 | 修复 |
 |---|---|---|
@@ -162,7 +171,7 @@ npx esbuild index.js.orig --loader:.orig=js --bundle --format=esm --outfile=inde
 | 进度条在走、画面停在首帧 | 原生 autoplay 抢跑导致 play 事件丢失，poster 首帧层盖住播放层 | 升级到当前 UIKit（关闭 autoplay、挂载后显式起播、poster 不进 video） |
 | 打开视频要等一会才播 | App 端先整包下载再播放（chatfiles 不支持 Range） | 预期行为；下载期有百分比进度，关闭会中止 |
 
-## 9.2 附件下载专项
+## 9.3 附件下载专项
 
 | 症状 | 根因 | 修复 |
 |---|---|---|
@@ -171,7 +180,7 @@ npx esbuild index.js.orig --loader:.orig=js --bundle --format=esm --outfile=inde
 | 文件提示「已下载，但当前类型无法打开」 | 微信小程序仅支持 doc/docx/xls/xlsx/ppt/pptx/pdf；App 会交给系统尝试 | 小程序换支持的类型或由宿主自行打开；App 检查系统是否有对应查看器 |
 | H5 点击下载后在新标签页打开 | 跨域直链的 `download` 属性被浏览器忽略 | 预期行为；服务端返回 `Content-Disposition: attachment` 可强制下载 |
 
-## 9.3 录音 / 拍摄权限专项
+## 9.4 录音 / 拍摄权限专项
 
 | 症状 | 根因 | 修复 |
 |---|---|---|
@@ -181,7 +190,7 @@ npx esbuild index.js.orig --loader:.orig=js --bundle --format=esm --outfile=inde
 | 按上面改完仍失败 | 改的是仓库里的 `harmony-configs`，但没重新组装工程，或只做了 JS 热更新 | 必须重新「运行到鸿蒙」（`uni.sh build app-harmony` 只出 assets、不组装 `entry/`）；用 `hdc shell bm dump -n <bundle>` 核对 `reqPermissionDetails` 是否已含目标权限 |
 | 鸿蒙编包里 `module.json5` 的 `abilities` 全没了 / 启动崩溃 | 只把 `requestPermissions` 片段放进 `harmony-configs`，整份覆盖把结构打掉 | 复制生成工程的完整 `module.json5` 再改，并保留已有 `INTERNET` 等声明 |
 | 鸿蒙授权框曾出现，用户拒绝后不再出现 | 系统记住了拒绝状态 | 引导到系统设置开启；不是继续补声明或重复调用录音 |
-| 安卓真机录音无反应 | `RECORD_AUDIO` 未声明或用户拒绝 | 检查 `manifest.json` → `app-android.distribute.permissions`；拒绝后引导到系统设置 |
+| 安卓真机录音无反应 | 最终包缺少 `RECORD_AUDIO`，或用户拒绝 | 检查合并后的 `AndroidManifest.xml` 与 `uni-recorder` 模块；缺失时补声明，拒绝后引导到系统设置 |
 | iOS 录音无反应 / 拍摄黑屏且不再弹窗 | `privacyDescription` 缺对应用途描述，或用户已拒绝 | 补 `NSMicrophoneUsageDescription` / `NSCameraUsageDescription` 后重打自定义基座；拒绝态引导 `uni.openAppAuthorizeSetting` |
 
 > 判断口诀：**系统从未弹窗 = 优先查声明；弹过窗但被拒 = 查用户授权状态并引导设置**。RecorderManager / 系统拍摄能力会自动发起运行时授权，无需另写 UTS 插件；UIKit 侧只在失败时 toast「录音失败」，不会自动跳设置。选择相册/文件和保存图片/视频均走系统 Picker 或确认框，不要为了这些路径额外添加相册、文件或读取剪贴板权限。
