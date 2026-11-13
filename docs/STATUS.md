@@ -1421,3 +1421,14 @@
 - **文档**：PLAN / CONFIG / FAQ / API-KIT-LIFECYCLE / API-TYPES / changelog 已登记；`check-docs` 通过（57 页 / 38 组件 / 83 方法 / 34 配置字段）。Demo 内置 UIKit 已定点同步，device/types/两个新模块与源码逐字一致，client 既有的 Demo 私有差异未覆盖。
 - **门禁**：Node 22 全量 Node 测试 52/52；UIKit `build web` 成功、H5 静态伺服 HTTP 200；`build mp-weixin` 成功且 11 项分包检查通过（主包 1073KB、分包合计 1493KB）；当前 Demo H5 编译成功；`check-docs` 与两仓 `git diff --check` 通过。Node 26 下 mp 构建在 Vite 配置加载阶段报 `cachedDataRejected`，同环境切换 Node 22 后通过，确认为编译链运行时兼容问题，未改业务代码或清缓存。
 - **真实初始化边界**：以真实 `EmClient` + WebSDK 类替换 `ChatClient.init` 捕获参数，默认扩展为 `{"deviceName":"android"}`，默认 deviceId 为 `android_1.0.0-rc.2_stable-id`，完整参数不含品牌、型号或系统版本；显式扩展 `{"deviceName":"我的设备","source":"uniapp"}` 优先，`serviceConfig/enableDeliveryReceipt` 原样透传，默认/自定义 Manager 数为 5/6。未使用真实账号连接服务端，App/小程序真机设备名仍待实机核验。
+
+
+## 2026-11-13 全局头像形状配置
+
+- **配置链**：`EmKitConfig` / `EmUiConfig` 新增 `avatarShape`（`'circle' | 'square'`，默认 `'circle'`），`EmKit.init` 显式传入时覆盖、未传时保留当前值，`setConfig` 运行时切换立即生效。
+- **组件契约**：`em-avatar` 按“显式 `shape` > 全局配置”解析图片与文字头像；`em-chat-page` 保留局部 prop 并改为缺省跟随全局。`em-conversation-page` / `em-conversation-item` 新增可选 `avatarShape`，真实条目与首次同步骨架屏共用解析结果；群列表移除固定方形，真实头像与骨架均跟随全局。`em-avatar` 仅通过 `useConfig` 读取形状，不连接业务 store，内部组件结构 skill 已登记该例外。
+- **测试**：新增 `test-avatar-shape.mjs`，旧代码上默认圆形、初始化合并、组件回落 3 项均按预期失败，实现后 3/3 通过；全量 Node 测试 55/55 通过。
+- **文档**：CONFIG、CONCEPTS、基础/会话组件、会话/聊天页面、宿主 conversation-chat Skill、内部架构/组件结构 skill 与 changelog 同步；Skills 公开页重新生成。`check-skills` 8 个技能通过，`check-docs` 57 页 / 38 组件 / 83 方法 / 35 配置字段通过。
+- **门禁**：Node 22 下 `build web` 成功，H5 独立端口静态伺服 HTTP 200；`build mp-weixin` 成功且 11 项分包检查通过（主包 1073KB、分包合计 1493KB）；`git diff --check` 通过。
+- **Android 真机**：在宿主组件示例页运行时切换全局圆形/方形，两个跟随全局配置的头像均立即更新，显式 `shape="square"` 的局部覆盖保持不变。宿主设置页曾出现状态已更新但单选圈动态 class 不刷新，改为明确的内联边框样式后双向切换通过；该问题不涉及 UIKit 头像本体，无需额外修改组件。
+- **待验**：iOS 与微信开发者工具/真机的全局圆形/方形切换视觉与局部覆盖；上述路径本轮未运行，不记为已验证。

@@ -187,7 +187,7 @@ function onOpenInfo(id: string): void {
 |---|---|---|---|
 | `conversationId` | `string` | 必传 | 对端 userId / groupId |
 | `chatType` | `'singleChat' \| 'groupChat'` | 必传 | 决定单聊/群聊分支 |
-| `avatarShape` | `'circle' \| 'square'` | `'circle'` | 头像形状 |
+| `avatarShape` | `'circle' \| 'square'` | 跟随全局配置 | 头像形状局部覆盖；未传时读取 `uiConfig.avatarShape`（全局默认 `'circle'`） |
 | `showMemberCount` | `boolean` | `true` | 群聊标题副标题成员数（单聊不生效） |
 | `senderNameMode` | `'always' \| 'hidden'` | `'always'` | 群聊气泡上方昵称行 |
 | `showAnnouncement` | `boolean` | `true` | 群公告条（群聊） |

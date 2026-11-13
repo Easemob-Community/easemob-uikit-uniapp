@@ -161,7 +161,7 @@ libs/store/* reactive 状态
 
 ## 6. 原子组件模型
 
-原子组件只负责一个视觉/交互单元，数据通过 props 传入，动作通过 events 透出，不直接连 store（少数页面内组合组件除外）。典型分层：
+原子组件只负责一个视觉/交互单元，数据通过 props 传入，动作通过 events 透出，不直接连业务 store（少数页面内组合组件除外；`em-avatar` 仅通过 `useConfig` 读取全局头像形状）。典型分层：
 
 - **基础**：`em-avatar`、`em-badge`、`em-button`、`em-icon`、`em-text`、`em-empty`、`em-skeleton`、`em-nav-bar`、`em-popup`、`em-action-sheet`、`em-search-bar`、`em-load-more`。
 - **会话**：`em-conversation-item`、`em-conversation-tabs`、`em-connection-banner`。

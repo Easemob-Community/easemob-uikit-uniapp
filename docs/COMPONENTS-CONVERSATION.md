@@ -13,6 +13,7 @@
 | `item` | `EmConversationItem` | 必填 | 会话数据：置顶、免打扰、未读数、最后消息摘要等 |
 | `name` | `string` | 必填 | 展示名，由页面侧完成"昵称 > 会话名 > id"的回落 |
 | `avatar` | `string` | 必填 | 头像地址，由页面侧合并用户资料与会话头像 |
+| `avatarShape` | `EmAvatarShape` | 跟随全局配置 | 头像形状局部覆盖；未传时由内置 `em-avatar` 读取 `uiConfig.avatarShape` |
 | `timeText` | `string` | 必填 | 已格式化的时间文本（今天显示时刻、更早显示日期），草稿时间也由页面侧并入 |
 | `draft` | `{ text: string, time: number } \| null` | 必填 | 草稿；`null` 时展示 `item.lastMessageText` |
 | `hasAtMe` | `boolean` | `false` | 群聊"有人@我"未读标记：名称主色高亮，摘要前加"有人@我"前缀 |

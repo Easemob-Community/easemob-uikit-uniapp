@@ -20,7 +20,8 @@ EmKit.init({
   enableTyping: true,
   recallTimeLimit: 120000,
   inputFeatures: { voice: true, emoji: true, image: true, camera: true, video: true, file: true, inputMode: 'single', sendOnReturn: true },
-  primaryColor: '#009EFF'
+  primaryColor: '#009EFF',
+  avatarShape: 'circle'
 })
 ```
 
@@ -143,11 +144,12 @@ EmKit.init({
 
 `inputFeatures.inputMode='single'` 为全端单行 input、回车发送；`'multiline'` 为全端生长 textarea、回车换行、纸飞机发送，1 行起步、最多 5 行，超出内部滚动。未设置 `inputMode` 时保留旧 `sendOnReturn` 行为：`false` 走多行；`true` 时 iOS 走多行回车发送，其余端走单行。显式 `inputMode` 优先，不与 `sendOnReturn` 组合。
 
-### 品牌与 SDK 加载
+### 品牌、头像与 SDK 加载
 
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `primaryColor` | `string` | 空串（用 token 默认） | 品牌色，写到 `--em-primary-color` |
+| `avatarShape` | `EmAvatarShape` | `'circle'` | 全局头像形状；`em-avatar`、会话、聊天、联系人、群与资料等未显式指定形状的头像统一跟随，局部 `shape` / `avatarShape` 优先 |
 | `sdkLoader` | `() => Promise<unknown>` | 无 | 小程序端自定义 SDK 异步加载器；仅 MP-WEIXIN 生效 |
 | `sdkModule` | `unknown` | 无 | 宿主已加载好的 SDK 模块；与 `sdkLoader` 二选一，模块优先 |
 
@@ -159,6 +161,7 @@ import { setConfig, useConfig } from '@/uni_modules/easemob-uikit-uni/libs'
 // 设置页即时切换
 setConfig({ enableStreamMessage: false })
 setConfig({ primaryColor: '#FF6B00' })
+setConfig({ avatarShape: 'square' })
 setConfig({ inputFeatures: { voice: false } })
 
 // 组件内读取 resolved 配置
@@ -193,6 +196,7 @@ console.log(config.recallTimeLimit)
 | `contactMenuKeys` | `ContactMenuKeyValue[]` | 两项 |
 | `emojiList` | `string[]` | 96 个 |
 | `primaryColor` | `string` | `''` |
+| `avatarShape` | `EmAvatarShape` | `'circle'` |
 | `logPayload` | `boolean` | `false` |
 
 `EmInputFeatures` 包含布尔工具字段 `voice` / `emoji` / `image` / `camera` / `video` / `file`，以及可选 `inputMode` 与旧 `sendOnReturn` 配置。
@@ -209,6 +213,7 @@ console.log(config.recallTimeLimit)
 | `emptyText` | `string` | `''` | 空列表文案；空串用 i18n 默认 |
 | `autoSync` | `boolean` | `true` | 首次挂载自动拉会话快照 |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条 |
+| `avatarShape` | `EmAvatarShape` | 跟随全局配置 | 当前会话页头像形状局部覆盖，真实头像与首次同步骨架屏一致 |
 
 ### `em-chat-page`
 
@@ -216,7 +221,7 @@ console.log(config.recallTimeLimit)
 |---|---|---|---|
 | `conversationId` | `string` | 必填 | 会话 ID |
 | `chatType` | `'singleChat' \| 'groupChat'` | 必填 | 会话类型 |
-| `avatarShape` | `'circle' \| 'square'` | `circle` | 头像形状 |
+| `avatarShape` | `'circle' \| 'square'` | 跟随全局配置 | 当前聊天页消息头像形状局部覆盖 |
 | `showMemberCount` | `boolean` | `true` | 群聊标题成员数副标题 |
 | `senderNameMode` | `'always' \| 'hidden'` | `always` | 群聊气泡上方昵称行 |
 | `showAnnouncement` | `boolean` | `true` | 群公告条 |

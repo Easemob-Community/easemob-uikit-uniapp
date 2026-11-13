@@ -113,6 +113,7 @@ function onMenu(key: string) {
 | `emptyText` | `string` | `''` | 空列表文案；空串使用分 tab 的 i18n 默认文案。搜索无结果时不使用该值 |
 | `autoSync` | `boolean` | `true` | 首次挂载自动拉取会话快照（要求 `EmKit.state.userId` 非空）；关闭后由宿主自行控制同步时机 |
 | `showConnectionBanner` | `boolean` | `true` | 顶部连接状态条显隐 |
+| `avatarShape` | `EmAvatarShape` | 跟随全局配置 | 会话头像形状局部覆盖；未传时读取 `uiConfig.avatarShape`，真实头像与首次同步骨架屏保持一致 |
 | `watermark` | `string \| EmWatermarkOptions` | 未设置 | 组件级水印：字符串=文案、对象=可调样式，空串不显示；覆盖导航栏/连接条/横幅/公告/置顶/消息列表，**不含输入栏、面板与弹层**。不传则不渲染（零开销） |
 
 ## Events

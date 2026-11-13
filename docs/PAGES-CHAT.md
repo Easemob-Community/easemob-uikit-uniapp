@@ -161,7 +161,7 @@ function onOpenInfo(id: string) {
 |---|---|---|---|
 | `conversationId` | `string` | 必填 | 单聊为对方 userId，群聊为 groupId |
 | `chatType` | `ConversationTypeValue` | 必填 | `CONVERSATION_TYPE.SINGLE_CHAT` 或 `CONVERSATION_TYPE.GROUP_CHAT`，决定已读回执、typing、@ 提及、公告等链路 |
-| `avatarShape` | `EmAvatarShape` | `'circle'` | 消息头像形状，`'circle'` / `'square'` |
+| `avatarShape` | `EmAvatarShape` | 跟随全局配置 | 消息头像形状局部覆盖；未传时读取 `uiConfig.avatarShape`（全局默认 `'circle'`） |
 | `showMemberCount` | `boolean` | `true` | 群聊导航栏副标题显示成员数；单聊该位置留给 typing 状态，两者互斥 |
 | `senderNameMode` | `EmSenderNameMode` | `'always'` | 群聊气泡上方是否显示发送者昵称；`'hidden'` 不显示 |
 | `showAnnouncement` | `boolean` | `true` | 群公告条显隐（仅群聊且群公告非空时生效） |

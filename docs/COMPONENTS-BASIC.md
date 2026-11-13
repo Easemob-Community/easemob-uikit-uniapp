@@ -1,6 +1,6 @@
 # 基础组件
 
-这页是 14 个通用原子组件的契约参考：`em-action-sheet`、`em-avatar`、`em-badge`、`em-button`、`em-empty`、`em-icon`、`em-load-more`、`em-nav-bar`、`em-popup`、`em-search-bar`、`em-skeleton`、`em-switch`、`em-text`、`em-watermark`。它们不连 store、不碰路由，props 进、events 出，可以直接嵌进宿主自己的界面。
+这页是 14 个通用原子组件的契约参考：`em-action-sheet`、`em-avatar`、`em-badge`、`em-button`、`em-empty`、`em-icon`、`em-load-more`、`em-nav-bar`、`em-popup`、`em-search-bar`、`em-skeleton`、`em-switch`、`em-text`、`em-watermark`。它们不连业务 store、不碰路由，props 进、events 出，可以直接嵌进宿主自己的界面；`em-avatar` 仅通过 `useConfig` 读取全局头像形状。
 
 本页所有组件都符合 easycom 目录约定，`pages.json` 打开 `autoscan` 后可直接写标签；也可以显式 `import` 后局部注册。引入方式与选型见 [组件总览与选型](./COMPONENTS.md)。所有组件都支持 `custom-class` / `custom-style` 根节点样式透出，用法见 [样式定制](./GUIDE-STYLING.md)。
 
@@ -85,7 +85,7 @@ function onSelect(action: EmActionSheetAction): void {
 | `src` | `string` | `''` | 头像地址；空串直接走文字头像 |
 | `name` | `string` | `''` | 展示名，文字头像取前 2 个字符，并作为底色取色依据 |
 | `size` | `number` | `40` | 头像直径 / 边长，单位 px |
-| `shape` | `'circle' \| 'square'` | `'circle'` | 圆形或方形 |
+| `shape` | `'circle' \| 'square'` | 跟随全局配置 | 圆形或方形局部覆盖；未传时读取 `uiConfig.avatarShape`（全局默认 `'circle'`） |
 | `badge` | `number` | `0` | 角标数字，`> 0` 时显示 |
 | `badgeDot` | `boolean` | `false` | 红点模式，优先于 `badge` |
 | `badgeMax` | `number` | `99` | 角标截断阈值，超过显示 `max+` |
