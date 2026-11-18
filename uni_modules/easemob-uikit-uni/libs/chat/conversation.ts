@@ -45,6 +45,10 @@ export function findConversation(conversationId: string): EmConversationItem | u
   return conversationStore.items.find((c) => c.conversationId === conversationId)
 }
 
+function conversationMuteKey(target: { conversationId: string, conversationType: string }): string {
+  return `${target.conversationType}:${target.conversationId}`
+}
+
 export class EmConversationDomain {
   currentConversationId = ''
   // 当前会话收消息清服务端未读的最近一次时间（按会话合批，见 clearUnread）
@@ -54,6 +58,9 @@ export class EmConversationDomain {
   private settingGenerationByConversationId: Record<string, number> = {}
   private accountGeneration = 0
   private syncRequestId = 0
+  private muteQueriedByKey: Record<string, boolean> = {}
+  private muteSyncPromise: Promise<void> | null = null
+  private muteSyncRerun = false
 
   constructor(private ctx: EmChatContext, private messages: EmMessageDomain) {}
 
@@ -185,6 +192,9 @@ export class EmConversationDomain {
     this.pinQueueByConversationId = {}
     this.muteQueueByConversationId = {}
     this.settingGenerationByConversationId = {}
+    this.muteQueriedByKey = {}
+    this.muteSyncPromise = null
+    this.muteSyncRerun = false
   }
 
   pinConversation(conversationId: string, chatType: ConversationTypeValue, pinned: boolean): Promise<void> {
@@ -447,18 +457,52 @@ export class EmConversationDomain {
   }
 
   // 会话列表快照不携带免打扰状态（SDK 快照恒为 DEFAULT / 群 joined-group 同步可能带入），
-  // 以 PushManager 批量查询作为权威来源：单次最多 20 条，分片查询后逐条回写 store。
+  // 以 PushManager 批量查询作为权威来源：成功项按会话记账，后续只查新增与上次失败项。
+  // 单轮最多 20 条且串行；运行中重复触发共享同一 Promise，并合并为一次补跑。
   // DURATION 规则无 remindType，按 expireTimestamp 未过期判定免打扰中（对齐 vue 版）。
   // 失败只告警：本地状态已由 toConversationItem 保留，不因一次网络失败把 icon 抹掉。
   async syncConversationMuteStates(expectedEpoch = getAccountEpoch()): Promise<void> {
     if (!isAccountEpochCurrent(expectedEpoch)) return
+    const running = this.muteSyncPromise
+    if (running != null) {
+      this.muteSyncRerun = true
+      return running
+    }
+    const promise = this.runConversationMuteSync(expectedEpoch)
+    this.muteSyncPromise = promise
+    try {
+      await promise
+    } finally {
+      if (this.muteSyncPromise === promise) {
+        this.muteSyncPromise = null
+        const rerun = this.muteSyncRerun
+        this.muteSyncRerun = false
+        // 覆盖 run 已结束、finally 尚未清理之间到达的触发，不能丢补跑请求
+        if (rerun && isAccountEpochCurrent(expectedEpoch)) {
+          await this.syncConversationMuteStates(expectedEpoch)
+        }
+      }
+    }
+  }
+
+  private async runConversationMuteSync(expectedEpoch: number): Promise<void> {
+    do {
+      this.muteSyncRerun = false
+      await this.queryConversationMuteStates(expectedEpoch)
+    } while (this.muteSyncRerun && isAccountEpochCurrent(expectedEpoch))
+  }
+
+  private async queryConversationMuteStates(expectedEpoch: number): Promise<void> {
+    if (!isAccountEpochCurrent(expectedEpoch)) return
     const client = this.ctx.client as unknown as { pushManager?: PushManager } | null
     const push = client?.pushManager
     if (push == null) return
-    const targets = conversationStore.items.map((c) => ({
-      conversationId: c.conversationId,
-      conversationType: c.chatType
-    }))
+    const targets = conversationStore.items
+      .filter((c) => this.muteQueriedByKey[conversationMuteKey({ conversationId: c.conversationId, conversationType: c.chatType })] !== true)
+      .map((c) => ({
+        conversationId: c.conversationId,
+        conversationType: c.chatType
+      }))
     for (let i = 0; i < targets.length; i += CONVERSATION_SILENT_MODE_BATCH_SIZE) {
       const batch = targets.slice(i, i + CONVERSATION_SILENT_MODE_BATCH_SIZE)
       const requestIdByConversationId: Record<string, number> = {}
@@ -492,6 +536,8 @@ export class EmConversationDomain {
             item.isMuted = muted
           }
         })
+        // 服务端未返回的会话按默认规则处理，同样记账，避免后续每轮重复查询
+        batch.forEach((target) => { this.muteQueriedByKey[conversationMuteKey(target)] = true })
       } catch (e) {
         logger.warn('syncConversationMuteStates failed:', e)
       }
