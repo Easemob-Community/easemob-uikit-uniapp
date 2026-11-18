@@ -38,6 +38,9 @@
 | H5 | 现代浏览器（Chrome / Safari） | 移动端布局，未做 PC 宽屏适配 |
 | 微信小程序 | 基础库 2.11.2+ | 跨分包 `require` 依赖该基础库；SDK 需分包接入，见[微信小程序 SDK 分包](./GUIDE-WEAPP-SDK-SUBPACKAGE.md) |
 
+> [!WARNING]
+> HBuilderX 5.34 引入 `easemob-websdk` 后可能报 `Identifier "h" has already been declared`。DCloud 已确认该编译链问题；当前需在宿主工程的 Vite 配置中忽略 `h` 自动导入，完整配置与官方 issue 见[快速开始](./QUICKSTART.md#hbuilderx-534-sdk-编译异常)。
+
 ## 能力矩阵
 
 ### 消息能力

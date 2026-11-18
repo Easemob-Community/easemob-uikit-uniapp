@@ -66,7 +66,28 @@ your-app/
 - UIKit 零运行时依赖；不要为它引入 UI 库、请求库或状态库。
 - 小程序端不要自己 `import 'easemob-websdk'`（会进主包）；UIKit 已内置跨分包加载，见 `em-host-mp-subpackage`。
 
-### 4.1 App 发行与权限声明（宿主必做）
+### 4.1 HBuilderX 5.34：SDK 编译异常
+
+若引入 SDK 后报 `Identifier "h" has already been declared`，在宿主工程根目录新增 `vite.config.ts`：
+
+```ts
+import { defineConfig } from 'vite';
+import uni from '@dcloudio/vite-plugin-uni';
+
+export default defineConfig({
+	plugins: [uni({
+		autoImportOptions: {
+			ignore: ['h']
+		}
+	})],
+});
+```
+
+已有配置时，把 `autoImportOptions` 合并到现有 `uni()` 配置中，不要覆盖其他插件。无需修改或重打包 `node_modules`。
+
+这是 HBuilderX 5.34 编译链的已知问题；DCloud 已在 [issue #34492](https://issues.dcloud.net.cn/pages/issues/detail?id=34492) 中确认并回复将由 HBuilderX 后续修复。
+
+### 4.2 App 发行与权限声明（宿主必做）
 
 先补 Android/iOS 的 WebSocket 原生模块，再检查媒体权限。环信 SDK 通过运行时适配对象调用 `connectSocket`，静态摇树可能漏掉 `uni-websocket`；缺失时调试基座可能正常，发行包却无法建立 IM 长连接：
 

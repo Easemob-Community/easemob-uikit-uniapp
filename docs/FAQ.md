@@ -10,6 +10,27 @@
 
 背景与升级路径：DCloud 官方已于 2024 年停止 nvue 与 5+ 的维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台的维护；uni-app x 蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可方便升级。依据见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)，升级指引见官方「uni-app 升级 uni-app x」专题。
 
+### HBuilderX 5.34 引入 SDK 后报 `Identifier "h" has already been declared`
+
+这是 HBuilderX 5.34 编译链的已知问题，不是 UIKit 业务代码导致。DCloud 已在 [issue #34492](https://issues.dcloud.net.cn/pages/issues/detail?id=34492) 中确认，并回复将由 HBuilderX 后续修复。
+
+当前在宿主工程根目录新增 `vite.config.ts`：
+
+```ts
+import { defineConfig } from 'vite';
+import uni from '@dcloudio/vite-plugin-uni';
+
+export default defineConfig({
+	plugins: [uni({
+		autoImportOptions: {
+			ignore: ['h']
+		}
+	})],
+});
+```
+
+已有 `vite.config.ts` 时，将 `autoImportOptions` 合并到现有 `uni()` 配置中，保留其他插件配置。无需重打包或覆盖 `node_modules/easemob-websdk`；保存配置后重新编译。
+
 ## 页面与布局
 
 ### 页面白屏 / 列表或输入栏高度为 0

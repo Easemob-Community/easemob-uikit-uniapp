@@ -52,15 +52,23 @@ console.log('im state', {
 | 报错原文 | 根因 | 修复 |
 |---|---|---|
 | 构建日志第一行打「VDOM模式」，但工程是蒸汽模式 | CLI 下 Web 蒸汽模式以工程根目录的 `.vapor` 文件为开关，缺失时静默退回 VDOM | 工程根目录创建空文件 `.vapor` 并提交进仓库；HBuilderX GUI 构建无此问题 |
-| `[uts] node_modules/easemob-websdk/chunks/*.js：Identifier "h" has already been declared` | HBuilderX 的 uts 编译器解析不了 SDK 的压缩 chunk（5.34 出现，旧版本正常），宿主工程与官方 demo 都会命中 | 用 esbuild 把 SDK 入口重打包成单文件并原位替换（命令见下）；恢复时删掉 `node_modules/easemob-websdk` 重新 `npm install` 即可 |
+| `[uts] node_modules/easemob-websdk/chunks/*.js：Identifier "h" has already been declared` | HBuilderX 5.34 编译链与 SDK 压缩 chunk 的已知兼容问题，宿主工程与官方 demo 都可能命中 | 在宿主工程根目录通过 `vite.config.ts` 忽略 `h` 自动导入（配置见下）；不要重打包或覆盖 `node_modules` |
 | `"default" is not exported by App.uvue?vue&type=script&setup=true&vapor=true&lang.uts`（页面文件同理） | vapor-web 模式下 `lang="uts"` 的 `<script setup>` 块不产出 default export（5.34 出现，旧版本正常） | 报错页面的 `<script setup>` 改 `lang="ts"`；`common/` 下的 `.uts` 工具模块不受影响，不用改 |
 
-```bash
-# 在宿主工程根目录执行：重打包 websdk 入口，绕过压缩 chunk 的解析问题
-cd node_modules/easemob-websdk
-cp index.js index.js.orig
-npx esbuild index.js.orig --loader:.orig=js --bundle --format=esm --outfile=index.js
+```ts
+import { defineConfig } from 'vite';
+import uni from '@dcloudio/vite-plugin-uni';
+
+export default defineConfig({
+	plugins: [uni({
+		autoImportOptions: {
+			ignore: ['h']
+		}
+	})],
+});
 ```
+
+已有 `vite.config.ts` 时，把 `autoImportOptions` 合并到现有 `uni()` 配置中，保留其他插件配置。DCloud 已在 [issue #34492](https://issues.dcloud.net.cn/pages/issues/detail?id=34492) 中确认该问题，并回复将由 HBuilderX 后续修复；当前使用上述配置后重新编译即可。
 
 ## 3. 白屏 / 布局
 

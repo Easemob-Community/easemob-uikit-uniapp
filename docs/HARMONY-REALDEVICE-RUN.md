@@ -1,6 +1,6 @@
 # 鸿蒙真机运行与签名配置
 
-> 本文是示例工程在鸿蒙真机上跑通的完整操作步骤与常见报错处理，2026-10 实测（HBuilderX 5.26 + DevEco Studio + 鸿蒙真机 USB 连接）。
+> 本文是示例工程在鸿蒙真机上跑通的完整操作步骤与常见报错处理，2026-10 实测（HBuilderX 5.26 + DevEco Studio + 鸿蒙真机 USB 连接）；2026-11 补充发行签名材料校验与报错排查。
 > 官方权威来源：[uni-app 鸿蒙运行和发行](https://uniapp.dcloud.net.cn/tutorial/harmony/runbuild.html)（签名报错处理以该文档「证书签名配置指南」一节为准）。
 
 ## 1. 环境要求
@@ -189,8 +189,155 @@ harmony-configs/
 
 排查方法：`logLevel: 'debug'` 下导出日志（示例工程「我的 → 导出调试日志」），搜 `Object entries`。
 
-## 6. 备注
+## 6. 鸿蒙发行签名：四件套与正确顺序
 
-- 调试证书有效期 365 天，到期重新申请；调试 Profile 与设备绑定，换新手机需重新注册 UDID 并更新 Profile。
-- 发布上架需另配**发布证书 + 发布 Profile**，流程相同（证书类型选发布），本文不展开。
+发行签名需要 `.p12`、`.csr`、`.cer`、`.p7b` 四份材料。它们不是彼此独立、可以随意组合的文件，而是同一条密钥链上的不同产物：
+
+```text
+本地生成 .p12（私钥）
+   │ 从同一私钥生成
+   ▼
+本地生成 .csr（证书请求）
+   │ 在 AGC 上传该 CSR，申请发布证书
+   ▼
+AGC 下载 .cer（华为签发的发布证书）
+   │ 创建发布 Profile 时选择这张证书
+   ▼
+AGC 下载 .p7b（绑定包名、发布证书和权限）
+   │
+   ▼
+HBuilderX 配置后执行发行打包
+```
+
+| 文件 | 生成位置 | 作用 | 能否随意替换 |
+|---|---|---|---|
+| `.p12` | 本地 DevEco Studio | 保存签名私钥和本地自签名证书 | 不能；更换后通常需要重新申请证书和 Profile |
+| `.csr` | 本地 DevEco Studio | 向 AGC 证明公钥并申请证书 | 必须与当前 `.p12` 的私钥匹配 |
+| `.cer` | AGC | 华为根据 CSR 签发的发布证书，文件可能是完整证书链 | 必须使用当前 CSR 申请 |
+| `.p7b` | AGC | 绑定应用包名、发布证书、权限和有效期 | 必须选择同一张发布证书创建 |
+
+> [!IMPORTANT]
+> `.p12` 不在 AGC 生成。AGC 不保存你的私钥，无法替你下载 `.p12` 或找回密码。重新生成 `.p12` 后，旧 CSR、旧 `.cer` 和旧 `.p7b` 不会自动适配新私钥。
+
+### 6.1 第一步：确定包名并注册 APP ID
+
+先按第 2 节确定 `bundleName`，并在 AGC【证书、APP ID 和 Profile】→【APP ID】中注册同一个包名。后续创建 Profile、HBuilderX 配置和实际构建都必须使用该包名。
+
+已经用于调试或上架的包名不要随意修改；包名变化后需要重新创建对应 Profile。
+
+### 6.2 第二步：在本地生成 `.p12` 和 `.csr`
+
+DevEco Studio 打开任意鸿蒙工程，选择 **Build → Generate Key and CSR**：
+
+1. 首次使用时，在 Key Store File 中选择 **New**，设置 `.p12` 保存位置和私钥库密码。
+2. 设置密钥别名（Alias）和私钥密码。私钥库密码与私钥密码可以相同，也可以不同，必须分别记录。
+3. 设置 `.csr` 保存位置并完成生成。
+4. 备份 `.p12`、两个密码、别名和同目录的 `material`，不要提交到仓库。
+
+如果是要为现有私钥重新申请证书，应选择**已有的 `.p12` 和别名**生成 CSR，不要再次选择 New。申请证书和 Profile 期间不要重建密钥。
+
+### 6.3 第三步：在 AGC 申请发布证书 `.cer`
+
+进入 AGC【证书、APP ID 和 Profile】→【证书】：
+
+1. 新增证书，类型选择**发布证书**。
+2. 上传上一步生成的 `.csr`。
+3. 下载签发后的 `.cer`。
+
+下载后应确认新证书与当前 CSR 对应。文件名与旧证书相同、文件已经重新下载，都不能证明公钥匹配。
+
+### 6.4 第四步：在 AGC 创建发布 Profile `.p7b`
+
+进入 AGC【证书、APP ID 和 Profile】→【Profile】：
+
+1. 新增 Profile，类型选择**发布**。
+2. 应用选择已注册的 `<bundleName>`。
+3. 证书选择**上一步刚创建的发布证书**，不要误选账号下的旧证书。
+4. 下载 `.p7b`。
+
+Profile 的下载时间不是证书匹配依据。即使 `.p7b` 刚下载，它仍可能绑定一张多年前创建的旧证书，应以 Profile 中嵌入的发布证书为准。
+
+### 6.5 第五步：配置 HBuilderX 发布证书
+
+建议将 `.p12`、`.cer`、`.p7b` 放在同一个稳定目录，并保留该目录下的 `material`。在 HBuilderX 的 `manifest.json` 可视化编辑页打开【鸿蒙 App 配置】→【发布证书】，填写：
+
+| 字段 | 填写内容 |
+|---|---|
+| 私钥库文件 `storeFile` | 当前 `.p12` |
+| 私钥库密码 `storePassword` | 创建该密钥库时设置的明文密码 |
+| 密钥别名 `keyAlias` | 当前 `.p12` 中实际存在的 Alias |
+| 私钥密码 `keyPassword` | 当前别名对应的明文私钥密码 |
+| 证书文件 `certpath` | 使用当前 CSR 申请得到的 `.cer` |
+| Profile 文件 `profile` | 选择同一张发布证书创建的 `.p7b` |
+| 签名算法 `signAlg` | 保持 `SHA256withECDSA`，除非签名材料另有明确说明 |
+
+重新生成过密钥或 `material` 后，应在两个密码框中重新输入明文密码，不要继续沿用从其他工程复制的加密密文。保存后，构建系统会把配置写入生成工程的 `build-profile.json5`；不要直接修改 `unpackage/` 中的该文件。
+
+### 6.6 第六步：执行发行打包
+
+选择 HBuilderX【发行】→【App-Harmony-本地打包】。成功的发行构建应完成 `SignHap` 并生成已签名的 `.app` 安装包。
+
+`CompileArkTS`、`PackageHap` 成功只表示编译和打包完成，不代表签名成功。前面的 ArkTS、重复文件名或混淆 `WARN` 通常不是安装包制作失败的原因，应定位第一个 `hvigor ERROR` 及其错误码。
+
+## 7. 发行前的交叉校验
+
+仅确认三个文件存在还不够。有效的发行签名必须同时满足以下条件：
+
+| 校验项 | 正确结果 |
+|---|---|
+| 密钥库 | `.p12` 可以打开，配置的别名确实存在，私钥密码可以解密该别名 |
+| 私钥与 CSR | 两者公钥完全一致 |
+| 私钥与发布证书 | `.p12` 私钥与 `.cer` 叶子发布证书的公钥完全一致 |
+| 证书链与 Profile | `.cer` 叶子发布证书与 `.p7b` 中的 `distribution-certificate` 序列号、指纹和公钥一致 |
+| Profile 应用信息 | `type = release`，`bundle-name` 与工程一致，当前时间处于有效期内 |
+| Profile 权限 | `allowed-acls` 覆盖工程声明的受限权限；普通权限不需要 ACL |
+| 构建配置 | `manifest.json` 与生成工程的 release `build-profile.json5` 引用同一套文件 |
+| 密码材料 | 明文密码正确；若使用加密密文，则密文必须与配套的 `material` 一起使用 |
+
+可用下面的命令检查别名和 CSR。命令不含密码参数，按提示交互输入即可：
+
+```bash
+# 查看密钥库条目与别名
+keytool -list -keystore /path/to/signing.p12 -storetype PKCS12
+
+# 校验 CSR 自身签名
+openssl req -in /path/to/signing.csr -noout -verify
+```
+
+也可以分别输出 `.p12` 和 CSR 的公钥进行比较：
+
+```bash
+openssl pkcs12 -in /path/to/signing.p12 -nokeys -clcerts | openssl x509 -noout -pubkey
+openssl req -in /path/to/signing.csr -noout -pubkey
+```
+
+> [!WARNING]
+> `.cer` 可能依次包含根 CA、中间 CA 和叶子发布证书。直接使用 `openssl x509 -in signing.cer` 通常只读取第一张证书，可能拿到根 CA，不能据此判断私钥是否匹配。校验时应逐张解析证书链，并选择实际发布叶子证书。
+
+## 8. 签名报错速查
+
+| 报错 | 常见原因 | 处理方法 |
+|---|---|---|
+| `11014003 Init keystore failed` / `keystore password was incorrect` | 当前 `storeFile` 与 `storePassword` 不配套；常见于只改密码但仍选中另一个 `.p12` | 先核对实际 `storeFile` 路径，再重新选择密钥库并输入该文件的明文私钥库密码 |
+| `11111002 Certificates Error` / `Signing failed` / `Please check whether the keyAlias is correct` | 别名错误是其中一种可能；私钥密码错误、`.p12` 与 `.cer` 公钥不匹配、Profile 绑定另一张证书也会进入证书失败 | 用第 7 节逐项验证，不要只重复选择同一个 `.cer` |
+| `00303242 Configuration Error` / `Signature material verification failed` / `Unsupported state or unable to authenticate data` | 加密密码密文与 `material` 不配套，或签名材料认证失败 | 保留同一目录的 `material`，在 HBuilderX 中重新输入两个明文密码；也可通过 DevEco Studio【File → Project Structure → Signing Configs】重新取得完整配置 |
+| `签名证书资料配置错误` | HBuilderX 对签名失败的汇总提示，不是具体根因 | 向上查找第一个 `hvigor ERROR` 和错误码，再按对应项处理 |
+| `配置的 bundleName 与签名证书不符` | Profile 与工程包名不同 | 修改工程包名，或为当前包名重新创建 Profile |
+| `运行所需的权限没有签名授权` | 工程声明了需要白名单的 ACL 权限，但 Profile 未包含授权 | 删除业务未使用的受限权限；确需使用时，先申请相应受限权限，再生成包含 ACL 的签名材料 |
+| 真机安装时 `签名验证失败` | 调试 Profile 未包含当前设备 UDID | 注册设备并重新创建调试 Profile |
+| 覆盖安装时 `签名不一致` | 设备上的应用与当前安装包使用了不同签名 | 调试场景可卸载旧应用后重装；已上架应用的签名变更需遵循华为的升级规则 |
+
+### 最容易反复踩中的四个问题
+
+1. **申请证书后又生成新 `.p12`**：新私钥与旧证书必然不匹配。应固定私钥，只重新申请证书和 Profile。
+2. **创建 Profile 时选到旧证书**：新下载的 `.p7b` 仍可能绑定旧证书。必须检查 Profile 内嵌证书，而不是只看文件时间。
+3. **复制加密密码却没有复制配套 `material`**：密文无法认证。最稳妥的处理是重新输入明文密码。
+4. **拿 `.cer` 第一张根 CA 证书与私钥比较**：比较对象错误。应使用叶子发布证书，并与 Profile 内嵌证书交叉确认。
+
+## 9. 签名材料安全与更新注意事项
+
+- `.p12`、两个密码和 `material` 必须妥善备份；丢失私钥后，AGC 无法帮你恢复。
+- 私钥、密码、CSR、签名证书、Profile、`material` 以及包含本机路径的签名配置都不要提交到公开仓库。
+- 调试证书有效期 365 天，到期重新申请；调试 Profile 与设备绑定，换新手机需注册 UDID 并更新 Profile。
 - 受 AGC API 限制，自动申请拿不到含 ACL 权限的调试证书；需要 ACL 权限的应用请走第 4 节的手动签名流程。
+- 已正式上架的应用不要随意更换签名体系。新签名安装包可能无法覆盖旧版本，应用更新应遵循华为的签名与升级规则。

@@ -43,6 +43,25 @@ npm install easemob-websdk@5.2.0
 
 > `easemob-websdk` 是 peer 依赖，版本精确锁定 `5.2.0`；升级前先看 UIKit 的 changelog 与对应版本发布说明。
 
+### HBuilderX 5.34：SDK 编译异常
+
+HBuilderX 5.34 引入 `easemob-websdk` 后，构建可能报 `Identifier "h" has already been declared`。DCloud 已在 [issue #34492](https://issues.dcloud.net.cn/pages/issues/detail?id=34492) 中确认该问题，并回复将由 HBuilderX 后续修复。当前可在宿主工程根目录新增 `vite.config.ts`，忽略 uni 插件对 `h` 的自动导入：
+
+```ts
+import { defineConfig } from 'vite';
+import uni from '@dcloudio/vite-plugin-uni';
+
+export default defineConfig({
+	plugins: [uni({
+		autoImportOptions: {
+			ignore: ['h']
+		}
+	})],
+});
+```
+
+若已有 `vite.config.ts`，把 `autoImportOptions` 合并到现有 `uni()` 配置中，不要覆盖其他插件配置。该配置不需要修改或重新打包 `node_modules`；保存后重新编译即可。
+
 ## 3. pages.json：easycom 与页面样式
 
 ### 3.1 页面组件 easycom

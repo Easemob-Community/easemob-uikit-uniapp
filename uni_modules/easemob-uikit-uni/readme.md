@@ -37,6 +37,23 @@ npm install easemob-websdk@5.2.0
 
 把 `uni_modules/easemob-uikit-uni/` 放入宿主工程（插件市场导入或直接拷贝）。
 
+**HBuilderX 5.34**：若引入 SDK 后报 `Identifier "h" has already been declared`，在宿主工程根目录新增 `vite.config.ts`：
+
+```ts
+import { defineConfig } from 'vite';
+import uni from '@dcloudio/vite-plugin-uni';
+
+export default defineConfig({
+	plugins: [uni({
+		autoImportOptions: {
+			ignore: ['h']
+		}
+	})],
+});
+```
+
+已有配置时合并 `autoImportOptions`，不要覆盖其他插件，也无需修改或重打包 `node_modules`。DCloud 已在 [issue #34492](https://issues.dcloud.net.cn/pages/issues/detail?id=34492) 中确认该问题，并回复将由 HBuilderX 后续修复。
+
 ### 2. pages.json：页面组件 easycom
 
 页面级组件位于 `components/pages/`，不在默认 easycom 扫描规则内，需要补一条 custom 规则：
