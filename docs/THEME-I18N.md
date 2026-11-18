@@ -134,15 +134,43 @@ const { themeClass } = useThemeChrome({
 | `theme.json` / manifest darkmode | 工程配置 | 对齐原生 chrome 首帧 |
 | `useThemeChrome()` 或 `syncNativeThemeUI()` | 页面 `onShow` 与主题变化 | 同步原生及 H5 chrome |
 
-### 首帧原生 chrome
+### 首帧原生 chrome 与系统状态栏
 
-小程序/App 的原生导航栏与 tabBar 颜色来自 `pages.json`。为了避免深色偏好用户首帧看到白条，可以：
+小程序/App 的原生导航栏与 tabBar 颜色来自 `pages.json`。为了让原生 chrome 的首帧与 `themeStore.mode` 一致，并避免二级页在深色模式下仍使用黑色系统图标，宿主应同时配置：
 
 - 在 `pages.json` 的 `globalStyle` / `tabBar` 使用主题变量（`@navBgColor` 等），并提供 `theme.json` 的 light/dark 两套值；
 - 微信小程序 `manifest.json` 开启 `mp-weixin.darkmode`；
-- App 端 `manifest.json` 设置 `app.defaultAppTheme: "auto"`。
+- App 端 `manifest.json` 设置 `app.defaultAppTheme: "auto"`，由 `initTheme()` / `setTheme()` 调用 `uni.setAppTheme` 驱动明暗切换。
 
-具体字段随宿主工程配置不同，核心是让原生 chrome 的首帧与 `themeStore.mode` 一致。
+导航栏与系统状态栏的最小配置如下。`theme.json` 放在宿主工程根目录：
+
+```json
+{
+  "light": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#F8F8F8"
+  },
+  "dark": {
+    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#1E2123"
+  }
+}
+```
+
+在 `pages.json` 中引用同名变量：
+
+```json
+{
+  "globalStyle": {
+    "navigationBarTextStyle": "@navigationBarTextStyle",
+    "navigationBarBackgroundColor": "@navigationBarBackgroundColor"
+  }
+}
+```
+
+`navigationBarTextStyle` 仅支持 `black` / `white`，同时控制导航栏标题和系统状态栏前景色。使用 `navigationStyle: custom` 时，状态栏背景恒为透明，由 `em-nav-bar` 的顶部安全区显示页面背景；此时仍需配置状态栏前景色，否则深色背景上可能继续显示黑色的时间、信号和电量图标。该配置属于宿主工程，页面级固定配色可以在对应页面的 `style` 中覆盖全局值。
+
+`theme.json` 负责页面创建时的原生样式；`useThemeChrome()` 或 `syncNativeThemeUI()` 继续负责页面显示和主题变化时的运行时同步。两者共同使用，可以覆盖首帧、二级页进入和运行中切换。
 
 ## 4. 品牌色
 
@@ -228,6 +256,7 @@ setLocale('ja')
 |---|---|---|
 | 暗色下只有部分区域变黑 | 页面根节点没绑 `themeClass`，或宿主写了固定颜色 | 根节点绑定 `themeClass`，颜色改用 `--em-*` |
 | 切主题后原生导航栏还是白的 | 原生 chrome 不随页面 class 变化 | 在 `onShow`/切换后调用 `syncNativeThemeUI()` |
+| 深色二级页的时间、电量等系统图标仍是黑色 | `navigationBarTextStyle` 固定为 `black`，或未随 `appTheme` 切换 | 在宿主 `theme.json` 中配置 dark 为 `white`，并在 `pages.json` 引用主题变量 |
 | 首帧闪白 | `pages.json`/`theme.json` 没配深色首帧 | 配置原生主题变量与 `darkmode` |
 | 语言切换后文案没变 | 页面缓存了字符串 | 用 `useLocale()` 的 `t()` 在模板/computed 中取 |
 | 英文环境仍是中文 | 系统语言不是 `en` 开头，或持久化了 `zh-CN` | 调 `setLocale('en')` 或清除 `emkit.locale` |
