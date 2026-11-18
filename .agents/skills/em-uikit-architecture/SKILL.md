@@ -50,7 +50,7 @@ uni_modules/easemob-uikit-uni/
 
 ## 会话域（libs/chat/conversation.ts）
 
-- 会话列表同步协议**不携带免打扰字段**：`ConversationItem.remindType` 在快照中恒为 `DEFAULT`（群 joined-group 同步可能带入）。`toConversationItem` 对已有会话必须**保留本地 `isMuted`**，不能按快照重置；冷启动/跨端校正走 `syncConversationMuteStates()`（`PushManager.getConversationSilentModes`，单次 ≤20，`DURATION` 按 `expireTimestamp` 判定）。成功查询按会话类型与 ID 记账，后续仅查新增及失败项；运行中重复触发共享 Promise 并合并补跑，单轮保持串行。批量查询与会话 refresh 同时按 requestId 和 settlementRevision 判定新鲜度：读取后发生新意图或本地成功/失败结算，旧响应均不得覆盖；结算前到达的新鲜权威值仍更新回滚基线但不改在途乐观 UI，结算后新发起的读取正常生效。
+- 会话列表同步协议**不携带免打扰字段**：`ConversationItem.remindType` 在快照中恒为 `DEFAULT`（群 joined-group 同步可能带入）。`toConversationItem` 对已有会话必须**保留本地 `isMuted`**，不能按快照重置；冷启动/跨端校正走 `syncConversationMuteStates()`（`PushManager.getConversationSilentModes`，单次 ≤20，`DURATION` 按 `expireTimestamp` 判定）。成功查询按会话类型与 ID 记账，后续仅查新增及失败项；运行中重复触发共享 Promise 并合并补跑，单轮保持串行。`DURATION` 到期定时器只使当前项记账失效并触发增量权威校正，删除会话清记账与定时器；响应回写和记账均校验发出时的会话代次，防止删除前响应污染重建会话。批量查询与会话 refresh 同时按 requestId 和 settlementRevision 判定新鲜度：读取后发生新意图或本地成功/失败结算，旧响应均不得覆盖；结算前到达的新鲜权威值仍更新回滚基线但不改在途乐观 UI，结算后新发起的读取正常生效。
 - 本端 `pinConversation` / `setConversationMuted` 按「会话 + 设置项」独立串行，调用时乐观回写最新意图；旧成功/失败不回写 UI。成功以本地意图为最终确认值，失败回滚到失败时的最新已确认值（可能是在途收到的权威远端状态），每次成功/失败结算均递增 settlementRevision；pin 在途时会话快照保留本地 pin/pinnedTime，其他端 mute 改动由 ChatClient 级 `onMultiDeviceConversation` 的 `CONVERSATION_MUTE_INFO_CHANGED` 回写。
 - 设置队列带会话代次与账号代次：`removeConversationLocal` 提升会话代次并失效 pin/mute 队列，`reset()` 提升账号代次；删除/重建同 ID 或换账号后，旧成功/失败闭包均不得回写新状态。`removeConversationLocal` 同时调用 `clearDraft(conversationId)`，不得恢复旧持久化草稿。
 - **列表顺序必须显式排序**，不直接用 SDK 快照顺序：置顶优先、置顶区间按 `pinnedTime` 倒序（无置顶时间回落 `lastMessageTime`），非置顶按 `lastMessageTime` 倒序（对齐 vue `sortedConversationList`）。SDK 快照会因 `lastAccess`/资料刷新/未读清零等非消息因素重排置顶区间，表现为「进会话再回来置顶顺序变了」。

@@ -78,14 +78,16 @@ async function flush(): Promise<void> {
   if (mgr == null || queue.length === 0) return
   const ids = queue
   queue = []
+  const expectedEpoch = getAccountEpoch()
+  // 整轮预占 loading：未来分片已在途，热更新再次 ensure 不得重复入队
+  ids.forEach((id) => { userStore.loadingByUserId[id] = true })
   for (let i = 0; i < ids.length; i += USER_INFO_REQUEST_BATCH_SIZE) {
-    await fetchChunk(mgr, ids.slice(i, i + USER_INFO_REQUEST_BATCH_SIZE))
+    if (!isAccountEpochCurrent(expectedEpoch)) return
+    await fetchChunk(mgr, ids.slice(i, i + USER_INFO_REQUEST_BATCH_SIZE), expectedEpoch)
   }
 }
 
-async function fetchChunk(mgr: UserInfoManager, ids: string[]): Promise<void> {
-  const expectedEpoch = getAccountEpoch()
-  ids.forEach((id) => { userStore.loadingByUserId[id] = true })
+async function fetchChunk(mgr: UserInfoManager, ids: string[], expectedEpoch: number): Promise<void> {
   try {
     const users = await mgr.getUserInfoByAttribute({ userIds: ids, attributes: ['nickname', 'avatarUrl'] })
     if (!isAccountEpochCurrent(expectedEpoch)) return

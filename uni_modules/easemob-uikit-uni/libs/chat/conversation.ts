@@ -61,6 +61,7 @@ export class EmConversationDomain {
   private muteQueriedByKey: Record<string, boolean> = {}
   private muteSyncPromise: Promise<void> | null = null
   private muteSyncRerun = false
+  private muteExpiryTimerByConversationId: Record<string, ReturnType<typeof setTimeout>> = {}
 
   constructor(private ctx: EmChatContext, private messages: EmMessageDomain) {}
 
@@ -195,6 +196,8 @@ export class EmConversationDomain {
     this.muteQueriedByKey = {}
     this.muteSyncPromise = null
     this.muteSyncRerun = false
+    Object.keys(this.muteExpiryTimerByConversationId).forEach((id) => clearTimeout(this.muteExpiryTimerByConversationId[id]))
+    this.muteExpiryTimerByConversationId = {}
   }
 
   pinConversation(conversationId: string, chatType: ConversationTypeValue, pinned: boolean): Promise<void> {
@@ -303,6 +306,9 @@ export class EmConversationDomain {
   // 被删会话是当前会话时复位 currentConversationId（对齐 vue 版 deleteConversation 语义）
   removeConversationLocal(conversationId: string): void {
     this.invalidateConversationSettings(conversationId)
+    this.clearMuteExpiry(conversationId)
+    delete this.muteQueriedByKey[conversationMuteKey({ conversationId, conversationType: CONVERSATION_TYPE.SINGLE_CHAT })]
+    delete this.muteQueriedByKey[conversationMuteKey({ conversationId, conversationType: CONVERSATION_TYPE.GROUP_CHAT })]
     this.messages.forgetStreams(conversationId)
     clearDraft(conversationId)
     conversationStore.items = conversationStore.items.filter((c) => c.conversationId !== conversationId)
@@ -507,10 +513,12 @@ export class EmConversationDomain {
       const batch = targets.slice(i, i + CONVERSATION_SILENT_MODE_BATCH_SIZE)
       const requestIdByConversationId: Record<string, number> = {}
       const settlementRevisionByConversationId: Record<string, number> = {}
+      const generationByConversationId: Record<string, number> = {}
       batch.forEach((target) => {
         const queue = this.muteQueueByConversationId[target.conversationId]
         requestIdByConversationId[target.conversationId] = queue?.latestRequestId ?? 0
         settlementRevisionByConversationId[target.conversationId] = queue?.settlementRevision ?? 0
+        generationByConversationId[target.conversationId] = this.settingGenerationByConversationId[target.conversationId] ?? 0
       })
       try {
         const result = await push.getConversationSilentModes({
@@ -519,6 +527,8 @@ export class EmConversationDomain {
         if (!isAccountEpochCurrent(expectedEpoch)) return
         result.conversations.forEach((r) => {
           if (!isAccountEpochCurrent(expectedEpoch)) return
+          const generation = generationByConversationId[r.conversationId] ?? 0
+          if (generation !== (this.settingGenerationByConversationId[r.conversationId] ?? 0)) return
           const queue = this.muteQueueByConversationId[r.conversationId]
           const requestId = requestIdByConversationId[r.conversationId] ?? 0
           const latestRequestId = queue?.latestRequestId ?? 0
@@ -535,18 +545,58 @@ export class EmConversationDomain {
           if ((queue?.pendingCount ?? 0) === 0 && item != null && item.isMuted !== muted) {
             item.isMuted = muted
           }
+          if (r.rule.expireTimestamp != null && r.rule.expireTimestamp > Date.now()) {
+            this.scheduleMuteExpiry(r.conversationId, r.rule.expireTimestamp)
+          } else {
+            this.clearMuteExpiry(r.conversationId)
+          }
         })
-        // 服务端未返回的会话按默认规则处理，同样记账，避免后续每轮重复查询
-        batch.forEach((target) => { this.muteQueriedByKey[conversationMuteKey(target)] = true })
+        // 服务端未返回的会话按默认规则处理；删除/重建过的会话不得被旧响应重新记账
+        batch.forEach((target) => {
+          const generation = generationByConversationId[target.conversationId] ?? 0
+          if (generation === (this.settingGenerationByConversationId[target.conversationId] ?? 0)) {
+            this.muteQueriedByKey[conversationMuteKey(target)] = true
+          }
+        })
       } catch (e) {
         logger.warn('syncConversationMuteStates failed:', e)
       }
     }
   }
 
+  private clearMuteExpiry(conversationId: string): void {
+    const timer = this.muteExpiryTimerByConversationId[conversationId]
+    if (timer != null) clearTimeout(timer)
+    delete this.muteExpiryTimerByConversationId[conversationId]
+  }
+
+  private scheduleMuteExpiry(conversationId: string, expireTimestamp: number): void {
+    this.clearMuteExpiry(conversationId)
+    const expectedEpoch = getAccountEpoch()
+    const expectedGeneration = this.settingGenerationByConversationId[conversationId] ?? 0
+    const timer = setTimeout(() => {
+      if (this.muteExpiryTimerByConversationId[conversationId] !== timer) return
+      delete this.muteExpiryTimerByConversationId[conversationId]
+      if (!isAccountEpochCurrent(expectedEpoch)) return
+      if (expectedGeneration !== (this.settingGenerationByConversationId[conversationId] ?? 0)) return
+      const item = findConversation(conversationId)
+      if (item == null) return
+      // 极长延时被平台提前唤醒时，继续等待真实到期时间
+      if (expireTimestamp > Date.now()) {
+        this.scheduleMuteExpiry(conversationId, expireTimestamp)
+        return
+      }
+      // 到期后仅让该会话重新走权威查询；本地设置在途时沿用既有新鲜度与回滚保护
+      delete this.muteQueriedByKey[conversationMuteKey({ conversationId, conversationType: item.chatType })]
+      this.syncConversationMuteStates(expectedEpoch).catch(() => {})
+    }, Math.max(expireTimestamp - Date.now(), 0))
+    this.muteExpiryTimerByConversationId[conversationId] = timer
+  }
+
   // 多设备会话事件（CONVERSATION_MUTE_INFO_CHANGED）：始终更新回滚基线，在途时保留乐观 UI
   applyMuteInfoChanged(conversationId: string, remindType: string | undefined): void {
     if (remindType == null || remindType === '') return
+    this.clearMuteExpiry(conversationId)
     const queue = this.muteQueueByConversationId[conversationId]
     const muted = remindType === 'NONE'
     if (queue != null) {
