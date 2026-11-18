@@ -158,6 +158,9 @@ export const CONVERSATION_TAB_KEY = {
 
 export type ConversationTabKeyValue = (typeof CONVERSATION_TAB_KEY)[keyof typeof CONVERSATION_TAB_KEY]
 
+/** UserInfoManager 批量查询用户资料单次上限，服务端硬限制 100 */
+export const USER_INFO_REQUEST_BATCH_SIZE = 100
+
 /** PushManager 批量查询会话免打扰（getConversationSilentModes）单次上限，SDK 硬限制 20 */
 export const CONVERSATION_SILENT_MODE_BATCH_SIZE = 20
 
