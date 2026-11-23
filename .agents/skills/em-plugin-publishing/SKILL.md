@@ -40,7 +40,10 @@ rm -f dist/publish/easemob-uikit-uni.zip
 (
   cd uni_modules/easemob-uikit-uni
   zip -q -r -X ../../dist/publish/easemob-uikit-uni.zip . \
-    -x '*/.DS_Store' '*/node_modules/*' '*/.git/*' '*/unpackage/*'
+    -x '.DS_Store' '*/.DS_Store' \
+       'node_modules/*' '*/node_modules/*' \
+       '.git/*' '*/.git/*' \
+       'unpackage/*' '*/unpackage/*'
 )
 unzip -l dist/publish/easemob-uikit-uni.zip
 unzip -t dist/publish/easemob-uikit-uni.zip

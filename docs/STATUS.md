@@ -1509,3 +1509,4 @@
 - **技能沉淀**：新增内部 Skill `.agents/skills/em-plugin-publishing`，覆盖发布门禁、ZIP 制作与完整清单复核、字段映射、Markdown/截图物料、最终上线授权和常见报错；已登记到 `AGENTS.md` 技能索引。
 - **Skill 验证**：无 Skill 基线错误选择 `uni_modules/easemob-uikit-uni/` 包结构并使用逗号标签；加载 Skill 后同场景改为根级 `package.json` 与空格标签。复核修订分类层级、RELEASE 选择、可选示例工程、图片 URL、截图尺寸及递归打包排除规则后，最终复验通过。
 - **提交前验证**：`check-docs` 通过（57 个公开页面、38 个组件、83 个 EmKit 方法、35 个配置字段）；`build web` 与 `build mp-weixin` 通过，小程序主包 **1054KB**、分包合计 **1489KB**，分包防回归检查全绿；本次 H5 产物在独立端口静态伺服返回 HTTP **200**。
+- **复核修订**：独立复核发现 ZIP 排除模式只覆盖嵌套路径；临时样例确认旧命令会打入根级 `.DS_Store`、`node_modules/` 与 `unpackage/`。命令已同时补充根级和嵌套排除规则，同样例复验后仅保留 `package.json` 与正常组件目录，`unzip -t` 完整性检查通过。
