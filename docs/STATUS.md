@@ -1503,7 +1503,7 @@
 
 ## 2026-11-23 DCloud 插件市场首发与网页发布 Skill
 
-- **发布结果**：`easemob-uikit-uni` `1.0.0` 已由项目负责人确认在 DCloud 插件市场成功发布；分类为一级「前端组件」、二级「vue 组件」，无需改为 JS SDK、UTS 或项目模板。
+- **发布结果**：`easemob-uikit-uni` `1.0.0` 已由项目负责人确认在 DCloud 插件市场成功发布；分类为一级「前端组件」、二级「vue 组件」，无需改为 JS SDK、UTS 或项目模板。包内 `dcloudext.category` 已按线上发布结果同步为该分类，后续发布统一以此为准。
 - **ZIP 根目录定案**：网页表单上传的 ZIP 必须根级直接包含 `package.json`、`components/`、`libs/` 等；额外包一层 `easemob-uikit-uni/` 会导致未被识别为 uni_modules，继而误报 `components/easemob-uikit-uni 不存在`。该结构口径仅用于网页上传，不用于推断 HBuilderX 右键发布内部格式。
 - **表单口径**：多个标签使用空格分隔，逗号会把整串识别为单个标签并触发 20 字符限制；更新日志不重复填写版本号和日期。预览图当前最多展示 5 张，文件选择回执不等于页面上传成功，必须复核实际上传状态和缩略图。
 - **技能沉淀**：新增内部 Skill `.agents/skills/em-plugin-publishing`，覆盖发布门禁、ZIP 制作与完整清单复核、字段映射、Markdown/截图物料、最终上线授权和常见报错；已登记到 `AGENTS.md` 技能索引。

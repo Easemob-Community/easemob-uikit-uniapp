@@ -11,7 +11,7 @@
     "uni-app-x": "^4.71.0"
   },
   "dcloudext": {
-    "category": ["前端组件", "通用组件"],
+    "category": ["前端组件", "vue 组件"],
     "sale": {
       "regular": { "price": 0 },
       "sourcecode": { "price": 0 }
