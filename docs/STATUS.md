@@ -1510,3 +1510,14 @@
 - **Skill 验证**：无 Skill 基线错误选择 `uni_modules/easemob-uikit-uni/` 包结构并使用逗号标签；加载 Skill 后同场景改为根级 `package.json` 与空格标签。复核修订分类层级、RELEASE 选择、可选示例工程、图片 URL、截图尺寸及递归打包排除规则后，最终复验通过。
 - **提交前验证**：`check-docs` 通过（57 个公开页面、38 个组件、83 个 EmKit 方法、35 个配置字段）；`build web` 与 `build mp-weixin` 通过，小程序主包 **1054KB**、分包合计 **1489KB**，分包防回归检查全绿；本次 H5 产物在独立端口静态伺服返回 HTTP **200**。
 - **复核修订**：独立复核发现 ZIP 排除模式只覆盖嵌套路径；临时样例确认旧命令会打入根级 `.DS_Store`、`node_modules/` 与 `unpackage/`。命令已同时补充根级和嵌套排除规则，同样例复验后仅保留 `package.json` 与正常组件目录，`unzip -t` 完整性检查通过。
+
+
+## 2026-11-23 UIKit 1.0.1 公共网络导出修复与本地发布验收
+
+- **根因与修复**：宿主从公共入口 `libs/index.ts` 导入 `checkNetworkOnce` 时编译失败；两个网络函数已在 `platform.ts` 实现，但公共入口遗漏命名导出，`subscribeNetworkStatus` 同样缺失。本次仅在公共入口补齐两个导出，网络实现与宿主调用方式不变。
+- **回归测试**：新增 `test-public-exports.mjs`，直接编译宿主从公共入口导入两个函数的用例。修复前同时复现两个 `No matching export`，修复后通过；全量 Node 测试 **63/63** 通过。设备 ID 测试的当前版本期望同步更新为 `1.0.1`。
+- **版本与文档**：插件、`UIKIT_VERSION`、demo、chat-only、公开文档和宿主 Skills 统一为 `1.0.1`；demo `versionCode=10001`，chat-only `versionCode=101`。changelog 与 API-UTILS 补充两个公共网络函数；发布手册明确使用 tag 与 DCloud 更新，不额外创建 GitHub Release。
+- **静态门禁**：`check-release` WARN 0，公开文档 57 页 / 38 组件 / 83 EmKit 方法 / 35 配置字段、8 Skills、配置/DX/主题契约、能力清单、截图引用、分包脚本同步与 App 模块图全部通过。
+- **构建与访问**：Node 22.23.4 下 demo 与 chat-only 的 Web、微信小程序构建全部通过。demo 小程序主包 **1054KB**、分包合计 **1489KB**；chat-only 主包 **747KB**、分包合计 **1273KB**。两个最终 H5 产物均 HTTP **200**，内置浏览器分别实际渲染完整登录页。
+- **文档门户**：`content:sync`、`content:check`、`pnpm test` 与生产 `pnpm build` 全部通过，产物公开内容检查通过。门户既有未提交修改均保留，未纳入 UIKit 发布提交。
+- **Demo 更新方式**：外部 Demo 不做文件级复制，待 DCloud 插件市场 `1.0.1` 上线后通过正规插件更新渠道拉取。

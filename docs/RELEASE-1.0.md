@@ -1,6 +1,6 @@
-# 1.0.0 发布清单（Release Checklist）
+# 1.0.1 发布清单（Release Checklist）
 
-> 目标版本：**1.0.0**，首个正式版本。本文是内部发布操作手册；接入步骤见 [QUICKSTART](./QUICKSTART.md)，对外变更见插件 `changelog.md`。
+> 目标版本：**1.0.1**，1.0.x 补丁版本。本文是内部发布操作手册；接入步骤见 [QUICKSTART](./QUICKSTART.md)，对外变更见插件 `changelog.md`。
 
 ## 1. 发布前硬门禁
 
@@ -46,16 +46,16 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
 
 | 文件 | 字段 | 发布值 |
 |---|---|---|
-| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.0` |
-| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.0（2026-11-23）` |
-| `uni_modules/easemob-uikit-uni/libs/constants/index.ts` | `UIKIT_VERSION` | `1.0.0` |
-| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.0` / `10000` |
-| `demo/package.json` / `package-lock.json` | `version` | `1.0.0` |
+| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.1` |
+| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.1（2026-11-23）` |
+| `uni_modules/easemob-uikit-uni/libs/constants/index.ts` | `UIKIT_VERSION` | `1.0.1` |
+| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.1` / `10001` |
+| `demo/package.json` / `package-lock.json` | `version` | `1.0.1` |
 | demo、插件 peer、chat-only | `easemob-websdk` | `5.2.0` |
 
 公开物料必须满足：
 
-- [ ] 根 README、插件 README、公开文档和 Skills 均为 `1.0.0`，无当前版本“未发布/内测/候选”口径。
+- [ ] 根 README、插件 README、公开文档和 Skills 均为 `1.0.1`，无当前版本“未发布/内测/候选”口径。
 - [ ] 插件市场更新日志与 `changelog.md` 首节一致。
 - [ ] 插件 README 的平台矩阵、文件下载、App 附件 provider 和已知限制与当前实现一致。
 - [ ] 插件市场选择会话、聊天、群聊或业务卡片等至少 3 张真实截图。
@@ -98,14 +98,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
 
 1. 完成上述硬门禁与安全闭环，确保工作树干净。
 2. 推送 `dev`，确认远端提交与本地验证提交一致。
-3. 打 tag：`git tag v1.0.0 && git push origin v1.0.0`。
-4. 创建 GitHub Release，附 changelog、Quick Start、五端范围和当前边界。
-5. 通过 HBuilderX 将 `uni_modules/easemob-uikit-uni/` 发布到 DCloud 插件市场。
-6. 核对插件市场的平台兼容矩阵、权限/数据声明、截图和更新日志。
-7. 在干净环境从 GitHub tag 或插件市场安装，按 QUICKSTART 跑通 H5 与微信小程序的登录、会话、文本和图片收发。
+3. 打 tag：`git tag v1.0.1 && git push origin v1.0.1`。
+4. 通过 DCloud 插件市场更新 `uni_modules/easemob-uikit-uni/`，不需要额外创建 GitHub Release。
+5. 核对插件市场的平台兼容矩阵、权限/数据声明、截图和更新日志。
+6. 在干净环境从 GitHub tag 或插件市场安装，按 QUICKSTART 跑通 H5 与微信小程序的登录、会话、文本和图片收发。
 
-## 7. 首发回滚
+## 7. 补丁回滚
 
-- 首个正式版本没有上一插件市场版本可回退。出现阻塞问题时，先下架或撤回插件市场首发，并在 GitHub Release 标注阻塞原因。
+- 出现阻塞问题时，在 DCloud 插件市场撤回当前补丁或恢复上一版本，并保留问题记录。
 - 不删除或 force-push 已发布 tag；修复后使用新的 patch 版本与 tag 发布。
 - 引用协议继续双写 `msgQuote` 与 `emQuote`，不得在修复版本中直接删除兼容字段。

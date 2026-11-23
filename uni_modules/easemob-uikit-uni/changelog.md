@@ -1,5 +1,11 @@
 # 更新日志
 
+## 1.0.1（2026-11-23）
+
+### 修复
+
+- 公共入口补充导出 `checkNetworkOnce()` 与 `subscribeNetworkStatus()`，宿主可以从 `@/uni_modules/easemob-uikit-uni/libs` 正常使用一次性网络探测和网络状态订阅，不再因缺少命名导出而编译失败。
+
 ## 1.0.0（2026-11-23）
 
 首个正式版本。基于 uni-app x 蒸汽模式，覆盖 Android、iOS、鸿蒙、H5 与微信小程序，依赖 `easemob-websdk 5.2.0`。
