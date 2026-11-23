@@ -1,6 +1,6 @@
-# 1.0.1 发布清单（Release Checklist）
+# 1.0.3 发布清单（Release Checklist）
 
-> 目标版本：**1.0.1**，1.0.x 补丁版本。本文是内部发布操作手册；接入步骤见 [QUICKSTART](./QUICKSTART.md)，对外变更见插件 `changelog.md`。
+> 目标版本：**1.0.3**，1.0.x 补丁版本。本文是内部发布操作手册；接入步骤见 [QUICKSTART](./QUICKSTART.md)，对外变更见插件 `changelog.md`。
 
 ## 1. 发布前硬门禁
 
@@ -46,16 +46,16 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
 
 | 文件 | 字段 | 发布值 |
 |---|---|---|
-| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.1` |
-| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.1（2026-11-23）` |
-| `uni_modules/easemob-uikit-uni/libs/constants/index.ts` | `UIKIT_VERSION` | `1.0.1` |
-| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.1` / `10001` |
-| `demo/package.json` / `package-lock.json` | `version` | `1.0.1` |
+| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.3` |
+| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.3（2026-11-23）` |
+| `uni_modules/easemob-uikit-uni/libs/constants/index.ts` | `UIKIT_VERSION` | `1.0.3` |
+| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.3` / `10002` |
+| `demo/package.json` / `package-lock.json` | `version` | `1.0.3` |
 | demo、插件 peer、chat-only | `easemob-websdk` | `5.2.0` |
 
 公开物料必须满足：
 
-- [ ] 根 README、插件 README、公开文档和 Skills 均为 `1.0.1`，无当前版本“未发布/内测/候选”口径。
+- [ ] 根 README、插件 README、公开文档和 Skills 均为 `1.0.3`，无当前版本“未发布/内测/候选”口径。
 - [ ] 插件市场更新日志与 `changelog.md` 首节一致。
 - [ ] 插件 README 的平台矩阵、文件下载、App 附件 provider 和已知限制与当前实现一致。
 - [ ] 插件市场选择会话、聊天、群聊或业务卡片等至少 3 张真实截图。
@@ -97,11 +97,21 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
 ## 6. 发布动作
 
 1. 完成上述硬门禁与安全闭环，确保工作树干净。
-2. 推送 `dev`，确认远端提交与本地验证提交一致。
-3. 打 tag：`git tag v1.0.1 && git push origin v1.0.1`。
-4. 通过 DCloud 插件市场更新 `uni_modules/easemob-uikit-uni/`，不需要额外创建 GitHub Release。
-5. 核对插件市场的平台兼容矩阵、权限/数据声明、截图和更新日志。
-6. 在干净环境从 GitHub tag 或插件市场安装，按 QUICKSTART 跑通 H5 与微信小程序的登录、会话、文本和图片收发。
+2. 在已识别插件的宿主工程中执行官方校验与 dry-run：
+
+   ```bash
+   CLI=/Applications/HBuilderX.app/Contents/MacOS/cli
+   "$CLI" uni_modules --validate easemob-uikit-uni --project /path/to/host --json
+   "$CLI" uni_modules --publish easemob-uikit-uni --project /path/to/host \
+     --changeLog "本次更新摘要" --dryRun --json
+   ```
+
+3. 推送 `dev`，确认远端提交与本地验证提交一致。
+4. 打 tag：`git tag v1.0.3 && git push origin v1.0.3`，不需要额外创建 GitHub Release。
+5. 去掉 `--dryRun` 正式发布，并确认返回 `outcome:"published"`。
+6. 核对管理列表“uni_modules 规范：是”，以及平台兼容矩阵、权限/数据声明、截图和更新日志。
+7. 在干净临时工程从插件市场下载，确认只落入 `uni_modules/easemob-uikit-uni/` 且包含本次修复；再验证旧版本可升级。
+8. 按 QUICKSTART 跑通 H5 与微信小程序的登录、会话、文本和图片收发；最终 Demo 的市场更新由项目负责人执行，不用文件复制替代。
 
 ## 7. 补丁回滚
 

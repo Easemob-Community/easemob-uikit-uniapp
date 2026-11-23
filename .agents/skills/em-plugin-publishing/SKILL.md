@@ -1,95 +1,131 @@
 ---
 name: em-plugin-publishing
-description: Use when publishing or updating easemob-uikit-uni through the DCloud web publish form, preparing its ZIP/Markdown/screenshot materials, or debugging errors such as "插件包指定目录 components/easemob-uikit-uni 不存在", "压缩包根目录是否正确", or "单个标签限制最长20个字符".
+description: Use when publishing or updating easemob-uikit-uni through HBuilderX uni_modules commands, validating DCloud downloads and upgrades, or debugging incorrect component-root imports and missing update prompts.
 ---
 
-# DCloud 插件网页发布
+# DCloud uni_modules 插件发布
 
 ## Overview
 
-本技能只用于 `https://ext.dcloud.net.cn/manage/publish` 网页表单。字段以 `uni_modules/easemob-uikit-uni/package.json` 为主数据源，发布门禁和回滚以当前版本对应的 `docs/RELEASE-<主版本.次版本>.md`（如 1.0.x 使用 `RELEASE-1.0.md`）为准；不要用网页上传 ZIP 的结构去推断 HBuilderX 右键发布的内部格式。
+默认使用 **HBuilderX 官方 uni_modules 校验与发布通道**，不要把网页 ZIP 上传作为常规发布路径。`1.0.1` 与 `1.0.2` 的网页 ZIP 虽显示上传成功，管理列表却为“uni_modules 规范：否”，并导致更新不可见及根级 `components/` 错装；`1.0.3` 已验证官方通道可以恢复。
+
+发布门禁和回滚以当前版本对应的 `docs/RELEASE-<主版本.次版本>.md` 为准。只打 Git tag，不额外创建 GitHub Release。
 
 ## 1. 发布前核对
 
 - 读取插件 `package.json`、`readme.md`、`changelog.md` 和当前 RELEASE 清单，核对版本、平台、价格、权限与数据声明。
-- 完成 RELEASE 中适用于本次发布的验证；网页显示“上传成功”不等于这些门禁通过。
+- 完成 RELEASE 中适用于本次发布的验证；网页或 CLI 显示“上传成功”不等于这些门禁通过。
 - 不写入或上传真实 appkey、token、签名材料、本机路径、`node_modules/`、`.git/`、`unpackage/` 或 `.DS_Store`。
-- 若 DCloud 未登录，让用户在可见浏览器中自行登录，不索取账号密码。
+- 若 DCloud 未登录，让用户自行登录，不索取账号密码。
 
-## 2. 制作网页上传 ZIP
+每次发布必须同步递增所有当前版本引用，不能只改插件 `package.json`：
 
-**ZIP 根目录必须直接包含 `package.json`。** 不要额外包 `uni_modules/`、`easemob-uikit-uni/` 或项目目录。
+- `uni_modules/easemob-uikit-uni/package.json` 的 `version`。
+- `libs/constants/index.ts` 的 `UIKIT_VERSION`。
+- `changelog.md` 首节。
+- `demo/package.json`、`demo/package-lock.json`。
+- `demo/manifest.json` 的 `versionName` 与 `versionCode`；`versionCode` 每次必须递增，例如 `1.0.3` 使用 `10002`。
+- `templates/chat-only/package.json`、`package-lock.json`、`manifest.json`；其 `versionCode` 同步递增，例如 `1.0.3` 使用 `102`。
+- 当前 README、公开文档、宿主 Skills、发布清单及版本相关测试期望；生成文档通过同步脚本更新，不手改生成页。
 
-正确结构：
+## 2. 选择发布宿主并校验
+
+在一个已被 HBuilderX 识别为 uni-app x 工程的宿主中发布，插件必须位于：
 
 ```text
-package.json
-components/
-libs/
-assets/
-license.md
-readme.md
-changelog.md
+<宿主工程>/uni_modules/easemob-uikit-uni/package.json
 ```
 
-从仓库根目录生成并检查：
+可以使用已经正确识别该插件的 Demo 工程。仅把目录附加到 HBuilderX 文件树不等于正规项目导入；需要时使用：
 
 ```bash
-mkdir -p dist/publish
-rm -f dist/publish/easemob-uikit-uni.zip
-(
-  cd uni_modules/easemob-uikit-uni
-  zip -q -r -X ../../dist/publish/easemob-uikit-uni.zip . \
-    -x '.DS_Store' '*/.DS_Store' \
-       'node_modules/*' '*/node_modules/*' \
-       '.git/*' '*/.git/*' \
-       'unpackage/*' '*/unpackage/*'
-)
-unzip -l dist/publish/easemob-uikit-uni.zip
-unzip -t dist/publish/easemob-uikit-uni.zip
+CLI=/Applications/HBuilderX.app/Contents/MacOS/cli
+"$CLI" project open --path /path/to/host
 ```
 
-`unzip -l` 必须显示根级 `package.json`，不得只显示 `easemob-uikit-uni/package.json` 或 `uni_modules/easemob-uikit-uni/package.json`。同时检查完整清单不含 `node_modules/`、`.git/`、`unpackage/`、`.DS_Store`、凭据或本机路径文件；排除参数不能代替人工复核。
+先执行只读校验：
 
-## 3. 填写表单
+```bash
+"$CLI" uni_modules \
+  --validate easemob-uikit-uni \
+  --project /path/to/host \
+  --json
+```
 
-| 字段 | 填写口径 |
-|---|---|
-| 分类 | 一级选 `前端组件`，二级选 `vue 组件`；uni-app x 的 uni_modules 组件不要改成 JS SDK、UTS 或项目模板 |
-| 名称、ID、版本、简介 | 使用插件 `package.json` 的对应字段 |
-| 标签 | **用空格分隔**，例如 `环信 easemob IM 聊天 uni-app-x`；每个标签单独不超过 20 字符，不用逗号拼接 |
-| 价格与协议 | 普通授权版 `0`；免费插件按包内 `license.md`，当前为 MIT |
-| Git 仓库 | `https://github.com/Easemob-Community/easemob-uikit-uniapp` |
-| 支持版本 | 仅勾选 `uni-app x`，最低版本按 `package.json` 的 engines 与 RELEASE |
-| 平台 | 按 `package.json` 的 `uni_modules.platforms.client['uni-app-x']` 逐项设置，不勾经典 uni-app |
-| 蒸汽/宽屏/多语言/暗黑 | 按 `package.json.dcloudext`；当前为 是/否/是/是 |
-| 权限、数据、广告 | 使用 `package.json.dcloudext.declaration`，数据说明补充即时通讯用途 |
+必须得到 `success:true`、`outcome:"validated"` 和预期版本。校验失败时先修正本地工程或元数据，不要改用网页 ZIP 绕过。
 
-更新日志只写本次主要变更，支持 Markdown；**不要重复填写版本号和日期**，不要粘贴整份使用说明。
+## 3. dry-run 与正式发布
 
-## 4. 上传说明与预览图
+先 dry-run，确认动作、插件 ID、版本和打包校验：
 
-- 插件使用说明上传 UTF-8 `.md` 文件；以插件 `readme.md` 为底稿，保留安装、初始化、最小链路、平台边界和已知限制。
-- 开发文档链接放在说明开头：`https://easemob-community-docs.easemob.com/uniapp/`。
-- Markdown 图片必须改为可公开访问的 URL，不能保留本地相对图片路径；优先使用文档站资源或公开 GitHub 仓库的 raw 地址，并验证 URL 可访问。
-- 截图使用真实界面，统一尺寸（当前物料为 1080×2340），单张小于 1MB，格式用 JPG/PNG/GIF；优先覆盖会话、消息、群组、业务扩展和 AI 流式。
-- 当前表最多展示 5 张；新增入口消失后不要继续选择文件，应删除或替换现有图。
-- 文件选择工具的 `uploaded` 回执只表示文件已交给页面。必须再看到页面“上传成功”和正确缩略图；若仍显示旧图或重试图标，转为 JPG 后重试并复核。
+```bash
+"$CLI" uni_modules \
+  --publish easemob-uikit-uni \
+  --project /path/to/host \
+  --changeLog "本次更新摘要，不重复版本号和日期" \
+  --dryRun \
+  --json
+```
 
-## 5. 提交与上线核对
+dry-run 返回的临时 ZIP 路径不保证持续存在，不要把它当作持久发布物料。确认无误且用户已明确授权对外发布后，去掉 `--dryRun` 执行同一命令。
 
-1. 回读所有字段，确认 ZIP 根目录、标签、分类、价格、平台矩阵和三项声明无误。
-2. 确认插件包、使用说明和全部预览图均上传成功；示例工程为可选项，未上传时保持为空，只有页面实际校验要求时才补充完整工程。
-3. 最终“发布”及“确定”会直接对外上线；只有在用户明确授权后点击。
-4. 提交后检查成功提示和插件市场公开详情页；只有公开可见、可下载并可导入才算上线。
-5. 若校验失败，保留表单内容，定位具体字段或包结构后重试，不重复创建不同分类的插件。
+正式发布必须得到 `success:true`、`outcome:"published"`。`--changeLog` 只写本次摘要，不粘贴整份 changelog 或使用说明。
+
+## 4. 上线验收（缺一不可）
+
+1. DCloud 管理列表显示目标版本“已上线”，且 **“uni_modules 规范：是”**。
+2. 在干净临时工程下载目标版本，文件只落到 `uni_modules/easemob-uikit-uni/`，不得出现根级 `components/`、`libs/`、`assets/` 等错装目录。
+3. 下载包中的版本、更新日志和本次代码修复均正确。
+4. 在临时工程中模拟或安装旧版本，执行官方升级命令，能识别并更新到目标版本。
+5. 最终宿主 Demo 的插件更新由项目负责人决定是否执行；不要用文件复制代替市场更新验收。
+
+干净工程验收示例：
+
+```bash
+"$CLI" project create \
+  --name easemob-uikit-import-check \
+  --path /tmp \
+  --type uni-app-x \
+  --vapor true
+
+"$CLI" uni_modules \
+  --download easemob-uikit-uni \
+  --project /tmp/easemob-uikit-import-check \
+  --json
+```
+
+升级验收只能在临时工程或用户明确授权的工程中进行：
+
+```bash
+"$CLI" uni_modules \
+  --upgrade easemob-uikit-uni \
+  --project /tmp/easemob-uikit-import-check \
+  --json
+```
+
+`--upgrade` 不支持 `--dryRun`，不得在未授权的 Demo 中试跑。旧版本下载受 DCloud 保留数量限制时，可在临时工程中把下载包的本地 `version` 改为旧版本，再测试升级发现能力；这只能验证更新通道，不能代替旧包内容验收。
+
+## 5. 错装清理
+
+若错误导入已在宿主根目录生成 `components/`、`libs/`、`assets/`、`changelog.md`、`license.md` 等：
+
+- 先用版本控制状态和内容确认它们确由错误导入产生，只清理这些明确路径。
+- 同时检查根 `README.md`、`package.json` 是否被插件文件覆盖，只恢复有证据的覆盖，不顺手回退用户的发版配置。
+- 不删除 `uni_modules/easemob-uikit-uni/` 中的正式插件源码。
+
+## 6. 网页表单的历史注意事项
+
+网页 ZIP 上传不是默认通道，根级包含 `package.json` 也不足以证明市场会识别为 uni_modules。确需网页操作时，除原有字段与物料复核外，必须额外完成第 4 节全部验收；若显示“uni_modules 规范：否”，立即停止继续导入并改回官方通道。
+
+分类不是修复识别问题的手段。保持已上线分类，不要为了排查识别问题反复切换“通用组件 / vue 组件”。
 
 ## Common Mistakes
 
 | 症状 | 根因与处理 |
 |---|---|
-| `插件包指定目录 components/easemob-uikit-uni 不存在` | 网页未识别 uni_modules 包。让 ZIP 根目录直接包含 `package.json`，不要改分类 |
-| `单个标签限制最长20个字符` 且提示整串内容 | 逗号被当成普通字符；改为空格分隔标签 |
-| 更新日志与详情重复 | 日志仅保留本次变更摘要，删除版本号、日期和完整接入文档 |
-| 文件已选择但发布时校验失败 | 不以文件选择回执为准；检查页面上传状态、包结构和实际缩略图 |
-| 截图新增入口消失 | 当前 5 张上限；替换低价值截图，不要反复上传 |
+| 管理列表“uni_modules 规范：否” | 发布通道未形成合规 uni_modules 包；停止导入，改用官方 `--validate` / `--publish` 流程 |
+| 更新后落到根级 `components/` | 当前市场包不合规，不要在业务 Demo 继续更新；按第 4 节验证新包后再更新 |
+| HB 不提示新版本 | 先确认管理列表规范为“是”，再在临时工程用 `--upgrade` 验证，不以“上传成功”代替更新验收 |
+| 本地目录没有发布入口 | 确认正规项目导入和 `uni_modules/<id>/package.json` 结构，再运行官方校验；不要盲改分类 |
+| dry-run ZIP 路径找不到 | 临时产物可能已清理，以 dry-run 的校验结果为准，正式包由发布命令重新生成 |
+| 更新日志变成整份文档 | `--changeLog` 仅传本次摘要，不重复版本号、日期和完整接入说明 |

@@ -1,5 +1,18 @@
 # 更新日志
 
+## 1.0.3（2026-11-23）
+
+### 修复
+
+- 公共入口补充导出 `checkNetworkOnce()` 与 `subscribeNetworkStatus()`，修复宿主编译失败。
+- 改用 HBuilderX 官方 uni_modules 发布通道，恢复插件市场更新识别与正确导入目录。
+
+## 1.0.2（2026-11-23）
+
+### 修复
+
+- 公共入口补充导出 `checkNetworkOnce()` 与 `subscribeNetworkStatus()`，修复宿主编译失败。
+
 ## 1.0.1（2026-11-23）
 
 ### 修复

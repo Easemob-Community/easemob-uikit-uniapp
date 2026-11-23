@@ -1528,3 +1528,13 @@
 - **发布结果**：`easemob-uikit-uni` `1.0.1` 已在 DCloud 网页表单发布成功，管理列表状态为「已上线」，公开详情页显示版本 `1.0.1`、更新日期 `2026-11-23` 及本次公共导出修复日志；未额外创建 GitHub Release。
 - **物料复核**：ZIP 根级直接包含 `package.json`，完整性检查通过；使用说明上传成功，文档图片使用可公开访问的文档站 URL。分类保持「前端组件 / vue 组件」，价格、权限、数据声明与既有真实截图保持不变。
 - **兼容矩阵**：更新表单默认显示全部「不确定」，已逐项校正为 Chrome、Safari、Android、iOS、鸿蒙和微信小程序支持，其余平台不支持。公开详情页的 uni-app x 矩阵与插件 `package.json` 一致。
+
+
+## 2026-11-23 UIKit 1.0.3 官方 uni_modules 发布通道恢复
+
+- **问题定界**：`1.0.1` 与 `1.0.2` 网页 ZIP 发布虽显示上线，管理列表均为「uni_modules 规范：否」，导致 HBuilderX 不提示更新，远程导入还会落到宿主根级 `components/` 等目录。完整外层工程、补 `name` 与切换分类均未证明可以修复，停止把这些字段当作根因。
+- **发布方式**：改用已正确识别插件的 Demo 宿主，通过 HBuilderX 5.34 官方 `uni_modules --validate`、`--publish --dryRun` 与正式发布命令上传 `1.0.3`；校验与 dry-run 均返回预期版本，正式返回 `outcome:"published"`。宿主 Web 发行编译同步通过，两个网络公共导出缺失错误消失。
+- **市场验收**：DCloud 管理列表显示 `1.0.3` 已上线且「uni_modules 规范：是」。全新临时工程下载后仅生成 `uni_modules/easemob-uikit-uni/`，版本为 `1.0.3`，公共入口包含 `checkNetworkOnce` 与 `subscribeNetworkStatus`，未生成根级 `components/` 或 `libs/`。
+- **升级验收**：在另一临时工程将本地下载包版本模拟为 `1.0.0`，官方 `uni_modules --upgrade` 成功识别并更新到 `1.0.3`，`changedFiles` 仅指向临时工程的插件目录。最终 Demo 的市场更新仍由项目负责人手动执行。
+- **错装清理**：外部 Demo 中确认由错误导入产生的根级 `assets/`、`components/`、`libs/`、`changelog.md`、`license.md` 已删除；被插件内容覆盖的根 `README.md` 与 `package.json` 已按版本控制基线恢复，Demo 自身 `manifest.json` 发版改动保留。
+- **规则沉淀**：`.agents/skills/em-plugin-publishing` 改为官方 uni_modules 通道，强制版本号与 Demo/chat-only `versionCode` 同步递增，并把「规范：是」、干净工程下载目录、包内容、旧版本升级四项纳入上线验收；网页 ZIP 不再作为常规发布路径。
