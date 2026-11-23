@@ -155,15 +155,18 @@ for (const rel of publicFiles) {
   }
 }
 
-// 7) 提醒：历史提交里的签名密码无法由工作树检查覆盖
+// 7) 历史提交里的签名密码同样阻断公开发布
 try {
-  const history = execSync('git log -S keyPassword --oneline -- demo/manifest.json', {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore']
-  }).trim()
-  if (history !== '') {
-    warn('git 历史仍含 demo/manifest.json 的 keyPassword；公开发布前请轮换证书密码并重写历史/重建仓库')
+  const fieldsWithHistory = ['keyPassword', 'storePassword'].filter((field) => {
+    const history = execSync(`git log --all -S ${field} --oneline -- demo/manifest.json`, {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim()
+    return history !== ''
+  })
+  if (fieldsWithHistory.length > 0) {
+    fail(`git 历史仍含 demo/manifest.json 的 ${fieldsWithHistory.join(' / ')}；请轮换签名凭据并重写历史/重建仓库`)
   }
 } catch {
   warn('无法检查 git 历史（可能不在 git 仓库中）')

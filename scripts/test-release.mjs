@@ -79,6 +79,11 @@ function runCheck(root) {
   })
 }
 
+function runGit(root, args) {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+}
+
 test('stable release rejects demo and runtime version drift', (t) => {
   const { root, write } = createFixture(t)
   write('demo/package.json', JSON.stringify({ version: '1.0.0-rc.2' }))
@@ -127,4 +132,49 @@ test('release candidate may retain unpublished wording', (t) => {
   write('docs/HOME.md', '当前版本 1.0.0-rc.2（内测）\n')
   const result = runCheck(root)
   assert.equal(result.status, 0, result.stderr)
+})
+
+test('signing passwords in git history block release', (t) => {
+  const { root, write } = createFixture(t)
+  write('demo/manifest.json', JSON.stringify({
+    versionName: '1.0.0',
+    versionCode: 10000,
+    signing: { keyPassword: 'test-key-secret', storePassword: 'test-store-secret' }
+  }))
+  runGit(root, ['init', '-q'])
+  runGit(root, ['config', 'user.name', 'Release Test'])
+  runGit(root, ['config', 'user.email', 'release-test@example.invalid'])
+  runGit(root, ['add', '.'])
+  runGit(root, ['commit', '-qm', 'fixture with historical signing passwords'])
+  write('demo/manifest.json', JSON.stringify({ versionName: '1.0.0', versionCode: 10000 }))
+  runGit(root, ['add', 'demo/manifest.json'])
+  runGit(root, ['commit', '-qm', 'remove current signing passwords'])
+
+  const result = runCheck(root)
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /keyPassword/)
+  assert.match(result.stderr, /storePassword/)
+})
+
+test('signing passwords on a non-current ref block release', (t) => {
+  const { root, write } = createFixture(t)
+  runGit(root, ['init', '-qb', 'main'])
+  runGit(root, ['config', 'user.name', 'Release Test'])
+  runGit(root, ['config', 'user.email', 'release-test@example.invalid'])
+  runGit(root, ['add', '.'])
+  runGit(root, ['commit', '-qm', 'clean main'])
+  runGit(root, ['checkout', '-qb', 'leaked-signing'])
+  write('demo/manifest.json', JSON.stringify({
+    versionName: '1.0.0',
+    versionCode: 10000,
+    signing: { keyPassword: 'test-key-secret', storePassword: 'test-store-secret' }
+  }))
+  runGit(root, ['add', 'demo/manifest.json'])
+  runGit(root, ['commit', '-qm', 'leaked side branch'])
+  runGit(root, ['checkout', '-q', 'main'])
+
+  const result = runCheck(root)
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /keyPassword/)
+  assert.match(result.stderr, /storePassword/)
 })

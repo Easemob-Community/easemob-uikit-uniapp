@@ -1489,3 +1489,12 @@
 - **双向前台实时接收**：14:12，Android 标准基座 `pfh` 保持聊天页前台，H5 `pfh2` 发出 `GA_H5_PFH2_TO_ANDROID_PFH_REALTIME_FINAL_01`，新 incoming 气泡即时出现，日志同时记录两次 `onConversationListUpdate`。14:22，云发行包 `pfh2` 保持聊天页前台，H5 `pfh` 发出 `GA_H5_PFH_TO_ANDROID_PFH2_REALTIME_FINAL_01`，新 incoming 气泡即时出现。两条均在消息发送前已打开接收页，双向实时接收记为通过。
 - **离线与后台边界**：同账号在 H5 登录会触发 Android「登录设备数超过限制，当前设备已下线」，必须重新登录后才能补拉离线消息。App 切入后台期间另观察到 `disconnected: error 300`、`Failed to create WebSocket` 和重连尝试耗尽；本轮只验收前台实时接收与重新登录后的漫游补拉，不把后台持续在线记为通过，也未在未定案前修改连接产品代码。
 - **发布门禁结论**：Android `1.0.0(10000)` 云发行包的安装、登录、历史加载、双向发送、双向前台实时接收与漫游补拉均已闭环；iOS 仍按项目负责人决定暂缓签名认证。历史 `keyPassword` 轮换与公开历史处理、推送、tag、GitHub Release 和插件市场发布仍未执行。
+
+
+## 2026-11-23 鸿蒙签名凭据治理与隔离历史清洗
+
+- **泄露范围**：历史 `demo/manifest.json` 的鸿蒙签名配置同时包含 `keyPassword` 与 `storePassword`，当前树均已移除。两个密码及对应签名凭据均需轮换，不能只清理 Git 历史。
+- **隔离清洗**：已保留本地原始镜像备份，并在独立镜像中重写 113 个提交，递归删除历史 manifest 的两个密码字段。清洗后 `dev` 文件树哈希仍为 `41c84397ab8cd8b1f9740d3930d6bced8809a2f9`，与清洗前完全一致；全部分支检索不到两个字段，全新克隆的发布自检为 WARN 0。此时尚未强推，公开仓库风险仍未解除。
+- **防复发门禁**：`check-release` 现在通过 `--all` 同时检查所有分支和标签中的 `keyPassword` / `storePassword`，任一字段存在于 Git 历史即从 WARN 改为发布阻塞；当前工作树原有签名配置、密码和本机绝对路径阻断保持不变。新增真实临时 Git 仓库回归，覆盖当前分支历史与非当前侧分支，均先确认旧实现退出码 0，修改后专项 7/7 通过。
+- **验证**：全量 Node 测试 **62/62**；Node 22.23.4 下 `build web`、`build mp-weixin` 通过，小程序主包 **1054KB**、分包合计 **1489KB**，H5 静态伺服 HTTP **200**；`check-release` WARN 0。既有 `.gitignore` 已覆盖鸿蒙/Android/iOS 签名材料与本地签名配置，无需新增重复规则。
+- **待完成**：鸿蒙签名凭据轮换与新签名构建验证、公开 `dev` 强推、全新远端克隆验证、正式 tag / GitHub Release / 插件市场发布。原始镜像仅在本地保留用于恢复，不得上传。
