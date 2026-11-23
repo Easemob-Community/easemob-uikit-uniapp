@@ -1499,3 +1499,13 @@
 - **验证**：全量 Node 测试 **62/62**；Node 22.23.4 下 `build web`、`build mp-weixin` 通过，小程序主包 **1054KB**、分包合计 **1489KB**，H5 静态伺服 HTTP **200**；`check-release` WARN 0。既有 `.gitignore` 已覆盖鸿蒙/Android/iOS 签名材料与本地签名配置，无需新增重复规则。
 - **风险接受**：项目负责人评估现有鸿蒙签名凭据泄露无实际影响，明确决定不执行轮换；该决定不代表密码已失效或已完成技术验证，不再作为本次发布阻塞。
 - **待完成**：公开 `dev` 强推、全新远端克隆验证、正式 tag / GitHub Release / 插件市场发布。原始镜像仅在本地保留用于恢复，不得上传。
+
+
+## 2026-11-23 DCloud 插件市场首发与网页发布 Skill
+
+- **发布结果**：`easemob-uikit-uni` `1.0.0` 已由项目负责人确认在 DCloud 插件市场成功发布；分类为一级「前端组件」、二级「vue 组件」，无需改为 JS SDK、UTS 或项目模板。
+- **ZIP 根目录定案**：网页表单上传的 ZIP 必须根级直接包含 `package.json`、`components/`、`libs/` 等；额外包一层 `easemob-uikit-uni/` 会导致未被识别为 uni_modules，继而误报 `components/easemob-uikit-uni 不存在`。该结构口径仅用于网页上传，不用于推断 HBuilderX 右键发布内部格式。
+- **表单口径**：多个标签使用空格分隔，逗号会把整串识别为单个标签并触发 20 字符限制；更新日志不重复填写版本号和日期。预览图当前最多展示 5 张，文件选择回执不等于页面上传成功，必须复核实际上传状态和缩略图。
+- **技能沉淀**：新增内部 Skill `.agents/skills/em-plugin-publishing`，覆盖发布门禁、ZIP 制作与完整清单复核、字段映射、Markdown/截图物料、最终上线授权和常见报错；已登记到 `AGENTS.md` 技能索引。
+- **Skill 验证**：无 Skill 基线错误选择 `uni_modules/easemob-uikit-uni/` 包结构并使用逗号标签；加载 Skill 后同场景改为根级 `package.json` 与空格标签。复核修订分类层级、RELEASE 选择、可选示例工程、图片 URL、截图尺寸及递归打包排除规则后，最终复验通过。
+- **提交前验证**：`check-docs` 通过（57 个公开页面、38 个组件、83 个 EmKit 方法、35 个配置字段）；`build web` 与 `build mp-weixin` 通过，小程序主包 **1054KB**、分包合计 **1489KB**，分包防回归检查全绿；本次 H5 产物在独立端口静态伺服返回 HTTP **200**。

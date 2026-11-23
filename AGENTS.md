@@ -28,6 +28,7 @@
 | 图标增换 | `.agents/skills/em-icon-strategy` |
 | 蒸汽工程结构/入口约定/App 端黑屏 | `.agents/skills/uniapp-x-vapor-structure` |
 | CLI 编译/伺服/缓存排错 | `.agents/skills/hbuilderx-cli-compile` |
+| DCloud 网页发布、ZIP/Markdown/截图物料、插件包根目录或标签校验报错 | `.agents/skills/em-plugin-publishing` |
 | SDK 集成（websdk 5.x 陷阱） | `.agents/skills/easemob-websdk-v5` |
 | 写/更新对外文档、页面/组件/API 参考、manifest 登记、公开边界审计 | `.agents/skills/em-public-docs` |
 
