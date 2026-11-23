@@ -2,8 +2,8 @@
     "name" : "easemob-uikit-uni demo",
     "appid" : "__UNI__08EF252",
     "description" : "环信 UIKit uni-app 版演示工程",
-    "versionName" : "1.0.0-rc.2",
-    "versionCode" : 102,
+    "versionName" : "1.0.0",
+    "versionCode" : 10000,
     "uni-app-x" : {
         "vapor" : true,
         "vapor-render-target" : "bytecode",
@@ -32,7 +32,8 @@
     "app-android" : {
         "distribute" : {
             "modules" : {
-                "uni-video" : {}
+                "uni-video" : {},
+                "uni-websocket" : {}
             },
             "icons" : {},
             "splashScreens" : {
@@ -43,7 +44,8 @@
     "app-ios" : {
         "distribute" : {
             "modules" : {
-                "uni-video" : {}
+                "uni-video" : {},
+                "uni-websocket" : {}
             },
             "privacyDescription" : {
                 "NSCameraUsageDescription" : "用于拍摄照片发送给聊天对象",

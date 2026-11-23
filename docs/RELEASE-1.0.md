@@ -1,134 +1,111 @@
-# 1.0 发布清单（Release Checklist）
+# 1.0.0 发布清单（Release Checklist）
 
-> 目标版本：**1.0.0-rc.2**（候选版）。rc 通过真机矩阵后再发 `1.0.0` GA。
-> 本文是发布操作手册；能力/接口说明见 [README](../README.md)，接入步骤见 [QUICKSTART](./QUICKSTART.md)，评审结论见 [REVIEW-1.0-READINESS](./REVIEW-1.0-READINESS.md)。
+> 目标版本：**1.0.0**，首个正式版本。本文是内部发布操作手册；接入步骤见 [QUICKSTART](./QUICKSTART.md)，对外变更见插件 `changelog.md`。
 
-## 1. 发布前必须通过（硬门禁）
+## 1. 发布前硬门禁
+
+使用 Node 22，在同一最终发布提交上执行：
 
 ```bash
-# 0) 发布物料自检（版本/changelog/README/平台矩阵/LICENSE/敏感信息）
+node --test scripts/test-*.mjs
 node scripts/check-release.mjs
+node scripts/check-docs.mjs
+node scripts/check-skills.mjs
+node scripts/check-config-docs.mjs
+node scripts/check-dx-contract.mjs
+node scripts/check-theme-locale-contract.mjs
+node scripts/audit-usage.mjs demo --check
+node scripts/sync-shots.mjs --check
+node scripts/sync-mp-subpackage.mjs --check
 
-# 1) 双端构建
 scripts/uni.sh build web
 scripts/uni.sh build mp-weixin
-
-# 2) 小程序防回归（build 脚本已内置，含 11 项断言 + 主包 ≤1.5MB）
-#    期望：全部防回归检查通过；主包约 850KB，分包合计约 1367KB
-
-# 3) H5 产物静态伺服 200
-cd demo/unpackage/dist/build/web && python3 -m http.server 5180
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5180/   # 200
+node scripts/check-template.mjs
+node scripts/check-app-module-graph.mjs
 ```
 
-- [ ] `build web` 通过，无新增 error
-- [ ] `build mp-weixin` 通过，11 项防回归全绿
-- [ ] 主包 ≤ 1.5MB，分包 `sub-sdk/im-sdk.js` 存在且无 `?.` 残留
-- [ ] H5 伺服 200
-- [ ] 图标 parity 通过（`scripts/verify-icons.py` / 构建脚本内断言）
-- [ ] `package.json`、`changelog.md`、README 版本号一致（`1.0.0-rc.2`）
+- [ ] 全部 Node 测试与静态检查通过。
+- [ ] demo 与 chat-only 的 web/mp 构建通过。
+- [ ] 两个微信小程序主包均 ≤1.5MB，SDK 与页面分包产物、配置和语法检查通过。
+- [ ] demo 与 chat-only 的最终 H5 产物分别静态伺服，根页面 HTTP 200，浏览器无启动错误。
+- [ ] App 模块图无 libs 反向依赖组件、无 `libs/index` 循环。
+- [ ] 文档门户 `content:sync`、`content:check`、`test`、`build` 全绿。
+- [ ] Android/iOS 使用最终发行配置重建包，确认 `uni-websocket` 已打入并完成登录与收发冒烟。
+
+H5 产物检查示例：
+
+```bash
+cd demo/unpackage/dist/build/web && python3 -m http.server 5180
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5180/
+
+cd templates/chat-only/unpackage/dist/build/web && python3 -m http.server 5181
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
+```
 
 ## 2. 版本与物料
 
-### 2.1 版本号位置
-
-| 文件 | 字段 | 当前值 |
+| 文件 | 字段 | 发布值 |
 |---|---|---|
-| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.0-rc.2` |
-| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.0-rc.2` |
-| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.0-rc.2` / `102` |
-| `demo/package.json` | `version` | `1.0.0-rc.2` |
+| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.0` |
+| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.0（2026-11-23）` |
+| `uni_modules/easemob-uikit-uni/libs/constants/index.ts` | `UIKIT_VERSION` | `1.0.0` |
+| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.0` / `10000` |
+| `demo/package.json` / `package-lock.json` | `version` | `1.0.0` |
+| demo、插件 peer、chat-only | `easemob-websdk` | `5.2.0` |
 
-> 发 GA 时把插件 version 改为 `1.0.0`，changelog 增 `1.0.0` 小节，demo 同步。
+公开物料必须满足：
 
-### 2.2 插件市场字段
+- [ ] 根 README、插件 README、公开文档和 Skills 均为 `1.0.0`，无当前版本“未发布/内测/候选”口径。
+- [ ] 插件市场更新日志与 `changelog.md` 首节一致。
+- [ ] 插件 README 的平台矩阵、文件下载、App 附件 provider 和已知限制与当前实现一致。
+- [ ] 插件市场选择会话、聊天、群聊或业务卡片等至少 3 张真实截图。
+- [ ] H5 在线预览与 demo 二维码如提供，链接可公开访问；未提供不阻塞发布。
 
-| 字段 | 建议值 |
-|---|---|
-| 插件名称 | 环信 IM UIKit（uni-app x） |
-| 分类 | 前端组件 / 通用组件 |
-| 价格 | 免费（普通授权 + 源码授权均为 0） |
-| 支持平台 | uni-app x：Android / iOS / 鸿蒙 / H5 / 微信小程序 |
-| 暗黑模式 | 支持 |
-| 多语言 | 支持（中/英） |
-| 宽屏 | 不支持（H5 仅移动端） |
-| 权限声明 | 相机、相册、麦克风（用户主动发图片/视频/语音时） |
-| 数据声明 | 插件不采集；消息经宿主集成的环信 SDK 传输至宿主配置的服务端 |
-| 仓库 | `https://github.com/Easemob-Community/easemob-uikit-uniapp` |
-| License | MIT |
+## 3. 五端验收基线
 
-- [ ] 插件市场「更新日志」与 `changelog.md` 首节一致
-- [ ] 插件 readme 为新版（自包含 Quick Start + 平台矩阵 + 已知限制）
-- [ ] 至少 3 张截图：会话列表、单聊（含引用/已读）、群聊/多场景卡片
-- [ ] 提供 H5 在线预览链接（可选）与 demo 二维码（可选）
+以下核心链路已由项目负责人在发布前确认完成验证；本文不替代详细真机记录。
 
-### 2.3 仓库
-
-- [ ] 根 `LICENSE`（MIT）存在
-- [ ] `README.md` 顶部为 1.0 状态 + 兼容矩阵 + Quick Start 链接
-- [ ] `docs/QUICKSTART.md` 评审通过（按文档从空工程能跑通）
-- [ ] `.gitignore` 覆盖签名材料与本地 manifest
-- [ ] 无真实 appkey/token/密码/绝对路径进入**当前树**
-- [ ] 若历史提交含签名密码：发布前轮换证书密码，并重写历史（`git filter-repo`）或重建公开仓
-
-## 3. 真机 / 真账号矩阵（rc 必测）
-
-| 场景 | Android | iOS | 鸿蒙 | H5 | 微信小程序 |
+| 验收范围 | Android | iOS | 鸿蒙 | H5 | 微信小程序 |
 |---|---|---|---|---|---|
-| 登录 / 断线重连 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 连接状态条（重连/断开/被踢） | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 单聊文本 / 图片 / 语音 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 录音权限拒绝 / 60s 自动发送 | ☐ | ☐ | ☐ | — | ☐ |
-| 语言切换 + 重启后保持 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 视频发送 + 播放（H5 可播，其它端隐藏） | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 文件发送（App 隐藏入口） | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 附件下载：图片/视频存相册、文件下载打开（H5 浏览器下载） | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 引用 / 撤回 / 重发 / 已读 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 群聊：公告 / @ / 昵称行 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 未读清零（离页/冷启不复活） | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Token 过期自动续期 / 被踢 reason | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 首屏历史骨架 / 失败重试 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 多群消息后回会话（内存裁剪/重拉） | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 深色模式 / 键盘避让 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| 小程序 SDK 分包加载 | — | — | — | — | ☐ |
+| 登录、会话同步与核心收发 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 核心聊天、群组、通讯录与主题链路 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 平台对应媒体、附件与权限路径 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 小程序 SDK 分包加载 | — | — | — | — | ✅ |
 
-补充重点：
+大规模账号压测、弱网矩阵、真实 AI 服务端流式链路和营销素材补拍作为独立验收项记录，不与上述核心验收混写。
 
-- [ ] iOS 首次完整验证（当前历史验证以 Android/H5/mp 为主）
-- [ ] 鸿蒙签名重配后运行（manifest 已清签名）
-- [ ] 与 vue 版 UIKit 互发引用（`msgQuote` 双向）
-- [ ] H5 联系人同步为 0 的复现/排除（同账号 mp 对照）
-- [ ] 附件下载：相册权限拒绝、微信小程序 `downloadFile` 合法域名、文件类型打开范围、H5 跨域直链
+## 4. 发布时必须公示的边界
 
-## 4. 已知限制（发布时必须公示）
+- 仅支持 uni-app x 蒸汽模式；H5 为移动端布局，未做桌面宽屏适配。
+- H5 不提供录音入口；语音发送仅 App/小程序。
+- App 发送文件需宿主注册附件 provider，未注册时入口隐藏。
+- App 视频播放前需完整下载；大视频需要等待，解码能力取决于系统/浏览器。
+- 附件下载位于长按菜单。App/小程序图片与视频保存相册，文件下载后尝试文档预览；H5 走浏览器下载。
+- 微信小程序需配置 `downloadFile` 合法域名，文档打开类型以平台支持范围为准。
+- @ 提及为追加式插入；消息列表使用 `scroll-view` 全量渲染。
+- 非当前会话只保留最近 100 条内存消息，回会话时重拉最新页；完整本地历史由宿主按需持久化。
+- 当前不包含消息转发、黑名单、群共享文件、公开群入群审批、群名片、群已读成员明细、消息搜索和 presence。
 
-- 视频播放依赖系统/浏览器解码；冷门编码会提示加载失败。App 端会先整包下载视频再播放（chatfiles 直链不支持 Range），大视频需等待；H5 可能拦截带声音的自动播放。
-- 附件下载走长按菜单：App/小程序图片/视频保存到系统相册，文件下载后尝试系统文档预览（App 对 doc/docx/xls/xlsx/ppt/pptx/pdf 指定类型、其他类型交给系统尝试；微信小程序仅支持这七类）；H5 走浏览器下载，不写相册。文件单击不触发下载。微信小程序需在公众平台配置 `downloadFile` 合法域名。
-- App 端暂不支持发送文件。
-- 语音发送仅 App/小程序；H5 入口隐藏。录音 60s 上限自动发送；麦克风权限失败只 toast，不自动跳系统设置。
-- H5 未做桌面宽屏适配。
-- @ 提及为追加式插入；消息列表为 `scroll-view` 全量渲染。
-- 非当前会话只保留最近 100 条内存消息，回会话时重拉最新页；完整本地历史需宿主自行持久化。
-- 1.0 不含：消息转发、黑名单、群文件、群搜索、presence、消息搜索。
+## 5. 公开仓安全
 
-## 5. 发布动作
+- [ ] 当前树无真实 appkey、token、签名密码或本机签名路径。
+- [ ] `.gitignore` 继续覆盖签名材料、本地 manifest 和本地凭据。
+- [ ] 历史提交曾包含鸿蒙签名密码字段：公开发布前轮换对应签名凭据。
+- [ ] 对公开历史执行清理或重建公开仓，并确认远端不再暴露历史签名材料；不得仅清理当前文件后视为完成。
+- [ ] 历史改写涉及共享远端时必须单独确认，不在常规发布提交中直接 force-push。
 
-1. 合并发布分支，跑第 1 节硬门禁；
-2. 更新 `changelog.md` / `package.json`（rc → GA 时）；
-3. 打 tag：`git tag v1.0.0-rc.2 && git push origin v1.0.0-rc.2`；
-4. HBuilderX 打开 `uni_modules/easemob-uikit-uni/`，右键「发布到插件市场」；
-5. 上传仓库 Release（附 changelog、Quick Start 链接、已知限制）；
-6. 发布后 24h 内回归：插件市场安装 → 按 QUICKSTART 跑通 H5 + mp。
+## 6. 发布动作
 
-## 6. 回滚
+1. 完成上述硬门禁与安全闭环，确保工作树干净。
+2. 推送 `dev`，确认远端提交与本地验证提交一致。
+3. 打 tag：`git tag v1.0.0 && git push origin v1.0.0`。
+4. 创建 GitHub Release，附 changelog、Quick Start、五端范围和当前边界。
+5. 通过 HBuilderX 将 `uni_modules/easemob-uikit-uni/` 发布到 DCloud 插件市场。
+6. 核对插件市场的平台兼容矩阵、权限/数据声明、截图和更新日志。
+7. 在干净环境从 GitHub tag 或插件市场安装，按 QUICKSTART 跑通 H5 与微信小程序的登录、会话、文本和图片收发。
 
-- 插件市场保留上一版本；出现阻塞问题时下架 rc 或将版本回退到上一个可用版本。
-- Git 回滚以 tag 为准；不要 force-push 已发布 tag。
-- 数据/协议兼容：引用双写 `msgQuote` + `emQuote`，回退到 0.x 客户端仍可读；不要在新版本删除旧 key，至少保留一个 minor。
+## 7. 首发回滚
 
-## 7. 发布后待办
-
-- 收集首周 issue（模板：端 / HBuilderX 版本 / 蒸汽 or VDOM / 最小复现）；
-- 把高频问题补进 `docs/QUICKSTART.md` 排错表；
-- 真机矩阵结果回填 `docs/STATUS.md`；
-- 规划 1.1：消息分页/内存上限、CI/自动化测试、连接条交互增强（手动重试/关闭）、录音权限引导、历史加载骨架细化。
+- 首个正式版本没有上一插件市场版本可回退。出现阻塞问题时，先下架或撤回插件市场首发，并在 GitHub Release 标注阻塞原因。
+- 不删除或 force-push 已发布 tag；修复后使用新的 patch 版本与 tag 发布。
+- 引用协议继续双写 `msgQuote` 与 `emQuote`，不得在修复版本中直接删除兼容字段。

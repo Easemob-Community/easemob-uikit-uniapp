@@ -55,10 +55,58 @@ const versionReferences = [
   'skills/em-host-theme-i18n/SKILL.md',
   'skills/em-host-mp-subpackage/SKILL.md',
   'skills/em-host-troubleshooting/SKILL.md',
+  'docs/HOME.md',
+  'docs/GUIDE-MULTI-SCENARIO.md',
+  'docs/DESIGN-TOKENS.md',
+  'docs/GUIDE-STYLING.md',
+  'docs/CONFIG.md',
+  'docs/FAQ.md',
+  'docs/RELEASE-1.0.md',
+  'uni_modules/easemob-uikit-uni/readme.md',
   'uni_modules/easemob-uikit-uni/libs/constants/index.ts'
 ]
 for (const rel of versionReferences) {
-  if (!read(rel).includes(pkg.version)) fail(`${rel}: 未引用当前版本 ${pkg.version}`)
+  const content = read(rel)
+  if (!content.includes(pkg.version)) fail(`${rel}: 未引用当前版本 ${pkg.version}`)
+  if (!pkg.version.includes('-') && content.includes(`${pkg.version}-`)) {
+    fail(`${rel}: 仍引用 ${pkg.version} 的预发布版本`)
+  }
+}
+
+const demoPkg = JSON.parse(read('demo/package.json'))
+if (demoPkg.version !== pkg.version) {
+  fail(`demo/package.json: version ${demoPkg.version} 与插件版本 ${pkg.version} 不一致`)
+}
+const demoManifest = read('demo/manifest.json')
+const demoManifestJson = JSON.parse(demoManifest)
+if (demoManifestJson.versionName !== pkg.version) {
+  fail(`demo/manifest.json: versionName ${demoManifestJson.versionName} 与插件版本 ${pkg.version} 不一致`)
+}
+if (!Number.isInteger(demoManifestJson.versionCode) || demoManifestJson.versionCode <= 0) {
+  fail('demo/manifest.json: versionCode 必须是正整数')
+}
+const constants = read('uni_modules/easemob-uikit-uni/libs/constants/index.ts')
+const uikitVersion = constants.match(/export const UIKIT_VERSION = '([^']+)'/)?.[1]
+if (uikitVersion !== pkg.version) {
+  fail(`UIKIT_VERSION ${uikitVersion ?? '(缺失)'} 与插件版本 ${pkg.version} 不一致`)
+}
+
+if (!pkg.version.includes('-')) {
+  const currentMaterial = [
+    'README.md',
+    'docs/HOME.md',
+    'docs/QUICKSTART.md',
+    'docs/GUIDE-MULTI-SCENARIO.md',
+    'docs/DESIGN-TOKENS.md',
+    'uni_modules/easemob-uikit-uni/readme.md'
+  ]
+  for (const rel of currentMaterial) {
+    if (/未发布|内测|候选/.test(read(rel))) fail(`${rel}: 正式版仍含候选/未发布/内测口径`)
+  }
+  const firstChangelogHeading = changelog.match(/^##\s+.+$/m)?.[0] ?? ''
+  if (/未发布|内测|候选/.test(firstChangelogHeading)) {
+    fail('changelog.md: 正式版首节仍含候选/未发布/内测口径')
+  }
 }
 
 // 3) 平台矩阵（HBuilderX 4.71+ 新规范）
@@ -89,7 +137,6 @@ if (!existsSync(resolve(root, 'LICENSE'))) {
 }
 
 // 5) demo manifest 不得含签名配置/绝对路径
-const demoManifest = read('demo/manifest.json')
 if (/signingConfigs|keyPassword|storePassword|"\/Users\//.test(demoManifest)) {
   fail('demo/manifest.json: 含签名配置、密码或本机绝对路径')
 }
