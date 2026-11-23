@@ -16,6 +16,8 @@
 ## 平台与媒体
 
 - `PLATFORM_CAPABILITIES`、`isPageVisible()`：平台能力与页面可见性。
+- `checkNetworkOnce()`：一次性探测系统网络状态，返回 `Promise<boolean | null>`；`null` 表示无法确定，不应据此阻断业务请求。
+- `subscribeNetworkStatus(listener)`：监听系统网络连通性变化，返回取消订阅函数；页面卸载时必须调用。
 - `chooseImage()`、`previewImage()`、`chooseVideo()`、`chooseFile()`：媒体选择与预览。
 - `getCameraAuthorizeState()`、`openAppAuthorizeSetting()`：相机授权预检与系统设置。
 - `setAttachmentProvider()`、`refreshAttachmentAvailability()`、`hasAttachmentProvider()`、`canPickAttachment()`、`attachmentCapability()`、`pickAttachments()`、`resolveAttachment()`：附件能力。
