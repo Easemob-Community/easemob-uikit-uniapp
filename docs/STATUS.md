@@ -1480,3 +1480,12 @@
 - **发行推进与 iOS 延期**：项目负责人明确本轮暂不进行 iOS 签名认证，继续推进其他发布项；该决定不记为 iOS 验证通过。Android 云打包预检为 **0 error / 1 warning**，唯一警告是测试包名尚未录入开发者中心、继续时自动登记为测试包名。已使用 DCloud 云端证书提交仅用于真机冒烟的 Android release 构建（ticket `90ba5970-e6fa-11f1-91e6-0fe132c07ad2`），不上架应用商店。编译摘要未打印 `uni-websocket`，但提交时的 `dist/build/app-android/manifest.json` 明确保留该模块；仍须以下载 APK 的内容和实际 IM 登录结果收口，不凭配置单独宣称通过。
 - **Android release 实测**：云端构建成功，APK 为 `demo/unpackage/release/__UNI__08EF252_1123131757.apk`（约 25MB，SHA-256 `b5854a0b447657d1947a48bd6681ed38e06e910bbd8f2b5a12afd6f2675e9abf`，构建产物不入库）。`aapt` 确认包名 `com.example.easemobdemo50`、`versionName=1.0.0`、`versionCode=10000`、minSdk 24 / targetSdk 36；APK 内含 `META-INF/uniappx/auto-register/io_dcloud_uts_uniWebsocket.properties`，注册模块为 `io.dcloud.uts.uniWebsocket`。旧测试基座因签名不同无法覆盖，备份 APK 后仅卸载该旧测试包并成功安装新包，标准基座数据不受影响。
 - **原生 IM 链路**：新 release 包在荣耀 ALI-AN00 上正常启动，不再出现旧基座启动即退出；设备安装后版本复核为 `1.0.0(10000)`。主账号登录日志明确出现 `Core websocket connected`、`login success`，历史会话正常加载。发送 `GA_Android_Release_20261123_1327` 后会话摘要更新，重新进入群聊仍显示 13:27 的正常 outgoing 气泡且无失败标记。Android 最终测试发行包的启动、WebSocket 登录、历史加载与发送记为通过；第二账号 token 不匹配导致双向接收仍未执行，不记双向收发通过。
+
+
+## 2026-11-23 Android 双账号收发与实时接收闭环
+
+- **测试拓扑**：同一台荣耀 ALI-AN00 上，云发行包 `com.example.easemobdemo50` 登录 `pfh2`，HBuilderX 标准基座登录 `pfh`；实时接收阶段分别用两个独立 H5 会话作为外部发送端，避免同机两个 App 前后台切换干扰前台接收判定。第二账号使用重新签发的有效 token，未把凭据写入仓库。
+- **双向发送与漫游补拉**：`pfh` 发出的 `GA_Android_PFH_to_PFH2_1339`、`GA_Android_PFH_to_PFH2_1347` 均在发行包 `pfh2` 与李四的正确单聊中显示。发行包 `pfh2` 回复 `GA_Android_PFH2_to_PFH_1355` 成功；`pfh` 重新登录并进入会话后显示对应 incoming 气泡。以上证明双向发送及离线后的漫游历史补拉通过，不将这批历史展示记为实时接收。
+- **双向前台实时接收**：14:12，Android 标准基座 `pfh` 保持聊天页前台，H5 `pfh2` 发出 `GA_H5_PFH2_TO_ANDROID_PFH_REALTIME_FINAL_01`，新 incoming 气泡即时出现，日志同时记录两次 `onConversationListUpdate`。14:22，云发行包 `pfh2` 保持聊天页前台，H5 `pfh` 发出 `GA_H5_PFH_TO_ANDROID_PFH2_REALTIME_FINAL_01`，新 incoming 气泡即时出现。两条均在消息发送前已打开接收页，双向实时接收记为通过。
+- **离线与后台边界**：同账号在 H5 登录会触发 Android「登录设备数超过限制，当前设备已下线」，必须重新登录后才能补拉离线消息。App 切入后台期间另观察到 `disconnected: error 300`、`Failed to create WebSocket` 和重连尝试耗尽；本轮只验收前台实时接收与重新登录后的漫游补拉，不把后台持续在线记为通过，也未在未定案前修改连接产品代码。
+- **发布门禁结论**：Android `1.0.0(10000)` 云发行包的安装、登录、历史加载、双向发送、双向前台实时接收与漫游补拉均已闭环；iOS 仍按项目负责人决定暂缓签名认证。历史 `keyPassword` 轮换与公开历史处理、推送、tag、GitHub Release 和插件市场发布仍未执行。
