@@ -1469,3 +1469,11 @@
 - **H5 实际访问**：demo 与 chat-only 最终产物独立静态伺服均 HTTP **200**；内置浏览器分别渲染出完整 demo 登录页（含 SDK 5.2.0）与单聊天登录页，不是空白页。验证后服务器与标签页关闭。
 - **文档门户**：`content:sync`、`content:check`、`pnpm test` **181/181**、生产 `pnpm build` 与产物公开内容检查全部通过；同步后的 uniapp 公开内容无 RC 当前版本或旧文件下载口径。门户既有 4 个未提交改动均保留。
 - **尚未执行的外部发布项**：历史签名凭据轮换与公开历史处理、推送、tag、GitHub Release、DCloud 插件市场发布均未执行。Android/iOS 需在新增 `uni-websocket` 配置后用 HBuilderX 重建发行包并做一次登录/收发冒烟；本机 CLI 验证不替代该原生发行检查。
+
+
+## 2026-11-23 HBuilderX 5.34 Vite 配置与 Android 真机冒烟
+
+- **编译修复**：demo 根目录新增 `vite.config.ts`，与 uni-app x 5.34 参考工程一致，在 `uni()` 插件配置 `autoImportOptions.ignore = ['h']`。此前 iOS App 编译稳定报 `Identifier "h" has already been declared`，新增后同一 CLI 编译成功；安装/运行仍因自定义基座重签缺少签名证书与密码而阻断，未记为 iOS 真机通过。
+- **静态回归**：新增配置后 Node 22.23.4 下 demo `build web`、`build mp-weixin` 通过；小程序主包 **1054KB**、分包合计 **1489KB**，全部 11 项分包检查通过。全量 Node 测试 **60/60**、`check-release`（仍仅历史 `keyPassword` WARN）与 `git diff --check` 通过。
+- **Android 发送链路**：荣耀 ALI-AN00（Android 15 / arm64）通过 HBuilderX 5.34 标准基座运行当前 `1.0.0` 源码，日志明确进入本仓库 `pages/login/login`。主测试账号真实登录、历史会话与群消息加载成功；向两人测试群发送 `GA_Android_20261123_1136` 后出现正式发送气泡，且 `[emkit:message] message sent … sent` 日志确认服务端发送成功。
+- **接收门禁未闭环**：H5 同账号登录会挤下线 Android，不能作为双账号对端。第二测试账号在 H5 与 Android 标准基座均返回 `Provision rejected`；Android 输入框核验 userId/token 长度为 4/130，与提供值一致，服务端原因为 `token or password does not match login info`，需重新签发或核对第二账号 token。设备旧自定义基座编译当前源码成功但启动后进程立即退出，也未用于验收。当前仅记 Android 标准基座登录/加载/发送通过，不记双向收发或最终发行包通过；未为本轮测试修改产品代码或写入凭据。
