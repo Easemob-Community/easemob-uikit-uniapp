@@ -37,7 +37,7 @@
 
 ## `EmChatEmojiPanelScope`
 
-默认输入栏 `#emoji-panel` 的作用域。`emojis` 为当前字符集，`disabled` 表示禁用态；`selectEmoji(emoji)` 追加字符，`closePanel()` 关闭面板，`notifyDisabledTap()` 上报禁用操作。
+默认输入栏 `#emoji-panel` 的作用域。`emojis` 为当前字符集，`disabled` 表示禁用态；`selectEmoji(emoji)` 追加字符，`deleteEmoji()` 删除草稿末尾一个完整字素（空草稿无操作），`closePanel()` 关闭面板，`notifyDisabledTap()` 上报禁用操作。选择与删除都保留禁用守卫；删除后面板保持展开，不主动聚焦输入框或弹出系统键盘。
 
 ## `EmChatImageMessageScope`
 

@@ -372,6 +372,7 @@
             :emojis="scope.emojis"
             :disabled="scope.disabled"
             :select-emoji="scope.selectEmoji"
+            :delete-emoji="scope.deleteEmoji"
             :close-panel="scope.closePanel"
             :notify-disabled-tap="scope.notifyDisabledTap"
           />

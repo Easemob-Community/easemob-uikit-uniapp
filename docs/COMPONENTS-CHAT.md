@@ -18,7 +18,7 @@
 
 ## em-chat-inputbar
 
-输入栏：文本输入、语音按住说话、emoji 面板、"+" 媒体面板、纸飞机发送键、引用条、快捷回复条与禁用态。
+输入栏：文本输入、语音按住说话、带退格键的 emoji 面板、"+" 媒体面板、纸飞机发送键、引用条、快捷回复条与禁用态。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
@@ -36,7 +36,7 @@
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `update:modelValue` | `value: string` | 草稿变化（输入、点 emoji） |
+| `update:modelValue` | `value: string` | 草稿变化（输入、点 emoji、面板退格删除） |
 | `send` | — | 点击纸飞机发送键或键盘回车；草稿全为空白或 `submitting=true` 时不派发 |
 | `quote-close` | — | 点击引用条右侧关闭 |
 | `edit-close` | — | 点击编辑条右侧关闭（取消消息编辑） |
@@ -48,7 +48,7 @@
 
 | 插槽 | 作用域 | 说明 |
 |---|---|---|
-| `emoji-panel` | `EmChatEmojiPanelScope` | 替换 emoji 内容区，缺省渲染内置字符网格。`selectEmoji(emoji)` 追加字符并保留禁用守卫，`closePanel()` 关闭面板，`disabled/notifyDisabledTap` 用于宿主自绘内容的禁用处理；面板高度与键盘互斥仍由输入栏管理 |
+| `emoji-panel` | `EmChatEmojiPanelScope` | 替换 emoji 内容区，缺省渲染带右下角退格键的内置字符网格。`selectEmoji(emoji)` 追加字符，`deleteEmoji()` 删除草稿末尾一个完整字素，两者都保留禁用守卫；空草稿删除无操作，删除后面板保持展开。`closePanel()` 关闭面板，`disabled/notifyDisabledTap` 用于宿主自绘内容的禁用处理；面板高度与键盘互斥仍由输入栏管理 |
 
 `EmInputFeatures` 的字段：
 

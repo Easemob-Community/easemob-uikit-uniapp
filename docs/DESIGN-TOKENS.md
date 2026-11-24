@@ -123,6 +123,7 @@ const { themeClass } = useTheme()
 |---|---|---|---|
 | `--em-chat-bg` | 聊天页消息区底 | `#FFFFFF` | `#1E1E23` |
 | `--em-input-bg` | 输入栏底 | `#FFFFFF` | `#1E2123` |
+| `--em-chat-emoji-delete-bg` | 表情面板悬浮退格键的半透明背景 | `rgba(255, 255, 255, 0.72)` | `rgba(42, 42, 48, 0.78)` |
 | `--em-conversation-list-bg` | 会话列表底 | `#FFFFFF` | `#1E2123` |
 | `--em-input-border-color` | 输入框描边 | `#C9CDCF` | `#3C3F42` |
 

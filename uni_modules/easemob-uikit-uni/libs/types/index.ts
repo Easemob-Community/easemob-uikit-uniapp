@@ -606,6 +606,8 @@ export interface EmChatEmojiPanelScope {
   emojis: string[]
   disabled: boolean
   selectEmoji: (emoji: string) => void
+  /** 删除草稿末尾一个完整字素；空草稿无操作，禁用态走统一上报，面板保持展开 */
+  deleteEmoji: () => void
   closePanel: () => void
   notifyDisabledTap: () => void
 }

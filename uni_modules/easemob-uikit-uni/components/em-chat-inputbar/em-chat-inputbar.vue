@@ -99,6 +99,7 @@
         :emojis="emojis"
         :disabled="disabled"
         :select-emoji="onEmoji"
+        :delete-emoji="onDeleteEmoji"
         :close-panel="closeEmojiPanel"
         :notify-disabled-tap="notifyDisabledTap"
       >
@@ -109,6 +110,9 @@
             </view>
           </view>
         </scroll-view>
+        <view :class="ns.e('emoji-delete')" @click="onDeleteEmoji">
+          <EmIcon name="rect-lftarrow" :size="24" />
+        </view>
       </slot>
     </view>
     <view v-else-if="panel === 'media'" :class="ns.e('panel')" :style="panelStyle">
@@ -149,6 +153,7 @@ import { canPickAttachment } from '../../libs/attachment'
 import { useChatComposer } from '../../libs/use/useChatComposer'
 import type { EmChatInputMode, EmInputFeatures, EmQuickReply, EmQuoteInfo } from '../../libs/types'
 import { quoteIconNameOf, quoteSuffixOf } from '../../libs/utils/quote'
+import { removeLastGrapheme } from '../../libs/utils/unicode'
 import { useNamespace } from '../../libs/use/useNamespace'
 import { useLocale } from '../../libs/use/useLocale'
 
@@ -372,6 +377,11 @@ function onSend(): void {
 function onEmoji(emoji: string): void {
   if (guardDisabled()) return
   emit('update:modelValue', props.modelValue + emoji)
+}
+
+function onDeleteEmoji(): void {
+  if (guardDisabled() || props.modelValue === '') return
+  emit('update:modelValue', removeLastGrapheme(props.modelValue))
 }
 
 function closeEmojiPanel(): void {
