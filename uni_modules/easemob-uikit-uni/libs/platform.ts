@@ -757,7 +757,7 @@ function errMsgOf(e: unknown): string {
 }
 
 /** 相册权限拒绝的跨端兜底识别：App/小程序失败 errMsg 含 auth/deny/permission/authorize，或 errCode=1101005（未获取权限） */
-function isAlbumAuthDenied(e: unknown): boolean {
+export function isAlbumAuthDenied(e: unknown): boolean {
   const code = (e as { errCode?: unknown } | null)?.errCode
   if (code === 1101005 || code === '1101005') return true
   return /auth|denied|deny|permission|authorize/i.test(errMsgOf(e))

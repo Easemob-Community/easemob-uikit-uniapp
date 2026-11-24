@@ -455,7 +455,7 @@ import EmWatermark from '../../em-watermark/em-watermark.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONNECTION_STATUS, CONVERSATION_TYPE, ERROR_CODE, FILE_SEND_CONCURRENCY, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
 import type { ConversationTypeValue, MessageMenuKeyValue } from '../../../libs/constants'
-import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, downloadAttachment, getCameraAuthorizeState, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
+import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, downloadAttachment, getCameraAuthorizeState, isAlbumAuthDenied, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
 import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
 import { errorCodeOf, sendFailureKeyOf, sendFailureKeyOfCode } from '../../../libs/utils/error'
@@ -1561,6 +1561,21 @@ async function sendQuickReplyText(text: string): Promise<void> {
   }
 }
 
+function showMediaPickFailure(e: unknown, fallbackKey: string): void {
+  if (!isAlbumAuthDenied(e)) {
+    uni.showToast({ title: t(fallbackKey), icon: 'none' })
+    return
+  }
+  uni.showModal({
+    title: t('chat.mediaPermission.title'),
+    content: t('chat.mediaPermission.denied'),
+    confirmText: t('chat.cameraPermission.openSetting'),
+    success: (res) => {
+      if (res.confirm) openAppAuthorizeSetting()
+    }
+  })
+}
+
 async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<void> {
   const request = capturePageRequest()
   // iOS 相机权限被拒后，uni.chooseImage 仍会拉起拍摄页并停在纯黑画面（系统不再弹窗）；
@@ -1578,7 +1593,7 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
   // 平台层将用户取消归一为空数组；只有真实选择/读取失败进入 catch。
   const images = await chooseImage(1, sourceType).catch((e) => {
     logger.error('chooseImage fail:', e)
-    uni.showToast({ title: t('error.imagePickFailed'), icon: 'none' })
+    showMediaPickFailure(e, 'error.imagePickFailed')
     return null
   })
   if (images == null || images.length === 0 || !isPageRequestCurrent(request)) return
@@ -1626,7 +1641,7 @@ async function onPickVideo(): Promise<void> {
   const request = capturePageRequest()
   const video = await chooseVideo().catch((e) => {
     logger.error('chooseVideo fail:', e)
-    uni.showToast({ title: t('error.videoPickFailed'), icon: 'none' })
+    showMediaPickFailure(e, 'error.videoPickFailed')
     return null
   })
   if (video == null || !isPageRequestCurrent(request)) return

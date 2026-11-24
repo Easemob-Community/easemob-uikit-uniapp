@@ -20,6 +20,7 @@
 - `subscribeNetworkStatus(listener)`：监听系统网络连通性变化，返回取消订阅函数；页面卸载时必须调用。
 - `chooseImage()`、`previewImage()`、`chooseVideo()`、`chooseFile()`：媒体选择与预览。
 - `getCameraAuthorizeState()`、`openAppAuthorizeSetting()`：相机授权预检与系统设置。
+- `isAlbumAuthDenied(error)`：识别图片/视频读取与相册保存的权限错误；支持 `errCode=1101005` 和跨端权限错误文本。
 - `setAttachmentProvider()`、`refreshAttachmentAvailability()`、`hasAttachmentProvider()`、`canPickAttachment()`、`attachmentCapability()`、`pickAttachments()`、`resolveAttachment()`：附件能力。
 - `startRecord()`、`stopRecord()`、`isRecording()`、`playAudio()`、`stopAudio()`：录音与播放。`stopRecord()` 在同一轮停止过程中重复调用会共享同一个 Promise；录音取消时该 Promise 以 `ERROR_CODE.RECORD_CANCELLED` 拒绝，原生录音错误也会使其拒绝，调用方需要处理异常。
 - `setStorage()`、`getStorage()`：跨端本地存储。
