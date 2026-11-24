@@ -1570,3 +1570,10 @@
 - **行为**：`em-contact-page` 删除只过滤三个入口的搜索框及搜索空态，直接展示好友列表、群组列表、新请求；`#watermark` 不再暴露已无意义的 `keyword`。`em-contact-list-page` 的展示名 / userId / 可选拼音搜索保持不变，相关 i18n 文案继续由好友列表与选人组件复用。
 - **契约与文档**：新增 `scripts/test-contact-page.mjs`，修复前因入口页仍含搜索框失败，删除后通过；同步 PAGES-CONTACTS、COMPONENTS-CONTACT、按需接入组件数（通讯录 6→4）及宿主 Skills 生成页。
 - **门禁**：`check-skills`、`check-docs`（58 页）、`build web`、`build mp-weixin` 全通过；小程序全部分包检查通过，主包 **1054KB**、分包合计 **1489KB**。5180 端口已有静态服务，新临时服务未启动；已核对其首页响应与本次构建 `index.html` 完全一致，HTTP **200**。H5 页面走查停在登录页，未读取或使用本地凭据；App 真机交互未在本轮执行。
+
+
+## 2026-11-24 聊天页超长群名单行省略
+
+- **根因与修复**：聊天页内置标题回退使用普通 `<text>`，长群名换行后在固定 44px 导航栏内挤压成员数副标题。现改用 `em-text` 单行省略，保留完整 `navTitle` 与宿主自定义 `#title` 契约；标题宿主补 `width: 100%; min-width: 0`，小程序内联文字样式补 `white-space: nowrap`，成员数位置与显隐逻辑不变。
+- **测试与评审**：新增 `test-chat-header-overflow.mjs`，旧实现因普通 `<text>` 按预期失败，修复后与 `check-dx-contract` 均通过；全量 Node 测试 **19/19 个脚本**通过，独立代码评审无 Critical / Important 项。
+- **门禁与实际布局**：`build web`、`build mp-weixin` 通过，小程序分包检查全绿，主包 **1068KB**、分包合计 **1491KB**；H5 静态伺服 HTTP **200**。移动视口进入真实长名称群聊，群名单行尾部省略，「2 名成员」完整显示，返回与详情入口位置正常；临时伺服与浏览器标签页已关闭。App 与小程序真机视觉未在本轮实测。

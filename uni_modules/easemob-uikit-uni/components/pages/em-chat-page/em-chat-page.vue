@@ -19,7 +19,13 @@
           <template #title>
             <!-- fallback 内联样式双通道：app-and-page 隔离下 nav-bar 组件样式不外泄，缺省标题需自带字重与主题色 -->
             <slot name="title" :name="peerDisplayName" :ext="titleExt" :conversation-id="conversationId">
-              <text :style="fallbackTitleTextStyle">{{ navTitle }}</text>
+              <em-text
+                :text="navTitle"
+                :lines="1"
+                :text-class="ns.e('nav-title')"
+                :text-style="fallbackTitleTextStyle"
+                :class="ns.e('nav-title-host')"
+              />
             </slot>
           </template>
         </em-nav-bar>
@@ -709,7 +715,7 @@ const peerDisplayName = computed(() => {
 const navTitle = computed(() => props.title !== '' ? props.title : peerDisplayName.value)
 // 与 em-nav-bar__title 同档的内联样式（小程序侧父组件样式进不了 nav-bar，text-style 内联不受隔离限制）
 const fallbackTitleTextStyle =
-  'font-family: var(--em-font-family); font-size: var(--em-font-size-16); font-weight: var(--em-font-weight-medium); line-height: 22px; color: var(--em-text-primary);'
+  'font-family: var(--em-font-family); font-size: var(--em-font-size-16); font-weight: var(--em-font-weight-medium); line-height: 22px; color: var(--em-text-primary); white-space: nowrap;'
 const titleExt = computed(() =>
   conversationStore.overrideByConversationId[props.conversationId]?.ext
   ?? groupStore.overrideByGroupId[props.conversationId]?.ext
