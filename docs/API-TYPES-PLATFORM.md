@@ -14,7 +14,7 @@
 
 ## `EmAttachment`
 
-宿主附件能力返回的可发送附件：`path`（本地真实路径）/ `name` / `size` / `mimeType?` / `temporary?` / `release?(path)`。
+宿主附件能力返回的可发送附件：`path`（本地真实路径或 Android `content://` URI）/ `name` / `size` / `mimeType?` / `temporary?` / `release?(path)`。Android 可直接使用 `uni.chooseFile` 的原始返回值。文件发送成功后本地副本保留到删除消息或登出，用于单击即时预览；`release` 收到的路径应与 `path` 一致。
 
 ## `EmAttachmentPickOptions`
 

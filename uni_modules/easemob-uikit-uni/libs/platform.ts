@@ -18,7 +18,7 @@ export interface EmPlatformCapabilities {
   videoPreview: boolean
   /** 内置文件选择：小程序 + H5；App 无内置选择器（宿主注入附件能力后由 libs/attachment.ts 调起） */
   filePick: boolean
-  /** 文件打开/下载：一期全端未接，气泡点击入口先隐藏 */
+  /** 文件打开/下载：全端支持；App/小程序本地优先，H5 走浏览器下载 */
   fileOpen: boolean
 }
 
@@ -26,7 +26,7 @@ function detectPlatformCapabilities(): EmPlatformCapabilities {
   const caps: EmPlatformCapabilities = {
     videoPreview: true,
     filePick: true,
-    fileOpen: false
+    fileOpen: true
   }
   // #ifdef APP
   // 内置选择器在 App 端不可用；宿主可经 EmKit.setAttachmentProvider 注入平台文件选择能力，
@@ -226,6 +226,15 @@ export function previewImage(urls: string[], current: string): void {
 export function normalizeVideoUrl(url: string): string {
   if (url.indexOf('//') === 0) return `https:${url}`
   // #ifdef APP-IOS
+  if (url.indexOf('http://') === 0) return `https://${url.slice(7)}`
+  // #endif
+  return url
+}
+
+/** App 下载环信附件时统一使用 HTTPS，避免 Android cleartext 策略拦截；查询参数由调用方保留。 */
+export function normalizeAttachmentUrl(url: string): string {
+  if (url.indexOf('//') === 0) return `https:${url}`
+  // #ifdef APP
   if (url.indexOf('http://') === 0) return `https://${url.slice(7)}`
   // #endif
   return url

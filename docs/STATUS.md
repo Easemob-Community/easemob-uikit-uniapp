@@ -1577,3 +1577,35 @@
 - **根因与修复**：聊天页内置标题回退使用普通 `<text>`，长群名换行后在固定 44px 导航栏内挤压成员数副标题。现改用 `em-text` 单行省略，保留完整 `navTitle` 与宿主自定义 `#title` 契约；标题宿主补 `width: 100%; min-width: 0`，小程序内联文字样式补 `white-space: nowrap`，成员数位置与显隐逻辑不变。
 - **测试与评审**：新增 `test-chat-header-overflow.mjs`，旧实现因普通 `<text>` 按预期失败，修复后与 `check-dx-contract` 均通过；全量 Node 测试 **19/19 个脚本**通过，独立代码评审无 Critical / Important 项。
 - **门禁与实际布局**：`build web`、`build mp-weixin` 通过，小程序分包检查全绿，主包 **1068KB**、分包合计 **1491KB**；H5 静态伺服 HTTP **200**。移动视口进入真实长名称群聊，群名单行尾部省略，「2 名成员」完整显示，返回与详情入口位置正常；临时伺服与浏览器标签页已关闭。App 与小程序真机视觉未在本轮实测。
+
+
+## 2026-11-24 Android 真机附件发送、下载与预览核查
+
+- **拓扑与样例**：荣耀 ALI-AN00 / Android 15，HBuilderX 5.34 标准基座 `pfh` 与正式包 `com.example.easemobdemo50` `1.0.0(10000)` / `pfh2`；H5 `pfh` 作为辅助发送端。样例为唯一标识的 3.15 MB PDF，Android 标准基座和正式包分别执行同一「+ → 文件 → 选择 PDF」链路。
+- **自己发送失败（RD-16）**：两个 Android 包均落失败气泡。选择器返回的 `/data/user/0/<package>/cache/*.pdf` 文件实际存在且大小正确，但 `uni.uploadFile` 将其错拼到应用 `www` 下（标准基座为 `/data/data/.../www/data/user/0/...`，正式包为 `/android_asset/.../www/data/user/0/...`），最终 `FileNotFoundException` / SDK 402。md5 不可用后的既有降级已执行，失败点在其后的实际上传，不是离线或文件已删除。
+- **单击与转发**：Android incoming 文件气泡单击无任何加载或预览；H5 自己成功发送的文件气泡单击同样无动作，符合当前 `fileOpen=false` 与空 `onFileDownload()` 实现。文件/视频长按菜单均只有引用、置顶、下载、删除等现有项，没有「转发」；单条转发仍是二期候选，未记为运行故障。
+- **文件下载失败（RD-17）**：H5 向 Android 发 PDF 实时接收成功；连续两次长按「下载」均提示「下载失败，请稍后重试」，日志为 `CLEARTEXT communication to ngi-a1.easemob.com not permitted by network security policy`。文件远端地址未升级 HTTPS，Android 在下载阶段即拦截，未进入系统文档预览。
+- **视频对照**：同一聊天中的视频长按下载成功提示「已保存到相册」，MediaStore 新增 `compress_video_1294899496_1795512777545.mp4`，证明不是相册权限或所有媒体下载整体失效。
+- **证据**：`reports/assets/shots/android/rd16-*.png`、`rd17-*.png`、`android-video-download-saved.png` 与 `reports/assets/android-attachment-20261124-log.txt`。本轮只测试和登记，未修改附件产品代码；iOS/鸿蒙未复测，Android 自己成功发送后的真机预览因 RD-16 阻断，不能以其他端结果替代。
+
+
+## 2026-11-24 Android 附件修复与下载 loading 真机闭环
+
+- **最终实现**：App provider 改为内置 `uni.chooseFile`，直接传递 `tempFiles[].path`，不做 `prepareFile`、`file://` 或 `externalCacheDir` 转换；自定义调试基座 `uni.app.UNI08EF252` 返回 `content://` URI，SDK 可直接计算 MD5 并通过 `uni.uploadFile` 上传。自研文件选择插件保留原有内部 cacheDir 实现，不参与本次最终链路。
+- **发送与本地预览（RD-16 已修已验）**：荣耀 ALI-AN00 / Android 15 上，3,146,409 字节 PDF 从选择到 `message sent … sent` 约 1.7 秒，无失败气泡或 `FileNotFoundException`。单击刚发送文件直接调用系统文档预览，不进入远端下载 loading；本地源文件删除后 `openDocument fail: File not exist`，随后正确回退远端下载。
+- **HTTPS 下载（RD-17 已修已验）**：下载 URL 在 App 端统一归一为 HTTPS 并保留 secret。删除源文件后的回退下载得到完整 3,146,409 字节 PDF，并在荣耀 PDF 预览器显示预期文本，不再出现 cleartext 拦截。
+- **新缺陷与修复（RD-18 已修已验）**：首次远端下载连续两次被系统查杀。日志证明进度回调每 1% 调一次 `uni.showLoading`，Android 蒸汽端累计创建数十个原生 loading 页面，进程 RSS 约 277–290MB 后被 `lowmemorykiller` 杀掉。现每次下载只创建一个 loading；复验仅一条 `uni:showLoading`，PID 保持不变，文件成功下载并打开。
+- **回归**：`scripts/test-attachment.mjs` 新增 loading 用例，先 RED 后 GREEN，专项 7/7；完整门禁结果见后续最终复跑记录。iOS、鸿蒙未复测，转发不在本次范围内。
+
+
+### 高频原生弹层同类审计
+
+- 全库 `uni.showLoading` 目前只剩附件下载的一次性出口；其余 `uni.showToast` 均为按钮、成功或失败的一次性提示。录音计时使用页面内 `setInterval` 更新文本，手势移动不创建原生弹层，录音失败另有 `recordErrorNotified` 防重。
+- 荣耀 ALI-AN00 真机持续横滑按住录音 8 秒，中途浮层正常计时，松开后语音消息进入 `sent`；整段日志没有 `uni:showToast` / `uni:showLoading`，未复现附件下载的同类问题。
+- 新增 `scripts/test-native-popup-lifecycle.mjs` 两项静态回归，约束定时器/录音手势不得创建原生 toast/loading，并固定全库单次 loading 出口；专项 2/2 通过。过短录音曾出现 DCloud AAC `signalEndOfInputStream` 停止异常，与原生弹层审计无关，不混入本项修复。
+
+
+### 附件与高频弹层最终门禁
+
+- 全量 Node 测试 **107/107**；`check-docs`（58 页 / 39 组件 / 83 方法 / 35 配置）、`check-skills`（8 个）与 App 模块图（142 模块、0 反向依赖 / 0 循环）通过；`git diff --check` 通过。
+- `build web` 与 `build mp-weixin` 均通过；小程序主包 **1068KB**、分包合计 **1491KB**，全部分包检查通过。最终 H5 产物独立静态伺服返回 HTTP **200**，验证后伺服与 logcat 采集均已关闭。

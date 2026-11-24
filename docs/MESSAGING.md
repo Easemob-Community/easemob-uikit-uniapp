@@ -40,7 +40,7 @@ await EmKit.sendFile('user-b', CONVERSATION_TYPE.SINGLE_CHAT, file)
 
 - 单聊 `to` 为对方 userId，群聊 `to` 为 groupId。
 - 媒体对象来自 `chooseImage` / `chooseVideo` / `chooseFile` 或输入栏事件。
-- App 端文件选择由宿主注册附件能力（`EmKit.setAttachmentProvider`）；`EmKit.sendFile` 接收 `{ path, name, size, mimeType?, temporary?, release? }`，`temporary` 附件在发送成功后由 UIKit 回调 `release` 清理，失败时保留供重发。详见 [EmKit 附件能力注入](./API-KIT-MESSAGES.md#emkitsetattachmentproviderprovider--pickattachmentsoptions--resolveattachmenturi-options)。
+- App 端文件选择由宿主注册附件能力（`EmKit.setAttachmentProvider`）；`EmKit.sendFile` 接收 `{ path, name, size, mimeType?, temporary?, release? }`，`path` 为宿主提供的本地路径或 Android `content://` URI。Android 可直接使用内置 `uni.chooseFile` 的原始返回值，无需额外的原生路径转换。文件发送或重发成功后保留本地副本供单击即时预览，删除消息或登出时回调 `release` 清理；其他媒体发送成功后释放，失败时均保留供重发。详见 [EmKit 附件能力注入](./API-KIT-MESSAGES.md#emkitsetattachmentproviderprovider--pickattachmentsoptions--resolveattachmenturi-options)。
 - 发送成功后返回 `EmMessageItem`；失败会抛错，聊天页同时把消息置为 `failed` 并显示重发入口。
 - 附件消息发送中，SDK 回传 `onFileUploadProgress` 时会把百分比写入 `EmMessageItem.uploadProgress`（0-100），图片/视频气泡蒙层与文件气泡会显示进度；发送结束（成功或失败）后该字段清空。
 

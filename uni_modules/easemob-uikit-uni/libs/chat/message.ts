@@ -174,8 +174,8 @@ export class EmMessageDomain {
   // 失败消息的原始上传文件（H5 File）：SDK web 上传只认 File/Blob，而 EmMessageItem 只持久化 URL/path；
   // 只在内存持有，发送成功 / 删除本地消息 / 登出时释放（重发 H5 图片/视频/文件需要它）。
   private uploadFileByLocalId: Record<string, unknown> = {}
-  // 宿主附件能力提供的临时副本：path → release。发送成功/重发成功/删除消息/登出时清理；
-  // 发送失败保留路径，重发仍能读到文件（与 uploadFileByLocalId 的生命周期一致）。
+  // 宿主附件能力提供的临时副本：path → release。文件发送/重发成功后保留供本地即时预览，
+  // 删除消息/其他端删除/登出时清理；其他媒体发送成功后释放，失败均保留供重发。
   private releaseByPath: Record<string, (path: string) => void> = {}
   // 历史加载飞行中去重（会话页预热 + 聊天页 mount 会并发调用同一会话）
   private historyPromiseByConversationId: Record<string, Promise<void>> = {}
@@ -714,8 +714,8 @@ export class EmMessageDomain {
       delete stored.uploadProgress
       logger.debug('message sent:', sent.msgLocalId, sent.sendStatus as string, sent.isContentReplaced === true ? '(content replaced)' : '')
       delete this.uploadFileByLocalId[item.localId]
-      // 临时副本只在发送成功后清理；失败保留，用户点重发仍能读到同一路径
-      this.releaseTemporary(stored.url)
+      // 文件本地副本保留给单击即时预览，删除消息或登出时统一清理；其他媒体维持成功后释放
+      if (stored.type !== MESSAGE_TYPE.FILE) this.releaseTemporary(stored.url)
       this.applyMediaBody(stored, sent)
       this.applySentModeration(stored, sent)
     } catch (e) {
@@ -1219,7 +1219,7 @@ export class EmMessageDomain {
     }
     delete this.uploadFileByLocalId[localId]
     removeMessageSource(localId)
-    // 删除失败/本地消息时顺手清掉宿主附件临时副本（发送成功的已在 deliver 清理，重复调用是 no-op）
+    // 删除消息时清掉宿主附件临时副本；其他媒体已成功释放，文件在此释放本地预览副本
     this.releaseTemporary(target.url)
     messageStore.messagesByConversationId[conversationId] = list.filter((m) => m.localId !== localId)
     return true
@@ -1376,8 +1376,8 @@ export class EmMessageDomain {
       delete item.failCode
       delete item.uploadProgress
       delete this.uploadFileByLocalId[localId]
-      // 重发成功同样释放宿主附件临时副本（失败则保留，允许再次重发）
-      this.releaseTemporary(item.url)
+      // 文件重发成功后同样保留本地副本供即时预览；其他媒体重发成功即释放
+      if (item.type !== MESSAGE_TYPE.FILE) this.releaseTemporary(item.url)
       this.applyMediaBody(item, sent)
       this.applySentModeration(item, sent)
     } catch (e) {

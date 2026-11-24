@@ -135,6 +135,14 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **解法**：`libs/client/index.ts` 的 `platformAdapterOptions.overrides` 包装 `imageProcessor`：`computeMd5` 失败降级为空 md5（warn 带 `details`），上传继续；`getImageInfo`/`generateBigImage` 原样委托。md5 只用于服务端秒传预检，SDK 自身对缺能力平台也是不传 md5 继续上传，消息内容/接收端无差异。
 - **纪律**：App 端**不要**用 `uni.getFileSystemManager` 读宿主给的文件路径；需要读字节（md5/解析）的能力都要有「读不到就不做」的降级。选择器副本路径只承诺「`uni.uploadFile` 可上传」，不承诺「FSM 可读」。
 - **排查口径**：若仍失败，看 `[emkit:client] attachment md5 unavailable ...` 的 warn——`details.filePath` + `errCode` 可区分「读不到」与「路径已不存在」；此时错误若变成 `Mini program upload failed`，才是上传链路问题。
+- **2026-11-24 Android 复测定案**：ALI-AN00 / Android 15 上，旧自研选择器返回的 `/data/user/0/<package>/cache/<uuid>.pdf` 会被拼到应用 `www` 下并抛 `FileNotFoundException`。最终方案不复制或转换该路径，改用内置 `uni.chooseFile` 返回的原始 `content://` URI；自定义基座已验证 SDK 可直接计算 MD5、上传成功，单击刚发送文件可本地打开。文件下载另有独立坑：SDK `body.url` 为 `http://` 时 Android 以 cleartext 策略拒绝，必须在下载入口归一为 HTTPS（RD-16/RD-17 已修已验，iOS/鸿蒙未复测）。
+
+### 5v. 下载进度反复 `uni.showLoading` → 原生页面堆积并被低内存查杀（Android 实测，2026-11-24）
+- **症状**：3.15MB 附件已经完整下载，但 loading 不消失，数秒后应用回登录页；连续两次复现。不是 SDK 下载失败，也不是业务 crash。
+- **根因**：进度回调每个百分点调用一次 `uni.showLoading`，Android 蒸汽端每次创建新的原生 loading 页面（logcat 连续出现新 pageId）。进程 RSS 约 277–290MB 后被 `lowmemorykiller` 以 `oom_score_adj 0` 查杀；同一时刻桌面、文档预览和多个系统应用也被回收，属于内存压力结果。
+- **定案解法**：一次下载只在开始显示一个「下载中...」，不要在 `onProgress` 中反复调 `showLoading`；成功/失败仍各关闭一次。百分比需要展示时使用页面内自有状态，不用原生 loading 页面承载高频更新。
+- **验证**：`scripts/test-attachment.mjs` 覆盖禁止进度 showLoading；修复后真机只有一次 `uni:showLoading`，PID 不变，远端 PDF 下载并在系统预览器打开（RD-18）。
+- **同类审计**：录音计时是页面内 `setInterval` 更新文本，录音 toast 仅在过短/失败结果出现一次；真机持续录音 8 秒并发送，无 `uni:showToast` / `uni:showLoading`。全库定时器与录音手势由 `scripts/test-native-popup-lifecycle.mjs` 防回归；其他高频状态也不要反复创建原生 toast/modal。
 
 ### 5i. App 端 class 方式覆盖 `--em-*` 变量结果随构建漂移（顺序无契约，两次真机构建相反，2026-10-22）
 - **症状**：子树根节点挂 `themeClass` + 自定义 class（`.my-brand { --em-primary-color: #FF6B00; }`）覆盖变量：同一写法第一版构建 App 真机是蓝的（被主题类顶掉），探针版构建 P1 对照组又是橙的——**没改任何相关代码，结果随样式合并顺序漂移**。H5/小程序稳定生效。
@@ -268,7 +276,7 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 | `FileSystemManager.writeFile` 的 `encoding` | ⚠️ App 只认 `ascii`/`base64`/`utf-8`（`'utf8'` 报 1200002）；小程序两者都收 |
 | `uni.env.USER_DATA_PATH` | ⚠️ App 是应用沙盒，文件管理器不可见；写成功也取不出，日志导出以剪贴板/分享为准 |
 | `uni.getFileSystemManager().readFile`（App） | ⚠️ 只认 uni 沙盒目录（`uni.env.*`）；系统缓存里的宿主文件读不到（1300013/1300002），SDK 的附件 md5 即踩中，见 §5h |
-| `uni.uploadFile` 读宿主缓存路径（App） | ✅ 原生读文件，不受 FSM 沙盒限制；附件上传以它为准 |
+| `uni.uploadFile` 读宿主缓存路径（App） | ⚠️ Android 5.34 实测会把 `/data/user/0/...` 错拼到 `www` 导致上传失败；不能跨端承诺绝对缓存路径可直传，见 §5h 修正 |
 | textarea 生长输入（App） | ⚠️ 禁止混用 auto-height 与 JS 固定高度；固定 19px 行高并始终显式高度，linechange 只取 lineCount，清空由草稿状态直接复位（§5r） |
 | `<video>` 组件（App） | ⚠️ 属内置模块 `uni-video`，参与摇树；自定义基座未包含时组件降级为 `<view>`（播放页黑屏），接入视频后需重打基座或 manifest 显式声明（§5n） |
 | iOS 远程视频直链 | ⚠️ chatfiles 无后缀且不支持 Range，AVPlayer 会停在 `00:00`；先下载到本地 `.mp4` 再播（§5o） |

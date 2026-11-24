@@ -83,7 +83,7 @@ EmKit.setAttachmentProvider({
 
 - `setAttachmentProvider(null)` 注销；H5/小程序继续使用内置选择器。
 - `pick` 的 `ctx` 带 `conversationId`、`chatType`、`mimeTypes`、`multiple`。
-- `temporary: true` + `release(path)`：发送成功、重发成功、删除消息或登出时释放；取消发送的临时文件也会释放，同一路径最多调用一次。
+- `temporary: true` + `release(path)`：文件发送或重发成功后保留本地副本供即时预览，删除消息或登出时释放；其他媒体发送成功后释放。取消发送的临时文件也会释放，同一路径最多调用一次。
 - `resolve(uri, ctx)` 可把分享进入/open-with 等外部 URI 转为可发送附件。
 - `EmKit.attachments` 返回 `{ available, providerName }`，`EmKit.canPickAttachment` 返回当前是否可选文件；可用性变化后调用 `EmKit.refreshAttachmentAvailability()`。
 - `pickAttachments(options)` 与 `resolveAttachment(uri, options?)` 是低层入口，内置聊天流程不需要手动调用。

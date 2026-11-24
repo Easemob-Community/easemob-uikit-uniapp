@@ -282,7 +282,7 @@ function onQuickReply(item: EmQuickReply): void {
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `download` | `message: EmMessageItem` | 点击文件卡；仅当 `PLATFORM_CAPABILITIES.fileOpen=true` 时派发（当前全端为 `false`，单击不派发） |
+| `download` | `message: EmMessageItem` | 点击文件卡；`PLATFORM_CAPABILITIES.fileOpen=true` 时派发 |
 | `long-press` | `message: EmMessageItem` | 长按气泡，宿主据此弹消息菜单 |
 
 无插槽。
@@ -291,7 +291,7 @@ function onQuickReply(item: EmQuickReply): void {
 <em-file-message :message="message" @download="downloadFile" @long-press="openMessageMenu" />
 ```
 
-**行为与平台**：发送中且 `message.uploadProgress` 有值时，在大小行下方显示上传百分比（发送结束清空）。扩展名归类决定图标与图标底色，覆盖 PDF、Excel、Word、PPT、Markdown、图片、视频、音频，其余归为通用文件；文件名缺失时显示"文件"文案。大小按 B / KB / MB 三档格式化，`fileSize` 为 0 时不显示大小行。普通文件卡单击不派发 `download`（`fileOpen=false`），下载入口在 `em-chat-page` 的长按菜单「下载」：App/小程序下载后尝试系统文档预览打开，H5 走浏览器下载；复合消息内嵌文件卡点击时会派发 `download`，进入同一附件下载链路。宿主自绘气泡可直接调用 `EmKit.downloadAttachment(message)`。H5 长按补发的 `click` 同样被吞掉。
+**行为与平台**：发送中且 `message.uploadProgress` 有值时，在大小行下方显示上传百分比（发送结束清空）。扩展名归类决定图标与图标底色，覆盖 PDF、Excel、Word、PPT、Markdown、图片、视频、音频，其余归为通用文件；文件名缺失时显示"文件"文案。大小按 B / KB / MB 三档格式化，`fileSize` 为 0 时不显示大小行。普通文件卡与复合消息内嵌文件卡点击时都会派发 `download`，在 `em-chat-page` 进入同一附件链路：自己已发送且本地可用的文件直接打开，其他文件下载后尝试系统文档预览；H5 走浏览器下载。长按菜单「下载」复用同一链路。宿主自绘气泡可直接调用 `EmKit.downloadAttachment(message)`。H5 长按补发的 `click` 同样被吞掉。
 
 ## em-multi-body-message
 

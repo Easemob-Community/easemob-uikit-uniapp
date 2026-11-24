@@ -476,6 +476,7 @@ import { useChatComposer } from '../../../libs/use/useChatComposer'
 import { formatDividerTime } from '../../../libs/utils/time'
 import { isRichStream } from '../../../libs/utils/stream'
 import { multiBodyPreviewOf } from '../../../libs/utils/multi-body'
+import { openLocalFileAttachment } from '../../../libs/utils/download'
 import { quoteHasIcon, quoteIconNameOf, quoteSenderOf, quoteSuffixOf, quoteTextClassOf, quoteTextStyleOf } from '../../../libs/utils/quote'
 import { createLogger } from '../../../libs/utils/logger'
 
@@ -1733,10 +1734,9 @@ function onVideoPreview(m: EmMessageItem): void {
   videoPreviewVisible.value = true
 }
 
-// 文件消息点击默认行为（从 em-file-message 上移，组件本身纯 emit 透传）：
-// 文件打开/下载一期全端未接（platform.fileOpen=false），气泡侧不发事件；接入后在此实现下载/打开。
+// 文件消息点击与长按下载共用本地优先链路：自己刚发送的文件直接打开，其他情况下载后打开。
 function onFileDownload(m: EmMessageItem): void {
-  if (!PLATFORM_CAPABILITIES.fileOpen) return
+  void downloadMessage(m)
 }
 
 function onMultiBodyFileDownload(m: EmMessageItem): void {
@@ -2079,23 +2079,20 @@ async function deleteMessage(m: EmMessageItem): Promise<void> {
   }
 }
 
-// 附件下载（M2.24）：长按图片/视频/文件消息菜单触发。App/小程序展示下载进度并保存到相册/打开文档；
+// 附件下载（M2.24）：长按图片/视频/文件消息菜单触发。App/小程序展示下载状态并保存到相册/打开文档；
 // H5 交给浏览器下载，不出现进度。单条消息加锁防重复点击；失败只 toast，不影响其它消息操作。
 async function downloadMessage(m: EmMessageItem): Promise<void> {
   if (downloadingByLocalId[m.localId] === true) return
   downloadingByLocalId[m.localId] = true
   let loadingShown = false
-  let lastPercent = -1
   try {
+    if (await openLocalFileAttachment(m)) {
+      uni.showToast({ title: t('message.download.opened'), icon: 'none' })
+      return
+    }
     uni.showLoading({ title: t('message.download.downloading'), mask: false })
     loadingShown = true
-    const result = await downloadAttachment(m, {
-      onProgress: (percent: number) => {
-        if (!loadingShown || percent === lastPercent) return
-        lastPercent = percent
-        uni.showLoading({ title: t('message.download.progress', { percent }), mask: false })
-      }
-    })
+    const result = await downloadAttachment(m)
     if (loadingShown) {
       uni.hideLoading()
       loadingShown = false

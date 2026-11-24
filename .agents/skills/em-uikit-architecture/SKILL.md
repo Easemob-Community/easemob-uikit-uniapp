@@ -94,7 +94,7 @@ uni_modules/easemob-uikit-uni/
 
 ## platform.ts 平台差异现状
 
-chooseVideo 全端；内置 chooseFile 仅小程序+H5，App 由 `libs/attachment.ts` 的宿主 provider 注入选择能力；图片/视频/内置文件选择统一识别用户取消（图片 `[]`、视频/文件 `null`），其他选择/读取/元数据处理失败 reject 并由聊天页 toast，H5 文件 input 通过 `oncancel` 静默结束；录音仅小程序+App（H5 抛错降级，输入栏已捕获 toast）；播放 `createInnerAudioContext` 全局互斥；视频由 chat-page 打开内置 em-video-preview，App 先下载本地再播，H5/小程序直接播远程 URL；文件点击不下载；`exportTextFile`/`copyText` 支撑日志导出。`copyText` 返回 Promise、空文本/原生失败 reject，并传 `showToast:false` 关闭原生提示，消息复制与日志导出调用方均需 await/catch。
+chooseVideo 全端；内置 chooseFile 仅小程序+H5，App 由 `libs/attachment.ts` 的宿主 provider 注入选择能力；图片/视频/内置文件选择统一识别用户取消（图片 `[]`、视频/文件 `null`），其他选择/读取/元数据处理失败 reject 并由聊天页 toast，H5 文件 input 通过 `oncancel` 静默结束；录音仅小程序+App（H5 抛错降级，输入栏已捕获 toast）；播放 `createInnerAudioContext` 全局互斥；视频由 chat-page 打开内置 em-video-preview，App 先下载本地再播，H5/小程序直接播远程 URL；文件单击与长按下载共用本地优先链路，自己已发送的本地文件直接打开，失败再远端下载；`exportTextFile`/`copyText` 支撑日志导出。`copyText` 返回 Promise、空文本/原生失败 reject，并传 `showToast:false` 关闭原生提示，消息复制与日志导出调用方均需 await/catch。
 
 ## 改某能力前的入口速查
 
