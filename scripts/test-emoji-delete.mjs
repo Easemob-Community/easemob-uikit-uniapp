@@ -31,8 +31,8 @@ test('退格删除普通字符、末尾 Emoji 与换行边界', () => {
 test('退格删除完整组合字素', () => {
   const removeLastGrapheme = loadRemoveLastGrapheme()
 
-  const cases = ['A☠️', '👍🏽', '👨‍👩‍👧‍👦', '🇨🇳', '1️⃣', 'e\u0301']
-  const expected = ['A', '', '', '', '', '']
+  const cases = ['A☠️', '👍🏽', '👨‍👩‍👧‍👦', '🇨🇳', '1️⃣', 'e\u0301', 'عَ', 'का', '가', 'A가', 'A각', 'A각']
+  const expected = ['A', '', '', '', '', '', '', '', '', 'A', 'A', 'A']
   cases.forEach((value, index) => {
     assert.equal(removeLastGrapheme(value), expected[index])
   })
