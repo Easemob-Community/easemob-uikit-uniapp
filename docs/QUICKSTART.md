@@ -6,6 +6,9 @@
 > [!WARNING]
 > **支持范围**：本插件仅支持 **uni-app x 蒸汽模式（Vapor）**；经典 uni-app（Vue2/Vue3）与 vdom 模式不在支持范围。DCloud 官方已于 2024 年停止 nvue 与 5+ 维护，并将于 2027 年初停止 uni-app App 平台与 uni-app x vdom 平台维护（见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；蒸汽模式已兼容 js/ts 写法，老工程可直接升级。差异见 [平台能力与差异](./PLATFORM.md)。
 
+> [!NOTE]
+> **端差异**：能力矩阵按 Android、iOS、鸿蒙、H5 与微信小程序的环境要求整理，同一能力在不同机型、系统版本与厂商 ROM 上的表现可能不同，也不排除存在尚未记录的差异。已知差异、当前状态与处理方式见 [设备与端差异](./PLATFORM-DEVICES.md)；遇到文档未覆盖的情况，按该页「反馈需要的信息」提交。
+
 > 本文只覆盖「最小可用链路」。完整页面契约见 [页面指南](./PAGES-CONVERSATION.md)，组件与 API 见 [组件参考](./COMPONENTS.md)、[EmKit API](./API-KIT.md)，业务扩展见 [多场景接入](./GUIDE-MULTI-SCENARIO.md) 与 [AI 流式消息](./AI-STREAM.md)。
 
 下面的完整流程适合搭建完整 IM。若你只需要一个单聊页面，`chat-only` 模板已预置工程结构、登录恢复、聊天页和微信小程序 SDK 分包，省去从完整 Demo 删减页面与重新接线的步骤。它仍是需要修改的宿主工程：appkey、服务端 token 接口、对端资料和会话存储都要按你的业务配置，并非独立 SDK 或免配置服务。
@@ -218,7 +221,7 @@ setLocale('en') // 立即切换并持久化；默认跟随系统/上次选择
 ```vue
 <template>
   <view class="page" :class="themeClass">
-    <em-conversation-page @select="onSelect" @menu="onMenu" />
+    <em-conversation-page @select="onSelect" />
   </view>
 </template>
 
@@ -252,10 +255,6 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue) {
   uni.navigateTo({
     url: `/pages/chat/chat?conversationId=${conversationId}&chatType=${chatType}`
   })
-}
-
-function onMenu(key: string) {
-  // create-group / new-chat 由页面组件内置处理一部分，业务菜单在这里接
 }
 </script>
 

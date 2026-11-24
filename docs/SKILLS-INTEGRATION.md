@@ -324,7 +324,7 @@ uni.reLaunch({ url: '/pages/login/login' })
 ```vue
 <template>
   <view class="page" :class="themeClass">
-    <em-conversation-page @select="onSelect" @menu="onMenu" />
+    <em-conversation-page @select="onSelect" />
   </view>
 </template>
 
@@ -347,11 +347,6 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue): void
   EmKit.enterConversation(conversationId, chatType).catch(() => {})
   EmKit.loadHistory(conversationId, chatType).catch(() => {})
   uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${conversationId}&chatType=${chatType}` })
-}
-
-function onMenu(key: string): void {
-  // new-chat / pin / mute / delete 由页面组件内置；
-  // create-group 需要宿主跳群列表页（见 em-host-contacts-groups）
 }
 </script>
 

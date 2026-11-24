@@ -80,6 +80,7 @@ sed -n '/interface EmKitConfig/,/^}/p' uni_modules/easemob-uikit-uni/libs/types/
 | `THEME-I18N.md` | `/guide/theme-i18n` | 主题、明暗模式、国际化 |
 | `DESIGN-TOKENS.md` | `/guide/design-tokens` | `--em-*` 设计变量 |
 | `PLATFORM.md` | `/guide/platform` | 五端能力矩阵与差异 |
+| `PLATFORM-DEVICES.md` | `/guide/platform-devices` | 设备与端差异：影响范围、归因、状态与处理 |
 | `FAQ.md` | `/guide/faq` | 常见问题与排错 |
 | `AI-STREAM.md` | `/guide/ai-stream` | AI 流式消息 |
 | `GUIDE-MULTI-SCENARIO.md` | `/guide/multi-scenario` | 多场景（客服/医疗/招聘/交易）接入 |

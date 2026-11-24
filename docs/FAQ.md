@@ -31,6 +31,17 @@ export default defineConfig({
 
 已有 `vite.config.ts` 时，将 `autoImportOptions` 合并到现有 `uni()` 配置中，保留其他插件配置。无需重打包或覆盖 `node_modules/easemob-websdk`；保存配置后重新编译。
 
+## 平台与设备差异
+
+### 同一份代码在不同机型上表现不同，是 UIKit 的问题吗
+
+先按四步判断，再决定报给谁：
+
+1. **版本**：HBuilderX ≥ 5.21、UIKit 是否为当前版本（见[更新日志](/uniapp/guide/changelog)）、`easemob-websdk` 5.2.0、小程序基础库 ≥ 2.11.2 是否一致；App 端是否重新打过自定义基座。
+2. **范围**：同一产物换一台同系统版本的设备是否正常；只在一台设备出现时，记录厂商、型号与系统版本。
+3. **复现**：新建空白 uni-app x 蒸汽工程，只调用对应的 `uni.*` API（如 `uni.chooseVideo`、`uni.onKeyboardHeightChange`）。能复现属于上游或平台，提交 uni-app x 官方 issue；不能复现再在示例工程复现。
+4. **登记**：确认归因后记录到[设备与端差异](./PLATFORM-DEVICES.md)，其中「反馈需要的信息」可直接作为 issue 模板。
+
 ## 页面与布局
 
 ### 页面白屏 / 列表或输入栏高度为 0

@@ -70,3 +70,5 @@ features:
 | 小程序 | 微信小程序（SDK 需分包接入） |
 
 > 当前版本：`1.0.3`。完整变更见 [更新日志](/uniapp/guide/changelog)。
+>
+> 端能力以 [平台能力与差异](/uniapp/guide/platform) 的能力矩阵为准；已知差异、状态与处理方式见 [设备与端差异](/uniapp/guide/platform-devices)。

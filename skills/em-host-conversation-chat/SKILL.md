@@ -12,7 +12,7 @@ description: Use when 接入或定制 easemob-uikit-uni 的会话列表页、聊
 
 | 组件 | 职责 | 宿主必须做 |
 |---|---|---|
-| `em-conversation-page` | 会话列表、搜索、筛选 tab、置顶/免打扰/删除（长按）、发起单聊（「+」内置选人）、连接状态条 | 根容器高度、`@select` 跳聊天页、`@menu` 接建群 |
+| `em-conversation-page` | 会话列表、搜索、筛选 tab、置顶/免打扰/删除（长按）、发起单聊与创建群组（「+」内置面板）、连接状态条 | 根容器高度、`@select` 跳聊天页 |
 | `em-chat-page` | 进会话、拉历史、滚底、发消息（文本/图片/语音/视频/文件）、引用/撤回/重发/已读、草稿、键盘避让、未读清零 | 路由参数、根容器高度、`@open-info` 跳详情 |
 | `em-chat-info-page` | 聊天详情：免打扰/置顶/清空/删除会话/删除好友；群分支的成员宫格、公告、群管理 | 根容器高度、`@back`/`@deleted`/`@leaved`/`@contact-deleted` 退场、群成员私聊接线 |
 
@@ -57,13 +57,13 @@ description: Use when 接入或定制 easemob-uikit-uni 的会话列表页、聊
 ```vue
 <template>
   <view class="page" :class="themeClass">
-    <em-conversation-page @select="onSelect" @menu="onMenu" />
+    <em-conversation-page @select="onSelect" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
-import { CONVERSATION_MENU_KEY, EmKit, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
+import { EmKit, useTheme } from '@/uni_modules/easemob-uikit-uni/libs'
 import type { ConversationTypeValue } from '@/uni_modules/easemob-uikit-uni/libs'
 
 const { themeClass } = useTheme()
@@ -83,12 +83,6 @@ function onSelect(conversationId: string, chatType: ConversationTypeValue): void
   EmKit.enterConversation(conversationId, chatType).catch(() => {})
   EmKit.loadHistory(conversationId, chatType).catch(() => {})
   uni.navigateTo({ url: `/sub-im/pages/chat/chat?conversationId=${conversationId}&chatType=${chatType}` })
-}
-
-function onMenu(key: string): void {
-  if (key === CONVERSATION_MENU_KEY.CREATE_GROUP) {
-    uni.navigateTo({ url: '/sub-im/pages/group/group' })
-  }
 }
 </script>
 
@@ -111,14 +105,13 @@ function onMenu(key: string): void {
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `select` | `(conversationId, chatType)` | 点击会话；**必须用第二参 chatType**，不要自己猜 |
-| `menu` | `(key)` | 仅「+」里的 `create-group` 需要宿主处理；`new-chat`、置顶/免打扰/删除均由组件内置 |
+| `select` | `(conversationId, chatType)` | 点击会话、单聊选人完成或建群成功；**必须用第二参 chatType**，不要自己猜 |
 
 | 插槽 | 作用 |
 |---|---|
 | `#empty` | 整体替换空态（搜索无结果与空列表共用一个插槽） |
 
-组件内置：搜索、五类筛选、6 条骨架、置顶/免打扰/删除（长按）、「+」发起单聊（内置选人并 emit `select`）、连接状态条。删除会话先二次确认；pin/mute/delete 按会话与动作防重，pin/mute 各自串行并以最新意图为准。`loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表；无缓存失败显示重试，有缓存时保留列表。重试真实调用 `refreshSessionList`，不会用内存快照伪装成功。
+组件内置：搜索、五类筛选、6 条骨架、置顶/免打扰/删除（长按）、「+」发起单聊与创建群组（均在当前页打开面板，完成后 emit `select`）、连接状态条。删除会话先二次确认；pin/mute/delete 按会话与动作防重，pin/mute 各自串行并以最新意图为准。`loaded / syncing / syncFailed` 区分未加载、加载中、失败与权威空列表；无缓存失败显示重试，有缓存时保留列表。重试真实调用 `refreshSessionList`，不会用内存快照伪装成功。
 
 ## 4. 聊天页
 

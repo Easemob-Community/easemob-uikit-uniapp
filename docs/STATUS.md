@@ -1540,6 +1540,15 @@
 - **规则沉淀**：`.agents/skills/em-plugin-publishing` 改为官方 uni_modules 通道，强制版本号与 Demo/chat-only `versionCode` 同步递增，并把「规范：是」、干净工程下载目录、包内容、旧版本升级四项纳入上线验收；网页 ZIP 不再作为常规发布路径。
 
 
+## 2026-11-23 通用 HBuilderX uni_modules 发布 CLI
+
+- **实现**：新增零依赖 `scripts/publish-uni-modules.mjs`，封装官方 validate、dry-run 与正式发布；支持自定义宿主、插件 ID、CLI 路径及文本/文件更新日志。默认仅 validate + dry-run，显式 `--publish` 才会正式发布，任一步失败立即停止。
+- **安全回归**：新增 `test-publish-uni-modules.mjs`，以临时假 CLI 验证默认不发布、正式调用顺序、失败中断、非法 JSON、环境变量和通用参数；专项 7/7、全量 Node 测试 70/70 通过。
+- **门禁与文档**：`check-release` WARN 0，`check-docs` 通过；发布 Skill 与 RELEASE 手册统一推荐封装命令，原始官方命令仅保留排错参考。
+- **真实通道验收**：当前线上 `1.0.3` 的 dry-run 按预期被 `VERSION_ALREADY_EXISTS` 拒绝。另在临时宿主模拟未发布 `1.0.4` 并同步临时 changelog，官方 validate 与 dry-run 均返回 `validated`；未执行正式发布，仓库和线上版本均未改变。
+
+
+
 ## 2026-11-24 输入栏面板与语音模式互斥修复
 
 - **根因与修复**：语音模式下点击表情或「+」面板仍显示「按住说话」，根因是共享 `useChatComposer.togglePanel` 只收键盘、未退出 `voiceMode`。现打开 emoji/media 面板时统一调用既有 `exitVoiceMode()`，默认输入栏与 `#input-bar` 自绘输入栏同时恢复文本输入控件；面板保持展开，不自动弹系统键盘。若面板打断进行中的录音，复用取消逻辑丢弃本次音频，不进入发送回调。
@@ -1565,11 +1574,69 @@
 - **测试**：`test-chat-composer.mjs` 新增 4 项，修复前填充、编辑、重编辑 3 项因恢复信号为 0 失败，直发对照通过；修复后专项 **6/6**、全量 Node 测试 **82/82**。
 - **门禁**：`check-docs`、`build web`、`build mp-weixin` 通过；小程序主包 **1055KB**、分包合计 **1489KB**；H5 静态伺服 HTTP **200**，临时伺服已关闭。App/小程序真机手动交互未在本轮执行。
 
+## 2026-11-24 设备与端差异页
+
+- **新增公开页**：`docs/PLATFORM-DEVICES.md`（站点 `/uniapp/guide/platform-devices`），用于记录端差异的影响范围、归因、状态与处理方式；状态词为 已修复 / 可绕过 / 上游跟踪 / 定位中 / 平台限制 / 短期不处理。首批登记三项均为「定位中」：鸿蒙系统能力差异、荣耀机型键盘遮挡输入栏、荣耀机型授权后视频选择空白。
+- **口径调整**：`PLATFORM.md` 的「已知平台约束」改为「平台约束与规避」，明确这些是平台或编译链约束而非 UIKit 缺陷；`FAQ.md` 新增「同一份代码在不同机型上表现不同」四步判定；`em-public-docs` 文档地图登记新页。
+- **醒目口径**：QUICKSTART 在支持范围下方新增「端差异」NOTE；PLATFORM 导语、HOME 兼容性区补充能力边界与差异页入口，避免只有记录页、没有前置说明。
+- **门禁**：`check-docs` 通过（58 个页面）；门户 `pnpm build` 通过，新页在「平台适配」分组渲染，站内链接改写正常。
+
+
 ## 2026-11-24 移除通讯录入口页搜索
 
 - **行为**：`em-contact-page` 删除只过滤三个入口的搜索框及搜索空态，直接展示好友列表、群组列表、新请求；`#watermark` 不再暴露已无意义的 `keyword`。`em-contact-list-page` 的展示名 / userId / 可选拼音搜索保持不变，相关 i18n 文案继续由好友列表与选人组件复用。
 - **契约与文档**：新增 `scripts/test-contact-page.mjs`，修复前因入口页仍含搜索框失败，删除后通过；同步 PAGES-CONTACTS、COMPONENTS-CONTACT、按需接入组件数（通讯录 6→4）及宿主 Skills 生成页。
 - **门禁**：`check-skills`、`check-docs`（58 页）、`build web`、`build mp-weixin` 全通过；小程序全部分包检查通过，主包 **1054KB**、分包合计 **1489KB**。5180 端口已有静态服务，新临时服务未启动；已核对其首页响应与本次构建 `index.html` 完全一致，HTTP **200**。H5 页面走查停在登录页，未读取或使用本地凭据；App 真机交互未在本轮执行。
+
+
+
+## 2026-11-24 新建群空会话闪现修复
+
+- **根因与行为**：建群成功后原先调用 `addConversation` 仅创建本地空会话，返回会话页时空 SDK 快照整量覆盖列表，导致新群先闪现再消失。按产品确认，共享 `em-create-group-modal` 的建群成功链路不再创建空会话；本地建群通知、toast 与 `created` 跳聊事件不变，真实消息产生后由 SDK 同步带入会话列表。通用 `addConversation` 与发起单聊流程不变。
+- **契约与测试**：新增 `test-group-create-conversation.mjs`，修复前因建群流程仍调用 `addConversation` 失败，移除后通过；PAGES-GROUPS、API-KIT-GROUPS 与宿主 Skills 同步新契约。
+- **门禁**：全量 Node 测试 **93/93**、`check-skills`、`check-docs`（58 页 / 39 组件）、`build web`、`build mp-weixin` 全通过；小程序全部分包检查通过，主包 **1061KB**、分包合计 **1489KB**；H5 静态伺服 HTTP **200**，临时伺服已关闭。真实账号建群及 App/小程序手动交互未在本轮执行。
+
+
+
+## 2026-11-24 会话页直接建群交互
+
+- **行为**：会话列表「+ → 创建群组」不再由 demo 路由到群列表，改为当前页直接打开多选建群弹层；取消留在会话列表，成功后统一 `select(groupId, groupChat)` 进入群聊。群列表右上角独立建群入口保留。
+- **实现**：新增共享 `em-create-group-modal`，收口联系人多选、可选群名/群设置、自动群名、提交态、系统通知与失败保留表单；`em-conversation-page` 与 `em-group-page` 共同复用。当前 UIKit demo 与正式 uni-app x demo 均已接入，两个会话页壳删除旧 `@menu/onMenu` 路由。正式 demo 保持其原有 `addConversation` 语义，本次未顺带同步其他数据行为。
+- **契约与测试**：`test-group-create-conversation.mjs` 先以旧实现取得 3 项失败，修复后专项 3/3、全量 Node 测试 93/93；QUICKSTART、PAGES-CONVERSATION、PAGES-GROUPS、COMPONENTS-CONVERSATION、内部组件契约与宿主 Skills 已同步，`check-skills`、`check-docs` 通过。
+- **构建门禁**：当前仓库 `build web`、`build mp-weixin` 通过，小程序全部分包检查通过，主包 **1061KB**、分包合计 **1489KB**。正式 demo 等效 web/mp-weixin production 编译通过，SDK 分包后处理按显式宿主目录参数完成；两个 H5 产物静态伺服均 HTTP **200**，临时伺服已关闭。
+- **交互验收边界**：当前 demo 登录时提示连接服务器超时并退回登录页，正式 demo 需要手机号登录，因此两个工程的真实账号建群与建群后跳群聊未在本轮验证；App/小程序真机手动交互亦未执行，不以编译结果代替上述验收。
+
+## 2026-11-24 表情面板退格删除（M2.34）
+
+- **实现**：新增库内零依赖 `removeLastGrapheme()`，按末尾完整字素删除，覆盖代理对、变体选择符、肤色、ZWJ、国旗、keycap、常见组合附加符与 CRLF；默认 emoji 面板新增固定右下角 `rect-lftarrow` 退格键，长列表底部预留空间。`EmChatEmojiPanelScope` 新增 `deleteEmoji()`，chat-page 显式转发；外部 `easemob-uniappx-demo-534` 的双页签自定义面板在 Emoji 页复用同一动作。空草稿不写回，禁用态沿用守卫，删除不收面板、不主动弹系统键盘。
+- **测试**：新增 `test-emoji-delete.mjs`，初次 2/2 因模块缺失按预期失败，实现后通过；`test-gif-injection.mjs` 的内置/类型/宿主新增断言均先失败后通过。最终字素、GIF 注入与 composer 联合专项 11/11，全量 Node 测试 **92/92**。
+- **源仓库门禁**：Node 22.23.4 下 `build web`、`build mp-weixin` 通过；小程序分包检查全绿，主包 **1061KB**、分包合计 **1489KB**；App 模块图通过；两仓 `git diff --check` 通过。`check-docs` 仍因本功能之外的新组件 `em-create-group-modal` 未写入公开组件页而失败，本次未改该既有事项。
+- **H5 实际交互**：最终构建产物登录真实单聊，选择两个不同 Emoji 后第一次退格仅删除后一个、第二次清空，空草稿再次点击无异常且面板保持展开；滚动到末行后按钮仍固定可见。验证后临时伺服和浏览器标签页已关闭。
+- **外部宿主**：Node 22.23.4 下 Web 与 mp-weixin 编译通过；宿主 `prepare-sdk-subpackage.mjs` 以显式宿主根目录参数完成 SDK 降级、分包写入与导出校验。宿主 H5 首屏可访问，但手机号验证码登录阻断自定义面板进一步点击；宿主运行时、App 三端与微信开发者工具/真机未实测，不记为已验收。
+
+
+
+## 2026-11-24 Demo 本机登录配置持久化
+
+- **本机配置**：新增 `demo/common/local.credentials.json` 作为本机默认登录配置，Vite 启动时生成真实 `local.credentials.module.ts` 供登录页导入；两个凭据文件均被既有 `local.credentials.*` 规则忽略。设备已有 `emkit.appkey/userId/token` 存储值优先，本机配置只补空值，成功登录后的原有存储链路不变。
+- **鸿蒙适配**：实测 `[plugin:uts]` 不会替换全局 Vite `define`，也不能解析 Vite 虚拟模块；最终改为编译前生成磁盘 TS 模块，并使用与 JSON 不同的 basename 避免同名解析到 JSON。新增 `test-demo-login-config.mjs` 覆盖缺失文件、字段归一化、真实模块导入、默认补齐与存储优先，专项 **5/5**、全量 Node 测试 **94/94** 通过。
+- **验证**：`build web`、`build mp-weixin` 通过，小程序全部分包检查通过，主包 **1061KB**、分包合计 **1489KB**；H5 静态伺服 HTTP **200**，临时伺服已关闭。Mate 60 Pro 重新运行后三项配置自动填入并精确匹配，点击一次登录成功进入 `pfh2` 聊天页，未发送消息。
+
+## 2026-11-24 表情退格键悬浮半透明样式
+
+- **样式**：按用户确认采用固定悬浮、背景半透明、图标不透明度不变的方案，不做逐项碰撞移动或滚动时隐藏。新增 `--em-chat-emoji-delete-bg` 明暗 token（亮色 `rgba(255,255,255,0.72)`、暗色 `rgba(42,42,48,0.78)`），退格键增加轻阴影；源仓库内置面板与外部宿主 Emoji 页签同步，末行 52px 避让保持不变。`DESIGN-TOKENS.md` 已登记。
+- **测试与视觉**：半透明、阴影、宿主同步及不对容器设 `opacity` 的样式断言先失败后通过；最终全量 Node 测试 **96/96**，主题/国际化、公开文档（58 页 / 39 组件）与 App 模块图检查通过。H5 真实聊天页复核悬浮观感、滚动后固定位置及选择后删除均正常，临时伺服与标签页已关闭。
+- **构建**：Node 22.23.4 下源仓库 Web/mp-weixin 通过，小程序主包 **1066KB**、分包合计 **1491KB**，分包检查全绿；外部宿主 Web/mp-weixin 与 SDK 后处理通过。两仓 `git diff --check` 通过；App 与小程序真机视觉未在本轮实测。
+
+
+## 2026-11-24 荣耀视频权限状态不一致与选择错误分流
+
+- **根因证据**：荣耀 ALI-AN00 / Android 15 的正式包 `com.easemob.uniappx` 设置页显示「允许全部照片和视频」，但 `dumpsys package` 实际为 `READ_MEDIA_IMAGES=true`、`READ_MEDIA_VIDEO=false`，与图片正常、视频空白完全对应。标准基座未授权时 logcat 明确出现 PermissionController 请求及 `chooseVideo errCode=1101005 / No Permission`；补真实视频权限并强制停止重启后，正式包视频列表恢复显示，根因已闭环。
+- **对照排除**：同权限下 `albumMode=custom/system` 均进入 DCloud `PickerActivity`，无权限时 `uni.chooseMedia` 也返回同一 1101005；这些无效选择器改动已全部撤回，`chooseVideo` 与 manifest 保持原链路，不引入新原生模块或 SAF 依赖。
+- **产品修复**：导出 `isAlbumAuthDenied` 统一复用相册权限识别，图片/视频选择 catch 分流权限异常与普通失败。权限异常弹「照片和视频权限异常」，说明重新授权及设置页已允许时先禁止再允许、重启应用，并提供「去设置」；普通失败保留原 toast，原始 errCode 继续写日志。中英 i18n 同步。
+- **测试**：新增 `test-platform-media.mjs`，覆盖原选择/取消契约、数字/字符串 1101005 与权限文本识别、聊天页两条错误分流；专项 **3/3**，全量 Node 测试 **97/97**。`build web`、`build mp-weixin` 通过，小程序主包 **1067KB**、分包合计 **1491KB**，App 模块图通过。
+- **真机发送冒烟**：标准基座授权后，视频列表正常，选中 738.9K 视频后出现正式 outgoing 视频气泡（0:05，无发送中或失败标记）；选择、上传与展示链路恢复。新权限弹窗由专项测试覆盖，但其独立真机 UI 未单独复验，不记该项真机通过。
+- **文档**：公开 `PLATFORM-DEVICES` 已改为已确认 ROM 权限状态不一致及可操作的恢复步骤，`API-UTILS` 补权限识别工具，坑集新增 §5u。H5 静态伺服 HTTP **200**，临时伺服已关闭；`check-docs`（58 页 / 39 组件）与 `git diff --check` 通过。
 
 
 ## 2026-11-24 聊天页超长群名单行省略

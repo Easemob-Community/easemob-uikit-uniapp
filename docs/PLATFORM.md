@@ -1,8 +1,8 @@
 # 平台能力与差异
 
-一套 `em-*` 组件要同时跑在 Android、iOS、鸿蒙、H5 与微信小程序上，平台差异必须收口在库内。这页给出环境要求、逐项能力矩阵、各端注意事项、权限、构建命令与已知约束，帮你在立项阶段就判断「这个功能在我的端上能不能用」。
+一套 `em-*` 组件要同时跑在 Android、iOS、鸿蒙、H5 与微信小程序上，平台差异必须收口在库内。这页给出环境要求、逐项能力矩阵、各端注意事项、权限、构建命令与平台约束，帮你在立项阶段就判断「这个功能在我的端上能不能用」。能力矩阵按环境要求列出的最低版本与真机验证整理；未逐一验证的机型与系统版本可能出现不同表现，也不排除尚未记录的差异——已知差异、状态与处理方式见[设备与端差异](./PLATFORM-DEVICES.md)。
 
-> 相关页面：[快速开始](./QUICKSTART.md) · [设计变量](./DESIGN-TOKENS.md) · [主题与国际化](./THEME-I18N.md) · [聊天与消息组件](./COMPONENTS-CHAT.md) · [示例工程](./DEMO.md) · [常见问题](./FAQ.md)
+> 相关页面：[快速开始](./QUICKSTART.md) · [设计变量](./DESIGN-TOKENS.md) · [主题与国际化](./THEME-I18N.md) · [聊天与消息组件](./COMPONENTS-CHAT.md) · [示例工程](./DEMO.md) · [常见问题](./FAQ.md) · [设备与端差异](./PLATFORM-DEVICES.md)
 
 > [!WARNING]
 > **仅支持 uni-app x 蒸汽模式（Vapor）**：DCloud 官方已于 2024 年停止 nvue 与 5+ 的维护，并将于 2027 年初停止 uni-app 的 App 平台与 uni-app x vdom 平台的维护（见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可方便升级。本插件不提供经典 uni-app（Vue2/Vue3、nvue）与 vdom 模式的兼容，下表环境要求以蒸汽编译目标为准。
@@ -207,7 +207,9 @@ bash scripts/uni.sh dev mp-weixin
 - 小程序构建结束后自动跑 `scripts/check-mp-size.mjs`：校验 SDK 精确锁版、分包文件存在、主包无 SDK 残留、主包体积与产物语法。
 - H5 产物需要以 HTTP 静态伺服访问（`file://` 直接打开会因模块加载策略失败）。
 
-## 已知平台约束
+## 平台约束与规避
+
+以下约束来自平台或编译链，不是 UIKit 缺陷；每条都给出规避方式。特定机型与系统版本的表现差异（例如厂商 ROM 的键盘遮挡、媒体选择异常）记录在[设备与端差异](./PLATFORM-DEVICES.md)。
 
 ### App 端样式子集（ucss）
 

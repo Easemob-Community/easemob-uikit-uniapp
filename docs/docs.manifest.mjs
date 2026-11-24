@@ -64,6 +64,7 @@ export const pages = [
   { source: 'docs/GUIDE-STYLING.md', to: 'uniapp/guide/styling.md', group: '设计与运行', text: '样式定制' },
   { source: 'docs/PLATFORM.md', to: 'uniapp/guide/platform.md', group: '设计与运行', text: '平台能力与差异' },
   { source: 'docs/FAQ.md', to: 'uniapp/guide/faq.md', group: '设计与运行', text: '常见问题' },
+  { source: 'docs/PLATFORM-DEVICES.md', to: 'uniapp/guide/platform-devices.md', group: '设计与运行', text: '设备与端差异' },
 
   // 进阶接入
   { source: 'docs/GUIDE-MULTI-SCENARIO.md', to: 'uniapp/guide/multi-scenario.md', group: '进阶接入', text: '多场景接入' },
@@ -202,6 +203,7 @@ export default {
             'uniapp/guide/styling.md': 'docs/GUIDE-STYLING.md',
             'uniapp/guide/platform.md': 'docs/PLATFORM.md',
             'uniapp/guide/faq.md': 'docs/FAQ.md',
+            'uniapp/guide/platform-devices.md': 'docs/PLATFORM-DEVICES.md',
             'uniapp/guide/multi-scenario.md': 'docs/GUIDE-MULTI-SCENARIO.md',
             'uniapp/guide/ai-stream.md': 'docs/AI-STREAM.md',
             'uniapp/guide/weapp-sdk-subpackage.md': 'docs/GUIDE-WEAPP-SDK-SUBPACKAGE.md',
