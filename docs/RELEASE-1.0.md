@@ -97,18 +97,23 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
 ## 6. 发布动作
 
 1. 完成上述硬门禁与安全闭环，确保工作树干净。
-2. 在已识别插件的宿主工程中执行官方校验与 dry-run：
+2. 在仓库根目录执行通用发布 CLI。默认使用 `demo` 宿主，依次完成官方 validate 与 dry-run，不会正式发布：
 
    ```bash
-   CLI=/Applications/HBuilderX.app/Contents/MacOS/cli
-   "$CLI" uni_modules --validate easemob-uikit-uni --project /path/to/host --json
-   "$CLI" uni_modules --publish easemob-uikit-uni --project /path/to/host \
-     --changeLog "本次更新摘要" --dryRun --json
+   node scripts/publish-uni-modules.mjs --change-log "本次更新摘要"
    ```
+
+   其他宿主、插件或 HBuilderX 安装位置分别用 `--project`、`--plugin`、`--cli` 覆盖，也可通过 `HBUILDERX_CLI` 指定 CLI。
 
 3. 推送 `dev`，确认远端提交与本地验证提交一致。
 4. 打 tag：`git tag v1.0.3 && git push origin v1.0.3`，不需要额外创建 GitHub Release。
-5. 去掉 `--dryRun` 正式发布，并确认返回 `outcome:"published"`。
+5. 明确授权后增加 `--publish` 正式发布；脚本会重新执行 validate 和 dry-run，再调用官方发布命令：
+
+   ```bash
+   node scripts/publish-uni-modules.mjs --change-log "本次更新摘要" --publish
+   ```
+
+   确认最终返回 `outcome:"published"`。
 6. 核对管理列表“uni_modules 规范：是”，以及平台兼容矩阵、权限/数据声明、截图和更新日志。
 7. 在干净临时工程从插件市场下载，确认只落入 `uni_modules/easemob-uikit-uni/` 且包含本次修复；再验证旧版本可升级。
 8. 按 QUICKSTART 跑通 H5 与微信小程序的登录、会话、文本和图片收发；最终 Demo 的市场更新由项目负责人执行，不用文件复制替代。

@@ -28,48 +28,44 @@ description: Use when publishing or updating easemob-uikit-uni through HBuilderX
 - `templates/chat-only/package.json`、`package-lock.json`、`manifest.json`；其 `versionCode` 同步递增，例如 `1.0.3` 使用 `102`。
 - 当前 README、公开文档、宿主 Skills、发布清单及版本相关测试期望；生成文档通过同步脚本更新，不手改生成页。
 
-## 2. 选择发布宿主并校验
+## 2. 通用发布 CLI
 
-在一个已被 HBuilderX 识别为 uni-app x 工程的宿主中发布，插件必须位于：
+统一使用仓库零依赖封装 `scripts/publish-uni-modules.mjs`，它只调用 HBuilderX 官方 `uni_modules` 命令，不使用网页接口或手工 ZIP。默认宿主为仓库 `demo`、插件为 `easemob-uikit-uni`，可用 `--project` 与 `--plugin` 覆盖；插件必须位于 `<宿主工程>/uni_modules/<插件ID>/package.json`。
 
-```text
-<宿主工程>/uni_modules/easemob-uikit-uni/package.json
+先运行版本物料门禁，再执行默认模式：
+
+```bash
+node scripts/check-release.mjs
+node scripts/publish-uni-modules.mjs \
+  --change-log "本次更新摘要，不重复版本号和日期"
 ```
 
-可以使用已经正确识别该插件的 Demo 工程。仅把目录附加到 HBuilderX 文件树不等于正规项目导入；需要时使用：
+默认模式依次执行官方 validate 与 publish dry-run，**不会正式发布**。必须得到两次 `success:true`、`outcome:"validated"` 和预期版本。更新日志也可通过 `--change-log-file <UTF-8文件>` 提供，与 `--change-log` 互斥。
+
+HBuilderX CLI 默认读取 macOS `/Applications/HBuilderX.app/Contents/MacOS/cli`；其他安装位置用 `--cli /path/to/cli` 或 `HBUILDERX_CLI` 环境变量覆盖。仅把目录附加到 HBuilderX 文件树不等于正规项目导入；识别失败时先用官方 `project open` 或原始 validate 命令排错，不要改用网页 ZIP 绕过。
+
+## 3. 正式发布
+
+只有用户明确授权对外发布后，才增加 `--publish`：
+
+```bash
+node scripts/publish-uni-modules.mjs \
+  --change-log "本次更新摘要，不重复版本号和日期" \
+  --publish
+```
+
+脚本会重新依次执行 validate、dry-run、正式发布，任一步失败立即停止。正式发布必须得到 `success:true`、`outcome:"published"`。更新日志只写本次摘要，不粘贴整份 changelog 或使用说明。
+
+需要绕过封装排查官方命令时，等价原始形式为：
 
 ```bash
 CLI=/Applications/HBuilderX.app/Contents/MacOS/cli
-"$CLI" project open --path /path/to/host
+"$CLI" uni_modules --validate easemob-uikit-uni --project /path/to/host --json
+"$CLI" uni_modules --publish easemob-uikit-uni --project /path/to/host \
+  --changeLog "本次更新摘要" --dryRun --json
 ```
 
-先执行只读校验：
-
-```bash
-"$CLI" uni_modules \
-  --validate easemob-uikit-uni \
-  --project /path/to/host \
-  --json
-```
-
-必须得到 `success:true`、`outcome:"validated"` 和预期版本。校验失败时先修正本地工程或元数据，不要改用网页 ZIP 绕过。
-
-## 3. dry-run 与正式发布
-
-先 dry-run，确认动作、插件 ID、版本和打包校验：
-
-```bash
-"$CLI" uni_modules \
-  --publish easemob-uikit-uni \
-  --project /path/to/host \
-  --changeLog "本次更新摘要，不重复版本号和日期" \
-  --dryRun \
-  --json
-```
-
-dry-run 返回的临时 ZIP 路径不保证持续存在，不要把它当作持久发布物料。确认无误且用户已明确授权对外发布后，去掉 `--dryRun` 执行同一命令。
-
-正式发布必须得到 `success:true`、`outcome:"published"`。`--changeLog` 只写本次摘要，不粘贴整份 changelog 或使用说明。
+dry-run 返回的临时 ZIP 路径不保证持续存在，不要把它当作持久发布物料。
 
 ## 4. 上线验收（缺一不可）
 
@@ -128,4 +124,6 @@ dry-run 返回的临时 ZIP 路径不保证持续存在，不要把它当作持�
 | HB 不提示新版本 | 先确认管理列表规范为“是”，再在临时工程用 `--upgrade` 验证，不以“上传成功”代替更新验收 |
 | 本地目录没有发布入口 | 确认正规项目导入和 `uni_modules/<id>/package.json` 结构，再运行官方校验；不要盲改分类 |
 | dry-run ZIP 路径找不到 | 临时产物可能已清理，以 dry-run 的校验结果为准，正式包由发布命令重新生成 |
+| `VERSION_ALREADY_EXISTS` | 本地版本已在线上，停止重复发布；完成下一版本的物料递增后再运行，不改用旧版本绕过 |
+| `CHANGELOG_MISSING` | `package.json.version` 已递增但 `changelog.md` 首节未同步；先补齐当前版本日志再重新校验 |
 | 更新日志变成整份文档 | `--changeLog` 仅传本次摘要，不重复版本号、日期和完整接入说明 |
