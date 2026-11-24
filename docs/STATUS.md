@@ -1564,3 +1564,9 @@
 - **实现**：`em-chat-inputbar` 新增 `textInputSignal`（默认 0），信号变化调用既有 `exitVoiceMode()`；聊天页以 `revealTextInput()` 统一分发，默认路径递增信号，自绘路径直接退出页面 composer 语音态。公开 COMPONENTS-CHAT 与 PAGES-CHAT 已同步。
 - **测试**：`test-chat-composer.mjs` 新增 4 项，修复前填充、编辑、重编辑 3 项因恢复信号为 0 失败，直发对照通过；修复后专项 **6/6**、全量 Node 测试 **82/82**。
 - **门禁**：`check-docs`、`build web`、`build mp-weixin` 通过；小程序主包 **1055KB**、分包合计 **1489KB**；H5 静态伺服 HTTP **200**，临时伺服已关闭。App/小程序真机手动交互未在本轮执行。
+
+## 2026-11-24 移除通讯录入口页搜索
+
+- **行为**：`em-contact-page` 删除只过滤三个入口的搜索框及搜索空态，直接展示好友列表、群组列表、新请求；`#watermark` 不再暴露已无意义的 `keyword`。`em-contact-list-page` 的展示名 / userId / 可选拼音搜索保持不变，相关 i18n 文案继续由好友列表与选人组件复用。
+- **契约与文档**：新增 `scripts/test-contact-page.mjs`，修复前因入口页仍含搜索框失败，删除后通过；同步 PAGES-CONTACTS、COMPONENTS-CONTACT、按需接入组件数（通讯录 6→4）及宿主 Skills 生成页。
+- **门禁**：`check-skills`、`check-docs`（58 页）、`build web`、`build mp-weixin` 全通过；小程序全部分包检查通过，主包 **1054KB**、分包合计 **1489KB**。5180 端口已有静态服务，新临时服务未启动；已核对其首页响应与本次构建 `index.html` 完全一致，HTTP **200**。H5 页面走查停在登录页，未读取或使用本地凭据；App 真机交互未在本轮执行。

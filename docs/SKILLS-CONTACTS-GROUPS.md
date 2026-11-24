@@ -70,7 +70,6 @@ function onEntryClick(key: string): void {
 
 - 三个入口及计数：好友数、群组数、待处理申请数；
 - 新请求入口的 pending 计数与 hot 红点；
-- 搜索（按入口名称/key 过滤，不搜好友本体）；
 - 顶部「+」触发 `add`。
 
 **没有**内置加好友表单：这是宿主业务 UI，提交时调：
