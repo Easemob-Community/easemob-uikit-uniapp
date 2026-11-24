@@ -347,6 +347,7 @@
         :emojis="config.emojiList"
         :quick-replies="quickReplies"
         :collapse-signal="inputbarCollapseSignal"
+        :text-input-signal="inputbarTextSignal"
         :disabled="isMutedAll"
         :submitting="sendingText"
         :placeholder="isMutedAll ? t('group.muteAllPlaceholder') : ''"
@@ -823,9 +824,15 @@ const {
   color: wmColor
 } = useWatermark({ watermark: () => props.watermark, hasSlot: slots.watermark != null })
 const hasCustomInputBar = slots['input-bar'] != null
+const composerAvailability = computed(() => ({
+  voice: resolvedInputFeatures.value.voice,
+  emoji: resolvedInputFeatures.value.emoji,
+  media: resolvedInputFeatures.value.image || resolvedInputFeatures.value.camera || resolvedInputFeatures.value.video || (resolvedInputFeatures.value.file && canPickAttachment())
+}))
 const composer = hasCustomInputBar
   ? useChatComposer({
       disabled: isMutedAll,
+      availability: composerAvailability,
       onDisabledTap: onMuteAllTap,
       onVoiceSend: (path, duration) => {
         onVoiceSend(path, duration).catch(() => {})
@@ -1098,6 +1105,16 @@ watch(keyboardHeight, (h, prev) => {
 // composer，直接 collapse。点消息区任意位置即收，对齐 vue 版 chat__content 的 onChatContentClick →
 // messageInput.blur()；无展开态时为空操作。
 const inputbarCollapseSignal = ref(0)
+const inputbarTextSignal = ref(0)
+
+// 快捷回复填充、编辑/重编辑等外部文本输入意图：语音模式下先恢复文本输入控件
+function revealTextInput(): void {
+  if (composer != null) {
+    composer.exitVoiceMode()
+    return
+  }
+  inputbarTextSignal.value += 1
+}
 
 function onChatAreaClick(): void {
   if (composer != null) {
@@ -1515,6 +1532,7 @@ function onQuickReply(item: EmQuickReply): void {
     sendQuickReplyText(text)
   } else {
     // 整句替换而非追加：常用语是完整话术，与已有半句拼接容易出怪文案
+    revealTextInput()
     draft.value = text
   }
 }
@@ -1584,6 +1602,7 @@ function showCameraPermissionGuide(state: EmCameraAuthorizeState): void {
 
 // 输入栏「+」面板选择（语音由 inputbar 内部消化，这里只有 album/camera/video/file）
 async function onMediaSelect(key: string): Promise<void> {
+  composer?.collapse()
   if (key === MEDIA_PANEL_KEY.ALBUM) {
     await onPickImage()
   } else if (key === MEDIA_PANEL_KEY.CAMERA) {
@@ -1736,6 +1755,7 @@ const modifyingByLocalId: Record<string, boolean> = {}
 function enterEditMode(m: EmMessageItem): void {
   if (m.type !== MESSAGE_TYPE.TEXT || m.status === MESSAGE_STATUS.RECALLED) return
   // 编辑与引用互斥：编辑提交只走 modifyMessage，不挂引用快照
+  revealTextInput()
   quoteInfo.value = null
   editingMessage.value = m
   setDraftValue(m.text)
@@ -1759,6 +1779,7 @@ function showReedit(m: EmMessageItem): boolean {
 
 // vue 对齐 onReedit：先退出编辑态再回显，避免编辑态残留把提交分流到旧消息
 function onReeditMessage(m: EmMessageItem): void {
+  revealTextInput()
   exitEditMode()
   setDraftValue(m.text)
 }

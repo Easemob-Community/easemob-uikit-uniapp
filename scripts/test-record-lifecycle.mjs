@@ -116,6 +116,7 @@ function outcome(promise) {
 
 function createComposer() {
   const voices = []
+  const availability = api.ref({ voice: true, emoji: true, media: true })
   const originalWarn = console.warn
   console.warn = (...args) => {
     if (!String(args[0]).includes('onUnmounted is called')) originalWarn(...args)
@@ -123,10 +124,11 @@ function createComposer() {
   try {
     const composer = api.useChatComposer({
       disabled: api.ref(false),
+      availability,
       onDisabledTap: () => {},
       onVoiceSend: (path, duration) => voices.push({ path, duration })
     })
-    return { composer, voices }
+    return { composer, voices, availability }
   } finally {
     console.warn = originalWarn
   }
@@ -140,7 +142,7 @@ before(() => {
   writeFileSync(entry, `
     export { startRecord, stopRecord, cancelRecord, isRecording } from './platform-app.ts'
     export { useChatComposer } from './composer-app.ts'
-    export { ref } from 'vue'
+    export { nextTick, ref } from 'vue'
   `)
   writeFileSync(transformed, compileForApp(readFileSync(platformPath, 'utf8'))
     .replaceAll("from './", `from '${resolve(root, 'uni_modules/easemob-uikit-uni/libs')}/`))
@@ -345,4 +347,77 @@ test('停止后取消只忽略取消错误，不额外提示录音失败', async
   assert.equal(composer.recording.value, false)
   assert.equal(toasts.length, 0)
   manager.finishStop()
+})
+
+test('语音模式打开表情面板会恢复文本输入态', () => {
+  const { composer } = createComposer()
+  composer.toggleVoiceMode()
+  composer.togglePanel('emoji')
+
+  assert.equal(composer.voiceMode.value, false)
+  assert.equal(composer.panel.value, 'emoji')
+  assert.equal(composer.inputFocus.value, false)
+})
+
+test('语音模式打开媒体面板会恢复文本输入态', () => {
+  const { composer } = createComposer()
+  composer.toggleVoiceMode()
+  composer.togglePanel('media')
+
+  assert.equal(composer.voiceMode.value, false)
+  assert.equal(composer.panel.value, 'media')
+  assert.equal(composer.inputFocus.value, false)
+})
+
+test('录音中打开面板会取消本次录音且不发送', () => {
+  const { composer, voices } = createComposer()
+  composer.toggleVoiceMode()
+  composer.onRecordTouchStart({ touches: [{ clientY: 100 }] })
+  manager.fireStart()
+  composer.onRecordTouchMove({ touches: [{ clientY: 0 }] })
+  composer.togglePanel('emoji')
+
+  assert.equal(composer.voiceMode.value, false)
+  assert.equal(composer.recording.value, false)
+  assert.equal(composer.willCancel.value, false)
+  assert.equal(composer.panel.value, 'emoji')
+  assert.equal(manager.stopCalls, 1)
+  assert.equal(api.isRecording(), false)
+  assert.equal(voices.length, 0)
+})
+
+
+test('运行中关闭语音功能会退出语音模式并取消录音', async () => {
+  const { composer, voices, availability } = createComposer()
+  composer.toggleVoiceMode()
+  composer.onRecordTouchStart({ touches: [{ clientY: 100 }] })
+  manager.fireStart()
+
+  availability.value = { voice: false, emoji: true, media: true }
+  await api.nextTick()
+
+  assert.equal(composer.voiceMode.value, false)
+  assert.equal(composer.recording.value, false)
+  assert.equal(manager.stopCalls, 1)
+  assert.equal(voices.length, 0)
+})
+
+test('运行中关闭表情功能会收起已打开的表情面板', async () => {
+  const { composer, availability } = createComposer()
+  composer.togglePanel('emoji')
+
+  availability.value = { voice: true, emoji: false, media: true }
+  await api.nextTick()
+
+  assert.equal(composer.panel.value, 'none')
+})
+
+test('运行中关闭全部媒体能力会收起已打开的媒体面板', async () => {
+  const { composer, availability } = createComposer()
+  composer.togglePanel('media')
+
+  availability.value = { voice: true, emoji: true, media: false }
+  await api.nextTick()
+
+  assert.equal(composer.panel.value, 'none')
 })

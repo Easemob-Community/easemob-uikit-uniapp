@@ -43,8 +43,8 @@
 - 内容被服务端审核替换时（`isContentReplaced`），气泡下方展示「内容已被审核修改」标识，发送方不再被静默覆盖；该标识与撤回/编辑事件同源更新。
 - 引用后输入栏上方出现引用条，发送的文本消息同时写入 `ext.msgQuote` 与兼容字段 `ext.emQuote`；气泡下方生成引用卡，点击定位原消息并闪烁高亮，原消息未加载或已删除时 toast 提示。
 - 撤回仅对「自己发送、状态为已发送、且在撤回窗口内」的消息出现；窗口由 `uiConfig.recallTimeLimit` 控制，默认 2 分钟。执行撤回时会再次检查时间窗，并拦截重复提交；成功后以 `recall` 事件透出，不额外弹确认框。
-- 撤回后的占位条显示原消息发送者的昵称（群聊取成员名片，单聊取好友备注 > 昵称）；自己撤回的文本消息在占位条上提供「重新编辑」，点击把原文回显到输入框，作为新消息发送。`uiConfig.enableReEdit` 可关闭该按钮。
-- 编辑仅支持自己发送的文本消息：点击「编辑」后输入栏上方出现编辑条（显示原文截断预览），修改后发送复用原消息 id，文本气泡尾部出现「已编辑」标记；单条消息最多编辑 10 次，达到上限后菜单项置灰，编辑失败保留编辑态供重试。
+- 撤回后的占位条显示原消息发送者的昵称（群聊取成员名片，单聊取好友备注 > 昵称）；自己撤回的文本消息在占位条上提供「重新编辑」，点击把原文回显到输入框，语音模式下会先恢复文本输入框，作为新消息发送。`uiConfig.enableReEdit` 可关闭该按钮。
+- 编辑仅支持自己发送的文本消息：点击「编辑」后输入栏上方出现编辑条（显示原文截断预览），语音模式下会先恢复文本输入框；修改后发送复用原消息 id，文本气泡尾部出现「已编辑」标记；单条消息最多编辑 10 次，达到上限后菜单项置灰，编辑失败保留编辑态供重试。
 - 置顶对未撤回的消息全类型可用：置顶后消息列表上方出现置顶条（最新置顶在前），多条置顶点击计数下拉展开完整列表（上限 20 条），点击任意置顶行定位并高亮原消息，行尾可取消置顶；`uiConfig.messageMenuKeys` 不含 `pin` 时置顶条不渲染。
 - 复制等待系统剪贴板返回结果，成功与失败分别提示；空文本按失败处理。
 - 删除先弹确认框，取消不发请求。有服务端 ID 的消息先删当前账号的漫游历史再删本地，本地消息仅本地删除；失败保留气泡并提示，成功后才以 `delete` 事件透出。删除后会话摘要与时间同步校正；该操作不删除接收方消息。
@@ -84,11 +84,11 @@
 
 ### 输入栏
 
-- 输入栏支持语音、Emoji、相册、拍照、视频、文件；单项可经 `uiConfig.inputFeatures` 关闭，Emoji 字符集可经 `uiConfig.emojiList` 替换。
+- 输入栏支持语音、Emoji、相册、拍照、视频、文件；单项可经 `uiConfig.inputFeatures` 关闭，Emoji 字符集可经 `uiConfig.emojiList` 替换。运行中关闭语音、Emoji 或全部媒体能力时，对应的语音输入态或已打开面板会同步退出。
 - 右侧是「+」与发送键的同槽互斥：草稿为空显示「+」媒体入口，草稿有内容时换成品牌色纸飞机发送键，不再常驻文字发送按钮，输入框因此更宽。
 - `inputFeatures.inputMode` 显式选择输入形态：`'single'` 为全端单行 input、回车发送；`'multiline'` 为全端生长 textarea、回车换行、纸飞机发送，1 行起步、最多 5 行，超出内部滚动。多行文本使用固定 19px 行高，输入区按行数显式计算高度，清空立即回到单行。
 - 未设置 `inputMode` 时保留旧 `sendOnReturn` 行为：`false` 走多行；`true`（默认）时 iOS 走多行回车发送，其余端走单行。显式 `inputMode` 优先，不与 `sendOnReturn` 组合。Android 系统限制 textarea 键盘右下角恒为换行。
-- `quickReplies` 在输入栏上方渲染常用语胶囊：`quickReplyMode='fill'`（默认）整句替换草稿，`'send'` 直接发送（不带引用与 @）。
+- `quickReplies` 在输入栏上方渲染常用语胶囊：`quickReplyMode='fill'`（默认）整句替换草稿，语音模式下会先恢复文本输入框；`'send'` 直接发送（不带引用与 @），不改变语音模式。
 - 全员禁言且当前用户不是群主/管理员时，输入栏进入禁用态，输入框提示为「全员禁言中」；尝试发送/工具/语音时 toast「全员禁言中，仅群主和管理员可发言」。
 - 引用条、@ 选择面板、媒体面板与键盘之间的切换由组件自身处理；切换 `conversationId` 时清空引用与 @ 状态。
 - 对整个输入栏的结构/样式不满意时，可用 `#input-bar` 插槽整栏自绘：键盘避让、面板互斥、录音手势、禁言、@ 提及、草稿持久化等行为由库内经插槽作用域（scope）契约保持运作，见下文「整栏自绘输入栏」。
@@ -308,7 +308,7 @@ function onMessageMenu(key: string, message: EmMessageItem) {
 | 发送按钮 | `scope.send()`（空草稿拦截、引用/@ext、清草稿、滚底内置） |
 | 禁用态 | 输入框 `:disabled="scope.disabled"`；禁用下的操作尝试调 `scope.notifyDisabledTap()`（页面 toast） |
 | emoji / 媒体面板开关 | `scope.togglePanel('emoji' | 'media')`；面板根节点绑 `:style="scope.panelStyle"`；emoji 点选用 `scope.setDraft(scope.draft + emoji)` 追加 |
-| 媒体动作 | `scope.selectMedia(key)`，`key` 取 `MEDIA_PANEL_KEY.ALBUM/CAMERA/VIDEO/FILE`（选择器与发送内置） |
+| 媒体动作 | `scope.selectMedia(key)`，`key` 取 `MEDIA_PANEL_KEY.ALBUM/CAMERA/VIDEO/FILE`（选择器与发送内置，调用前自动收起媒体面板） |
 | 语音按钮 | `scope.toggleVoiceMode()` 切换；「按住说话」条的四个手势事件绑 `scope.onVoiceTouchStart/Move/End/Cancel`，用 `scope.recording/willCancel` 渲染状态（60 秒自动发送、过短拦截、上滑取消内置） |
 | 引用条 | 按 `scope.quote` 自绘，关闭调 `scope.closeQuote()` |
 | 快捷回复 | 按 `scope.quickReplies` 自绘，点击调 `scope.selectQuickReply(item)` |

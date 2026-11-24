@@ -32,6 +32,7 @@
 | `placeholder` | `string` | `''` | 输入框提示文案；空串使用内置"输入消息"文案 |
 | `quickReplies` | `EmQuickReply[]` | `[]` | 快捷回复常用语；空数组不渲染，禁用态自动隐藏 |
 | `collapseSignal` | `number` | `0` | 外部收起信号：数值变化即收起 emoji/媒体面板并收起键盘 |
+| `textInputSignal` | `number` | `0` | 外部文本输入意图信号：数值变化即退出语音模式并显示文本输入框，不主动弹键盘 |
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|

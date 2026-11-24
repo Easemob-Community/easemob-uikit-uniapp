@@ -1538,3 +1538,29 @@
 - **升级验收**：在另一临时工程将本地下载包版本模拟为 `1.0.0`，官方 `uni_modules --upgrade` 成功识别并更新到 `1.0.3`，`changedFiles` 仅指向临时工程的插件目录。最终 Demo 的市场更新仍由项目负责人手动执行。
 - **错装清理**：外部 Demo 中确认由错误导入产生的根级 `assets/`、`components/`、`libs/`、`changelog.md`、`license.md` 已删除；被插件内容覆盖的根 `README.md` 与 `package.json` 已按版本控制基线恢复，Demo 自身 `manifest.json` 发版改动保留。
 - **规则沉淀**：`.agents/skills/em-plugin-publishing` 改为官方 uni_modules 通道，强制版本号与 Demo/chat-only `versionCode` 同步递增，并把「规范：是」、干净工程下载目录、包内容、旧版本升级四项纳入上线验收；网页 ZIP 不再作为常规发布路径。
+
+
+## 2026-11-24 输入栏面板与语音模式互斥修复
+
+- **根因与修复**：语音模式下点击表情或「+」面板仍显示「按住说话」，根因是共享 `useChatComposer.togglePanel` 只收键盘、未退出 `voiceMode`。现打开 emoji/media 面板时统一调用既有 `exitVoiceMode()`，默认输入栏与 `#input-bar` 自绘输入栏同时恢复文本输入控件；面板保持展开，不自动弹系统键盘。若面板打断进行中的录音，复用取消逻辑丢弃本次音频，不进入发送回调。
+- **回归测试**：`test-record-lifecycle.mjs` 新增表情、媒体、录音中取消三项；修复前新增用例 3/3 失败且原有用例 13/13 通过，修复后专项 **16/16** 通过。
+- **构建门禁**：`build web`、`build mp-weixin` 通过；小程序全部分包检查通过，主包 **1054KB**、分包合计 **1489KB**；H5 产物静态伺服 HTTP **200**，验证后临时伺服已关闭。App/小程序默认与自绘输入栏的真机手动交互未在本轮执行。
+
+
+
+## 2026-11-24 输入栏同类状态切换走查
+
+- **自绘媒体面板**：`#input-bar` 的 `scope.selectMedia` 原先直达 `onMediaSelect`，不像默认输入栏先收面板，选择完成或取消后媒体面板会残留。现页面媒体分发入口先执行 `composer?.collapse()`，默认输入栏无 composer 时保持原链路。
+- **动态功能开关**：`setConfig` 与页面 props 支持运行中改 `inputFeatures`，但旧实现关闭语音、表情或全部媒体能力时不会退出已生效状态。`useChatComposer` 新增可选 `availability` 响应式输入，默认输入栏与自绘页面分别接入真实可用性；关闭语音会退出语音模式并取消进行中录音，关闭表情/全部媒体能力会收起对应面板。App 文件可用性继续纳入 `canPickAttachment()`。
+- **边界口径**：快捷回复填充、重新编辑等文本注入是否应退出语音模式没有统一交互依据，本次不擅自改变；消息区点击仍只收键盘/面板，保持 Vue 参照语义。
+- **回归验证**：新增 `test-chat-composer.mjs`，直接提取执行真实 `onMediaSelect`，修复前自绘用例缺少 `collapse` 失败、默认路径对照通过，修复后 2/2。录音测试新增三项动态开关用例，修复前均失败，修复后专项 19/19；全量 Node 测试 **78/78**。
+- **门禁**：`check-docs`、App 模块图、`build web`、`build mp-weixin` 全通过；小程序主包 **1054KB**、分包合计 **1489KB**；H5 静态伺服 HTTP **200**，临时伺服已关闭。公开 API-COMPOSABLES 与 PAGES-CHAT 已同步行为契约；App/小程序真机手动走查未在本轮执行。
+
+
+
+## 2026-11-24 文本注入意图恢复文本输入框
+
+- **行为**：语音模式下使用填充型快捷回复、消息编辑或撤回重编辑时，先退出语音模式再写入/回显草稿，默认与 `#input-bar` 自绘输入栏均显示文本输入控件；不主动聚焦或弹系统键盘，进行中录音按取消处理。直发型快捷回复不改变语音模式。
+- **实现**：`em-chat-inputbar` 新增 `textInputSignal`（默认 0），信号变化调用既有 `exitVoiceMode()`；聊天页以 `revealTextInput()` 统一分发，默认路径递增信号，自绘路径直接退出页面 composer 语音态。公开 COMPONENTS-CHAT 与 PAGES-CHAT 已同步。
+- **测试**：`test-chat-composer.mjs` 新增 4 项，修复前填充、编辑、重编辑 3 项因恢复信号为 0 失败，直发对照通过；修复后专项 **6/6**、全量 Node 测试 **82/82**。
+- **门禁**：`check-docs`、`build web`、`build mp-weixin` 通过；小程序主包 **1055KB**、分包合计 **1489KB**；H5 静态伺服 HTTP **200**，临时伺服已关闭。App/小程序真机手动交互未在本轮执行。

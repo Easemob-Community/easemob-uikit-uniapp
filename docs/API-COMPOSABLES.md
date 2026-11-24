@@ -26,7 +26,7 @@
 
 ## 聊天输入行为
 
-`useChatComposer(options)` 为完全自研聊天输入栏提供键盘避让、底部面板、录音手势和禁用态守卫。`options` 必须提供 `disabled`、`onDisabledTap`、`onVoiceSend`。
+`useChatComposer(options)` 为完全自研聊天输入栏提供键盘避让、底部面板、录音手势和禁用态守卫。`options` 必须提供 `disabled`、`onDisabledTap`、`onVoiceSend`；可选传入 `availability`，值为 `{ voice, emoji, media }` 的只读响应式引用。运行中关闭某项能力时，已打开的对应语音或面板状态会同步退出；打开表情或媒体面板也会退出语音模式并收起键盘。
 
 返回 `UseChatComposerResult`：`panel`、`inputFocus`、`voiceMode`、`recording`、`willCancel`、`keyboardHeight`、`keyboardLift`、`rootStyle`、`panelStyle`、`guardDisabled`、`togglePanel`、`collapse`、`closeKeyboard`、`onInputFocus`、`onInputBlur`、`toggleVoiceMode`、`exitVoiceMode`、`onRecordTouchStart`、`onRecordTouchMove`、`onRecordTouchEnd` 和 `onRecordTouchCancel`。
 
