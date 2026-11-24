@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const host = '/Users/neohuang/Desktop/WorkCommonUse/easemob-uniappx-demo-534'
+const host = process.env.EM_HOST_DEMO_ROOT
+const hasHost = host != null && existsSync(host)
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 const readHost = (path) => readFileSync(resolve(host, path), 'utf8')
 
@@ -48,7 +49,7 @@ test('UIKit sends image ext and preserves GIF metadata without owning sticker co
   assert.doesNotMatch(types, /stickerPacks/)
 })
 
-test('Host demo owns GIF panel, sending and rendering through the generic slots', () => {
+test('Host demo owns GIF panel, sending and rendering through the generic slots', { skip: !hasHost }, () => {
   const chat = readHost('sub-im/pages/chat/chat.uvue')
   const stickers = readHost('common/demo-stickers.ts')
   const panel = readHost('sub-im/components/demo-emoji-panel/demo-emoji-panel.uvue')
