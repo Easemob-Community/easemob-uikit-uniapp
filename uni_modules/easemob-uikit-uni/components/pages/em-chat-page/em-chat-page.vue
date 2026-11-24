@@ -455,7 +455,7 @@ import EmWatermark from '../../em-watermark/em-watermark.vue'
 import type { EmIconName } from '../../em-icon/em-icons'
 import { CONNECTION_STATUS, CONVERSATION_TYPE, ERROR_CODE, FILE_SEND_CONCURRENCY, GROUP_MEMBER_ROLE, MEDIA_PANEL_KEY, MESSAGE_MENU_KEY, MESSAGE_MODIFY_COUNT_LIMIT, MESSAGE_STATUS, MESSAGE_TYPE, PINNED_PREVIEW_MAX_LENGTH } from '../../../libs/constants'
 import type { ConversationTypeValue, MessageMenuKeyValue } from '../../../libs/constants'
-import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, downloadAttachment, getCameraAuthorizeState, isAlbumAuthDenied, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
+import { EmKit, PLATFORM_CAPABILITIES, canPickAttachment, chooseImage, chooseVideo, copyText, downloadAttachment, getCameraAuthorizeState, isAlbumAuthDenied, canOpenAuthorizeSetting, openAppAuthorizeSetting, pickAttachments, previewImage, stopAudio } from '../../../libs'
 import type { EmCameraAuthorizeState, EmPickedFile } from '../../../libs'
 import { filterActiveMentions } from '../../../libs/utils/mention'
 import { errorCodeOf, sendFailureKeyOf, sendFailureKeyOfCode } from '../../../libs/utils/error'
@@ -1561,17 +1561,23 @@ async function sendQuickReplyText(text: string): Promise<void> {
   }
 }
 
-function showMediaPickFailure(e: unknown, fallbackKey: string): void {
+function showMediaPickFailure(e: unknown, fallbackKey: string, sourceType: 'album' | 'camera' | 'video' = 'album'): void {
   if (!isAlbumAuthDenied(e)) {
     uni.showToast({ title: t(fallbackKey), icon: 'none' })
     return
   }
+  if (sourceType === 'camera') {
+    showCameraPermissionGuide('denied')
+    return
+  }
+  const canOpenSetting = canOpenAuthorizeSetting()
   uni.showModal({
     title: t('chat.mediaPermission.title'),
     content: t('chat.mediaPermission.denied'),
-    confirmText: t('chat.cameraPermission.openSetting'),
+    showCancel: canOpenSetting,
+    confirmText: canOpenSetting ? t('chat.cameraPermission.openSetting') : t('button.confirm'),
     success: (res) => {
-      if (res.confirm) openAppAuthorizeSetting()
+      if (res.confirm && canOpenSetting) openAppAuthorizeSetting()
     }
   })
 }
@@ -1593,7 +1599,7 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
   // 平台层将用户取消归一为空数组；只有真实选择/读取失败进入 catch。
   const images = await chooseImage(1, sourceType).catch((e) => {
     logger.error('chooseImage fail:', e)
-    showMediaPickFailure(e, 'error.imagePickFailed')
+    showMediaPickFailure(e, 'error.imagePickFailed', sourceType)
     return null
   })
   if (images == null || images.length === 0 || !isPageRequestCurrent(request)) return
@@ -1610,15 +1616,15 @@ async function onPickImage(sourceType: 'album' | 'camera' = 'album'): Promise<vo
 // 相机授权被拒/安装包缺权限描述：不再拉起系统拍摄页（iOS 会停在黑屏），改为明确引导
 function showCameraPermissionGuide(state: EmCameraAuthorizeState): void {
   const configError = state === 'config error'
+  const canOpenSetting = !configError && canOpenAuthorizeSetting()
   const content = configError ? t('chat.cameraPermission.config') : t('chat.cameraPermission.denied')
   uni.showModal({
     title: t('chat.cameraPermission.title'),
     content,
-    showCancel: !configError,
-    confirmText: configError ? t('button.confirm') : t('chat.cameraPermission.openSetting'),
+    showCancel: canOpenSetting,
+    confirmText: canOpenSetting ? t('chat.cameraPermission.openSetting') : t('button.confirm'),
     success: (res) => {
-      if (!res.confirm || configError) return
-      openAppAuthorizeSetting()
+      if (res.confirm && canOpenSetting) openAppAuthorizeSetting()
     }
   })
 }

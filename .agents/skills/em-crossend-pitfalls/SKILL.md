@@ -222,7 +222,7 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 ### 5u. 设置页显示「允许全部照片和视频」，视频选择仍空白（荣耀 Android 15 实测，2026-11-24）
 - **症状**：图片选择正常，视频列表空白或 `chooseVideo` 返回 `errCode=1101005 / No Permission`；系统设置页却显示「允许使用全部照片和视频」。
 - **根因**：ROM 把图片/视频权限合并展示，但包管理器实际状态为 `READ_MEDIA_IMAGES=true`、`READ_MEDIA_VIDEO=false`。用 `adb shell dumpsys package <package>` 直接核对两个 runtime permission，不要只看设置页。权限请求日志里 PermissionController 已启动并返回拒绝，不是 UIKit 没发起授权，也不是发送/播放器链路。
-- **定案解法**：设置页先把权限改为禁止，再重新允许全部，强制停止并重启应用；正式包按此恢复视频列表。图片/视频选择失败统一经 `isAlbumAuthDenied` 识别 errCode 1101005（含字符串）与 auth/deny/permission/authorize 文本，权限错误弹独立恢复指引和「去设置」，普通失败才显示通用 toast。
+- **定案解法**：设置页先把权限改为禁止，再重新允许全部，强制停止并重启应用；正式包按此恢复视频列表。图片/视频选择失败统一经 `isAlbumAuthDenied` 识别 errCode 1101005（含字符串）与 auth/deny/permission/authorize 文本，权限错误弹独立恢复指引，普通失败才显示通用 toast。相机来源必须转 `showCameraPermissionGuide('denied')`，不能套用相册文案；App 走 `uni.openAppAuthorizeSetting`、微信小程序走 `uni.openSetting`，H5 不展示无实际动作的「去设置」按钮。
 - **已证伪路线**：同权限下 `albumMode=custom/system` 均进入 DCloud `PickerActivity`；无权限时 `uni.chooseMedia` 也返回同一 1101005。不要把这些 API 替换当成 ROM 权限修复。
 - **验证**：`scripts/test-platform-media.mjs` 覆盖原选择/取消契约、权限识别和聊天页错误分流；真机结果记 `docs/STATUS.md`。
 

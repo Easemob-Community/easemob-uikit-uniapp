@@ -127,15 +127,60 @@ test('相册权限错误按 errCode 和跨端错误文本识别', async (t) => {
   assert.equal(isAlbumAuthDenied({ errCode: 1101010, errMsg: 'read failed' }), false)
 })
 
+test('系统授权设置入口按平台调用且 H5 不提供无效动作', async (t) => {
+  const temp = mkdtempSync(join(tmpdir(), 'em-platform-setting-test-'))
+  t.after(() => rmSync(temp, { recursive: true, force: true }))
+  const entry = join(temp, 'entry.ts')
+  const output = join(temp, 'bundle.mjs')
+  const source = readFileSync(platformPath, 'utf8')
+  const libsDir = resolve(root, 'uni_modules/easemob-uikit-uni/libs')
+  const targets = [
+    ['android', new Set(['APP', 'UNI-APP-X', 'APP-ANDROID'])],
+    ['mp', new Set(['MP-WEIXIN'])],
+    ['web', new Set(['WEB'])]
+  ]
+  targets.forEach(([name, enabled]) => {
+    writeFileSync(join(temp, `platform-${name}.ts`), compileForPlatform(source, enabled)
+      .replaceAll("from './", `from '${libsDir}/`))
+  })
+  writeFileSync(entry, `
+    export { canOpenAuthorizeSetting as canOpenAndroid, openAppAuthorizeSetting as openAndroid } from './platform-android.ts'
+    export { canOpenAuthorizeSetting as canOpenMp, openAppAuthorizeSetting as openMp } from './platform-mp.ts'
+    export { canOpenAuthorizeSetting as canOpenWeb, openAppAuthorizeSetting as openWeb } from './platform-web.ts'
+  `)
+  const vuePath = resolve(hbx, 'plugins/uniapp-cli-vite/node_modules/vue')
+  execFileSync(esbuildBin, [entry, '--bundle', '--platform=node', '--format=esm', `--alias:vue=${vuePath}`, `--outfile=${output}`], { stdio: 'pipe' })
+
+  const calls = []
+  globalThis.uni = {
+    openAppAuthorizeSetting: () => calls.push('app'),
+    openSetting: () => calls.push('mp')
+  }
+  t.after(() => delete globalThis.uni)
+  const api = await import(pathToFileURL(output).href)
+
+  assert.equal(api.canOpenAndroid(), true)
+  assert.equal(api.canOpenMp(), true)
+  assert.equal(api.canOpenWeb(), false)
+  api.openAndroid()
+  api.openMp()
+  api.openWeb()
+  assert.deepEqual(calls, ['app', 'mp'])
+})
+
 test('聊天页将相册权限异常与普通选择失败分流', () => {
   const chatPage = readFileSync(resolve(root, 'uni_modules/easemob-uikit-uni/components/pages/em-chat-page/em-chat-page.vue'), 'utf8')
   const zh = readFileSync(resolve(root, 'uni_modules/easemob-uikit-uni/libs/locale/zh-CN.ts'), 'utf8')
   const en = readFileSync(resolve(root, 'uni_modules/easemob-uikit-uni/libs/locale/en.ts'), 'utf8')
 
   assert.match(chatPage, /function showMediaPickFailure[\s\S]*?isAlbumAuthDenied\(e\)[\s\S]*?uni\.showModal/)
-  assert.match(chatPage, /showMediaPickFailure\(e, 'error\.imagePickFailed'\)/)
+  assert.match(chatPage, /if \(sourceType === 'camera'\) \{\s*showCameraPermissionGuide\('denied'\)/)
+  assert.match(chatPage, /showMediaPickFailure\(e, 'error\.imagePickFailed', sourceType\)/)
   assert.match(chatPage, /showMediaPickFailure\(e, 'error\.videoPickFailed'\)/)
-  assert.match(chatPage, /if \(res\.confirm\) openAppAuthorizeSetting\(\)/)
+  assert.match(chatPage, /const canOpenSetting = canOpenAuthorizeSetting\(\)/)
+  assert.match(chatPage, /showCancel: canOpenSetting/)
+  assert.match(chatPage, /confirmText: canOpenSetting \? t\('chat\.cameraPermission\.openSetting'\) : t\('button\.confirm'\)/)
+  assert.match(chatPage, /if \(res\.confirm && canOpenSetting\) openAppAuthorizeSetting\(\)/)
   for (const locale of [zh, en]) {
     assert.match(locale, /'chat\.mediaPermission\.title'/)
     assert.match(locale, /'chat\.mediaPermission\.denied'/)

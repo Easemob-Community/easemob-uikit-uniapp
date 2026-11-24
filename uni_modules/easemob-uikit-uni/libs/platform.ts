@@ -169,13 +169,30 @@ export function getCameraAuthorizeState(): EmCameraAuthorizeState {
   // #endif
 }
 
-/** 打开系统应用授权设置页（仅 App；基座缺模块/调用失败时静默，由调用方文案兜底） */
+export function canOpenAuthorizeSetting(): boolean {
+  // #ifdef APP
+  return true
+  // #endif
+  // #ifdef MP-WEIXIN
+  return true
+  // #endif
+  return false
+}
+
+/** 打开系统授权设置页（App/微信小程序；基座缺模块或调用失败时静默，由调用方文案兜底） */
 export function openAppAuthorizeSetting(): void {
   // #ifdef APP
   try {
     uni.openAppAuthorizeSetting({})
   } catch (e) {
     logger.warn('openAppAuthorizeSetting unavailable:', e)
+  }
+  // #endif
+  // #ifdef MP-WEIXIN
+  try {
+    uni.openSetting({})
+  } catch (e) {
+    logger.warn('openSetting unavailable:', e)
   }
   // #endif
 }

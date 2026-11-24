@@ -19,7 +19,9 @@
 - `checkNetworkOnce()`：一次性探测系统网络状态，返回 `Promise<boolean | null>`；`null` 表示无法确定，不应据此阻断业务请求。
 - `subscribeNetworkStatus(listener)`：监听系统网络连通性变化，返回取消订阅函数；页面卸载时必须调用。
 - `chooseImage()`、`previewImage()`、`chooseVideo()`、`chooseFile()`：媒体选择与预览。
-- `getCameraAuthorizeState()`、`openAppAuthorizeSetting()`：相机授权预检与系统设置。
+- `getCameraAuthorizeState()`：相机授权预检。
+- `canOpenAuthorizeSetting()`：返回当前平台是否提供可用的系统授权设置入口；App 与微信小程序为 `true`，H5 为 `false`。
+- `openAppAuthorizeSetting()`：打开系统授权设置；App 使用 `uni.openAppAuthorizeSetting`，微信小程序使用 `uni.openSetting`。调用前可用 `canOpenAuthorizeSetting()` 判断是否展示设置按钮。
 - `isAlbumAuthDenied(error)`：识别图片/视频读取与相册保存的权限错误；支持 `errCode=1101005` 和跨端权限错误文本。
 - `setAttachmentProvider()`、`refreshAttachmentAvailability()`、`hasAttachmentProvider()`、`canPickAttachment()`、`attachmentCapability()`、`pickAttachments()`、`resolveAttachment()`：附件能力。
 - `startRecord()`、`stopRecord()`、`isRecording()`、`playAudio()`、`stopAudio()`：录音与播放。`stopRecord()` 在同一轮停止过程中重复调用会共享同一个 Promise；录音取消时该 Promise 以 `ERROR_CODE.RECORD_CANCELLED` 拒绝，原生录音错误也会使其拒绝，调用方需要处理异常。
