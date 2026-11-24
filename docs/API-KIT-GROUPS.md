@@ -22,7 +22,7 @@
 
 ## `EmKit.createGroup(params)`
 
-创建群组，返回 `Promise<string>`（新群 groupId）。`params` 见[联系人与群组类型](./API-TYPES-CONTACTS-GROUPS.md#creategroupparams)。
+创建群组，返回 `Promise<string>`（新群 groupId）。`params` 见[联系人与群组类型](./API-TYPES-CONTACTS-GROUPS.md#creategroupparams)。创建成功本身不会生成空会话；产生真实消息后由 SDK 同步进入会话列表。
 
 ```ts
 const groupId = await EmKit.createGroup({
@@ -31,7 +31,6 @@ const groupId = await EmKit.createGroup({
   public: false,
   allowInvites: true
 })
-EmKit.addConversation(groupId, 'groupChat')
 ```
 
 ## `EmKit.inviteUsersToGroup(groupId, userIds)`

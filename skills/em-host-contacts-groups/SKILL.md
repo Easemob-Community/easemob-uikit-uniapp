@@ -175,8 +175,8 @@ function onBack(): void {
 
 - 内置：已加入群列表、建群面板（选人、名称、设置）、空态；无缓存同步失败显示重试，有缓存时保留列表。SDK 无群全量手动重启同步 API，失败后需恢复连接或重新登录，内存重读不会被当作成功。
 - 建群不增加二次确认；创建中禁止更改选择、重复确认与关闭，失败保留选择和表单，成功才关闭。
-- 建群成功后组件**已经**：`createGroup` → upsert 群 store → `addConversation` → 插入建群系统灰条 → toast → emit `created`。
-- 宿主在 `created` 里只需跳聊天页；**不要再调一次 `addConversation` / `insertGroupNotice`**。
+- 建群成功后组件**已经**：`createGroup` → upsert 群 store → 插入建群系统灰条 → toast → emit `created`；不会创建空会话，真实消息产生后由 SDK 同步进入会话列表。
+- 宿主在 `created` 里只需跳聊天页；**不要再调一次 `insertGroupNotice`**。
 - 群条目点击与 `created` 可以共用同一个 handler。
 
 自定义群列表/建群 UI 时用 API：
@@ -191,7 +191,6 @@ const groupId = await EmKit.createGroup({
   approval: false,
   allowInvites: true
 })
-EmKit.addConversation(groupId, CONVERSATION_TYPE.GROUP_CHAT)
 ```
 
 ## 6. 群详情与群管理

@@ -138,6 +138,22 @@ function onTabChange(tab: ConversationTabKeyValue): void {
 
 **行为与平台**：组件只读连接状态（`connectionStore`），不参与业务。`online` 与 `idle` 状态下不渲染任何内容；`connecting` 与 `reconnecting` 用警示色 + 环形箭头图标 + 对应文案；`closed` 时被踢/账号失效终态（`kicked=true`，错误码 206/207/214/216/217）按 `kickCode` 分流——206 显示"当前账号已在其他设备登录"、216 显示"账号密码已修改，请重新登录"、214 显示"登录设备数超过限制，当前设备已下线"、其余显示"当前账号已被迫下线，请重新登录"；其余断开再按原因分流——`token-expired` 显示 Token 过期、`limit` 显示设备数超限被踢、其余显示网络异常，全部用错误色 + 感叹号图标。状态条是浅色底的轻量条，不遮挡内容，暗色模式随 token 切换。整页场景下由 `em-conversation-page` / `em-chat-page` 的 `showConnectionBanner` 控制显隐，单独使用时自行传 `show`。
 
+## 建群弹层：em-create-group-modal
+
+会话列表页与群组列表页共享的建群复合组件，封装多选联系人、可选群名与群设置、自动群名、提交态、建群通知及失败重试。两个页面已内置使用，宿主通常只需处理页面的 `select` 或 `created` 事件，无需单独接入。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `show` | `boolean` | 必填 | 弹层显隐；每次打开重置群名与群设置 |
+| `items` | `EmSelectContactItem[]` | 必填 | 可选联系人快照 |
+| `showNameInput` | `boolean` | `false` | 显示群名称输入框；关闭时使用自动群名 |
+| `showSettings` | `boolean` | `false` | 显示公开群、允许成员邀请设置 |
+
+| 事件 | 载荷 | 说明 |
+|---|---|---|
+| `update:show` | `value: boolean` | 更新弹层显隐 |
+| `created` | `groupId: string` | 建群成功；系统通知已写入，宿主可进入群聊 |
+
 ## 页面组件：em-conversation-page
 
 会话列表整页：搜索、筛选 tab、置顶/免打扰/未读、长按菜单、连接状态条、空状态，数据订阅与列表刷新都在页面内部完成。
@@ -153,8 +169,7 @@ function onTabChange(tab: ConversationTabKeyValue): void {
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `select` | `conversationId: string, chatType: ConversationTypeValue` | 选中会话，宿主跳聊天页 |
-| `menu` | `key: string` | 右上角「+」动作面板中的业务菜单项，当前为 `create-group`；会话长按菜单由组件内部处理 |
+| `select` | `conversationId: string, chatType: ConversationTypeValue` | 选中会话、单聊选人完成或建群成功，宿主按 `chatType` 跳聊天页 |
 
 | 插槽 | 作用域 | 说明 |
 |---|---|---|
