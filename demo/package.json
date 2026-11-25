@@ -1,6 +1,6 @@
 {
   "name": "easemob-uikit-uni-demo",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "license": "MIT",
   "description": "环信 UIKit uni-app 版演示工程（uni-app x 蒸汽模式）",

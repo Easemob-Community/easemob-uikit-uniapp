@@ -2,7 +2,7 @@
 
 面向**用 AI 把 `easemob-uikit-uni` 接进宿主工程**的开发者与编码代理。每个目录是一份可独立加载的 `SKILL.md`，包含触发条件、接入步骤、可复制代码、组件契约、坑与验收清单。
 
-> 版本基线：`easemob-uikit-uni` **1.0.5** · `easemob-websdk` **5.2.0** · HBuilderX **5.21+**（uni-app x 蒸汽模式）。
+> 版本基线：`easemob-uikit-uni` **1.0.6** · `easemob-websdk` **5.2.0** · HBuilderX **5.21+**（uni-app x 蒸汽模式）。
 
 ## 与仓库 `.agents/skills/` 的区别
 

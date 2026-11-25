@@ -5,7 +5,7 @@
 
 ## 1. 项目一句话
 
-环信 IM 的 **uni-app 版 UIKit**（**仅支持** uni-app x 蒸汽模式，不兼容经典 uni-app / vdom 模式；Android/iOS/鸿蒙 + H5 + 微信小程序共五端），MIT 开源，DCloud 插件市场分发。组件前缀 `em-`，CSS 变量前缀 `--em-*`，插件 id `easemob-uikit-uni`。当前版本 `1.0.5`；进度与各端验证状态见 `docs/STATUS.md`，接入步骤见 `docs/QUICKSTART.md`。
+环信 IM 的 **uni-app 版 UIKit**（**仅支持** uni-app x 蒸汽模式，不兼容经典 uni-app / vdom 模式；Android/iOS/鸿蒙 + H5 + 微信小程序共五端），MIT 开源，DCloud 插件市场分发。组件前缀 `em-`，CSS 变量前缀 `--em-*`，插件 id `easemob-uikit-uni`。当前版本 `1.0.6`；进度与各端验证状态见 `docs/STATUS.md`，接入步骤见 `docs/QUICKSTART.md`。
 
 ## 2. 硬约束（每次必守，违反即返工）
 

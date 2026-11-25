@@ -1,6 +1,6 @@
-# 1.0.5 发布清单（Release Checklist）
+# 1.0.6 发布清单（Release Checklist）
 
-> 目标版本：**1.0.5**，1.0.x 补丁版本。本文是内部发布操作手册；接入步骤见 [QUICKSTART](./QUICKSTART.md)，对外变更见插件 `changelog.md`。
+> 目标版本：**1.0.6**，1.0.x 补丁版本。本文是内部发布操作手册；接入步骤见 [QUICKSTART](./QUICKSTART.md)，对外变更见插件 `changelog.md`。
 
 ## 1. 发布前硬门禁
 
@@ -46,18 +46,18 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
 
 | 文件 | 字段 | 发布值 |
 |---|---|---|
-| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.5` |
-| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.5（2026-11-25）` |
-| `uni_modules/easemob-uikit-uni/libs/constants/index.ts` | `UIKIT_VERSION` | `1.0.5` |
-| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.5` / `10004` |
-| `demo/package.json` / `package-lock.json` | `version` | `1.0.5` |
-| `templates/chat-only/package.json` / `package-lock.json` | `version` | `1.0.5` |
-| `templates/chat-only/manifest.json` | `versionName` / `versionCode` | `1.0.5` / `104` |
+| `uni_modules/easemob-uikit-uni/package.json` | `version` | `1.0.6` |
+| `uni_modules/easemob-uikit-uni/changelog.md` | 首个小节 | `1.0.6（2026-11-25）` |
+| `uni_modules/easemob-uikit-uni/libs/constants/index.ts` | `UIKIT_VERSION` | `1.0.6` |
+| `demo/manifest.json` | `versionName` / `versionCode` | `1.0.6` / `10005` |
+| `demo/package.json` / `package-lock.json` | `version` | `1.0.6` |
+| `templates/chat-only/package.json` / `package-lock.json` | `version` | `1.0.6` |
+| `templates/chat-only/manifest.json` | `versionName` / `versionCode` | `1.0.6` / `105` |
 | demo、插件 peer、chat-only | `easemob-websdk` | `5.2.0` |
 
 公开物料必须满足：
 
-- [ ] 根 README、插件 README、公开文档和 Skills 均为 `1.0.5`，无当前版本“未发布/内测/候选”口径。
+- [ ] 根 README、插件 README、公开文档和 Skills 均为 `1.0.6`，无当前版本“未发布/内测/候选”口径。
 - [ ] 插件市场更新日志与 `changelog.md` 首节一致。
 - [ ] 插件 README 的平台矩阵、文件下载、App 附件 provider 和已知限制与当前实现一致。
 - [ ] 插件市场选择会话、聊天、群聊或业务卡片等至少 3 张真实截图。
@@ -108,7 +108,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5181/
    其他宿主、插件或 HBuilderX 安装位置分别用 `--project`、`--plugin`、`--cli` 覆盖，也可通过 `HBUILDERX_CLI` 指定 CLI。
 
 3. 推送 `dev`，确认远端提交与本地验证提交一致。
-4. 打 tag：`git tag v1.0.5 && git push origin v1.0.5`，不需要额外创建 GitHub Release。
+4. 打 tag：`git tag v1.0.6 && git push origin v1.0.6`，不需要额外创建 GitHub Release。
 5. 明确授权后增加 `--publish` 正式发布；脚本会重新执行 validate 和 dry-run，再调用官方发布命令：
 
    ```bash
