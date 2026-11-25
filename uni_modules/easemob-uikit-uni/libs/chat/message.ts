@@ -239,6 +239,16 @@ export class EmMessageDomain {
     }
   }
 
+  // 转发会让多条消息共享同一本地路径；删除最后一条引用前不能释放，否则其他消息无法预览或重发
+  private releaseTemporaryIfUnused(path: string): void {
+    if (path === '') return
+    const lists = messageStore.messagesByConversationId
+    const used = Object.keys(lists).some((conversationId) =>
+      (lists[conversationId] ?? []).some((message) => message.url === path)
+    )
+    if (!used) this.releaseTemporary(path)
+  }
+
   /** 会话域进入/离开时同步当前会话：进入后该会话不再被内存上限裁剪 */
   setActiveConversation(conversationId: string): void {
     this.activeConversationId = conversationId
@@ -1092,21 +1102,21 @@ export class EmMessageDomain {
       if (id !== '') idSet[id] = true
     })
     const kept: EmMessageItem[] = []
-    let removed = 0
+    const removedItems: EmMessageItem[] = []
     list.forEach((m) => {
       const hitId = m.id !== '' && idSet[m.id] === true
       const hitBefore = before > 0 && m.time > 0 && m.time < before
       if (hitId || hitBefore) {
-        removed += 1
+        removedItems.push(m)
         delete this.uploadFileByLocalId[m.localId]
         removeMessageSource(m.localId)
-        this.releaseTemporary(m.url)
         return
       }
       kept.push(m)
     })
-    if (removed === 0) return false
+    if (removedItems.length === 0) return false
     messageStore.messagesByConversationId[event.conversationId] = kept
+    removedItems.forEach((m) => this.releaseTemporaryIfUnused(m.url))
     // 置顶条同样不能残留被删消息（审核删除/其他端删除后 pinned 列表同步过滤）
     const pinned = messageStore.pinnedByConversationId[event.conversationId]
     if (pinned != null) {
@@ -1219,9 +1229,9 @@ export class EmMessageDomain {
     }
     delete this.uploadFileByLocalId[localId]
     removeMessageSource(localId)
-    // 删除消息时清掉宿主附件临时副本；其他媒体已成功释放，文件在此释放本地预览副本
-    this.releaseTemporary(target.url)
     messageStore.messagesByConversationId[conversationId] = list.filter((m) => m.localId !== localId)
+    // 其他媒体已成功释放；文件仅在最后一条本地引用删除后释放预览副本
+    this.releaseTemporaryIfUnused(target.url)
     return true
   }
 

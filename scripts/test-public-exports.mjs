@@ -45,3 +45,35 @@ test('公共入口导出一次性网络探测与网络状态订阅', async (t) =
   assert.match(bundle, /checkNetworkOnce/)
   assert.match(bundle, /subscribeNetworkStatus/)
 })
+
+test('公共入口导出附件下载请求 URL 供宿主转发使用', async (t) => {
+  const temp = mkdtempSync(join(tmpdir(), 'em-public-exports-test-'))
+  t.after(() => rmSync(temp, { recursive: true, force: true }))
+  const entry = join(temp, 'entry.ts')
+  const output = join(temp, 'bundle.mjs')
+  writeFileSync(entry, `
+    import { downloadRequestUrlOf } from '${resolve(root, 'uni_modules/easemob-uikit-uni/libs/index.ts')}'
+    console.log(downloadRequestUrlOf)
+  `)
+  await build({
+    entryPoints: [entry],
+    outfile: output,
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    external: ['easemob-websdk'],
+    nodePaths: [resolve(root, 'demo/node_modules'), resolve(cliDir, 'node_modules')],
+    plugins: [{
+      name: 'uni-non-mp-conditions',
+      setup(build) {
+        build.onLoad({ filter: /\.ts$/ }, async (args) => ({
+          contents: (await readFile(args.path, 'utf8')).replace(/\/\/ #ifdef MP-WEIXIN[\s\S]*?\/\/ #endif/g, ''),
+          loader: 'ts'
+        }))
+      }
+    }]
+  })
+
+  const bundle = readFileSync(output, 'utf8')
+  assert.match(bundle, /downloadRequestUrlOf/)
+})

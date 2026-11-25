@@ -610,7 +610,7 @@ export type { EmTabBarBadgeOptions, EmTabBarBadgeController } from './use/useTab
 export { groupStore, groupDisplayNameOf, groupAvatarOf, setGroupPresentation, groupMemberDisplayNameOf, sortGroupMembers } from './store/group'
 export { ensureUserInfos } from './chat/user-info'
 export { setPinyinAdapter, groupContacts, matchContact, resolveAlphabetKeyByOffsetY } from './utils/pinyin'
-export { downloadAttachment, attachmentFileNameOf, downloadKindOf, downloadUrlOf } from './utils/download'
+export { downloadAttachment, attachmentFileNameOf, downloadKindOf, downloadUrlOf, downloadRequestUrlOf } from './utils/download'
 export type { EmPinyinResult, EmContactGroup } from './utils/pinyin'
 export { filterActiveMentions, parseMentions } from './utils/mention'
 export type { EmMentionSegment } from './utils/mention'

@@ -56,6 +56,7 @@ before(async () => {
     export { downloadRequestUrlOf } from '${downloadOutput}'
     export * as downloadApi from '${downloadOutput}'
     export { EmMessageDomain } from '${resolve(root, 'uni_modules/easemob-uikit-uni/libs/chat/message.ts')}'
+    export { messageStore, clearMessages, getMessages } from '${resolve(root, 'uni_modules/easemob-uikit-uni/libs/store/message.ts')}'
   `)
   const vuePath = resolve(hbx, 'plugins/uniapp-cli-vite/node_modules/vue')
   execFileSync(esbuildBin, [entry, '--bundle', '--platform=node', '--format=esm', `--alias:vue=${vuePath}`, `--outfile=${output}`], { stdio: 'pipe' })
@@ -136,6 +137,73 @@ test('文件发送成功保留本地副本，reset 时仍按原契约释放', as
   domain.reset()
   assert.deepEqual(releaseCalls, ['file:///data/user/0/pkg/cache/a.pdf'])
 })
+
+test('本地删除共享文件时仅在最后一条引用移除后释放', async () => {
+  const fixture = await createSentTemporaryFile('local-delete')
+  const forwarded = addSharedReference(fixture.path)
+  try {
+    assert.equal(fixture.domain.deleteLocalMessage('peer', fixture.localId), true)
+    assert.deepEqual(fixture.releaseCalls, [])
+    assert.equal(fixture.domain.deleteLocalMessage('forwarded', forwarded.localId), true)
+    assert.deepEqual(fixture.releaseCalls, [fixture.path])
+  } finally {
+    fixture.domain.reset()
+    api.clearMessages()
+  }
+})
+
+test('多端删除共享文件时保留其他会话的本地预览副本', async () => {
+  const fixture = await createSentTemporaryFile('multi-delete')
+  const forwarded = addSharedReference(fixture.path)
+  const source = api.getMessages('peer')[0]
+  try {
+    assert.equal(fixture.domain.onMultiDeviceMessageRemoved({ conversationId: 'peer', messageIds: [source.id] }), true)
+    assert.deepEqual(fixture.releaseCalls, [])
+    assert.equal(fixture.domain.onMultiDeviceMessageRemoved({ conversationId: 'forwarded', messageIds: [forwarded.id] }), true)
+    assert.deepEqual(fixture.releaseCalls, [fixture.path])
+  } finally {
+    fixture.domain.reset()
+    api.clearMessages()
+  }
+})
+
+async function createSentTemporaryFile(key) {
+  api.clearMessages()
+  const releaseCalls = []
+  const path = `file:///data/user/0/pkg/cache/${key}.pdf`
+  const localMessage = {
+    msgServerId: '', msgLocalId: key, from: 'me', to: 'peer', sender: { userId: 'me' },
+    conversationId: 'peer', conversationType: 'singleChat', type: 'file', sendStatus: 'sending', ext: {},
+    timestamp: 1700000000000, body: { url: '', filename: `${key}.pdf`, fileSize: 3 }
+  }
+  const sent = {
+    ...localMessage, msgServerId: `server-${key}`, sendStatus: 'sent', timestamp: 1700000000001,
+    body: { url: `https://example.com/chatfiles/${key}`, filename: `${key}.pdf`, fileSize: 3 }
+  }
+  const chatManager = {
+    createFileMessage: () => localMessage,
+    sendMessage: async () => sent
+  }
+  const domain = new api.EmMessageDomain({ client: { chatManager }, waitOnline: null })
+  await domain.sendFile('peer', 'singleChat', {
+    path, name: `${key}.pdf`, size: 3, mimeType: 'application/pdf',
+    temporary: true, release: (releasedPath) => releaseCalls.push(releasedPath)
+  })
+  return { domain, localId: key, path, releaseCalls }
+}
+
+function addSharedReference(path) {
+  const source = api.getMessages('peer')[0]
+  const forwarded = {
+    ...source,
+    id: `forwarded-server-${source.localId}`,
+    localId: `forwarded-${source.localId}`,
+    conversationId: 'forwarded',
+    url: path
+  }
+  api.messageStore.messagesByConversationId['forwarded'] = [forwarded]
+  return forwarded
+}
 
 test('本地文件直接 openDocument，不触发 downloadFile', async () => {
   assert.equal(typeof api.downloadApi.openLocalFileAttachment, 'function')
