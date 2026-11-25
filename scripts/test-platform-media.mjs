@@ -39,7 +39,7 @@ function compileForPlatform(source, enabled) {
   return output.join('\n')
 }
 
-test('视频选择保持返回与取消契约', async (t) => {
+test('Android 使用系统视频选择器且其他 App 端保持原模式与返回契约', async (t) => {
   const temp = mkdtempSync(join(tmpdir(), 'em-platform-media-test-'))
   t.after(() => rmSync(temp, { recursive: true, force: true }))
   const entry = join(temp, 'entry.ts')
@@ -47,14 +47,20 @@ test('视频选择保持返回与取消契约', async (t) => {
   const source = readFileSync(platformPath, 'utf8')
   const libsDir = resolve(root, 'uni_modules/easemob-uikit-uni/libs')
 
-  for (const platform of ['android', 'ios']) {
-    const enabled = new Set(['APP', 'UNI-APP-X', platform === 'android' ? 'APP-ANDROID' : 'APP-IOS'])
+  const targets = [
+    ['android', 'APP-ANDROID'],
+    ['ios', 'APP-IOS'],
+    ['harmony', 'APP-HARMONY']
+  ]
+  targets.forEach(([platform, flag]) => {
+    const enabled = new Set(['APP', 'UNI-APP-X', flag])
     writeFileSync(join(temp, `platform-${platform}.ts`), compileForPlatform(source, enabled)
       .replaceAll("from './", `from '${libsDir}/`))
-  }
+  })
   writeFileSync(entry, `
     export { chooseVideo as chooseVideoAndroid } from './platform-android.ts'
     export { chooseVideo as chooseVideoIos } from './platform-ios.ts'
+    export { chooseVideo as chooseVideoHarmony } from './platform-harmony.ts'
   `)
   const vuePath = resolve(hbx, 'plugins/uniapp-cli-vite/node_modules/vue')
   execFileSync(esbuildBin, [entry, '--bundle', '--platform=node', '--format=esm', `--alias:vue=${vuePath}`, `--outfile=${output}`], { stdio: 'pipe' })
@@ -92,11 +98,13 @@ test('视频选择保持返回与取消契约', async (t) => {
   const api = await import(pathToFileURL(output).href)
   const android = await api.chooseVideoAndroid()
   const ios = await api.chooseVideoIos()
+  const harmony = await api.chooseVideoHarmony()
 
   assert.equal(mediaCalls.length, 0)
-  assert.equal(videoCalls.length, 2)
-  assert.equal('albumMode' in videoCalls[0], false)
+  assert.equal(videoCalls.length, 3)
+  assert.equal(videoCalls[0].albumMode, 'system')
   assert.equal('albumMode' in videoCalls[1], false)
+  assert.equal('albumMode' in videoCalls[2], false)
   assert.deepEqual(android, {
     path: 'content://media/external/video/media/42',
     name: '42',
@@ -106,9 +114,68 @@ test('视频选择保持返回与取消契约', async (t) => {
     size: 2048
   })
   assert.deepEqual(ios, android)
+  assert.deepEqual(harmony, android)
 
   globalThis.uni.chooseVideo = (options) => options.fail({ errCode: 1101001, errMsg: 'chooseVideo:fail cancel' })
   assert.equal(await api.chooseVideoAndroid(), null)
+})
+
+test('Android 相册选图使用系统选择器且拍摄与其他 App 端模式不变', async (t) => {
+  const temp = mkdtempSync(join(tmpdir(), 'em-platform-image-test-'))
+  t.after(() => rmSync(temp, { recursive: true, force: true }))
+  const entry = join(temp, 'entry.ts')
+  const output = join(temp, 'bundle.mjs')
+  const source = readFileSync(platformPath, 'utf8')
+  const libsDir = resolve(root, 'uni_modules/easemob-uikit-uni/libs')
+  const targets = [
+    ['android', 'APP-ANDROID'],
+    ['ios', 'APP-IOS'],
+    ['harmony', 'APP-HARMONY']
+  ]
+  targets.forEach(([platform, flag]) => {
+    const enabled = new Set(['APP', 'UNI-APP-X', flag])
+    writeFileSync(join(temp, `platform-${platform}.ts`), compileForPlatform(source, enabled)
+      .replaceAll("from './", `from '${libsDir}/`))
+  })
+  writeFileSync(entry, `
+    export { chooseImage as chooseImageAndroid } from './platform-android.ts'
+    export { chooseImage as chooseImageIos } from './platform-ios.ts'
+    export { chooseImage as chooseImageHarmony } from './platform-harmony.ts'
+  `)
+  const vuePath = resolve(hbx, 'plugins/uniapp-cli-vite/node_modules/vue')
+  execFileSync(esbuildBin, [entry, '--bundle', '--platform=node', '--format=esm', `--alias:vue=${vuePath}`, `--outfile=${output}`], { stdio: 'pipe' })
+
+  const imageCalls = []
+  globalThis.uni = {
+    chooseImage: (options) => {
+      imageCalls.push(options)
+      options.success({
+        tempFilePaths: ['content://media/external/images/media/7'],
+        tempFiles: [{ path: 'content://media/external/images/media/7', size: 1024 }]
+      })
+    }
+  }
+  t.after(() => delete globalThis.uni)
+  const api = await import(pathToFileURL(output).href)
+  const android = await api.chooseImageAndroid()
+  await api.chooseImageAndroid(1, 'camera')
+  const ios = await api.chooseImageIos()
+  const harmony = await api.chooseImageHarmony()
+
+  assert.equal(imageCalls.length, 4)
+  assert.equal(imageCalls[0].albumMode, 'system')
+  assert.equal(imageCalls[1].albumMode, 'custom')
+  assert.deepEqual(imageCalls[1].sourceType, ['camera'])
+  assert.equal('albumMode' in imageCalls[2], false)
+  assert.equal('albumMode' in imageCalls[3], false)
+  assert.deepEqual(android, [{
+    path: 'content://media/external/images/media/7',
+    name: '7',
+    size: 1024,
+    webFile: null
+  }])
+  assert.deepEqual(ios, android)
+  assert.deepEqual(harmony, android)
 })
 
 test('相册权限错误按 errCode 和跨端错误文本识别', async (t) => {

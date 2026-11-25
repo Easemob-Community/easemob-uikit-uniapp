@@ -43,6 +43,7 @@ description: Use when writing or reviewing ANY code in easemob-uikit-uni（新�
 - **单行折叠档（line1）必须带 `white-space: nowrap`**：mp-weixin 的 wxss 不认 uvue 独占的 `lines` 属性，缺 nowrap 时 text 自由换行被父容器固定行高拦腰裁切，视觉像两行重叠。
 - 宿主标签必须补 `min-width: 0` 等约束，否则 flex 约束链断裂横向溢出。
 - **`<text>` 内禁止用 `v-if`/`v-else`/`v-for` 增删子 text**：鸿蒙蒸汽端移除子 text 后父 text 字形整块丢失（气泡空白但高度保留，流式光标终态即踩中）。条件展示改「常驻子 text + 内容切换」，或把分支移到 text 外用 view 承载（见坑集 §5d）。
+- **局部例外：`em-action-sheet` 动作项不用 `em-text`**。鸿蒙在动作行的 auto/flex 文本上启用 `text-overflow: ellipsis` 会误吃短文案末字，动作项统一用原生 `<text>` 渲染 `action.text + ' '`，并保留 `min-width: 0`、`flex-shrink: 1`、`overflow: hidden`、`white-space: nowrap`、图标不收缩及整行左右 16px 内边距；不要重新加 `lines` 或改回 `em-text`。标题等其他文本仍按上方规则收口（见坑集 §5w）。
 
 ## 枚举与字面量
 

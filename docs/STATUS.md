@@ -1723,3 +1723,26 @@
 - **H5 真实链路**：使用本机既有配置登录成功，会话列表与单聊页正常；唯一标识文本 `UIKit_1.0.4_H5_TEXT_20261125_1108` 与所选图片均显示为正常 outgoing 气泡，无失败标记。验证标签页已关闭。
 - **微信小程序边界**：开发者工具导入过程中检测到真实光标介入，本轮停止 GUI 操作，未执行小程序登录、文本或图片收发，不记为已验证。最终 Demo 的市场升级未执行。
 - **临时资源**：市场下载与升级验收均使用独立 `/tmp` 工程；验收记录收口后清理，不影响用户既有工程。
+
+
+## 2026-11-25 鸿蒙动作菜单短文案误省略定案
+
+- **根因**：UIKit 1.0.4 与正式 Demo 的 ActionSheet 文件及鸿蒙产物一致，并非漏合并。此前 `62f9641` 用原生 text 修复短项，随后 `bfeb22d` 为长自定义项恢复 `em-text + lines=1`，导致回归；`em-text` 的 lines 默认即为 1，显式补写没有修复效果。同机单变量矩阵进一步确认，短项在 auto/flex 文本上启用 `text-overflow: ellipsis` 即被吃掉末字，lines、flex、min-width、独立宿主均不是根因。
+- **修复**：所有操作项统一在 `em-action-sheet` 使用原生 `<text>` 渲染 `action.text + ' '`，尾随空格仅规避鸿蒙省略测量问题，不改变 action 数据与事件。保留 nowrap、overflow、ellipsis、min-width/flex 收缩、图标不收缩和整行左右 16px 内边距；不加 lines，不改公共 em-text，不做页面级补丁。防回归测试先失败后通过，覆盖上述约束。
+- **真机验证**：鸿蒙真实会话菜单、动态「取消免打扰」及消息菜单（复制/引用/编辑/置顶/删除）完整；临时长中文、长英文、中英混排、danger、disabled 探针均单行省略且图标完整，探针已恢复。Android ALI-AN00 同组长短探针通过。正式 Demo 与 UIKit 的组件文件逐字一致，并已通过 HBuilderX CLI 编译安装到鸿蒙设备；正式包当前停在手机号登录页，未将其记为正式账号流程已验收。
+- **门禁与其他端**：全量 Node 测试 116/116 通过；Web 与 mp-weixin 构建通过，小程序主包 1069KB、分包合计 1491KB，分包检查全绿。H5 移动视口长短菜单及最终「发起单聊/创建群组」实际显示通过。iOS 真机与微信小程序真机未在本轮验证。
+
+## 2026-11-25 Android 视频选择改用系统相册
+
+- **根因修正**：用户确认荣耀、vivo、OPPO 等 Android 均有「先授权并选择图片后，视频无法选择」，iOS/鸿蒙正常，不能归为荣耀 ROM 特例。当前 `chooseVideo` 未传 `albumMode`，默认进入 DCloud 自定义相册；HBuilderX 5.34 Android 原生代码证明选图只申请 `READ_MEDIA_IMAGES`、选视频只申请 `READ_MEDIA_VIDEO`，合并授权界面并不代表视频权限已授予。原生 `system` 分支直接打开 `PickVisualMedia`，不经过上述权限请求，推翻旧记录中「system 仍进入自定义 PickerActivity」的判断。
+- **修复**：`platform.ts` 仅在 `APP-ANDROID` 下给 `uni.chooseVideo` 增加 `albumMode: 'system'`，移除视频选择对 `READ_MEDIA_VIDEO` 的依赖。图片、拍摄、其他平台、返回字段、取消与失败契约均不变；未新增 UTS 插件、运行时依赖或 manifest 修改。
+- **测试**：`test-platform-media.mjs` 新增 Android system 与 iOS/鸿蒙无该参数的条件编译断言，修复前按预期以 `actual=undefined / expected='system'` 失败，修复后专项 4/4 通过；全量 Node 116 项中 114 通过、2 项外部宿主集成按设计跳过。
+- **门禁**：Node 22.23.4 下 Web 与 mp-weixin 构建通过，小程序主包 1069KB、分包合计 1491KB，全部分包检查通过；最终 H5 产物静态伺服 HTTP 200。公开文档 58 页检查、App 模块图与 `git diff --check` 通过。公开设备页纠正为 Android 多厂商及独立权限根因；当前发布版本的绕过说明保留，未虚构新版本或发布记录。
+- **真机边界**：系统 adb、HBuilderX 自带 adb 与 mDNS 均未枚举到设备，无法重新安装并执行修复后的真实选择/发送流程；本次不记 Android 真机验收通过。需要设备在 `adb devices` 可见后，补验视频权限未授予时仍能打开系统选择器、选择并发送，以及选图与取消回归。
+
+## 2026-11-25 Android 相册选图同步系统选择器与多机验收
+
+- **新增现象与定因**：连接荣耀 ALI-AN00 / Android 15 后，用户反馈拍摄授权通过但图库仍空白，视频已可选择。真机日志显示 17:31 依次启动相机授权、`IMAGE_CAPTURE`、自定义图库 `PickerActivity` 和系统视频 `SystemPickerActivity`；视频 Intent 为 `PICK_IMAGES typ=video/*`。同时 `CAMERA=true`、`READ_MEDIA_IMAGES=false`、`READ_MEDIA_VIDEO=true`，证明拍摄授权不会补图片读取权限，图库空白与此前视频空白是同一独立权限问题的两个方向。17:37 再次点图库，实际截到自定义「选择图片」空列表。
+- **最终修复**：Android 相册来源的 `chooseImage` 同样改为 `albumMode='system'`，拍摄来源显式保持 `'custom'`；此前视频的 system 修复保留。至此 Android 图库与视频均不再依赖自定义相册和媒体读取权限，拍摄、其他平台和返回契约不变。
+- **测试与门禁**：新增选图条件编译测试先以 `actual=undefined / expected='system'` RED，修复后专项 5/5；全量 Node 117 项中 115 通过、2 项外部宿主集成按设计跳过。Node 22.23.4 下 Web/mp 构建通过，小程序主包 1069KB、分包合计 1491KB，分包检查全绿。Android `app-service.js` 已包含图片/视频 system 参数。
+- **真机验收**：首次自动热更新后图库仍进旧 `PickerActivity`，产物时间显示 `app-service.js` 为 17:38、`bytes/` 仍为 17:31，未把旧字节码结果误判为新修复失败。用户随后在 HBuilderX 手动完整重新运行，并在**两台荣耀手机与一台 vivo** 验证图库和视频选择通过；这是用户报告的真机验收结果，不写成终端自动化点击已覆盖三台设备。

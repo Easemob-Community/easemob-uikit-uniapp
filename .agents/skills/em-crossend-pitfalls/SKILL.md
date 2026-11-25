@@ -144,6 +144,12 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **验证**：`scripts/test-attachment.mjs` 覆盖禁止进度 showLoading；修复后真机只有一次 `uni:showLoading`，PID 不变，远端 PDF 下载并在系统预览器打开（RD-18）。
 - **同类审计**：录音计时是页面内 `setInterval` 更新文本，录音 toast 仅在过短/失败结果出现一次；真机持续录音 8 秒并发送，无 `uni:showToast` / `uni:showLoading`。全库定时器与录音手势由 `scripts/test-native-popup-lifecycle.mjs` 防回归；其他高频状态也不要反复创建原生 toast/modal。
 
+### 5w. ActionSheet 短操作项末字被省略号替换（鸿蒙实测，2026-11-25）
+- **症状**：会话/消息操作项在空间足够时仍显示「置…」「复制…」「删除会…」；长自定义文案又需要保持单行省略。`em-text` 与原生 `<text>` 都能复现，不是 1.0.4 合并遗漏。
+- **根因**：同机对照矩阵证明，纯文本、`white-space: nowrap`、`overflow: hidden` 均正常，加入 `text-overflow: ellipsis` 后短文案末字即被替换；`lines`、flex 收缩、`min-width`、独立 view 宿主及 width:100% 都不是根因。鸿蒙在该动作行文本测量链上会错误预留省略号空间。
+- **定案解法**：动作项使用原生 `<text>` 渲染 `action.text + ' '`，尾随空格只修正测量，不改变 action 数据与事件载荷；保留 `min-width: 0`、`flex-shrink: 1`、`overflow: hidden`、`text-overflow: ellipsis`、`white-space: nowrap`，图标 `flex-shrink: 0`，整行左右 16px 内边距，不加 `lines`，不改公共 `em-text`。所有会话、消息、联系人和群成员动作共用 `em-action-sheet`，不做页面级补丁。
+- **验证**：鸿蒙真实会话菜单、动态「取消免打扰」与消息菜单完整；长中文、长英文、中英混排、danger、disabled 均单行省略且图标完整。Android ALI-AN00 同组长短探针通过，H5 移动视口长短菜单通过。`scripts/test-action-sheet.mjs` 覆盖原生文本、尾随空格、单行收缩、禁用 lines、图标与行间距；全量 Node 116/116、Web/mp 构建通过。
+
 ### 5i. App 端 class 方式覆盖 `--em-*` 变量结果随构建漂移（顺序无契约，两次真机构建相反，2026-10-22）
 - **症状**：子树根节点挂 `themeClass` + 自定义 class（`.my-brand { --em-primary-color: #FF6B00; }`）覆盖变量：同一写法第一版构建 App 真机是蓝的（被主题类顶掉），探针版构建 P1 对照组又是橙的——**没改任何相关代码，结果随样式合并顺序漂移**。H5/小程序稳定生效。
 - **根因**：库内每个组件 css 都 `@import` variables.css，蒸汽端样式合并后 `.em-theme-*` 的多份拷贝与宿主自定义 class 是**同特异性单类选择器**，同名自定义属性胜负拼声明顺序；宿主页面 css 与各组件拷贝的合并顺序不受宿主控制，随构建批次漂移。
@@ -219,12 +225,11 @@ description: Use when a bug appears on 蒸汽真机/Android/iOS/鸿蒙/mp-weixin
 - **纪律**：不要把 `recorder.start()` 返回当作真实开始，不要用延时或放宽过短阈值掩盖授权时序；启动等待期的停止/取消必须在 `onStart` 补偿收尾，开始后的错误必须排空旧原生录音，停止 Promise 不得被覆盖或静默丢弃。
 - **验证**：`scripts/test-record-lifecycle.mjs` 用延迟 `onStart` 的 mock RecorderManager 覆盖授权期停止/取消、清理期防重、开始后错误排水、重复停止、取消/错误结算、同步回调及正常/自动停止/错误重试，13/13 通过；真机结果记 `docs/STATUS.md`。
 
-### 5u. 设置页显示「允许全部照片和视频」，视频选择仍空白（荣耀 Android 15 实测，2026-11-24）
-- **症状**：图片选择正常，视频列表空白或 `chooseVideo` 返回 `errCode=1101005 / No Permission`；系统设置页却显示「允许使用全部照片和视频」。
-- **根因**：ROM 把图片/视频权限合并展示，但包管理器实际状态为 `READ_MEDIA_IMAGES=true`、`READ_MEDIA_VIDEO=false`。用 `adb shell dumpsys package <package>` 直接核对两个 runtime permission，不要只看设置页。权限请求日志里 PermissionController 已启动并返回拒绝，不是 UIKit 没发起授权，也不是发送/播放器链路。
-- **定案解法**：设置页先把权限改为禁止，再重新允许全部，强制停止并重启应用；正式包按此恢复视频列表。图片/视频选择失败统一经 `isAlbumAuthDenied` 识别 errCode 1101005（含字符串）与 auth/deny/permission/authorize 文本，权限错误弹独立恢复指引，普通失败才显示通用 toast。相机来源必须转 `showCameraPermissionGuide('denied')`，不能套用相册文案；App 走 `uni.openAppAuthorizeSetting`、微信小程序走 `uni.openSetting`，H5 不展示无实际动作的「去设置」按钮。
-- **已证伪路线**：同权限下 `albumMode=custom/system` 均进入 DCloud `PickerActivity`；无权限时 `uni.chooseMedia` 也返回同一 1101005。不要把这些 API 替换当成 ROM 权限修复。
-- **验证**：`scripts/test-platform-media.mjs` 覆盖原选择/取消契约、权限识别和聊天页错误分流；真机结果记 `docs/STATUS.md`。
+### 5u. Android 图库/视频选择空白或 1101005（多厂商通用，2026-11-25 修正归因）
+- **症状**：先选图片并允许「照片和视频」后图片正常，点击视频却列表空白或返回 `errCode=1101005 / No Permission`；拍摄只授权相机后点击图库也可能空白。荣耀、vivo、OPPO 等 Android 均可出现，iOS/鸿蒙不复现。
+- **根因**：`chooseImage` / `chooseVideo` 未指定 `albumMode` 时默认走 DCloud 自定义相册。HBuilderX 5.34 Android 原生 `chooseMediaImage` 只申请 `READ_MEDIA_IMAGES`，`chooseMediaVideo` 只申请 `READ_MEDIA_VIDEO`，拍摄则申请 `CAMERA`；系统的合并授权文案不代表另一项媒体权限已授予。真机日志中拍摄后的 `CAMERA=true`、`READ_MEDIA_IMAGES=false` 与图库自定义 `PickerActivity` 空白完全对应。这不是荣耀 ROM 特例，也不是发送或播放器问题。
+- **定案解法**：在 `APP-ANDROID` 分支给相册来源的 `uni.chooseImage` 传 `albumMode: 'system'`，拍摄来源显式保持 `'custom'`；`uni.chooseVideo` 同样传 `'system'`。原生 system 分支直接打开系统 `PickVisualMedia`，不申请媒体读取权限，从根上移除两项媒体读取依赖；iOS、鸿蒙、H5/小程序以及返回值/取消契约不变，不需要新增 UTS 插件或要求用户先禁止再允许。既有 `isAlbumAuthDenied` 和权限恢复指引继续覆盖其他自定义选择器或保存相册失败；相机来源仍走 `showCameraPermissionGuide('denied')`，App/微信小程序设置入口与 H5 无设置动作的分流保持不变。
+- **验证**：`scripts/test-platform-media.mjs` 对图片和视频均先因 Android 缺少 `albumMode='system'` RED，修复后 GREEN；同时断言拍摄为 custom、iOS/鸿蒙不携带该参数，并覆盖成功结果、`content://`、取消和权限错误分流。用户完整重新运行 Android 后，在两台荣耀和一台 vivo 手动验证图库与视频选择通过；详细记录见 `docs/STATUS.md`。
 
 ## 小程序（mp-weixin）
 
