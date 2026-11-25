@@ -2,8 +2,8 @@
     "name" : "easemob-uikit-uni demo",
     "appid" : "__UNI__08EF252",
     "description" : "环信 UIKit uni-app 版演示工程",
-    "versionName" : "1.0.3",
-    "versionCode" : 10002,
+    "versionName" : "1.0.4",
+    "versionCode" : 10003,
     "uni-app-x" : {
         "vapor" : true,
         "vapor-render-target" : "bytecode",

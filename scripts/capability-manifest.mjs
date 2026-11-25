@@ -59,7 +59,7 @@ export const FEATURES = [
   {
     id: 'group',
     label: '群组',
-    components: ['em-group-page'],
+    components: ['em-group-page', 'em-create-group-modal'],
     apis: [
       'getJoinedGroups', 'enterGroup', 'getGroupInfo', 'getGroupMemberList', 'getGroupAnnouncement',
       'createGroup', 'inviteUsersToGroup', 'acceptGroupInvite', 'declineGroupInvite', 'leaveGroup',

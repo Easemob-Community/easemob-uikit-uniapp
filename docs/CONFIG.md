@@ -72,7 +72,7 @@ UIKit 在初始化 SDK 时默认注入固定设备标识和登录设备扩展名
 | 字段 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `enableDeviceInfo` | `boolean` | `true` | 自动设备信息注入总开关；`false` 时自动 `deviceId` / `devicePlatform` / `loginExtensionInfo` 均不生效 |
-| `deviceId` | `string` | 自动派生 | 显式指定设备标识（透传 SDK `deviceId`），**原样使用、不加任何段**。不传时按以下优先级自动派生：① 当前格式的持久化设备标识；② `uni.getDeviceInfo()` 框架设备标识；③ 自生成 UUID。后两者一经得出即拼上平台/版本段并写入本地存储，跨启动保持稳定。**格式**固定为三段式 `Platform_uikitVersion_uuid`（例 `android_1.0.3_b3fdc46-...`；Platform 取归一平台名 `android` / `ios` / `harmonyos` / `web` / `mp-weixin`）。为避免设备型号合规风险，不加入品牌、型号或系统版本；旧六段式持久化值不会复用，会自动按三段式重新派生。注意：**UIKit 升级后版本段变化，服务端会视为新设备** |
+| `deviceId` | `string` | 自动派生 | 显式指定设备标识（透传 SDK `deviceId`），**原样使用、不加任何段**。不传时按以下优先级自动派生：① 当前格式的持久化设备标识；② `uni.getDeviceInfo()` 框架设备标识；③ 自生成 UUID。后两者一经得出即拼上平台/版本段并写入本地存储，跨启动保持稳定。**格式**固定为三段式 `Platform_uikitVersion_uuid`（例 `android_1.0.4_b3fdc46-...`；Platform 取归一平台名 `android` / `ios` / `harmonyos` / `web` / `mp-weixin`）。为避免设备型号合规风险，不加入品牌、型号或系统版本；旧六段式持久化值不会复用，会自动按三段式重新派生。注意：**UIKit 升级后版本段变化，服务端会视为新设备** |
 | `devicePlatform` | `number` | 不注入 | 显式指定自定义平台编号（透传 SDK `customOSPlatform`）。SDK 要求 1–100 的整数，且是向环信申请注册过的编号；不传时不注入，平台维度由 `deviceId` 前缀承担 |
 
 `sdkInitOptions.loginExtensionInfo` 未显式传入时，UIKit 生成仅含归一平台名的 JSON 字符串，例如 `{ "deviceName": "android" }`；平台缺失时回退系统名，完全不可用时为 `unknown`。设备 API 不可用时不会阻断初始化。UIKit 只请求 `uni.getDeviceInfo({ filter: ['deviceId', 'platform', 'osName'] })` 的必要字段，不读取或上报品牌、型号和系统版本。该字段也可以覆盖为包含业务自定义字段的 JSON 字符串，WebSDK 限制最大 1024 个字符。
