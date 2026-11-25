@@ -57,7 +57,7 @@ test('自动设备注入不采集或上报品牌、型号和系统版本', async
   const result = resolveDeviceInfo({ appkey: 'org#app' })
 
   assert.deepEqual(requestedFilter, ['deviceId', 'platform', 'osName'])
-  assert.equal(result.deviceId, 'android_1.0.4_stable-id')
+  assert.equal(result.deviceId, 'android_1.0.5_stable-id')
   assert.equal(result.loginExtensionInfo, '{"deviceName":"android"}')
   assert.equal(JSON.stringify(result).includes('Xiaomi'), false)
   assert.equal(JSON.stringify(result).includes('23127PN0CC'), false)

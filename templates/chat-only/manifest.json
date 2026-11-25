@@ -2,8 +2,8 @@
   "name": "环信单聊天模板",
   "appid": "__UNI__C0A70001",
   "description": "easemob-uikit-uni 单聊天页模板",
-  "versionName": "1.0.4",
-  "versionCode": "103",
+  "versionName": "1.0.5",
+  "versionCode": "104",
   "uni-app-x": {
     "vapor": true,
     "vapor-render-target": "bytecode",
