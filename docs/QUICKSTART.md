@@ -1,7 +1,7 @@
 # Quick Start：从空工程到收发消息
 
 > [!INFO]
-> 适用版本：**1.0.6**。目标读者是已有一个 uni-app x（Vue3、蒸汽模式）工程的宿主开发者。
+> 适用版本：**1.0.7**。目标读者是已有一个 uni-app x（Vue3、蒸汽模式）工程的宿主开发者。
 
 > [!WARNING]
 > **支持范围**：本插件仅支持 **uni-app x 蒸汽模式（Vapor）**；经典 uni-app（Vue2/Vue3）与 vdom 模式不在支持范围。DCloud 官方已于 2024 年停止 nvue 与 5+ 维护，并将于 2027 年初停止 uni-app App 平台与 uni-app x vdom 平台维护（见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；蒸汽模式已兼容 js/ts 写法，老工程可直接升级。差异见 [平台能力与差异](./PLATFORM.md)。
@@ -39,12 +39,12 @@
 
 ```bash
 cd your-uniapp-x-project
-npm install easemob-websdk@5.2.0
+npm install easemob-websdk@5.2.1
 ```
 
 把 `easemob-uikit-uni/` 放进宿主工程的 `uni_modules/` 目录（插件市场导入或直接拷贝仓库中的 `uni_modules/easemob-uikit-uni`）。
 
-> `easemob-websdk` 是 peer 依赖，版本精确锁定 `5.2.0`；升级前先看 UIKit 的 changelog 与对应版本发布说明。
+> `easemob-websdk` 是 peer 依赖，版本精确锁定 `5.2.1`；升级前先看 UIKit 的 changelog 与对应版本发布说明。
 
 ### HBuilderX 5.34：SDK 编译异常
 

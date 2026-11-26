@@ -93,7 +93,7 @@ test('app.json 缺失时只报告上游编译问题', () => {
   const host = fixture()
   const out = fixture()
   try {
-    writeJson(host.dir, 'package.json', { dependencies: { 'easemob-websdk': '5.2.0' } })
+    writeJson(host.dir, 'package.json', { dependencies: { 'easemob-websdk': '5.2.1' } })
     const result = spawnSync(process.execPath, [checkPath, out.dir, host.dir], { encoding: 'utf8' })
     const output = `${result.stdout}${result.stderr}`
     assert.equal(result.status, 1)
@@ -177,7 +177,7 @@ test('watch 在自身输出后保持静止', async (t) => {
   t.after(host.cleanup)
   const sdkDir = join(host.dir, 'node_modules/easemob-websdk/bundle')
   mkdirSync(sdkDir, { recursive: true })
-  writeJson(join(host.dir, 'node_modules/easemob-websdk'), 'package.json', { version: '5.2.0' })
+  writeJson(join(host.dir, 'node_modules/easemob-websdk'), 'package.json', { version: '5.2.1' })
   const exports = ['ChatClient', 'ChatManager', 'ContactManager', 'GroupManager', 'UserInfoManager', 'PushManager', 'setConsoleLogEnabled', 'setLogLevel']
   writeFileSync(join(sdkDir, 'im-sdk-web.iife.js'), `var IMSDK={${exports.map((name) => `${name}:{}`).join(',')}};`)
   const out = join(host.dir, 'out')

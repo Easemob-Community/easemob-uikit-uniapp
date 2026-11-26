@@ -4,7 +4,7 @@
 
 > **仅支持 uni-app x 蒸汽模式（Vapor）**：DCloud 官方已于 2024 年停止 nvue 与 5+ 维护，并将于 2027 年初停止 uni-app App 平台与 uni-app x vdom 平台维护（依据见 [DCloud 官方文档 · FAQ「老 uni-app 还维护吗？」](https://doc.dcloud.net.cn/uni-app-x/)）；uni-app x 蒸汽模式已兼容 js/ts 写法，老 uni-app 工程可直接升级。本插件不提供经典 uni-app（Vue2/Vue3、nvue、vdom 模式）兼容，五端均基于 uni-app x 蒸汽编译目标。详见 [docs/PLATFORM.md](./docs/PLATFORM.md)。
 
-> 当前版本：**1.0.6**。首个正式版本包含单聊、群聊、联系人、多场景扩展与 AI 流式消息；能力边界与已知限制见下文。接入步骤见 [docs/QUICKSTART.md](./docs/QUICKSTART.md)，版本变更见 [更新日志](./uni_modules/easemob-uikit-uni/changelog.md)。
+> 当前版本：**1.0.7**。首个正式版本包含单聊、群聊、联系人、多场景扩展与 AI 流式消息；能力边界与已知限制见下文。接入步骤见 [docs/QUICKSTART.md](./docs/QUICKSTART.md)，版本变更见 [更新日志](./uni_modules/easemob-uikit-uni/changelog.md)。
 
 ## 兼容性
 
@@ -13,7 +13,7 @@
 | HBuilderX | **5.21+**（推荐 5.26+；蒸汽模式硬性要求） |
 | uni-app x | HBuilderX 4.71+ |
 | Node.js | 18+（CLI 编译用） |
-| 环信 SDK | `easemob-websdk` **5.2.0**（peer 依赖） |
+| 环信 SDK | `easemob-websdk` **5.2.1**（peer 依赖） |
 | App | Android 6+ / iOS 15+ / 鸿蒙 API20+ |
 | H5 | 现代浏览器（移动端布局；未做 PC 宽屏） |
 | 小程序 | 微信小程序（SDK 需分包接入） |
@@ -49,7 +49,7 @@ scripts/                         # 编译/发布脚本
 
 完整步骤（空工程 → 登录 → 会话列表 → 聊天页 → 五端运行 → 排错）见 **[docs/QUICKSTART.md](./docs/QUICKSTART.md)**。最短路径：
 
-1. `npm install easemob-websdk@5.2.0`，把 `uni_modules/easemob-uikit-uni/` 放入宿主工程；
+1. `npm install easemob-websdk@5.2.1`，把 `uni_modules/easemob-uikit-uni/` 放入宿主工程；
 2. `pages.json` 补页面组件 easycom 规则，聊天页/详情页设 `navigationStyle: "custom"`；
 3. `App.uvue` 的 `onLaunch` 调 `initTheme()` + `EmKit.init({ appkey, onTokenWillExpire })`；
 4. 宿主服务端签发 token，登录页调 `await EmKit.login({ userId, token })` 后 `reLaunch` 到会话页；

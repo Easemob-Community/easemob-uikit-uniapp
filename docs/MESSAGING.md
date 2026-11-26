@@ -232,7 +232,7 @@ AI 流式输出通过 SDK 的 `onStreamMessage` 驱动：
 
 ## 10. 复合消息（接收展示）
 
-SDK 5.2.0 的 `multi_body` 消息经 `toMessageItem` 归一为 `MESSAGE_TYPE.MULTI_BODY`，父消息的 `segments` 按发送顺序保存展示子项。聊天页使用 `em-multi-body-message` 在一个气泡内展示文本、图片、语音、视频、文件、位置和自定义分段。
+SDK 5.2 的 `multi_body` 消息经 `toMessageItem` 归一为 `MESSAGE_TYPE.MULTI_BODY`，父消息的 `segments` 按发送顺序保存展示子项。聊天页使用 `em-multi-body-message` 在一个气泡内展示文本、图片、语音、视频、文件、位置和自定义分段。
 
 - 父消息保留方向、状态、发送人、会话与 ext；每个子项有独立的 `localId`（父 `localId` 加分段下标），文本复制按原顺序拼接所有文本分段并以换行分隔。
 - 会话列表、长按菜单标题、引用与置顶预览共用首段摘要：文本取内容、文件优先取文件名、其他类型取对应标签，非空摘要追加 `...`；空内容回落 `[复合消息]`。

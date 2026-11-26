@@ -29,7 +29,7 @@ demo/
 ├── theme.json              # pages.json 的明暗变量来源
 ├── index.html              # H5 入口（含首帧主题 CSS）
 ├── App.uvue / main.uts     # 应用入口
-└── package.json            # 仅一个依赖：easemob-websdk 5.2.0
+└── package.json            # 仅一个依赖：easemob-websdk 5.2.1
 ```
 
 | 目录 | 作用 | 是否属于 UIKit |

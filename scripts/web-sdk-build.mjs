@@ -9,7 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export function withRebundledWebSdk(hostDir, esbuildBin, build) {
   const sdkEntry = resolve(hostDir, 'node_modules/easemob-websdk/index.js')
   if (!existsSync(sdkEntry)) {
-    throw new Error(`找不到 websdk 入口：${sdkEntry}\n  先执行 npm install easemob-websdk@5.2.0 --save-exact`)
+    throw new Error(`找不到 websdk 入口：${sdkEntry}\n  先执行 npm install easemob-websdk@5.2.1 --save-exact`)
   }
   if (!existsSync(esbuildBin)) {
     throw new Error(`找不到 esbuild：${esbuildBin}\n  请设置 HBUILDERX_PATH 或 ESBUILD_BIN`)

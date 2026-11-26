@@ -26,7 +26,7 @@ features:
 ---
 
 > [!WARNING]
-> 当前版本：`1.0.6`。
+> 当前版本：`1.0.7`。
 
 ## 支持范围
 
@@ -64,11 +64,11 @@ features:
 | HBuilderX | 5.21+（推荐 5.26+；蒸汽模式） |
 | uni-app x | HBuilderX 4.71+，Vue 3 组合式 API |
 | Node.js | 18+（CLI 构建） |
-| 环信 SDK | `easemob-websdk` 5.2.0（peer 依赖） |
+| 环信 SDK | `easemob-websdk` 5.2.1（peer 依赖） |
 | App | Android 6+ / iOS 15+ / 鸿蒙 API20+ |
 | H5 | 现代浏览器（移动端布局） |
 | 小程序 | 微信小程序（SDK 需分包接入） |
 
-> 当前版本：`1.0.6`。完整变更见 [更新日志](/uniapp/guide/changelog)。
+> 当前版本：`1.0.7`。完整变更见 [更新日志](/uniapp/guide/changelog)。
 >
 > 端能力以 [平台能力与差异](/uniapp/guide/platform) 的能力矩阵为准；已知差异、状态与处理方式见 [设备与端差异](/uniapp/guide/platform-devices)。

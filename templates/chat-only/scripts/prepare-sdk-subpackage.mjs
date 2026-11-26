@@ -93,7 +93,7 @@ function assertOutputReady() {
 function runOnce() {
   assertOutputReady()
   if (!existsSync(iifePath)) {
-    throw new Error(`找不到 SDK IIFE：${iifePath}\n  先执行 npm install easemob-websdk@5.2.0 --save-exact`)
+    throw new Error(`找不到 SDK IIFE：${iifePath}\n  先执行 npm install easemob-websdk@5.2.1 --save-exact`)
   }
   if (!existsSync(esbuildBin)) {
     throw new Error(

@@ -37,7 +37,7 @@ export default defineConfig({
 
 先按四步判断，再决定报给谁：
 
-1. **版本**：HBuilderX ≥ 5.21、UIKit 是否为当前版本（见[更新日志](/uniapp/guide/changelog)）、`easemob-websdk` 5.2.0、小程序基础库 ≥ 2.11.2 是否一致；App 端是否重新打过自定义基座。
+1. **版本**：HBuilderX ≥ 5.21、UIKit 是否为当前版本（见[更新日志](/uniapp/guide/changelog)）、`easemob-websdk` 5.2.1、小程序基础库 ≥ 2.11.2 是否一致；App 端是否重新打过自定义基座。
 2. **范围**：同一产物换一台同系统版本的设备是否正常；只在一台设备出现时，记录厂商、型号与系统版本。
 3. **复现**：新建空白 uni-app x 蒸汽工程，只调用对应的 `uni.*` API（如 `uni.chooseVideo`、`uni.onKeyboardHeightChange`）。能复现属于上游或平台，提交 uni-app x 官方 issue；不能复现再在示例工程复现。
 4. **登记**：确认归因后记录到[设备与端差异](./PLATFORM-DEVICES.md)，其中「反馈需要的信息」可直接作为 issue 模板。
@@ -167,7 +167,7 @@ EmKit.init({
 
 UIKit 默认在 `EmKit.init()` 时向 SDK 注入固定 deviceId（`enableDeviceInfo` 总开关，默认开启，关闭则停止自动注入、SDK 用默认行为）。自动派生的格式与优先级：
 
-- **格式**：固定为三段式 `Platform_uikitVersion_uuid`（例 `android_1.0.6_<uuid>`）。为避免设备型号合规风险，不包含品牌、型号或系统版本；旧六段式持久化值会自动按三段式重新派生。
+- **格式**：固定为三段式 `Platform_uikitVersion_uuid`（例 `android_1.0.7_<uuid>`）。为避免设备型号合规风险，不包含品牌、型号或系统版本；旧六段式持久化值会自动按三段式重新派生。
 - **优先级**：当前格式的持久化值（本地存储 key `emkit.device.id`）→ `uni.getDeviceInfo()` 框架设备标识 → 自生成 UUID。一经得出即持久化，跨启动保持稳定。设备 API 只请求 `deviceId/platform/osName` 必要字段。
 - **显式覆盖**：宿主传入 `config.deviceId` 时原样使用、不加任何段；`devicePlatform` 是向环信申请注册的 1–100 编号，传入后 SDK 会把 resource 改写为 `custom<N>_` 形态。
 

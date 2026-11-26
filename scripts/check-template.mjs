@@ -25,7 +25,7 @@ if (!existsSync(link) || !lstatSync(link).isSymbolicLink()) {
 }
 if (existsSync(resolve(host, 'package.json'))) {
   const pkg = JSON.parse(readFileSync(resolve(host, 'package.json'), 'utf8'))
-  if (pkg.dependencies?.['easemob-websdk'] !== '5.2.0') failures.push('模板必须精确锁 easemob-websdk@5.2.0')
+  if (pkg.dependencies?.['easemob-websdk'] !== '5.2.1') failures.push('模板必须精确锁 easemob-websdk@5.2.1')
 }
 if (existsSync(resolve(host, 'pages/chat/chat.uvue'))) failures.push('聊天页必须位于 sub-im 分包')
 if (existsSync(resolve(host, 'sub-im/pages/chat/chat.uvue'))) {

@@ -2,7 +2,7 @@
 
 这页帮助你在 uni-app x 宿主中完成两类微信小程序分包：`sub-im` 承载页面，`sub-sdk` 承载环信 websdk。新工程可以直接使用已配置模板；既有工程复用同一套脚本完成构建后处理和检查。
 
-> 微信基础库需 ≥ 2.11.2。当前示例锁定 `easemob-websdk@5.2.0`，HBuilderX 内置 CLI 与 esbuild 即可完成后处理，无需新增运行时依赖。
+> 微信基础库需 ≥ 2.11.2。当前示例锁定 `easemob-websdk@5.2.1`，HBuilderX 内置 CLI 与 esbuild 即可完成后处理，无需新增运行时依赖。
 
 ## 新工程：复制双分包模板
 
@@ -96,7 +96,7 @@ npm run check:mp
     "watch:mp": "node scripts/mp-weixin.mjs watch"
   },
   "dependencies": {
-    "easemob-websdk": "5.2.0"
+    "easemob-websdk": "5.2.1"
   }
 }
 ```
@@ -126,7 +126,7 @@ npm run check:mp
 | dev 重编译后 SDK 消失 | 使用 `dev:mp`，或在 HBX GUI 编译期间保持 `watch:mp`。 |
 | 点击聊天入口没反应或报页面不存在 | 页面已移入 `sub-im` 时，跳转路径必须改为 `/sub-im/pages/chat/chat`。 |
 | 分包面板没有 `/sub-sdk/` | 检查 `subPackages` 层级、root 名称和 pages 数组；每个分包至少一个页面。 |
-| `ChatClient is undefined` | SDK IIFE 全局名或导出结构发生变化；恢复 5.2.0，或按实际版本更新 prepare 的全局名和导出校验。 |
+| `ChatClient is undefined` | SDK IIFE 全局名或导出结构发生变化；恢复 5.2.1，或按实际版本更新 prepare 的全局名和导出校验。 |
 | 真机 `SyntaxError: Unexpected token .` | SDK 未降级到 ES2017；重新运行 prepare，不要用原始 IIFE 直接覆盖产物。 |
 | `require is not a function` | 基础库低于 2.11.2，请升级微信基础库。 |
 | 总包比分包前更大 | SDK 降级后体积会增长，评估时看主包是否下降，而不是看主包与分包总和。 |
