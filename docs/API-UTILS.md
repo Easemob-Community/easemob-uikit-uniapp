@@ -28,6 +28,7 @@
 - `setStorage()`、`getStorage()`：跨端本地存储。
 - `copyText(text)`：复制文本，返回 `Promise<void>`。
 - `downloadAttachment(message, options?)`：下载附件，返回 `Promise<EmMessageDownloadResult>`。
+- `downloadKindOf(message)`、`downloadUrlOf(message)`、`attachmentFileNameOf(message, kind)`：分别解析消息的附件类型、原始下载地址与下载文件名，供宿主自绘附件卡或自定义下载流程复用。
 - `downloadRequestUrlOf(message, kind)`：返回带环信重定向参数与附件 secret 的实际下载请求地址，供宿主转发或自定义下载流程复用。
 - `getSafeAreaTop()`、`getSafeAreaBottom()`、`nextZIndex()`：安全区与浮层层级。
 
